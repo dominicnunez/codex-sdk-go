@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 )
 
 // ThreadService provides methods for thread lifecycle management
@@ -397,7 +398,7 @@ func (s *SandboxPolicyWrapper) UnmarshalJSON(data []byte) error {
 		}
 		s.Value = policy
 	default:
-		s.Value = SandboxPolicyDangerFullAccess{Type: "dangerFullAccess"}
+		return fmt.Errorf("unknown sandbox policy type: %s", raw.Type)
 	}
 
 	return nil
