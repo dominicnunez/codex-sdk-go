@@ -30,6 +30,7 @@ type Client struct {
 	Account *AccountService
 	Config  *ConfigService
 	Model   *ModelService
+	Skills  *SkillsService
 }
 
 // ClientOption configures a Client.
@@ -61,6 +62,7 @@ func NewClient(transport Transport, opts ...ClientOption) *Client {
 	c.Account = newAccountService(c)
 	c.Config = newConfigService(c)
 	c.Model = newModelService(c)
+	c.Skills = newSkillsService(c)
 
 	// Register the transport's notification handler to route to our listeners
 	transport.OnNotify(c.handleNotification)
