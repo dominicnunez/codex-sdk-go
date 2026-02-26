@@ -131,6 +131,20 @@ func (m *MockTransport) SetResponse(method string, resp codex.Response) {
 	m.responses[method] = resp
 }
 
+// SetResponseData is a convenience helper that marshals data to JSON and sets it as the response result.
+func (m *MockTransport) SetResponseData(method string, data interface{}) error {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("failed to marshal response data: %w", err)
+	}
+
+	m.SetResponse(method, codex.Response{
+		JSONRPC: "2.0",
+		Result:  jsonData,
+	})
+	return nil
+}
+
 // SetSendError configures the mock to return an error on Send calls.
 func (m *MockTransport) SetSendError(err error) {
 	m.mu.Lock()
