@@ -160,6 +160,6 @@ Server sends requests TO the client for approval (patch, command exec, file chan
 - [x] Run `golangci-lint run ./...` — fix any lint issues (add `.golangci.yml` if needed)
 - [x] Run `govulncheck ./...` — verify no known vulnerabilities in dependencies or stdlib usage
 - [x] Verify every JSON schema in `specs/` has a corresponding Go type — no spec coverage gaps
-- [ ] Verify all 38 request methods (1 v1 + 37 v2) have service methods on Client
+- [x] Verify all 38 request methods (1 v1 + 37 v2) have service methods on Client
 - [ ] Verify all 40 notification types have listener registration methods on Client
 - [ ] Verify all 9 server→client request types have handler fields in ApprovalHandlers (including ChatgptAuthTokensRefresh)
