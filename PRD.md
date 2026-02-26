@@ -48,7 +48,7 @@ Server sends requests TO the client for approval (patch, command exec, file chan
 
 ### Phase 1: Foundation
 
-- [ ] Create `go.mod` with module path `github.com/dominicnunez/codex-sdk-go`, Go 1.25, zero external dependencies
+- [x] Create `go.mod` with module path `github.com/dominicnunez/codex-sdk-go`, Go 1.25, zero external dependencies
 - [ ] Create `jsonrpc_test.go` with tests for: Request/Response/Notification JSON marshal/unmarshal round-trips, RequestID string vs int64 handling, Error type serialization, JSON-RPC error code constants. Tests reference types from `jsonrpc.go` that don't exist yet — they define the contract.
 - [ ] Create `jsonrpc.go` with core JSON-RPC 2.0 types: `Request` (id + method + params), `Response` (id + result + error), `Notification` (method + params), `Error` (code + message + data), and `RequestID` (string | int64 union type). All types must implement JSON marshal/unmarshal. Include JSON-RPC error codes as constants (-32700 parse error, -32600 invalid request, -32601 method not found, -32602 invalid params, -32603 internal error). All tests in `jsonrpc_test.go` must pass.
 - [ ] Create `errors_test.go` with tests for: `RPCError` wrapping a JSON-RPC error response, `TransportError` wrapping IO failures, `TimeoutError`. Test `errors.Is` and `errors.As` behavior for each.
