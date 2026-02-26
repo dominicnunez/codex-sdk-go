@@ -153,7 +153,7 @@ Server sends requests TO the client for approval (patch, command exec, file chan
 ### Phase 15: Final Verification & Cleanup
 
 - [x] Run `go mod tidy` — verify no unexpected dependencies, confirm zero external deps outside stdlib
-- [ ] Run `go vet ./...` — fix any issues
+- [x] Run `go vet ./...` — fix any issues
 - [ ] Run `go build ./...` — verify clean compilation with no errors or warnings
 - [ ] Run `go test ./...` — all tests pass
 - [ ] Run `go test -race ./...` — no data races detected (critical for the concurrent transport/dispatch code)

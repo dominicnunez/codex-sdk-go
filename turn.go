@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 )
 
 // TurnService handles turn-related operations
@@ -275,6 +276,6 @@ func UnmarshalUserInput(data []byte) (UserInput, error) {
 		}
 		return &input, nil
 	default:
-		return nil, json.Unmarshal([]byte(`"unknown type"`), nil) // Return error
+		return nil, fmt.Errorf("unknown UserInput type: %s", typeField.Type)
 	}
 }
