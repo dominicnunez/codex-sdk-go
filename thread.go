@@ -139,8 +139,17 @@ func (ThreadStatusActive) isThreadStatus() {}
 
 // Turn represents a single turn in a conversation
 type Turn struct {
-	// Simplified for now - will be expanded based on spec
-	ID string `json:"id,omitempty"`
+	ID     string     `json:"id"`
+	Status string     `json:"status"` // "completed" | "interrupted" | "failed" | "inProgress"
+	Items  []string   `json:"items"`  // Simplified for now - actual type is []ThreadItem
+	Error  *TurnError `json:"error,omitempty"`
+}
+
+// TurnError represents an error in a turn
+type TurnError struct {
+	Message           string      `json:"message"`
+	CodexErrorInfo    interface{} `json:"codexErrorInfo,omitempty"`    // Simplified for now
+	AdditionalDetails *string     `json:"additionalDetails,omitempty"`
 }
 
 // SessionSourceWrapper wraps SessionSource for JSON marshaling

@@ -75,9 +75,9 @@ Server sends requests TO the client for approval (patch, command exec, file chan
 
 ### Phase 4: Turn Types & Service
 
-- [ ] Create `turn_test.go` with tests for all TurnService methods using MockTransport: verify correct JSON-RPC method names, param serialization, response deserialization for Start/Interrupt/Steer. Include notification dispatch tests for TurnStarted/TurnCompleted/TurnPlanUpdated/TurnDiffUpdated.
-- [ ] Create `turn.go` with param/response types from specs: `TurnStartParams`, `TurnStartResponse`, `TurnInterruptParams`, `TurnInterruptResponse`, `TurnSteerParams`, `TurnSteerResponse`. Create `TurnService` struct with methods: `Start(ctx, TurnStartParams) (TurnStartResponse, error)`, `Interrupt(ctx, TurnInterruptParams) (TurnInterruptResponse, error)`, `Steer(ctx, TurnSteerParams) (TurnSteerResponse, error)`. Wire into Client as `Client.Turn`. All tests in `turn_test.go` must pass.
-- [ ] Create `turn_notifications.go` with notification types: `TurnStartedNotification`, `TurnCompletedNotification`, `TurnPlanUpdatedNotification`, `TurnDiffUpdatedNotification`. Add listener registration methods on Client for each. All notification dispatch tests must pass.
+- [x] Create `turn_test.go` with tests for all TurnService methods using MockTransport: verify correct JSON-RPC method names, param serialization, response deserialization for Start/Interrupt/Steer. Include notification dispatch tests for TurnStarted/TurnCompleted/TurnPlanUpdated/TurnDiffUpdated.
+- [x] Create `turn.go` with param/response types from specs: `TurnStartParams`, `TurnStartResponse`, `TurnInterruptParams`, `TurnInterruptResponse`, `TurnSteerParams`, `TurnSteerResponse`. Create `TurnService` struct with methods: `Start(ctx, TurnStartParams) (TurnStartResponse, error)`, `Interrupt(ctx, TurnInterruptParams) (TurnInterruptResponse, error)`, `Steer(ctx, TurnSteerParams) (TurnSteerResponse, error)`. Wire into Client as `Client.Turn`. All tests in `turn_test.go` must pass.
+- [x] Create `turn_notifications.go` with notification types: `TurnStartedNotification`, `TurnCompletedNotification`, `TurnPlanUpdatedNotification`, `TurnDiffUpdatedNotification`. Add listener registration methods on Client for each. All notification dispatch tests must pass.
 
 ### Phase 5: Account & Auth Service
 

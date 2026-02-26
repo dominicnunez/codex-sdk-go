@@ -26,6 +26,7 @@ type Client struct {
 
 	// Service accessors
 	Thread *ThreadService
+	Turn   *TurnService
 }
 
 // ClientOption configures a Client.
@@ -53,6 +54,7 @@ func NewClient(transport Transport, opts ...ClientOption) *Client {
 
 	// Initialize services
 	c.Thread = newThreadService(c)
+	c.Turn = newTurnService(c)
 
 	// Register the transport's notification handler to route to our listeners
 	transport.OnNotify(c.handleNotification)
