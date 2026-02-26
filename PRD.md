@@ -87,8 +87,8 @@ Server sends requests TO the client for approval (patch, command exec, file chan
 
 ### Phase 6: Config Service
 
-- [ ] Create `config_test.go` with tests for all ConfigService methods using MockTransport: Read/ReadRequirements/Write/BatchWrite round-trips, plus ConfigWarningNotification dispatch test.
-- [ ] Create `config.go` with types from specs: `ConfigReadParams`, `ConfigReadResponse`, `ConfigRequirementsReadResponse`, `ConfigValueWriteParams`, `ConfigBatchWriteParams`, `ConfigWriteResponse`. Create `ConfigService` with methods: `Read(ctx, ConfigReadParams) (ConfigReadResponse, error)`, `ReadRequirements(ctx) (ConfigRequirementsReadResponse, error)`, `Write(ctx, ConfigValueWriteParams) (ConfigWriteResponse, error)`, `BatchWrite(ctx, ConfigBatchWriteParams) (ConfigWriteResponse, error)`. Wire as `Client.Config`. Add `ConfigWarningNotification` type and listener. All tests in `config_test.go` must pass.
+- [x] Create `config_test.go` with tests for all ConfigService methods using MockTransport: Read/ReadRequirements/Write/BatchWrite round-trips, plus ConfigWarningNotification dispatch test.
+- [x] Create `config.go` with types from specs: `ConfigReadParams`, `ConfigReadResponse`, `ConfigRequirementsReadResponse`, `ConfigValueWriteParams`, `ConfigBatchWriteParams`, `ConfigWriteResponse`. Create `ConfigService` with methods: `Read(ctx, ConfigReadParams) (ConfigReadResponse, error)`, `ReadRequirements(ctx) (ConfigRequirementsReadResponse, error)`, `Write(ctx, ConfigValueWriteParams) (ConfigWriteResponse, error)`, `BatchWrite(ctx, ConfigBatchWriteParams) (ConfigWriteResponse, error)`. Wire as `Client.Config`. Add `ConfigWarningNotification` type and listener. All tests in `config_test.go` must pass.
 
 ### Phase 7: Model & Skills Services
 

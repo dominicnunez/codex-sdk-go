@@ -28,6 +28,7 @@ type Client struct {
 	Thread  *ThreadService
 	Turn    *TurnService
 	Account *AccountService
+	Config  *ConfigService
 }
 
 // ClientOption configures a Client.
@@ -57,6 +58,7 @@ func NewClient(transport Transport, opts ...ClientOption) *Client {
 	c.Thread = newThreadService(c)
 	c.Turn = newTurnService(c)
 	c.Account = newAccountService(c)
+	c.Config = newConfigService(c)
 
 	// Register the transport's notification handler to route to our listeners
 	transport.OnNotify(c.handleNotification)
