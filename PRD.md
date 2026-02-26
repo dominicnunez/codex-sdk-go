@@ -119,13 +119,15 @@ Server sends requests TO the client for approval (patch, command exec, file chan
 
 ### Phase 10: Approval Handlers (Server → Client Requests)
 
-- [ ] Create `approval_test.go` with tests for: each approval type's params/response JSON round-trip matching spec schemas, approval handler dispatch via MockTransport, missing handler returns JSON-RPC method-not-found error, each approval type end-to-end (server sends request → handler called → response sent back).
-- [ ] Create `approval.go` with request/response types for all server-to-client approval flows: `ApplyPatchApprovalParams`/`Response`, `CommandExecutionRequestApprovalParams`/`Response`, `ExecCommandApprovalParams`/`Response`, `FileChangeRequestApprovalParams`/`Response`, `SkillRequestApprovalParams`/`Response`, `DynamicToolCallParams`/`Response`, `ToolRequestUserInputParams`/`Response`, `FuzzyFileSearchParams`/`Response`. Types parsed from corresponding spec files. Create `ApprovalHandlers` struct with optional function fields for each approval type. Add `Client.SetApprovalHandlers(ApprovalHandlers)` method. When the server sends a request, dispatch to the matching handler; if no handler is set, return a JSON-RPC method-not-found error. All tests in `approval_test.go` must pass.
+- [ ] Create `approval_test.go` with tests for: each approval type's params/response JSON round-trip matching spec schemas, approval handler dispatch via MockTransport, missing handler returns JSON-RPC method-not-found error, each approval type end-to-end (server sends request → handler called → response sent back). Include ChatgptAuthTokensRefresh as a server→client request.
+- [ ] Create `approval.go` with request/response types for all server-to-client approval flows: `ApplyPatchApprovalParams`/`Response`, `CommandExecutionRequestApprovalParams`/`Response`, `ExecCommandApprovalParams`/`Response`, `FileChangeRequestApprovalParams`/`Response`, `SkillRequestApprovalParams`/`Response`, `DynamicToolCallParams`/`Response`, `ToolRequestUserInputParams`/`Response`, `FuzzyFileSearchParams`/`Response`, `ChatgptAuthTokensRefreshParams`/`Response`. Types parsed from corresponding spec files. Create `ApprovalHandlers` struct with optional function fields for each approval type (including `OnChatgptAuthTokensRefresh`). Add `Client.SetApprovalHandlers(ApprovalHandlers)` method. When the server sends a request, dispatch to the matching handler; if no handler is set, return a JSON-RPC method-not-found error. All tests in `approval_test.go` must pass.
 - [ ] Create `fuzzy_search_test.go` with tests for FuzzyFileSearch params/response round-trip and notification dispatch for SessionCompleted/SessionUpdated.
 - [ ] Create `fuzzy_search.go` with `FuzzyFileSearchParams`, `FuzzyFileSearchResponse`, `FuzzyFileSearchSessionCompletedNotification`, `FuzzyFileSearchSessionUpdatedNotification`. Wire search approval into ApprovalHandlers and add notification listeners. All tests must pass.
 
-### Phase 11: Streaming Notifications
+### Phase 11: Shared Event Types & Streaming Notifications
 
+- [ ] Create `event_types_test.go` with tests for shared event types from `specs/EventMsg.json`: JSON deserialization of `EventMsg` and its nested definitions (AgentMessageContent variants, AbsolutePathBuf, etc.). These are the base types that streaming notifications embed.
+- [ ] Create `event_types.go` with shared types parsed from `specs/EventMsg.json`. These are referenced by multiple streaming notification types and must be defined before the notifications that embed them.
 - [ ] Create `streaming_test.go` with tests for each streaming notification type: JSON deserialization matching spec schemas, listener registration and dispatch via MockTransport for all 9 types (AgentMessageDelta, ItemStarted, ItemCompleted, RawResponseItemCompleted, FileChangeOutputDelta, PlanDelta, ReasoningTextDelta, ReasoningSummaryTextDelta, ReasoningSummaryPartAdded).
 - [ ] Create `streaming.go` with all streaming notification types: `AgentMessageDeltaNotification`, `ItemStartedNotification`, `ItemCompletedNotification`, `RawResponseItemCompletedNotification`, `FileChangeOutputDeltaNotification`, `PlanDeltaNotification`, `ReasoningTextDeltaNotification`, `ReasoningSummaryTextDeltaNotification`, `ReasoningSummaryPartAddedNotification`. Add listener registration methods on Client for each. All tests in `streaming_test.go` must pass.
 
@@ -133,8 +135,8 @@ Server sends requests TO the client for approval (patch, command exec, file chan
 
 - [ ] Create `realtime_test.go` with tests for each realtime notification type: JSON deserialization and listener dispatch for Started/Closed/Error/ItemAdded/OutputAudioDelta.
 - [ ] Create `realtime.go` with notification types: `ThreadRealtimeStartedNotification`, `ThreadRealtimeClosedNotification`, `ThreadRealtimeErrorNotification`, `ThreadRealtimeItemAddedNotification`, `ThreadRealtimeOutputAudioDeltaNotification`. Add listener registration methods on Client. All tests must pass.
-- [ ] Create `system_test.go` with tests for each system notification type: JSON deserialization and listener dispatch for WindowsSandboxSetupCompleted/WindowsWorldWritableWarning/ContextCompacted/DeprecationNotice/Error/TerminalInteraction.
-- [ ] Create `system.go` with notification types: `WindowsSandboxSetupCompletedNotification`, `WindowsWorldWritableWarningNotification`, `ContextCompactedNotification`, `DeprecationNoticeNotification`, `ErrorNotification`, `TerminalInteractionNotification`. Add listener registration methods on Client. All tests must pass.
+- [ ] Create `system_test.go` with tests for each system notification type: JSON deserialization and listener dispatch for WindowsSandboxSetupCompleted/WindowsWorldWritableWarning/ContextCompacted/DeprecationNotice/Error/TerminalInteraction. Include tests for WindowsSandboxSetupStart request round-trip.
+- [ ] Create `system.go` with notification types: `WindowsSandboxSetupCompletedNotification`, `WindowsWorldWritableWarningNotification`, `ContextCompactedNotification`, `DeprecationNoticeNotification`, `ErrorNotification`, `TerminalInteractionNotification`. Create `SystemService` with `WindowsSandboxSetupStart(ctx, WindowsSandboxSetupStartParams) (WindowsSandboxSetupStartResponse, error)` (client→server request from specs). Wire as `Client.System`. Add listener registration methods on Client. All tests must pass.
 
 ### Phase 13: Helpers & Polish
 
@@ -158,6 +160,6 @@ Server sends requests TO the client for approval (patch, command exec, file chan
 - [ ] Run `golangci-lint run ./...` — fix any lint issues (add `.golangci.yml` if needed)
 - [ ] Run `govulncheck ./...` — verify no known vulnerabilities in dependencies or stdlib usage
 - [ ] Verify every JSON schema in `specs/` has a corresponding Go type — no spec coverage gaps
-- [ ] Verify all 37 request methods (1 v1 + 36 v2) have service methods on Client
+- [ ] Verify all 38 request methods (1 v1 + 37 v2) have service methods on Client
 - [ ] Verify all 40 notification types have listener registration methods on Client
-- [ ] Verify all 8 approval types have handler fields in ApprovalHandlers
+- [ ] Verify all 9 server→client request types have handler fields in ApprovalHandlers (including ChatgptAuthTokensRefresh)
