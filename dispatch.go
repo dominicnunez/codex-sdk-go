@@ -45,7 +45,7 @@ package codex
 // # Error Handling
 //
 // - Notification unmarshal errors: silently ignored (bad data doesn't crash the client)
-// - Request unmarshal errors: return JSON-RPC invalid params error (-32602)
+// - Request unmarshal errors: return JSON-RPC internal error (-32603)
 // - Handler errors: propagated in the response error field
 // - Unknown methods: ignored for notifications, method-not-found for requests
 
