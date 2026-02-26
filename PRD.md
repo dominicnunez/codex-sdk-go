@@ -156,6 +156,7 @@ Server sends requests TO the client for approval (patch, command exec, file chan
 - [ ] Run `go test ./...` — all tests pass
 - [ ] Run `go test -race ./...` — no data races detected (critical for the concurrent transport/dispatch code)
 - [ ] Run `golangci-lint run ./...` — fix any lint issues (add `.golangci.yml` if needed)
+- [ ] Run `govulncheck ./...` — verify no known vulnerabilities in dependencies or stdlib usage
 - [ ] Verify every JSON schema in `specs/` has a corresponding Go type — no spec coverage gaps
 - [ ] Verify all 37 request methods (1 v1 + 36 v2) have service methods on Client
 - [ ] Verify all 40 notification types have listener registration methods on Client
