@@ -126,8 +126,8 @@ Server sends requests TO the client for approval (patch, command exec, file chan
 
 ### Phase 11: Shared Event Types & Streaming Notifications
 
-- [ ] Create `event_types_test.go` with tests for shared event types from `specs/EventMsg.json`: JSON deserialization of `EventMsg` and its nested definitions (AgentMessageContent variants, AbsolutePathBuf, etc.). These are the base types that streaming notifications embed.
-- [ ] Create `event_types.go` with shared types parsed from `specs/EventMsg.json`. These are referenced by multiple streaming notification types and must be defined before the notifications that embed them.
+- [x] Create `event_types_test.go` with tests for shared event types from `specs/EventMsg.json`: JSON deserialization of `EventMsg` and its nested definitions (AgentMessageContent variants, AbsolutePathBuf, etc.). These are the base types that streaming notifications embed.
+- [x] Create `event_types.go` with shared types parsed from `specs/EventMsg.json`. These are referenced by multiple streaming notification types and must be defined before the notifications that embed them.
 - [ ] Create `streaming_test.go` with tests for each streaming notification type: JSON deserialization matching spec schemas, listener registration and dispatch via MockTransport for all 9 types (AgentMessageDelta, ItemStarted, ItemCompleted, RawResponseItemCompleted, FileChangeOutputDelta, PlanDelta, ReasoningTextDelta, ReasoningSummaryTextDelta, ReasoningSummaryPartAdded).
 - [ ] Create `streaming.go` with all streaming notification types: `AgentMessageDeltaNotification`, `ItemStartedNotification`, `ItemCompletedNotification`, `RawResponseItemCompletedNotification`, `FileChangeOutputDeltaNotification`, `PlanDeltaNotification`, `ReasoningTextDeltaNotification`, `ReasoningSummaryTextDeltaNotification`, `ReasoningSummaryPartAddedNotification`. Add listener registration methods on Client for each. All tests in `streaming_test.go` must pass.
 
