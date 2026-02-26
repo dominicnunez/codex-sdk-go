@@ -12,7 +12,7 @@ import codex "github.com/dominicnunez/codex-sdk-go"
 
 ## Requirements
 
-Go 1.25+
+Go 1.22+
 
 ## Quick Start
 
@@ -42,7 +42,7 @@ threadResp, _ := client.Thread.Start(ctx, codex.ThreadStartParams{
 
 client.Turn.Start(ctx, codex.TurnStartParams{
 	ThreadID: threadResp.Thread.ID,
-	UserInput: []codex.UserInput{
+	Input: []codex.UserInput{
 		&codex.TextUserInput{Text: "What is the capital of France?"},
 	},
 })
@@ -55,7 +55,7 @@ Codex is bidirectional — the server sends requests back to the client for appr
 ```go
 client.SetApprovalHandlers(codex.ApprovalHandlers{
 	OnFileChangeRequestApproval: func(ctx context.Context, params codex.FileChangeRequestApprovalParams) (codex.FileChangeRequestApprovalResponse, error) {
-		return codex.FileChangeRequestApprovalResponse{Decision: "approved"}, nil
+		return codex.FileChangeRequestApprovalResponse{Decision: "accept"}, nil
 	},
 	OnCommandExecutionRequestApproval: func(ctx context.Context, params codex.CommandExecutionRequestApprovalParams) (codex.CommandExecutionRequestApprovalResponse, error) {
 		return codex.CommandExecutionRequestApprovalResponse{
