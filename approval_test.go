@@ -205,6 +205,7 @@ func TestApprovalHandlerDispatch(t *testing.T) {
 	// Track handler calls
 	var applyPatchCalled bool
 	var commandExecCalled bool
+	var execCommandCalled bool
 	var fileChangeCalled bool
 	var skillCalled bool
 	var toolCallCalled bool
@@ -223,6 +224,12 @@ func TestApprovalHandlerDispatch(t *testing.T) {
 			commandExecCalled = true
 			return codex.CommandExecutionRequestApprovalResponse{
 				Decision: codex.CommandExecutionApprovalDecisionWrapper{Value: "accept"},
+			}, nil
+		},
+		OnExecCommandApproval: func(ctx context.Context, params codex.ExecCommandApprovalParams) (codex.ExecCommandApprovalResponse, error) {
+			execCommandCalled = true
+			return codex.ExecCommandApprovalResponse{
+				Decision: codex.ReviewDecisionWrapper{Value: "approved"},
 			}, nil
 		},
 		OnFileChangeRequestApproval: func(ctx context.Context, params codex.FileChangeRequestApprovalParams) (codex.FileChangeRequestApprovalResponse, error) {
@@ -278,7 +285,7 @@ func TestApprovalHandlerDispatch(t *testing.T) {
 	ctx := context.Background()
 
 	// 1. ApplyPatchApproval
-	mock.InjectServerRequest(ctx, codex.Request{
+	_, _ = mock.InjectServerRequest(ctx, codex.Request{
 		JSONRPC: "2.0",
 		ID:      codex.RequestID{Value: 1},
 		Method:  "applyPatchApproval",
@@ -286,57 +293,65 @@ func TestApprovalHandlerDispatch(t *testing.T) {
 	})
 
 	// 2. CommandExecutionRequestApproval
-	mock.InjectServerRequest(ctx, codex.Request{
+	_, _ = mock.InjectServerRequest(ctx, codex.Request{
 		JSONRPC: "2.0",
 		ID:      codex.RequestID{Value: 2},
 		Method:  "item/commandExecution/requestApproval",
 		Params:  json.RawMessage(`{"itemId":"i1","threadId":"t1","turnId":"tu1"}`),
 	})
 
-	// 3. FileChangeRequestApproval
-	mock.InjectServerRequest(ctx, codex.Request{
+	// 3. ExecCommandApproval (legacy)
+	_, _ = mock.InjectServerRequest(ctx, codex.Request{
 		JSONRPC: "2.0",
 		ID:      codex.RequestID{Value: 3},
+		Method:  "execCommandApproval",
+		Params:  json.RawMessage(`{"callId":"c1","conversationId":"t1","command":["ls"],"cwd":"/","parsedCmd":[]}`),
+	})
+
+	// 4. FileChangeRequestApproval
+	_, _ = mock.InjectServerRequest(ctx, codex.Request{
+		JSONRPC: "2.0",
+		ID:      codex.RequestID{Value: 4},
 		Method:  "item/fileChange/requestApproval",
 		Params:  json.RawMessage(`{"itemId":"i1","threadId":"t1","turnId":"tu1"}`),
 	})
 
-	// 4. SkillRequestApproval
-	mock.InjectServerRequest(ctx, codex.Request{
+	// 5. SkillRequestApproval
+	_, _ = mock.InjectServerRequest(ctx, codex.Request{
 		JSONRPC: "2.0",
-		ID:      codex.RequestID{Value: 4},
+		ID:      codex.RequestID{Value: 5},
 		Method:  "skill/requestApproval",
 		Params:  json.RawMessage(`{"itemId":"i1","skillName":"test-skill"}`),
 	})
 
-	// 5. DynamicToolCall
-	mock.InjectServerRequest(ctx, codex.Request{
+	// 6. DynamicToolCall
+	_, _ = mock.InjectServerRequest(ctx, codex.Request{
 		JSONRPC: "2.0",
-		ID:      codex.RequestID{Value: 5},
+		ID:      codex.RequestID{Value: 6},
 		Method:  "item/tool/call",
 		Params:  json.RawMessage(`{"tool":"test","arguments":{},"callId":"c1","threadId":"t1","turnId":"tu1"}`),
 	})
 
-	// 6. ToolRequestUserInput
-	mock.InjectServerRequest(ctx, codex.Request{
+	// 7. ToolRequestUserInput
+	_, _ = mock.InjectServerRequest(ctx, codex.Request{
 		JSONRPC: "2.0",
-		ID:      codex.RequestID{Value: 6},
+		ID:      codex.RequestID{Value: 7},
 		Method:  "item/tool/requestUserInput",
 		Params:  json.RawMessage(`{"itemId":"i1","threadId":"t1","turnId":"tu1","questions":[{"id":"q1","header":"H","question":"Q"}]}`),
 	})
 
-	// 7. FuzzyFileSearch
-	mock.InjectServerRequest(ctx, codex.Request{
+	// 8. FuzzyFileSearch
+	_, _ = mock.InjectServerRequest(ctx, codex.Request{
 		JSONRPC: "2.0",
-		ID:      codex.RequestID{Value: 7},
+		ID:      codex.RequestID{Value: 8},
 		Method:  "fuzzyFileSearch",
 		Params:  json.RawMessage(`{"query":"test","roots":["/"]}`),
 	})
 
-	// 8. ChatgptAuthTokensRefresh
-	mock.InjectServerRequest(ctx, codex.Request{
+	// 9. ChatgptAuthTokensRefresh
+	_, _ = mock.InjectServerRequest(ctx, codex.Request{
 		JSONRPC: "2.0",
-		ID:      codex.RequestID{Value: 8},
+		ID:      codex.RequestID{Value: 9},
 		Method:  "account/chatgptAuthTokens/refresh",
 		Params:  json.RawMessage(`{"reason":"unauthorized"}`),
 	})
@@ -347,6 +362,9 @@ func TestApprovalHandlerDispatch(t *testing.T) {
 	}
 	if !commandExecCalled {
 		t.Error("CommandExecutionRequestApproval handler not called")
+	}
+	if !execCommandCalled {
+		t.Error("ExecCommandApproval handler not called")
 	}
 	if !fileChangeCalled {
 		t.Error("FileChangeRequestApproval handler not called")
@@ -378,7 +396,7 @@ func TestMissingApprovalHandler(t *testing.T) {
 	ctx := context.Background()
 
 	// Inject a server→client request
-	mock.InjectServerRequest(ctx, codex.Request{
+	_, _ = mock.InjectServerRequest(ctx, codex.Request{
 		JSONRPC: "2.0",
 		ID:      codex.RequestID{Value: 1},
 		Method:  "applyPatchApproval",
@@ -426,7 +444,7 @@ func TestApprovalEndToEnd(t *testing.T) {
 	ctx := context.Background()
 
 	// Server sends approval request
-	mock.InjectServerRequest(ctx, codex.Request{
+	_, _ = mock.InjectServerRequest(ctx, codex.Request{
 		JSONRPC: "2.0",
 		ID:      codex.RequestID{Value: 99},
 		Method:  "item/commandExecution/requestApproval",
@@ -457,4 +475,39 @@ func TestApprovalEndToEnd(t *testing.T) {
 	if result.Decision.Value != "accept" {
 		t.Errorf("Expected decision=accept, got %v", result.Decision.Value)
 	}
+}
+
+// TestApprovalHandlersCompleteness verifies all 9 server→client request handler fields exist
+func TestApprovalHandlersCompleteness(t *testing.T) {
+	// This test ensures ApprovalHandlers struct has all 9 handler fields
+	// as specified in the PRD architecture overview
+	handlers := codex.ApprovalHandlers{
+		OnApplyPatchApproval:              func(context.Context, codex.ApplyPatchApprovalParams) (codex.ApplyPatchApprovalResponse, error) { return codex.ApplyPatchApprovalResponse{}, nil },
+		OnCommandExecutionRequestApproval: func(context.Context, codex.CommandExecutionRequestApprovalParams) (codex.CommandExecutionRequestApprovalResponse, error) { return codex.CommandExecutionRequestApprovalResponse{}, nil },
+		OnExecCommandApproval:             func(context.Context, codex.ExecCommandApprovalParams) (codex.ExecCommandApprovalResponse, error) { return codex.ExecCommandApprovalResponse{}, nil },
+		OnFileChangeRequestApproval:       func(context.Context, codex.FileChangeRequestApprovalParams) (codex.FileChangeRequestApprovalResponse, error) { return codex.FileChangeRequestApprovalResponse{}, nil },
+		OnSkillRequestApproval:            func(context.Context, codex.SkillRequestApprovalParams) (codex.SkillRequestApprovalResponse, error) { return codex.SkillRequestApprovalResponse{}, nil },
+		OnDynamicToolCall:                 func(context.Context, codex.DynamicToolCallParams) (codex.DynamicToolCallResponse, error) { return codex.DynamicToolCallResponse{}, nil },
+		OnToolRequestUserInput:            func(context.Context, codex.ToolRequestUserInputParams) (codex.ToolRequestUserInputResponse, error) { return codex.ToolRequestUserInputResponse{}, nil },
+		OnFuzzyFileSearch:                 func(context.Context, codex.FuzzyFileSearchParams) (codex.FuzzyFileSearchResponse, error) { return codex.FuzzyFileSearchResponse{}, nil },
+		OnChatgptAuthTokensRefresh:        func(context.Context, codex.ChatgptAuthTokensRefreshParams) (codex.ChatgptAuthTokensRefreshResponse, error) { return codex.ChatgptAuthTokensRefreshResponse{}, nil },
+	}
+
+	// Verify we can set handlers on client
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+	client.SetApprovalHandlers(handlers)
+
+	// Count: 9 server→client request types
+	// 1. ApplyPatchApproval
+	// 2. CommandExecutionRequestApproval
+	// 3. ExecCommandApproval
+	// 4. FileChangeRequestApproval
+	// 5. SkillRequestApproval
+	// 6. DynamicToolCall
+	// 7. ToolRequestUserInput
+	// 8. FuzzyFileSearch
+	// 9. ChatgptAuthTokensRefresh
+
+	// This test will fail to compile if any handler field is missing or has wrong signature
 }

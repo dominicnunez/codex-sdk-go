@@ -162,4 +162,4 @@ Server sends requests TO the client for approval (patch, command exec, file chan
 - [x] Verify every JSON schema in `specs/` has a corresponding Go type — no spec coverage gaps
 - [x] Verify all 38 request methods (1 v1 + 37 v2) have service methods on Client
 - [x] Verify all 40 notification types have listener registration methods on Client
-- [ ] Verify all 9 server→client request types have handler fields in ApprovalHandlers (including ChatgptAuthTokensRefresh)
+- [x] Verify all 9 server→client request types have handler fields in ApprovalHandlers (including ChatgptAuthTokensRefresh)
