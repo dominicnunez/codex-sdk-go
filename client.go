@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -18,6 +19,9 @@ type Client struct {
 	// Notification listeners: method → handler function
 	notificationListeners map[string]NotificationHandler
 	listenersMu           sync.RWMutex
+
+	// Request ID counter for generating unique request IDs
+	requestIDCounter uint64
 }
 
 // ClientOption configures a Client.
@@ -113,4 +117,10 @@ func (c *Client) handleNotification(ctx context.Context, notif Notification) {
 // Close closes the underlying transport and releases resources.
 func (c *Client) Close() error {
 	return c.transport.Close()
+}
+
+// nextRequestID generates a unique request ID for outgoing requests.
+func (c *Client) nextRequestID() interface{} {
+	id := atomic.AddUint64(&c.requestIDCounter, 1)
+	return id
 }

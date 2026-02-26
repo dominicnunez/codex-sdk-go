@@ -1,6 +1,14 @@
 package codex
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
+
+// ErrorAs is a re-export of errors.As for convenience.
+func ErrorAs(err error, target interface{}) bool {
+	return errors.As(err, target)
+}
 
 // RPCError wraps a JSON-RPC error response.
 // It implements error, errors.Is, and errors.As.
@@ -27,6 +35,22 @@ func (e *RPCError) Error() string {
 // RPCError returns the underlying JSON-RPC error.
 func (e *RPCError) RPCError() *Error {
 	return e.err
+}
+
+// Code returns the JSON-RPC error code.
+func (e *RPCError) Code() int {
+	if e.err == nil {
+		return 0
+	}
+	return e.err.Code
+}
+
+// Message returns the JSON-RPC error message.
+func (e *RPCError) Message() string {
+	if e.err == nil {
+		return ""
+	}
+	return e.err.Message
 }
 
 // Is implements errors.Is by comparing error codes.

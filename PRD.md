@@ -63,7 +63,7 @@ Server sends requests TO the client for approval (patch, command exec, file chan
 
 ### Phase 2: V1 Handshake
 
-- [ ] Create `initialize_test.go` with tests for: `InitializeParams` serialization matching `specs/v1/InitializeParams.json` schema, `InitializeResponse` deserialization matching `specs/v1/InitializeResponse.json` schema, `Client.Initialize` round-trip using MockTransport verifying correct JSON-RPC method name `initialize`.
+- [x] Create `initialize_test.go` with tests for: `InitializeParams` serialization matching `specs/v1/InitializeParams.json` schema, `InitializeResponse` deserialization matching `specs/v1/InitializeResponse.json` schema, `Client.Initialize` round-trip using MockTransport verifying correct JSON-RPC method name `initialize`.
 - [ ] Create `initialize.go` with `InitializeParams` struct (ClientInfo with Name string + Version string + optional Title *string, optional InitializeCapabilities with ExperimentalApi bool + OptOutNotificationMethods []string). Add `Client.Initialize(ctx, InitializeParams) (InitializeResponse, error)` method that sends JSON-RPC request with method `initialize`. Parse `specs/v1/InitializeResponse.json` and create the response type. All tests in `initialize_test.go` must pass.
 
 ### Phase 3: Thread Types & Service
