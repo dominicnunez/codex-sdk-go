@@ -37,6 +37,7 @@ type Client struct {
 	Review        *ReviewService
 	Feedback      *FeedbackService
 	ExternalAgent *ExternalAgentService
+	Experimental  *ExperimentalService
 }
 
 // ClientOption configures a Client.
@@ -75,6 +76,7 @@ func NewClient(transport Transport, opts ...ClientOption) *Client {
 	c.Review = newReviewService(c)
 	c.Feedback = newFeedbackService(c)
 	c.ExternalAgent = newExternalAgentService(c)
+	c.Experimental = newExperimentalService(c)
 
 	// Register the transport's notification handler to route to our listeners
 	transport.OnNotify(c.handleNotification)
