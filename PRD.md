@@ -92,8 +92,8 @@ Server sends requests TO the client for approval (patch, command exec, file chan
 
 ### Phase 7: Model & Skills Services
 
-- [ ] Create `model_test.go` with tests for ModelService.List round-trip and ModelReroutedNotification dispatch.
-- [ ] Create `model.go` with types: `ModelListParams`, `ModelListResponse`, `ModelReroutedNotification`. Create `ModelService` with `List(ctx, ModelListParams) (ModelListResponse, error)`. Wire as `Client.Model`. Add `ModelReroutedNotification` listener. All tests in `model_test.go` must pass.
+- [x] Create `model_test.go` with tests for ModelService.List round-trip and ModelReroutedNotification dispatch.
+- [x] Create `model.go` with types: `ModelListParams`, `ModelListResponse`, `ModelReroutedNotification`. Create `ModelService` with `List(ctx, ModelListParams) (ModelListResponse, error)`. Wire as `Client.Model`. Add `ModelReroutedNotification` listener. All tests in `model_test.go` must pass.
 - [ ] Create `skills_test.go` with tests for all SkillsService methods: List/ConfigWrite/RemoteRead/RemoteWrite round-trips.
 - [ ] Create `skills.go` with types: `SkillsListParams`, `SkillsListResponse`, `SkillsConfigWriteParams`, `SkillsConfigWriteResponse`, `SkillsRemoteReadParams`, `SkillsRemoteReadResponse`, `SkillsRemoteWriteParams`, `SkillsRemoteWriteResponse`. Create `SkillsService` with methods: `List`, `ConfigWrite`, `RemoteRead`, `RemoteWrite`. Wire as `Client.Skills`. All tests in `skills_test.go` must pass.
 
