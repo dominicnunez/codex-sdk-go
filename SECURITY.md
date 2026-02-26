@@ -29,7 +29,3 @@ This SDK handles JSON-RPC communication over stdio/WebSocket. Security considera
 ## Dependencies
 
 This project has zero external dependencies outside of the Go standard library. All code is reviewed and tested for security issues.
-
-## Contact
-
-For security-related questions or concerns, please open a GitHub issue.
