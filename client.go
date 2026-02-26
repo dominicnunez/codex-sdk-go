@@ -3,10 +3,13 @@ package codex
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"time"
 )
+
+var errInvalidParams = errors.New("invalid params")
 
 // Client is the main entry point for interacting with the Codex JSON-RPC server.
 // It uses a Transport for bidirectional communication and provides typed methods
@@ -241,7 +244,7 @@ func methodNotFoundResponse(id RequestID) Response {
 func (c *Client) handleApplyPatchApproval(ctx context.Context, req Request) (Response, error) {
 	var params ApplyPatchApprovalParams
 	if err := json.Unmarshal(req.Params, &params); err != nil {
-		return Response{}, err
+		return Response{}, errInvalidParams
 	}
 
 	c.approvalMu.RLock()
@@ -267,7 +270,7 @@ func (c *Client) handleApplyPatchApproval(ctx context.Context, req Request) (Res
 func (c *Client) handleCommandExecutionRequestApproval(ctx context.Context, req Request) (Response, error) {
 	var params CommandExecutionRequestApprovalParams
 	if err := json.Unmarshal(req.Params, &params); err != nil {
-		return Response{}, err
+		return Response{}, errInvalidParams
 	}
 
 	c.approvalMu.RLock()
@@ -293,7 +296,7 @@ func (c *Client) handleCommandExecutionRequestApproval(ctx context.Context, req 
 func (c *Client) handleExecCommandApproval(ctx context.Context, req Request) (Response, error) {
 	var params ExecCommandApprovalParams
 	if err := json.Unmarshal(req.Params, &params); err != nil {
-		return Response{}, err
+		return Response{}, errInvalidParams
 	}
 
 	c.approvalMu.RLock()
@@ -319,7 +322,7 @@ func (c *Client) handleExecCommandApproval(ctx context.Context, req Request) (Re
 func (c *Client) handleFileChangeRequestApproval(ctx context.Context, req Request) (Response, error) {
 	var params FileChangeRequestApprovalParams
 	if err := json.Unmarshal(req.Params, &params); err != nil {
-		return Response{}, err
+		return Response{}, errInvalidParams
 	}
 
 	c.approvalMu.RLock()
@@ -345,7 +348,7 @@ func (c *Client) handleFileChangeRequestApproval(ctx context.Context, req Reques
 func (c *Client) handleSkillRequestApproval(ctx context.Context, req Request) (Response, error) {
 	var params SkillRequestApprovalParams
 	if err := json.Unmarshal(req.Params, &params); err != nil {
-		return Response{}, err
+		return Response{}, errInvalidParams
 	}
 
 	c.approvalMu.RLock()
@@ -371,7 +374,7 @@ func (c *Client) handleSkillRequestApproval(ctx context.Context, req Request) (R
 func (c *Client) handleDynamicToolCall(ctx context.Context, req Request) (Response, error) {
 	var params DynamicToolCallParams
 	if err := json.Unmarshal(req.Params, &params); err != nil {
-		return Response{}, err
+		return Response{}, errInvalidParams
 	}
 
 	c.approvalMu.RLock()
@@ -397,7 +400,7 @@ func (c *Client) handleDynamicToolCall(ctx context.Context, req Request) (Respon
 func (c *Client) handleToolRequestUserInput(ctx context.Context, req Request) (Response, error) {
 	var params ToolRequestUserInputParams
 	if err := json.Unmarshal(req.Params, &params); err != nil {
-		return Response{}, err
+		return Response{}, errInvalidParams
 	}
 
 	c.approvalMu.RLock()
@@ -423,7 +426,7 @@ func (c *Client) handleToolRequestUserInput(ctx context.Context, req Request) (R
 func (c *Client) handleFuzzyFileSearch(ctx context.Context, req Request) (Response, error) {
 	var params FuzzyFileSearchParams
 	if err := json.Unmarshal(req.Params, &params); err != nil {
-		return Response{}, err
+		return Response{}, errInvalidParams
 	}
 
 	c.approvalMu.RLock()
@@ -449,7 +452,7 @@ func (c *Client) handleFuzzyFileSearch(ctx context.Context, req Request) (Respon
 func (c *Client) handleChatgptAuthTokensRefresh(ctx context.Context, req Request) (Response, error) {
 	var params ChatgptAuthTokensRefreshParams
 	if err := json.Unmarshal(req.Params, &params); err != nil {
-		return Response{}, err
+		return Response{}, errInvalidParams
 	}
 
 	c.approvalMu.RLock()
