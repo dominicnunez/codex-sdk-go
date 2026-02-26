@@ -23,6 +23,8 @@ type ApprovalHandlers struct {
 
 // SetApprovalHandlers registers approval handlers on the client for server→client requests.
 func (c *Client) SetApprovalHandlers(handlers ApprovalHandlers) {
+	c.approvalMu.Lock()
+	defer c.approvalMu.Unlock()
 	c.approvalHandlers = handlers
 }
 

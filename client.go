@@ -23,6 +23,7 @@ type Client struct {
 
 	// Approval handlers for server→client requests
 	approvalHandlers ApprovalHandlers
+	approvalMu       sync.RWMutex
 
 	// Request ID counter for generating unique request IDs
 	requestIDCounter uint64
@@ -156,58 +157,63 @@ func (c *Client) handleNotification(ctx context.Context, notif Notification) {
 // handleRequest is the internal handler for server→client requests (approval flows).
 // It routes incoming requests to the appropriate approval handler.
 func (c *Client) handleRequest(ctx context.Context, req Request) (Response, error) {
+	// Snapshot handlers under read lock, then release before calling
+	c.approvalMu.RLock()
+	handlers := c.approvalHandlers
+	c.approvalMu.RUnlock()
+
 	// Route based on method to the appropriate approval handler
 	switch req.Method {
 	case "applyPatchApproval":
-		if c.approvalHandlers.OnApplyPatchApproval == nil {
+		if handlers.OnApplyPatchApproval == nil {
 			return methodNotFoundResponse(req.ID), nil
 		}
 		return c.handleApplyPatchApproval(ctx, req)
 
 	case "item/commandExecution/requestApproval":
-		if c.approvalHandlers.OnCommandExecutionRequestApproval == nil {
+		if handlers.OnCommandExecutionRequestApproval == nil {
 			return methodNotFoundResponse(req.ID), nil
 		}
 		return c.handleCommandExecutionRequestApproval(ctx, req)
 
 	case "execCommandApproval":
-		if c.approvalHandlers.OnExecCommandApproval == nil {
+		if handlers.OnExecCommandApproval == nil {
 			return methodNotFoundResponse(req.ID), nil
 		}
 		return c.handleExecCommandApproval(ctx, req)
 
 	case "item/fileChange/requestApproval":
-		if c.approvalHandlers.OnFileChangeRequestApproval == nil {
+		if handlers.OnFileChangeRequestApproval == nil {
 			return methodNotFoundResponse(req.ID), nil
 		}
 		return c.handleFileChangeRequestApproval(ctx, req)
 
 	case "skill/requestApproval":
-		if c.approvalHandlers.OnSkillRequestApproval == nil {
+		if handlers.OnSkillRequestApproval == nil {
 			return methodNotFoundResponse(req.ID), nil
 		}
 		return c.handleSkillRequestApproval(ctx, req)
 
 	case "item/tool/call":
-		if c.approvalHandlers.OnDynamicToolCall == nil {
+		if handlers.OnDynamicToolCall == nil {
 			return methodNotFoundResponse(req.ID), nil
 		}
 		return c.handleDynamicToolCall(ctx, req)
 
 	case "item/tool/requestUserInput":
-		if c.approvalHandlers.OnToolRequestUserInput == nil {
+		if handlers.OnToolRequestUserInput == nil {
 			return methodNotFoundResponse(req.ID), nil
 		}
 		return c.handleToolRequestUserInput(ctx, req)
 
 	case "fuzzyFileSearch":
-		if c.approvalHandlers.OnFuzzyFileSearch == nil {
+		if handlers.OnFuzzyFileSearch == nil {
 			return methodNotFoundResponse(req.ID), nil
 		}
 		return c.handleFuzzyFileSearch(ctx, req)
 
 	case "account/chatgptAuthTokens/refresh":
-		if c.approvalHandlers.OnChatgptAuthTokensRefresh == nil {
+		if handlers.OnChatgptAuthTokensRefresh == nil {
 			return methodNotFoundResponse(req.ID), nil
 		}
 		return c.handleChatgptAuthTokensRefresh(ctx, req)
@@ -238,7 +244,10 @@ func (c *Client) handleApplyPatchApproval(ctx context.Context, req Request) (Res
 		return Response{}, err
 	}
 
-	result, err := c.approvalHandlers.OnApplyPatchApproval(ctx, params)
+	c.approvalMu.RLock()
+	handler := c.approvalHandlers.OnApplyPatchApproval
+	c.approvalMu.RUnlock()
+	result, err := handler(ctx, params)
 	if err != nil {
 		return Response{}, err
 	}
@@ -261,7 +270,10 @@ func (c *Client) handleCommandExecutionRequestApproval(ctx context.Context, req 
 		return Response{}, err
 	}
 
-	result, err := c.approvalHandlers.OnCommandExecutionRequestApproval(ctx, params)
+	c.approvalMu.RLock()
+	handler := c.approvalHandlers.OnCommandExecutionRequestApproval
+	c.approvalMu.RUnlock()
+	result, err := handler(ctx, params)
 	if err != nil {
 		return Response{}, err
 	}
@@ -284,7 +296,10 @@ func (c *Client) handleExecCommandApproval(ctx context.Context, req Request) (Re
 		return Response{}, err
 	}
 
-	result, err := c.approvalHandlers.OnExecCommandApproval(ctx, params)
+	c.approvalMu.RLock()
+	handler := c.approvalHandlers.OnExecCommandApproval
+	c.approvalMu.RUnlock()
+	result, err := handler(ctx, params)
 	if err != nil {
 		return Response{}, err
 	}
@@ -307,7 +322,10 @@ func (c *Client) handleFileChangeRequestApproval(ctx context.Context, req Reques
 		return Response{}, err
 	}
 
-	result, err := c.approvalHandlers.OnFileChangeRequestApproval(ctx, params)
+	c.approvalMu.RLock()
+	handler := c.approvalHandlers.OnFileChangeRequestApproval
+	c.approvalMu.RUnlock()
+	result, err := handler(ctx, params)
 	if err != nil {
 		return Response{}, err
 	}
@@ -330,7 +348,10 @@ func (c *Client) handleSkillRequestApproval(ctx context.Context, req Request) (R
 		return Response{}, err
 	}
 
-	result, err := c.approvalHandlers.OnSkillRequestApproval(ctx, params)
+	c.approvalMu.RLock()
+	handler := c.approvalHandlers.OnSkillRequestApproval
+	c.approvalMu.RUnlock()
+	result, err := handler(ctx, params)
 	if err != nil {
 		return Response{}, err
 	}
@@ -353,7 +374,10 @@ func (c *Client) handleDynamicToolCall(ctx context.Context, req Request) (Respon
 		return Response{}, err
 	}
 
-	result, err := c.approvalHandlers.OnDynamicToolCall(ctx, params)
+	c.approvalMu.RLock()
+	handler := c.approvalHandlers.OnDynamicToolCall
+	c.approvalMu.RUnlock()
+	result, err := handler(ctx, params)
 	if err != nil {
 		return Response{}, err
 	}
@@ -376,7 +400,10 @@ func (c *Client) handleToolRequestUserInput(ctx context.Context, req Request) (R
 		return Response{}, err
 	}
 
-	result, err := c.approvalHandlers.OnToolRequestUserInput(ctx, params)
+	c.approvalMu.RLock()
+	handler := c.approvalHandlers.OnToolRequestUserInput
+	c.approvalMu.RUnlock()
+	result, err := handler(ctx, params)
 	if err != nil {
 		return Response{}, err
 	}
@@ -399,7 +426,10 @@ func (c *Client) handleFuzzyFileSearch(ctx context.Context, req Request) (Respon
 		return Response{}, err
 	}
 
-	result, err := c.approvalHandlers.OnFuzzyFileSearch(ctx, params)
+	c.approvalMu.RLock()
+	handler := c.approvalHandlers.OnFuzzyFileSearch
+	c.approvalMu.RUnlock()
+	result, err := handler(ctx, params)
 	if err != nil {
 		return Response{}, err
 	}
@@ -422,7 +452,10 @@ func (c *Client) handleChatgptAuthTokensRefresh(ctx context.Context, req Request
 		return Response{}, err
 	}
 
-	result, err := c.approvalHandlers.OnChatgptAuthTokensRefresh(ctx, params)
+	c.approvalMu.RLock()
+	handler := c.approvalHandlers.OnChatgptAuthTokensRefresh
+	c.approvalMu.RUnlock()
+	result, err := handler(ctx, params)
 	if err != nil {
 		return Response{}, err
 	}
