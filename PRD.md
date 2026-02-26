@@ -110,8 +110,8 @@ Server sends requests TO the client for approval (patch, command exec, file chan
 
 - [x] Create `review_test.go` with test for ReviewService.Start round-trip.
 - [x] Create `review.go` with types: `ReviewStartParams`, `ReviewStartResponse`. Create `ReviewService` with `Start(ctx, ReviewStartParams) (ReviewStartResponse, error)`. Wire as `Client.Review`. All tests must pass.
-- [ ] Create `feedback_test.go` with test for FeedbackService.Upload round-trip.
-- [ ] Create `feedback.go` with types: `FeedbackUploadParams`, `FeedbackUploadResponse`. Create `FeedbackService` with `Upload(ctx, FeedbackUploadParams) (FeedbackUploadResponse, error)`. Wire as `Client.Feedback`. All tests must pass.
+- [x] Create `feedback_test.go` with test for FeedbackService.Upload round-trip.
+- [x] Create `feedback.go` with types: `FeedbackUploadParams`, `FeedbackUploadResponse`. Create `FeedbackService` with `Upload(ctx, FeedbackUploadParams) (FeedbackUploadResponse, error)`. Wire as `Client.Feedback`. All tests must pass.
 - [ ] Create `external_agent_test.go` with tests for ExternalAgentService methods: ConfigDetect/ConfigImport round-trips.
 - [ ] Create `external_agent.go` with types: `ExternalAgentConfigDetectParams`, `ExternalAgentConfigDetectResponse`, `ExternalAgentConfigImportParams`, `ExternalAgentConfigImportResponse`. Create `ExternalAgentService` with methods: `ConfigDetect`, `ConfigImport`. Wire as `Client.ExternalAgent`. All tests must pass.
 - [ ] Create `experimental_test.go` with test for ExperimentalService.FeatureList round-trip.
