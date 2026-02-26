@@ -21,6 +21,9 @@ type Client struct {
 	notificationListeners map[string]NotificationHandler
 	listenersMu           sync.RWMutex
 
+	// Approval handlers for server→client requests
+	approvalHandlers ApprovalHandlers
+
 	// Request ID counter for generating unique request IDs
 	requestIDCounter uint64
 
@@ -80,6 +83,9 @@ func NewClient(transport Transport, opts ...ClientOption) *Client {
 
 	// Register the transport's notification handler to route to our listeners
 	transport.OnNotify(c.handleNotification)
+
+	// Register the transport's request handler for server→client approval requests
+	transport.OnRequest(c.handleRequest)
 
 	return c
 }
@@ -143,6 +149,292 @@ func (c *Client) handleNotification(ctx context.Context, notif Notification) {
 
 	// Call the handler (in the same goroutine for now - transport already dispatches in goroutines)
 	handler(ctx, notif)
+}
+
+// handleRequest is the internal handler for server→client requests (approval flows).
+// It routes incoming requests to the appropriate approval handler.
+func (c *Client) handleRequest(ctx context.Context, req Request) (Response, error) {
+	// Route based on method to the appropriate approval handler
+	switch req.Method {
+	case "applyPatchApproval":
+		if c.approvalHandlers.OnApplyPatchApproval == nil {
+			return methodNotFoundResponse(req.ID), nil
+		}
+		return c.handleApplyPatchApproval(ctx, req)
+
+	case "item/commandExecution/requestApproval":
+		if c.approvalHandlers.OnCommandExecutionRequestApproval == nil {
+			return methodNotFoundResponse(req.ID), nil
+		}
+		return c.handleCommandExecutionRequestApproval(ctx, req)
+
+	case "execCommandApproval":
+		if c.approvalHandlers.OnExecCommandApproval == nil {
+			return methodNotFoundResponse(req.ID), nil
+		}
+		return c.handleExecCommandApproval(ctx, req)
+
+	case "item/fileChange/requestApproval":
+		if c.approvalHandlers.OnFileChangeRequestApproval == nil {
+			return methodNotFoundResponse(req.ID), nil
+		}
+		return c.handleFileChangeRequestApproval(ctx, req)
+
+	case "skill/requestApproval":
+		if c.approvalHandlers.OnSkillRequestApproval == nil {
+			return methodNotFoundResponse(req.ID), nil
+		}
+		return c.handleSkillRequestApproval(ctx, req)
+
+	case "item/tool/call":
+		if c.approvalHandlers.OnDynamicToolCall == nil {
+			return methodNotFoundResponse(req.ID), nil
+		}
+		return c.handleDynamicToolCall(ctx, req)
+
+	case "item/tool/requestUserInput":
+		if c.approvalHandlers.OnToolRequestUserInput == nil {
+			return methodNotFoundResponse(req.ID), nil
+		}
+		return c.handleToolRequestUserInput(ctx, req)
+
+	case "fuzzyFileSearch":
+		if c.approvalHandlers.OnFuzzyFileSearch == nil {
+			return methodNotFoundResponse(req.ID), nil
+		}
+		return c.handleFuzzyFileSearch(ctx, req)
+
+	case "account/chatgptAuthTokens/refresh":
+		if c.approvalHandlers.OnChatgptAuthTokensRefresh == nil {
+			return methodNotFoundResponse(req.ID), nil
+		}
+		return c.handleChatgptAuthTokensRefresh(ctx, req)
+
+	default:
+		// Unknown method - return method not found error
+		return methodNotFoundResponse(req.ID), nil
+	}
+}
+
+// methodNotFoundResponse creates a JSON-RPC method-not-found error response.
+func methodNotFoundResponse(id RequestID) Response {
+	return Response{
+		JSONRPC: "2.0",
+		ID:      id,
+		Error: &Error{
+			Code:    ErrCodeMethodNotFound,
+			Message: "Method not found",
+		},
+	}
+}
+
+// Individual approval handler methods
+
+func (c *Client) handleApplyPatchApproval(ctx context.Context, req Request) (Response, error) {
+	var params ApplyPatchApprovalParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return Response{}, err
+	}
+
+	result, err := c.approvalHandlers.OnApplyPatchApproval(ctx, params)
+	if err != nil {
+		return Response{}, err
+	}
+
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		return Response{}, err
+	}
+
+	return Response{
+		JSONRPC: "2.0",
+		ID:      req.ID,
+		Result:  resultJSON,
+	}, nil
+}
+
+func (c *Client) handleCommandExecutionRequestApproval(ctx context.Context, req Request) (Response, error) {
+	var params CommandExecutionRequestApprovalParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return Response{}, err
+	}
+
+	result, err := c.approvalHandlers.OnCommandExecutionRequestApproval(ctx, params)
+	if err != nil {
+		return Response{}, err
+	}
+
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		return Response{}, err
+	}
+
+	return Response{
+		JSONRPC: "2.0",
+		ID:      req.ID,
+		Result:  resultJSON,
+	}, nil
+}
+
+func (c *Client) handleExecCommandApproval(ctx context.Context, req Request) (Response, error) {
+	var params ExecCommandApprovalParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return Response{}, err
+	}
+
+	result, err := c.approvalHandlers.OnExecCommandApproval(ctx, params)
+	if err != nil {
+		return Response{}, err
+	}
+
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		return Response{}, err
+	}
+
+	return Response{
+		JSONRPC: "2.0",
+		ID:      req.ID,
+		Result:  resultJSON,
+	}, nil
+}
+
+func (c *Client) handleFileChangeRequestApproval(ctx context.Context, req Request) (Response, error) {
+	var params FileChangeRequestApprovalParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return Response{}, err
+	}
+
+	result, err := c.approvalHandlers.OnFileChangeRequestApproval(ctx, params)
+	if err != nil {
+		return Response{}, err
+	}
+
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		return Response{}, err
+	}
+
+	return Response{
+		JSONRPC: "2.0",
+		ID:      req.ID,
+		Result:  resultJSON,
+	}, nil
+}
+
+func (c *Client) handleSkillRequestApproval(ctx context.Context, req Request) (Response, error) {
+	var params SkillRequestApprovalParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return Response{}, err
+	}
+
+	result, err := c.approvalHandlers.OnSkillRequestApproval(ctx, params)
+	if err != nil {
+		return Response{}, err
+	}
+
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		return Response{}, err
+	}
+
+	return Response{
+		JSONRPC: "2.0",
+		ID:      req.ID,
+		Result:  resultJSON,
+	}, nil
+}
+
+func (c *Client) handleDynamicToolCall(ctx context.Context, req Request) (Response, error) {
+	var params DynamicToolCallParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return Response{}, err
+	}
+
+	result, err := c.approvalHandlers.OnDynamicToolCall(ctx, params)
+	if err != nil {
+		return Response{}, err
+	}
+
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		return Response{}, err
+	}
+
+	return Response{
+		JSONRPC: "2.0",
+		ID:      req.ID,
+		Result:  resultJSON,
+	}, nil
+}
+
+func (c *Client) handleToolRequestUserInput(ctx context.Context, req Request) (Response, error) {
+	var params ToolRequestUserInputParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return Response{}, err
+	}
+
+	result, err := c.approvalHandlers.OnToolRequestUserInput(ctx, params)
+	if err != nil {
+		return Response{}, err
+	}
+
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		return Response{}, err
+	}
+
+	return Response{
+		JSONRPC: "2.0",
+		ID:      req.ID,
+		Result:  resultJSON,
+	}, nil
+}
+
+func (c *Client) handleFuzzyFileSearch(ctx context.Context, req Request) (Response, error) {
+	var params FuzzyFileSearchParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return Response{}, err
+	}
+
+	result, err := c.approvalHandlers.OnFuzzyFileSearch(ctx, params)
+	if err != nil {
+		return Response{}, err
+	}
+
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		return Response{}, err
+	}
+
+	return Response{
+		JSONRPC: "2.0",
+		ID:      req.ID,
+		Result:  resultJSON,
+	}, nil
+}
+
+func (c *Client) handleChatgptAuthTokensRefresh(ctx context.Context, req Request) (Response, error) {
+	var params ChatgptAuthTokensRefreshParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return Response{}, err
+	}
+
+	result, err := c.approvalHandlers.OnChatgptAuthTokensRefresh(ctx, params)
+	if err != nil {
+		return Response{}, err
+	}
+
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		return Response{}, err
+	}
+
+	return Response{
+		JSONRPC: "2.0",
+		ID:      req.ID,
+		Result:  resultJSON,
+	}, nil
 }
 
 // Close closes the underlying transport and releases resources.

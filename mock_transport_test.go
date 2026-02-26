@@ -17,6 +17,7 @@ type MockTransport struct {
 	// Sent messages
 	SentRequests      []codex.Request
 	SentNotifications []codex.Notification
+	sentResponses     []codex.Response // Responses sent by request handler
 
 	// Handlers
 	requestHandler      codex.RequestHandler
@@ -214,7 +215,14 @@ func (m *MockTransport) InjectServerRequest(ctx context.Context, req codex.Reque
 		return codex.Response{}, fmt.Errorf("no request handler registered")
 	}
 
-	return handler(ctx, req)
+	resp, err := handler(ctx, req)
+
+	// Track sent responses for test verification
+	m.mu.Lock()
+	m.sentResponses = append(m.sentResponses, resp)
+	m.mu.Unlock()
+
+	return resp, err
 }
 
 // InjectServerNotification simulates the server sending a notification to the client.
@@ -236,6 +244,7 @@ func (m *MockTransport) Reset() {
 
 	m.SentRequests = nil
 	m.SentNotifications = nil
+	m.sentResponses = nil
 	m.responses = make(map[string]codex.Response)
 	m.expectedCalls = make(map[string]int)
 	m.actualCalls = make(map[string]int)
