@@ -81,9 +81,9 @@ Server sends requests TO the client for approval (patch, command exec, file chan
 
 ### Phase 5: Account & Auth Service
 
-- [ ] Create `account_test.go` with tests for all AccountService methods using MockTransport: Get/GetRateLimits/Login/CancelLogin/Logout round-trips, plus notification dispatch tests for AccountUpdated/AccountLoginCompleted/AccountRateLimitsUpdated.
-- [ ] Create `account.go` with types from specs: `GetAccountParams`, `GetAccountResponse`, `GetAccountRateLimitsResponse`, `LoginAccountParams`, `LoginAccountResponse`, `CancelLoginAccountParams`, `CancelLoginAccountResponse`, `LogoutAccountResponse`. Create `AccountService` with methods: `Get(ctx, GetAccountParams) (GetAccountResponse, error)`, `GetRateLimits(ctx) (GetAccountRateLimitsResponse, error)`, `Login(ctx, LoginAccountParams) (LoginAccountResponse, error)`, `CancelLogin(ctx, CancelLoginAccountParams) (CancelLoginAccountResponse, error)`, `Logout(ctx) (LogoutAccountResponse, error)`. Wire as `Client.Account`. All tests in `account_test.go` must pass.
-- [ ] Create `account_notifications.go` with: `AccountUpdatedNotification`, `AccountLoginCompletedNotification`, `AccountRateLimitsUpdatedNotification`. Add listener registration methods on Client. All notification tests must pass.
+- [x] Create `account_test.go` with tests for all AccountService methods using MockTransport: Get/GetRateLimits/Login/CancelLogin/Logout round-trips, plus notification dispatch tests for AccountUpdated/AccountLoginCompleted/AccountRateLimitsUpdated.
+- [x] Create `account.go` with types from specs: `GetAccountParams`, `GetAccountResponse`, `GetAccountRateLimitsResponse`, `LoginAccountParams`, `LoginAccountResponse`, `CancelLoginAccountParams`, `CancelLoginAccountResponse`, `LogoutAccountResponse`. Create `AccountService` with methods: `Get(ctx, GetAccountParams) (GetAccountResponse, error)`, `GetRateLimits(ctx) (GetAccountRateLimitsResponse, error)`, `Login(ctx, LoginAccountParams) (LoginAccountResponse, error)`, `CancelLogin(ctx, CancelLoginAccountParams) (CancelLoginAccountResponse, error)`, `Logout(ctx) (LogoutAccountResponse, error)`. Wire as `Client.Account`. All tests in `account_test.go` must pass.
+- [x] Create `account_notifications.go` with: `AccountUpdatedNotification`, `AccountLoginCompletedNotification`, `AccountRateLimitsUpdatedNotification`. Add listener registration methods on Client. All notification tests must pass.
 
 ### Phase 6: Config Service
 

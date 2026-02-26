@@ -25,8 +25,9 @@ type Client struct {
 	requestIDCounter uint64
 
 	// Service accessors
-	Thread *ThreadService
-	Turn   *TurnService
+	Thread  *ThreadService
+	Turn    *TurnService
+	Account *AccountService
 }
 
 // ClientOption configures a Client.
@@ -55,6 +56,7 @@ func NewClient(transport Transport, opts ...ClientOption) *Client {
 	// Initialize services
 	c.Thread = newThreadService(c)
 	c.Turn = newTurnService(c)
+	c.Account = newAccountService(c)
 
 	// Register the transport's notification handler to route to our listeners
 	transport.OnNotify(c.handleNotification)
@@ -164,4 +166,30 @@ func (c *Client) sendRequest(ctx context.Context, method string, params interfac
 	}
 
 	return nil
+}
+
+// sendRequestRaw is a helper that sends a typed request and returns the raw response result.
+// This is useful for union types where the result needs custom unmarshaling.
+func (c *Client) sendRequestRaw(ctx context.Context, method string, params interface{}) (json.RawMessage, error) {
+	// Marshal params to JSON
+	paramsJSON, err := json.Marshal(params)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create request
+	req := Request{
+		JSONRPC: "2.0",
+		Method:  method,
+		Params:  paramsJSON,
+		ID:      RequestID{Value: c.nextRequestID()},
+	}
+
+	// Send request
+	resp, err := c.Send(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Result, nil
 }
