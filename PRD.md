@@ -141,8 +141,8 @@ Server sends requests TO the client for approval (patch, command exec, file chan
 ### Phase 13: Helpers & Polish
 
 - [x] Create `ptr.go` with `Ptr[T](v T) *T` helper function for optional field construction (same pattern as opencode-sdk-go).
-- [ ] Create `dispatch_test.go` with tests for the message router: known notification methods dispatch to correct listeners, known request methods dispatch to correct approval handlers, unknown notification methods are ignored without error, unknown request methods return method-not-found JSON-RPC error.
-- [ ] Create `dispatch.go` that wires the Client's internal message router: incoming JSON-RPC messages are parsed, then dispatched to the correct notification listener or approval handler based on the `method` field. Must handle unknown methods gracefully (log and ignore for notifications, return method-not-found for requests). All tests in `dispatch_test.go` must pass.
+- [x] Create `dispatch_test.go` with tests for the message router: known notification methods dispatch to correct listeners, known request methods dispatch to correct approval handlers, unknown notification methods are ignored without error, unknown request methods return method-not-found JSON-RPC error.
+- [x] Create `dispatch.go` that wires the Client's internal message router: incoming JSON-RPC messages are parsed, then dispatched to the correct notification listener or approval handler based on the `method` field. Must handle unknown methods gracefully (log and ignore for notifications, return method-not-found for requests). All tests in `dispatch_test.go` must pass.
 
 ### Phase 14: Docs
 

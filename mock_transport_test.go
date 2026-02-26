@@ -204,6 +204,16 @@ func (m *MockTransport) GetSentNotification(index int) *codex.Notification {
 	return &m.SentNotifications[index]
 }
 
+// GetSentResponses returns a copy of all responses sent by request handlers.
+func (m *MockTransport) GetSentResponses() []codex.Response {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	result := make([]codex.Response, len(m.sentResponses))
+	copy(result, m.sentResponses)
+	return result
+}
+
 // InjectServerRequest simulates the server sending a request to the client.
 // Calls the registered request handler if one exists.
 func (m *MockTransport) InjectServerRequest(ctx context.Context, req codex.Request) (codex.Response, error) {
