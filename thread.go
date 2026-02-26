@@ -421,6 +421,7 @@ type ThreadStartParams struct {
 	ModelProvider         *string         `json:"modelProvider,omitempty"`
 	Personality           *string         `json:"personality,omitempty"`
 	Sandbox               *string         `json:"sandbox,omitempty"`
+	ServiceName           *string         `json:"serviceName,omitempty"`
 }
 
 // ThreadStartResponse is the response from starting a thread
