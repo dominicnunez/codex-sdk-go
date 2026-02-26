@@ -146,7 +146,7 @@ Server sends requests TO the client for approval (patch, command exec, file chan
 
 ### Phase 14: Docs
 
-- [ ] Create `README.md` with: module path, installation, requirements (Go 1.25+), usage example showing Initialize → ThreadStart → TurnStart → listen for notifications, explanation of the approval handler pattern. Note this is for OpenAI Codex CLI (not OpenCode by Anomaly Co).
+- [x] Create `README.md` with: module path, installation, requirements (Go 1.25+), usage example showing Initialize → ThreadStart → TurnStart → listen for notifications, explanation of the approval handler pattern. Note this is for OpenAI Codex CLI (not OpenCode by Anomaly Co).
 - [ ] Create `SECURITY.md` with vulnerability reporting instructions pointing to GitHub issues.
 - [ ] Create `LICENSE.md` with MIT license, copyright 2025 Dominic Nunez.
 
