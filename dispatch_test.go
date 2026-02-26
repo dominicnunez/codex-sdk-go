@@ -427,7 +427,7 @@ func TestKnownApprovalHandlerDispatch(t *testing.T) {
 				Params:  json.RawMessage(paramsJSON),
 			}
 
-			mock.InjectServerRequest(ctx, req)
+			_, _ = mock.InjectServerRequest(ctx, req)
 
 			// Verify response was sent
 			if len(mock.GetSentResponses()) == 0 {
@@ -480,7 +480,7 @@ func TestUnknownRequestReturnsMethodNotFound(t *testing.T) {
 		Params:  json.RawMessage(`{"data":"test"}`),
 	}
 
-	mock.InjectServerRequest(ctx, req)
+	_, _ = mock.InjectServerRequest(ctx, req)
 
 	// Verify method-not-found error response was sent
 	if len(mock.GetSentResponses()) == 0 {
@@ -563,7 +563,7 @@ func TestMissingApprovalHandlerReturnsMethodNotFound(t *testing.T) {
 		Params:  json.RawMessage(`{"diff":"test"}`),
 	}
 
-	mock.InjectServerRequest(ctx, req)
+	_, _ = mock.InjectServerRequest(ctx, req)
 
 	// Verify method-not-found error response
 	if len(mock.GetSentResponses()) == 0 {

@@ -192,7 +192,7 @@ func TestSkillsList(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := NewMockTransport()
-			mock.SetResponseData("skills/list", tt.mockResponse)
+			_ = mock.SetResponseData("skills/list", tt.mockResponse)
 			client := codex.NewClient(mock)
 
 			resp, err := client.Skills.List(context.Background(), tt.params)
@@ -255,7 +255,7 @@ func TestSkillsConfigWrite(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := NewMockTransport()
-			mock.SetResponseData("skills/configWrite", tt.mockResponse)
+			_ = mock.SetResponseData("skills/configWrite", tt.mockResponse)
 			client := codex.NewClient(mock)
 
 			resp, err := client.Skills.ConfigWrite(context.Background(), tt.params)
@@ -340,7 +340,7 @@ func TestSkillsRemoteRead(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := NewMockTransport()
-			mock.SetResponseData("skills/remoteRead", tt.mockResponse)
+			_ = mock.SetResponseData("skills/remoteRead", tt.mockResponse)
 			client := codex.NewClient(mock)
 
 			resp, err := client.Skills.RemoteRead(context.Background(), tt.params)
@@ -391,7 +391,7 @@ func TestSkillsRemoteWrite(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := NewMockTransport()
-			mock.SetResponseData("skills/remoteWrite", tt.mockResponse)
+			_ = mock.SetResponseData("skills/remoteWrite", tt.mockResponse)
 			client := codex.NewClient(mock)
 
 			resp, err := client.Skills.RemoteWrite(context.Background(), tt.params)

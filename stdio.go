@@ -261,7 +261,7 @@ func (t *StdioTransport) handleRequest(data []byte) {
 				Message: "method not found",
 			},
 		}
-		t.writeMessage(errorResp)
+		_ = t.writeMessage(errorResp) // Error writing error response - nothing more we can do
 		return
 	}
 
@@ -279,14 +279,14 @@ func (t *StdioTransport) handleRequest(data []byte) {
 					Message: err.Error(),
 				},
 			}
-			t.writeMessage(errorResp)
+			_ = t.writeMessage(errorResp) // Error writing error response - nothing more we can do
 			return
 		}
 
 		// Ensure response has correct ID and version
 		resp.JSONRPC = "2.0"
 		resp.ID = req.ID
-		t.writeMessage(resp)
+		_ = t.writeMessage(resp) // Error writing response - nothing more we can do (already in goroutine)
 	}()
 }
 

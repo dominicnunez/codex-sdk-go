@@ -114,7 +114,7 @@ func TestReviewStart(t *testing.T) {
 			client := codex.NewClient(mock)
 			ctx := context.Background()
 
-			mock.SetResponseData("review/start", tt.response)
+			_ = mock.SetResponseData("review/start", tt.response)
 
 			resp, err := client.Review.Start(ctx, tt.params)
 			if err != nil {

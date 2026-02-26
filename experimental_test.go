@@ -76,7 +76,7 @@ func TestExperimentalFeatureList(t *testing.T) {
 			mock := NewMockTransport()
 			client := codex.NewClient(mock)
 
-			mock.SetResponseData("experimental/featureList", tt.responseData)
+			_ = mock.SetResponseData("experimental/featureList", tt.responseData)
 
 			resp, err := client.Experimental.FeatureList(context.Background(), tt.params)
 			if err != nil {

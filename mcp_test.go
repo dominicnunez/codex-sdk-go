@@ -81,7 +81,7 @@ func TestMcpListServerStatus(t *testing.T) {
 			mock := NewMockTransport()
 			client := codex.NewClient(mock)
 
-			mock.SetResponseData("mcp/listServerStatus", tt.responseData)
+			_ = mock.SetResponseData("mcp/listServerStatus", tt.responseData)
 
 			resp, err := client.Mcp.ListServerStatus(context.Background(), tt.params)
 			if err != nil {
@@ -142,7 +142,7 @@ func TestMcpOauthLogin(t *testing.T) {
 			mock := NewMockTransport()
 			client := codex.NewClient(mock)
 
-			mock.SetResponseData("mcp/server/oauthLogin", tt.responseData)
+			_ = mock.SetResponseData("mcp/server/oauthLogin", tt.responseData)
 
 			resp, err := client.Mcp.OauthLogin(context.Background(), tt.params)
 			if err != nil {
@@ -161,7 +161,7 @@ func TestMcpRefresh(t *testing.T) {
 	client := codex.NewClient(mock)
 
 	// Empty response per spec
-	mock.SetResponseData("mcp/server/refresh", map[string]interface{}{})
+	_ = mock.SetResponseData("mcp/server/refresh", map[string]interface{}{})
 
 	_, err := client.Mcp.Refresh(context.Background())
 	if err != nil {

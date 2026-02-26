@@ -143,9 +143,9 @@ func TestMockTransportCallTracking(t *testing.T) {
 	mock.ExpectCall("method2", 1)
 
 	// Make calls
-	mock.Send(ctx, codex.Request{JSONRPC: "2.0", ID: codex.RequestID{Value: "1"}, Method: "method1"})
-	mock.Send(ctx, codex.Request{JSONRPC: "2.0", ID: codex.RequestID{Value: "2"}, Method: "method1"})
-	mock.Send(ctx, codex.Request{JSONRPC: "2.0", ID: codex.RequestID{Value: "3"}, Method: "method2"})
+	_, _ = mock.Send(ctx, codex.Request{JSONRPC: "2.0", ID: codex.RequestID{Value: "1"}, Method: "method1"})
+	_, _ = mock.Send(ctx, codex.Request{JSONRPC: "2.0", ID: codex.RequestID{Value: "2"}, Method: "method1"})
+	_, _ = mock.Send(ctx, codex.Request{JSONRPC: "2.0", ID: codex.RequestID{Value: "3"}, Method: "method2"})
 
 	// Verify expectations met
 	if err := mock.VerifyCalls(); err != nil {
@@ -158,7 +158,7 @@ func TestMockTransportCallTrackingMismatch(t *testing.T) {
 	ctx := context.Background()
 
 	mock.ExpectCall("method1", 2)
-	mock.Send(ctx, codex.Request{JSONRPC: "2.0", ID: codex.RequestID{Value: "1"}, Method: "method1"})
+	_, _ = mock.Send(ctx, codex.Request{JSONRPC: "2.0", ID: codex.RequestID{Value: "1"}, Method: "method1"})
 
 	// Only made 1 call but expected 2
 	err := mock.VerifyCalls()
@@ -174,8 +174,8 @@ func TestMockTransportGetSentRequest(t *testing.T) {
 	req1 := codex.Request{JSONRPC: "2.0", ID: codex.RequestID{Value: "1"}, Method: "first"}
 	req2 := codex.Request{JSONRPC: "2.0", ID: codex.RequestID{Value: "2"}, Method: "second"}
 
-	mock.Send(ctx, req1)
-	mock.Send(ctx, req2)
+	_, _ = mock.Send(ctx, req1)
+	_, _ = mock.Send(ctx, req2)
 
 	// Test valid indices
 	got := mock.GetSentRequest(0)
@@ -204,8 +204,8 @@ func TestMockTransportGetSentNotification(t *testing.T) {
 	notif1 := codex.Notification{JSONRPC: "2.0", Method: "first"}
 	notif2 := codex.Notification{JSONRPC: "2.0", Method: "second"}
 
-	mock.Notify(ctx, notif1)
-	mock.Notify(ctx, notif2)
+	_ = mock.Notify(ctx, notif1)
+	_ = mock.Notify(ctx, notif2)
 
 	// Test valid indices
 	got := mock.GetSentNotification(0)
@@ -352,8 +352,8 @@ func TestMockTransportReset(t *testing.T) {
 	ctx := context.Background()
 
 	// Make some calls
-	mock.Send(ctx, codex.Request{JSONRPC: "2.0", ID: codex.RequestID{Value: "1"}, Method: "method1"})
-	mock.Notify(ctx, codex.Notification{JSONRPC: "2.0", Method: "notif1"})
+	_, _ = mock.Send(ctx, codex.Request{JSONRPC: "2.0", ID: codex.RequestID{Value: "1"}, Method: "method1"})
+	_ = mock.Notify(ctx, codex.Notification{JSONRPC: "2.0", Method: "notif1"})
 	mock.SetSendError(errors.New("test error"))
 	mock.Close()
 

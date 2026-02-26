@@ -228,7 +228,7 @@ func TestTransportConcurrentHandlers(t *testing.T) {
 						Method:  "server.request",
 						Params:  json.RawMessage(`{}`),
 					}
-					mock.InjectServerRequest(ctx, req)
+					_, _ = mock.InjectServerRequest(ctx, req)
 				} else {
 					notif := codex.Notification{
 						JSONRPC: "2.0",
@@ -302,7 +302,7 @@ func TestTransportConcurrentSendAndHandlers(t *testing.T) {
 				Method:  "client.request",
 				Params:  json.RawMessage(`{}`),
 			}
-			mock.Send(ctx, req)
+			_, _ = mock.Send(ctx, req)
 		}
 	}()
 
@@ -317,7 +317,7 @@ func TestTransportConcurrentSendAndHandlers(t *testing.T) {
 				Method:  "server.approval",
 				Params:  json.RawMessage(`{}`),
 			}
-			mock.InjectServerRequest(ctx, req)
+			_, _ = mock.InjectServerRequest(ctx, req)
 		}
 	}()
 
@@ -401,7 +401,7 @@ func TestTransportConcurrentClose(t *testing.T) {
 				Method:  "test.method",
 				Params:  json.RawMessage(`{}`),
 			}
-			mock.Send(ctx, req)
+			_, _ = mock.Send(ctx, req)
 			time.Sleep(time.Millisecond)
 		}
 	}()
@@ -461,5 +461,5 @@ func TestTransportHandlerPanic(t *testing.T) {
 		}
 	}()
 
-	mock.InjectServerRequest(context.Background(), req)
+	_, _ = mock.InjectServerRequest(context.Background(), req)
 }

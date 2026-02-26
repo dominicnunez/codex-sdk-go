@@ -73,7 +73,7 @@ func TestConfigRead(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := NewMockTransport()
-			mock.SetResponseData("config/read", tt.mockResponse)
+			_ = mock.SetResponseData("config/read", tt.mockResponse)
 			client := codex.NewClient(mock)
 
 			resp, err := client.Config.Read(context.Background(), tt.params)
@@ -136,7 +136,7 @@ func TestConfigReadRequirements(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := NewMockTransport()
-			mock.SetResponseData("config/requirements/read", tt.mockResponse)
+			_ = mock.SetResponseData("config/requirements/read", tt.mockResponse)
 			client := codex.NewClient(mock)
 
 			resp, err := client.Config.ReadRequirements(context.Background())
@@ -224,7 +224,7 @@ func TestConfigWrite(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := NewMockTransport()
-			mock.SetResponseData("config/value/write", tt.mockResponse)
+			_ = mock.SetResponseData("config/value/write", tt.mockResponse)
 			client := codex.NewClient(mock)
 
 			resp, err := client.Config.Write(context.Background(), tt.params)
@@ -285,7 +285,7 @@ func TestConfigBatchWrite(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := NewMockTransport()
-			mock.SetResponseData("config/batch/write", tt.mockResponse)
+			_ = mock.SetResponseData("config/batch/write", tt.mockResponse)
 			client := codex.NewClient(mock)
 
 			resp, err := client.Config.BatchWrite(context.Background(), tt.params)

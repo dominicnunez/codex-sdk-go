@@ -100,7 +100,7 @@ func TestCommandExec(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := NewMockTransport()
-			mock.SetResponseData("command/exec", tt.response)
+			_ = mock.SetResponseData("command/exec", tt.response)
 
 			client := codex.NewClient(mock)
 			resp, err := client.Command.Exec(context.Background(), tt.params)

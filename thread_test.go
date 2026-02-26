@@ -18,7 +18,7 @@ func TestThreadStart(t *testing.T) {
 		client := codex.NewClient(transport)
 
 		// Inject a mock response (simplified for now - full implementation will parse ThreadStartResponse.json)
-		transport.SetResponseData("thread/start", map[string]interface{}{
+	_ = transport.SetResponseData("thread/start", map[string]interface{}{
 			"thread": map[string]interface{}{
 				"id":            "thread-123",
 				"cliVersion":    "1.0.0",
@@ -71,7 +71,7 @@ func TestThreadStart(t *testing.T) {
 
 		client := codex.NewClient(transport)
 
-		transport.SetResponseData("thread/start", map[string]interface{}{
+	_ = transport.SetResponseData("thread/start", map[string]interface{}{
 			"thread": map[string]interface{}{
 				"id":            "thread-456",
 				"cliVersion":    "1.0.0",
@@ -122,7 +122,7 @@ func TestThreadRead(t *testing.T) {
 
 		client := codex.NewClient(transport)
 
-		transport.SetResponseData("thread/read", map[string]interface{}{
+	_ = transport.SetResponseData("thread/read", map[string]interface{}{
 			"approvalPolicy": "untrusted",
 			"cwd":            "/test/dir",
 			"model":          "gpt-4",
@@ -178,7 +178,7 @@ func TestThreadList(t *testing.T) {
 
 		client := codex.NewClient(transport)
 
-		transport.SetResponseData("thread/list", map[string]interface{}{
+	_ = transport.SetResponseData("thread/list", map[string]interface{}{
 			"threads": []interface{}{
 				map[string]interface{}{
 					"id":            "thread-1",
@@ -236,7 +236,7 @@ func TestThreadLoadedList(t *testing.T) {
 
 	client := codex.NewClient(transport)
 
-	transport.SetResponseData("thread/loadedList", map[string]interface{}{
+_ = transport.SetResponseData("thread/loadedList", map[string]interface{}{
 		"threads": []interface{}{
 			map[string]interface{}{
 				"id":            "thread-loaded",
@@ -280,7 +280,7 @@ func TestThreadResume(t *testing.T) {
 
 	client := codex.NewClient(transport)
 
-	transport.SetResponseData("thread/resume", map[string]interface{}{
+_ = transport.SetResponseData("thread/resume", map[string]interface{}{
 		"approvalPolicy": "untrusted",
 		"cwd":            "/test/dir",
 		"model":          "gpt-4",
@@ -329,7 +329,7 @@ func TestThreadFork(t *testing.T) {
 
 	client := codex.NewClient(transport)
 
-	transport.SetResponseData("thread/fork", map[string]interface{}{
+_ = transport.SetResponseData("thread/fork", map[string]interface{}{
 		"approvalPolicy": "untrusted",
 		"cwd":            "/test/dir",
 		"model":          "gpt-4",
@@ -378,7 +378,7 @@ func TestThreadRollback(t *testing.T) {
 
 	client := codex.NewClient(transport)
 
-	transport.SetResponseData("thread/rollback", map[string]interface{}{
+_ = transport.SetResponseData("thread/rollback", map[string]interface{}{
 		"approvalPolicy": "untrusted",
 		"cwd":            "/test/dir",
 		"model":          "gpt-4",
@@ -428,7 +428,7 @@ func TestThreadSetName(t *testing.T) {
 
 	client := codex.NewClient(transport)
 
-	transport.SetResponseData("thread/setName", map[string]interface{}{
+	_ = transport.SetResponseData("thread/setName", map[string]interface{}{
 		"thread": map[string]interface{}{
 			"id":            "thread-123",
 			"cliVersion":    "1.0.0",
@@ -473,7 +473,7 @@ func TestThreadArchive(t *testing.T) {
 
 	client := codex.NewClient(transport)
 
-	transport.SetResponseData("thread/archive", map[string]interface{}{
+	_ = transport.SetResponseData("thread/archive", map[string]interface{}{
 		"thread": map[string]interface{}{
 			"id":            "thread-archived",
 			"cliVersion":    "1.0.0",
@@ -516,7 +516,7 @@ func TestThreadUnarchive(t *testing.T) {
 
 	client := codex.NewClient(transport)
 
-	transport.SetResponseData("thread/unarchive", map[string]interface{}{
+	_ = transport.SetResponseData("thread/unarchive", map[string]interface{}{
 		"thread": map[string]interface{}{
 			"id":            "thread-unarchived",
 			"cliVersion":    "1.0.0",
@@ -560,7 +560,7 @@ func TestThreadUnsubscribe(t *testing.T) {
 
 	client := codex.NewClient(transport)
 
-	transport.SetResponseData("thread/unsubscribe", map[string]interface{}{})
+	_ = transport.SetResponseData("thread/unsubscribe", map[string]interface{}{})
 
 	params := codex.ThreadUnsubscribeParams{
 		ThreadID: "thread-unsub",
@@ -590,7 +590,7 @@ func TestThreadCompactStart(t *testing.T) {
 
 	client := codex.NewClient(transport)
 
-	transport.SetResponseData("thread/compactStart", map[string]interface{}{
+	_ = transport.SetResponseData("thread/compactStart", map[string]interface{}{
 		"threadId": "compact-thread-id",
 	})
 

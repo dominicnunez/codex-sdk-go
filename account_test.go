@@ -61,7 +61,7 @@ func TestAccountGet(t *testing.T) {
 			transport := NewMockTransport()
 			client := codex.NewClient(transport)
 
-			transport.SetResponseData("account/get", tt.response)
+			_ = transport.SetResponseData("account/get", tt.response)
 
 			ctx := context.Background()
 			resp, err := client.Account.Get(ctx, tt.params)
@@ -94,7 +94,7 @@ func TestAccountGetRateLimits(t *testing.T) {
 	transport := NewMockTransport()
 	client := codex.NewClient(transport)
 
-	transport.SetResponseData("account/getRateLimits", map[string]interface{}{
+	_ = transport.SetResponseData("account/getRateLimits", map[string]interface{}{
 		"rateLimits": map[string]interface{}{
 			"limitId":   "codex",
 			"limitName": "Codex Rate Limit",
@@ -188,7 +188,7 @@ func TestAccountLogin(t *testing.T) {
 			transport := NewMockTransport()
 			client := codex.NewClient(transport)
 
-			transport.SetResponseData("account/login", tt.response)
+			_ = transport.SetResponseData("account/login", tt.response)
 
 			ctx := context.Background()
 			resp, err := client.Account.Login(ctx, tt.params)
@@ -266,7 +266,7 @@ func TestAccountCancelLogin(t *testing.T) {
 			transport := NewMockTransport()
 			client := codex.NewClient(transport)
 
-			transport.SetResponseData("account/login/cancel", tt.response)
+			_ = transport.SetResponseData("account/login/cancel", tt.response)
 
 			ctx := context.Background()
 			resp, err := client.Account.CancelLogin(ctx, tt.params)
@@ -291,7 +291,7 @@ func TestAccountLogout(t *testing.T) {
 	transport := NewMockTransport()
 	client := codex.NewClient(transport)
 
-	transport.SetResponseData("account/logout", map[string]interface{}{})
+	_ = transport.SetResponseData("account/logout", map[string]interface{}{})
 
 	ctx := context.Background()
 	resp, err := client.Account.Logout(ctx)

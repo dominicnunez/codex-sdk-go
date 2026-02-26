@@ -36,7 +36,7 @@ func TestWindowsSandboxSetupStart(t *testing.T) {
 			mock := NewMockTransport()
 			client := codex.NewClient(mock)
 
-			mock.SetResponseData("windowsSandbox/setupStart", tt.response)
+			_ = mock.SetResponseData("windowsSandbox/setupStart", tt.response)
 
 			resp, err := client.System.WindowsSandboxSetupStart(context.Background(), tt.params)
 			if err != nil {
@@ -543,7 +543,7 @@ func TestSystemServiceMethodSignatures(t *testing.T) {
 	}
 
 	// Test WindowsSandboxSetupStart method signature
-	mock.SetResponseData("windowsSandbox/setupStart", map[string]interface{}{})
+	_ = mock.SetResponseData("windowsSandbox/setupStart", map[string]interface{}{})
 	_, err := client.System.WindowsSandboxSetupStart(context.Background(), codex.WindowsSandboxSetupStartParams{
 		Mode: codex.WindowsSandboxSetupModeElevated,
 	})

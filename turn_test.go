@@ -55,7 +55,7 @@ func TestTurnStart(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockTransport := NewMockTransport()
-			mockTransport.SetResponseData("turn/start", tt.want)
+			_ = mockTransport.SetResponseData("turn/start", tt.want)
 			client := codex.NewClient(mockTransport)
 
 			resp, err := client.Turn.Start(context.Background(), tt.params)
@@ -78,7 +78,7 @@ func TestTurnStart(t *testing.T) {
 // TestTurnInterrupt tests turn/interrupt method
 func TestTurnInterrupt(t *testing.T) {
 	mockTransport := NewMockTransport()
-	mockTransport.SetResponseData("turn/interrupt", map[string]interface{}{})
+	_ = mockTransport.SetResponseData("turn/interrupt", map[string]interface{}{})
 	client := codex.NewClient(mockTransport)
 
 	params := codex.TurnInterruptParams{
@@ -115,7 +115,7 @@ func TestTurnInterrupt(t *testing.T) {
 // TestTurnSteer tests turn/steer method
 func TestTurnSteer(t *testing.T) {
 	mockTransport := NewMockTransport()
-	mockTransport.SetResponseData("turn/steer", map[string]interface{}{
+	_ = mockTransport.SetResponseData("turn/steer", map[string]interface{}{
 		"turnId": "turn-789",
 	})
 	client := codex.NewClient(mockTransport)

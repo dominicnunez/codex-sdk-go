@@ -84,7 +84,7 @@ func TestStdioNewlineDelimitedJSON(t *testing.T) {
 		Result:  json.RawMessage(`{"status":"ok"}`),
 	}
 	respJSON, _ := json.Marshal(response)
-	serverWriter.Write(append(respJSON, '\n'))
+	_, _ = serverWriter.Write(append(respJSON, '\n'))
 
 	// Verify response was received
 	select {
@@ -136,7 +136,7 @@ func TestStdioConcurrentRequestDispatch(t *testing.T) {
 			Method:  method,
 		}
 		reqJSON, _ := json.Marshal(req)
-		serverWriter.Write(append(reqJSON, '\n'))
+		_, _ = serverWriter.Write(append(reqJSON, '\n'))
 	}
 
 	// Wait for all requests to be processed
@@ -239,7 +239,7 @@ func TestStdioResponseRequestIDMatching(t *testing.T) {
 			Result:  json.RawMessage(`{"index":` + string(rune('0'+i)) + `}`),
 		}
 		respJSON, _ := json.Marshal(resp)
-		serverWriter.Write(append(respJSON, '\n'))
+		_, _ = serverWriter.Write(append(respJSON, '\n'))
 	}
 
 	// Verify each request got its correct response
@@ -304,7 +304,7 @@ func TestStdioNotificationDispatch(t *testing.T) {
 			Method:  method,
 		}
 		notifJSON, _ := json.Marshal(notif)
-		serverWriter.Write(append(notifJSON, '\n'))
+		_, _ = serverWriter.Write(append(notifJSON, '\n'))
 	}
 
 	// Verify all notifications were received (order may vary due to goroutine scheduling)
@@ -373,7 +373,7 @@ func TestStdioMixedMessageTypes(t *testing.T) {
 						Result:  json.RawMessage(`{"received":true}`),
 					}
 					respJSON, _ := json.Marshal(resp)
-					serverWriter.Write(append(respJSON, '\n'))
+					_, _ = serverWriter.Write(append(respJSON, '\n'))
 				}
 			}
 		}
@@ -388,7 +388,7 @@ func TestStdioMixedMessageTypes(t *testing.T) {
 			ID:      codex.RequestID{Value: "client-req-1"},
 			Method:  "thread/start",
 		}
-		transport.Send(ctx, req)
+		_, _ = transport.Send(ctx, req)
 	}()
 
 	// Send client→server notification
@@ -397,7 +397,7 @@ func TestStdioMixedMessageTypes(t *testing.T) {
 			JSONRPC: "2.0",
 			Method:  "client/notify",
 		}
-		transport.Notify(ctx, notif)
+		_ = transport.Notify(ctx, notif)
 	}()
 
 	// Send server→client request
@@ -407,7 +407,7 @@ func TestStdioMixedMessageTypes(t *testing.T) {
 		Method:  "approval/commandExecution",
 	}
 	reqJSON, _ := json.Marshal(serverReq)
-	serverWriter.Write(append(reqJSON, '\n'))
+	_, _ = serverWriter.Write(append(reqJSON, '\n'))
 
 	// Send server→client notification
 	serverNotif := codex.Notification{
@@ -415,7 +415,7 @@ func TestStdioMixedMessageTypes(t *testing.T) {
 		Method:  "thread/updated",
 	}
 	notifJSON, _ := json.Marshal(serverNotif)
-	serverWriter.Write(append(notifJSON, '\n'))
+	_, _ = serverWriter.Write(append(notifJSON, '\n'))
 
 	// Wait for all messages to be processed
 	time.Sleep(200 * time.Millisecond)
@@ -495,7 +495,7 @@ func TestStdioInvalidJSON(t *testing.T) {
 	}
 
 	for _, line := range invalidLines {
-		serverWriter.Write([]byte(line + "\n"))
+		_, _ = serverWriter.Write([]byte(line + "\n"))
 	}
 
 	// Send a valid notification after invalid ones to verify transport still works
@@ -504,7 +504,7 @@ func TestStdioInvalidJSON(t *testing.T) {
 		Method:  "test/valid",
 	}
 	notifJSON, _ := json.Marshal(validNotif)
-	serverWriter.Write(append(notifJSON, '\n'))
+	_, _ = serverWriter.Write(append(notifJSON, '\n'))
 
 	received := make(chan string, 1)
 	transport.OnNotify(func(ctx context.Context, notif codex.Notification) {

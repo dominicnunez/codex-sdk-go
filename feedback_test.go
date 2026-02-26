@@ -49,7 +49,7 @@ func TestFeedbackUpload(t *testing.T) {
 			mock := NewMockTransport()
 			client := codex.NewClient(mock)
 
-			mock.SetResponseData("feedback/upload", map[string]interface{}{
+			_ = mock.SetResponseData("feedback/upload", map[string]interface{}{
 				"threadId": "thread-456",
 			})
 

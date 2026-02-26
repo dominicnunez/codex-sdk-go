@@ -15,7 +15,7 @@ func TestAppsList(t *testing.T) {
 		client := codex.NewClient(mock)
 
 		// Mock response with single app
-		mock.SetResponseData("apps/list", map[string]interface{}{
+		_ = mock.SetResponseData("apps/list", map[string]interface{}{
 			"data": []map[string]interface{}{
 				{
 					"id":   "test-app-123",
@@ -47,7 +47,7 @@ func TestAppsList(t *testing.T) {
 		client := codex.NewClient(mock)
 
 		// Mock response with multiple apps and pagination
-		mock.SetResponseData("apps/list", map[string]interface{}{
+		_ = mock.SetResponseData("apps/list", map[string]interface{}{
 			"data": []map[string]interface{}{
 				{
 					"id":               "app-1",
@@ -180,7 +180,7 @@ func TestAppsList(t *testing.T) {
 		mock := NewMockTransport()
 		client := codex.NewClient(mock)
 
-		mock.SetResponseData("apps/list", map[string]interface{}{
+		_ = mock.SetResponseData("apps/list", map[string]interface{}{
 			"data": []map[string]interface{}{},
 		})
 

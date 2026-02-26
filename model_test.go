@@ -152,7 +152,7 @@ func TestModelList(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := NewMockTransport()
-			mock.SetResponseData("model/list", tt.mockResponse)
+			_ = mock.SetResponseData("model/list", tt.mockResponse)
 			client := codex.NewClient(mock)
 
 			resp, err := client.Model.List(context.Background(), tt.params)
