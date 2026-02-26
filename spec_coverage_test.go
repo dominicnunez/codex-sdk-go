@@ -1,0 +1,163 @@
+package codex
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+// TestSpecCoverage verifies that every JSON schema in specs/ has a corresponding Go type.
+// This ensures the SDK covers the entire Codex protocol specification.
+func TestSpecCoverage(t *testing.T) {
+	// Map schema filenames to Go type names
+	schemaToType := make(map[string]string)
+
+	// Walk through all spec files
+	err := filepath.Walk("specs", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() && strings.HasSuffix(path, ".json") && !strings.Contains(path, "EventMsg.json") {
+			// Extract type name from filename (remove .json extension)
+			filename := filepath.Base(path)
+			typeName := strings.TrimSuffix(filename, ".json")
+			schemaToType[path] = typeName
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Failed to walk specs directory: %v", err)
+	}
+
+	t.Logf("Found %d JSON schemas in specs/", len(schemaToType))
+
+	// Track missing types
+	var missing []string
+	var found []string
+
+	// For each schema, check if we have the Go type defined
+	for schemaPath, typeName := range schemaToType {
+		// Read the schema to understand its structure
+		data, err := os.ReadFile(schemaPath)
+		if err != nil {
+			t.Errorf("Failed to read schema %s: %v", schemaPath, err)
+			continue
+		}
+
+		// Parse schema to understand if it's a top-level type or embedded
+		var schema map[string]interface{}
+		if err := json.Unmarshal(data, &schema); err != nil {
+			t.Errorf("Failed to parse schema %s: %v", schemaPath, err)
+			continue
+		}
+
+		// Check if this type exists in our codebase
+		// We use a heuristic: the type should be defined somewhere in the Go files
+		typeExists := checkTypeExists(t, typeName)
+
+		if typeExists {
+			found = append(found, typeName)
+		} else {
+			missing = append(missing, typeName+" ("+schemaPath+")")
+		}
+	}
+
+	t.Logf("Coverage: %d/%d types implemented", len(found), len(schemaToType))
+
+	// Filter missing types into intentional gaps vs actual gaps
+	var intentionalGaps []string
+	var actualGaps []string
+
+	for _, m := range missing {
+		// These are intentional - they're low-level protocol types or union/enum dispatch types
+		if strings.Contains(m, "JSONRPCRequest") || strings.Contains(m, "JSONRPCResponse") ||
+			strings.Contains(m, "JSONRPCNotification") || strings.Contains(m, "JSONRPCMessage") ||
+			strings.Contains(m, "JSONRPCError") || strings.Contains(m, "JSONRPCErrorError") ||
+			strings.Contains(m, "ServerNotification") || strings.Contains(m, "ClientNotification") ||
+			strings.Contains(m, "ServerRequest") || strings.Contains(m, "ClientRequest") ||
+			strings.Contains(m, "RequestId (") || // We use RequestID (different casing)
+			strings.Contains(m, "codex_app_server_protocol.schemas") { // Schema metadata file
+			intentionalGaps = append(intentionalGaps, m)
+		} else {
+			actualGaps = append(actualGaps, m)
+		}
+	}
+
+	if len(intentionalGaps) > 0 {
+		t.Logf("Intentional gaps (low-level protocol types or union types):")
+		for _, g := range intentionalGaps {
+			t.Logf("  - %s", g)
+		}
+	}
+
+	if len(actualGaps) > 0 {
+		t.Errorf("MISSING TYPES - these should be implemented:")
+		for _, g := range actualGaps {
+			t.Errorf("  - %s", g)
+		}
+	} else {
+		t.Logf("✓ All expected types are implemented")
+	}
+}
+
+// checkTypeExists verifies if a type with the given name exists in the codebase.
+// It looks for type definitions using a simple grep-like approach.
+func checkTypeExists(t *testing.T, typeName string) bool {
+	// Common patterns where types are defined
+	patterns := []string{
+		"type " + typeName + " struct",
+		"type " + typeName + " interface",
+		"type " + typeName + " string",
+		"type " + typeName + " int",
+		"type " + typeName + " bool",
+		"type " + typeName + " []",
+		"type " + typeName + " map",
+		"type " + typeName + " =",
+	}
+
+	// Search through all .go files (except test files)
+	found := false
+	_ = filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() && strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, "_test.go") {
+			content, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+
+			for _, pattern := range patterns {
+				if strings.Contains(string(content), pattern) {
+					found = true
+					return filepath.SkipAll // Found it, stop searching
+				}
+			}
+		}
+		return nil
+	})
+
+	return found
+}
+
+// TestSpecCoverageDocumentation documents the expected coverage based on PRD.md requirements.
+func TestSpecCoverageDocumentation(t *testing.T) {
+	requirements := map[string]int{
+		"v1 requests (Initialize)":          1,
+		"v2 client→server requests":         37,
+		"v2 server→client notifications":    40,
+		"v2 server→client approval requests": 9,
+	}
+
+	t.Log("Expected coverage per PRD.md Phase 15:")
+	total := 0
+	for category, count := range requirements {
+		t.Logf("  - %s: %d", category, count)
+		total += count
+	}
+	t.Logf("Total: %d types expected", total)
+	t.Log("Note: Some spec files are shared definitions (EventMsg.json) or embedded types")
+	t.Log("The 150 JSON schemas include both top-level types and nested definitions")
+}
