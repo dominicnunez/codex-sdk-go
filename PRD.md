@@ -99,8 +99,8 @@ Server sends requests TO the client for approval (patch, command exec, file chan
 
 ### Phase 8: Apps, MCP, Command Services
 
-- [ ] Create `apps_test.go` with tests for AppsService.List round-trip and AppListUpdatedNotification dispatch.
-- [ ] Create `apps.go` with types: `AppsListParams`, `AppsListResponse`, `AppListUpdatedNotification`. Create `AppsService` with `List(ctx, AppsListParams) (AppsListResponse, error)`. Wire as `Client.Apps`. Add notification listener. All tests in `apps_test.go` must pass.
+- [x] Create `apps_test.go` with tests for AppsService.List round-trip and AppListUpdatedNotification dispatch.
+- [x] Create `apps.go` with types: `AppsListParams`, `AppsListResponse`, `AppListUpdatedNotification`. Create `AppsService` with `List(ctx, AppsListParams) (AppsListResponse, error)`. Wire as `Client.Apps`. Add notification listener. All tests in `apps_test.go` must pass.
 - [ ] Create `mcp_test.go` with tests for McpService methods: ListServerStatus/OauthLogin/Refresh round-trips, plus OauthLoginCompleted and ToolCallProgress notification dispatch.
 - [ ] Create `mcp.go` with types: `ListMcpServerStatusParams`, `ListMcpServerStatusResponse`, `McpServerOauthLoginParams`, `McpServerOauthLoginResponse`, `McpServerRefreshResponse`, `McpServerOauthLoginCompletedNotification`, `McpToolCallProgressNotification`. Create `McpService` with methods: `ListServerStatus`, `OauthLogin`, `Refresh`. Wire as `Client.Mcp`. Add notification listeners. All tests in `mcp_test.go` must pass.
 - [ ] Create `command_test.go` with tests for CommandService.Exec round-trip and CommandExecutionOutputDeltaNotification dispatch.
