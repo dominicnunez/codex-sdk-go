@@ -351,7 +351,6 @@ func TestThreadFork(t *testing.T) {
 
 	params := codex.ThreadForkParams{
 		ThreadID: "thread-original",
-		TurnID:   strPtr("turn-5"),
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -401,7 +400,7 @@ func TestThreadRollback(t *testing.T) {
 
 	params := codex.ThreadRollbackParams{
 		ThreadID: "thread-rollback",
-		TurnID:   "turn-3",
+		NumTurns: 3,
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -447,7 +446,7 @@ func TestThreadSetName(t *testing.T) {
 
 	params := codex.ThreadSetNameParams{
 		ThreadID: "thread-123",
-		Name:     strPtr("My Custom Thread Name"),
+		Name:     "My Custom Thread Name",
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -458,9 +457,8 @@ func TestThreadSetName(t *testing.T) {
 		t.Fatalf("Thread.SetName failed: %v", err)
 	}
 
-	if response.Thread.Name == nil || *response.Thread.Name != "My Custom Thread Name" {
-		t.Errorf("expected thread name 'My Custom Thread Name'")
-	}
+	// SetName returns empty response per spec
+	_ = response
 
 	req := transport.GetSentRequest(0)
 	if req.Method != "thread/setName" {
@@ -502,9 +500,8 @@ func TestThreadArchive(t *testing.T) {
 		t.Fatalf("Thread.Archive failed: %v", err)
 	}
 
-	if response.Thread.ID != "thread-archived" {
-		t.Errorf("expected thread ID 'thread-archived', got %q", response.Thread.ID)
-	}
+	// Archive returns empty response per spec
+	_ = response
 
 	req := transport.GetSentRequest(0)
 	if req.Method != "thread/archive" {
@@ -609,9 +606,8 @@ func TestThreadCompactStart(t *testing.T) {
 		t.Fatalf("Thread.CompactStart failed: %v", err)
 	}
 
-	if response.ThreadID != "compact-thread-id" {
-		t.Errorf("expected threadId 'compact-thread-id', got %q", response.ThreadID)
-	}
+	// CompactStart returns empty response per spec
+	_ = response
 
 	req := transport.GetSentRequest(0)
 	if req.Method != "thread/compactStart" {
@@ -658,7 +654,6 @@ func TestThreadParamsSerialization(t *testing.T) {
 			BaseInstructions:      strPtr("base"),
 			DeveloperInstructions: strPtr("dev"),
 			Ephemeral:             boolPtr(true),
-			ServiceName:           strPtr("test-service"),
 		}
 
 		data, err := json.Marshal(params)
@@ -707,7 +702,6 @@ func TestThreadParamsSerialization(t *testing.T) {
 	t.Run("ThreadForkParams", func(t *testing.T) {
 		params := codex.ThreadForkParams{
 			ThreadID: "thread-original",
-			TurnID:   strPtr("turn-5"),
 		}
 
 		data, err := json.Marshal(params)
@@ -722,9 +716,6 @@ func TestThreadParamsSerialization(t *testing.T) {
 
 		if decoded["threadId"] != "thread-original" {
 			t.Error("expected threadId field")
-		}
-		if decoded["turnId"] != "turn-5" {
-			t.Error("expected turnId field")
 		}
 	})
 }

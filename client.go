@@ -2,6 +2,7 @@ package codex
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -22,6 +23,9 @@ type Client struct {
 
 	// Request ID counter for generating unique request IDs
 	requestIDCounter uint64
+
+	// Service accessors
+	Thread *ThreadService
 }
 
 // ClientOption configures a Client.
@@ -46,6 +50,9 @@ func NewClient(transport Transport, opts ...ClientOption) *Client {
 	for _, opt := range opts {
 		opt(c)
 	}
+
+	// Initialize services
+	c.Thread = newThreadService(c)
 
 	// Register the transport's notification handler to route to our listeners
 	transport.OnNotify(c.handleNotification)
@@ -123,4 +130,36 @@ func (c *Client) Close() error {
 func (c *Client) nextRequestID() interface{} {
 	id := atomic.AddUint64(&c.requestIDCounter, 1)
 	return id
+}
+
+// sendRequest is a helper that sends a typed request and unmarshals the response.
+func (c *Client) sendRequest(ctx context.Context, method string, params interface{}, result interface{}) error {
+	// Marshal params to JSON
+	paramsJSON, err := json.Marshal(params)
+	if err != nil {
+		return err
+	}
+
+	// Create request
+	req := Request{
+		JSONRPC: "2.0",
+		Method:  method,
+		Params:  paramsJSON,
+		ID:      RequestID{Value: c.nextRequestID()},
+	}
+
+	// Send request
+	resp, err := c.Send(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	// Unmarshal result if we have one
+	if result != nil && resp.Result != nil {
+		if err := json.Unmarshal(resp.Result, result); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
