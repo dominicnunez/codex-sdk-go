@@ -36,6 +36,8 @@ func normalizeID(id interface{}) interface{} {
 		return float64(v)
 	case int:
 		return float64(v)
+	case uint64:
+		return float64(v)
 	case float64:
 		return v
 	case string:
