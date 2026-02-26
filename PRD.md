@@ -133,8 +133,8 @@ Server sends requests TO the client for approval (patch, command exec, file chan
 
 ### Phase 12: Realtime & System Notifications
 
-- [ ] Create `realtime_test.go` with tests for each realtime notification type: JSON deserialization and listener dispatch for Started/Closed/Error/ItemAdded/OutputAudioDelta.
-- [ ] Create `realtime.go` with notification types: `ThreadRealtimeStartedNotification`, `ThreadRealtimeClosedNotification`, `ThreadRealtimeErrorNotification`, `ThreadRealtimeItemAddedNotification`, `ThreadRealtimeOutputAudioDeltaNotification`. Add listener registration methods on Client. All tests must pass.
+- [x] Create `realtime_test.go` with tests for each realtime notification type: JSON deserialization and listener dispatch for Started/Closed/Error/ItemAdded/OutputAudioDelta.
+- [x] Create `realtime.go` with notification types: `ThreadRealtimeStartedNotification`, `ThreadRealtimeClosedNotification`, `ThreadRealtimeErrorNotification`, `ThreadRealtimeItemAddedNotification`, `ThreadRealtimeOutputAudioDeltaNotification`. Add listener registration methods on Client. All tests must pass.
 - [ ] Create `system_test.go` with tests for each system notification type: JSON deserialization and listener dispatch for WindowsSandboxSetupCompleted/WindowsWorldWritableWarning/ContextCompacted/DeprecationNotice/Error/TerminalInteraction. Include tests for WindowsSandboxSetupStart request round-trip.
 - [ ] Create `system.go` with notification types: `WindowsSandboxSetupCompletedNotification`, `WindowsWorldWritableWarningNotification`, `ContextCompactedNotification`, `DeprecationNoticeNotification`, `ErrorNotification`, `TerminalInteractionNotification`. Create `SystemService` with `WindowsSandboxSetupStart(ctx, WindowsSandboxSetupStartParams) (WindowsSandboxSetupStartResponse, error)` (client→server request from specs). Wire as `Client.System`. Add listener registration methods on Client. All tests must pass.
 
