@@ -34,6 +34,7 @@ type Client struct {
 	Apps    *AppsService
 	Mcp     *McpService
 	Command *CommandService
+	Review  *ReviewService
 }
 
 // ClientOption configures a Client.
@@ -69,6 +70,7 @@ func NewClient(transport Transport, opts ...ClientOption) *Client {
 	c.Apps = newAppsService(c)
 	c.Mcp = newMcpService(c)
 	c.Command = newCommandService(c)
+	c.Review = newReviewService(c)
 
 	// Register the transport's notification handler to route to our listeners
 	transport.OnNotify(c.handleNotification)
