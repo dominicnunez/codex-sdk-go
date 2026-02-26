@@ -25,17 +25,18 @@ type Client struct {
 	requestIDCounter uint64
 
 	// Service accessors
-	Thread   *ThreadService
-	Turn     *TurnService
-	Account  *AccountService
-	Config   *ConfigService
-	Model    *ModelService
-	Skills   *SkillsService
-	Apps     *AppsService
-	Mcp      *McpService
-	Command  *CommandService
-	Review   *ReviewService
-	Feedback *FeedbackService
+	Thread        *ThreadService
+	Turn          *TurnService
+	Account       *AccountService
+	Config        *ConfigService
+	Model         *ModelService
+	Skills        *SkillsService
+	Apps          *AppsService
+	Mcp           *McpService
+	Command       *CommandService
+	Review        *ReviewService
+	Feedback      *FeedbackService
+	ExternalAgent *ExternalAgentService
 }
 
 // ClientOption configures a Client.
@@ -73,6 +74,7 @@ func NewClient(transport Transport, opts ...ClientOption) *Client {
 	c.Command = newCommandService(c)
 	c.Review = newReviewService(c)
 	c.Feedback = newFeedbackService(c)
+	c.ExternalAgent = newExternalAgentService(c)
 
 	// Register the transport's notification handler to route to our listeners
 	transport.OnNotify(c.handleNotification)
