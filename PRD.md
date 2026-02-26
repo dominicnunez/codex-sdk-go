@@ -58,8 +58,8 @@ Server sends requests TO the client for approval (patch, command exec, file chan
 - [x] Create `transport_test.go` testing concurrent request/response matching using MockTransport.
 - [x] Create `stdio_test.go` with tests for the stdio transport: newline-delimited JSON encoding/decoding, concurrent read dispatching, response-to-request ID matching. Use `io.Pipe` to simulate stdin/stdout.
 - [x] Create `stdio.go` implementing `Transport` over stdin/stdout using newline-delimited JSON. Must handle concurrent reads (server notifications/requests arriving while waiting for a response) by dispatching to handlers in goroutines and matching responses to pending requests by ID. All tests in `stdio_test.go` must pass.
-- [ ] Create `client_test.go` with tests using MockTransport: sending a request and receiving a response, notification listener dispatch, unknown method handling, timeout behavior.
-- [ ] Create `client.go` with `Client` struct using functional options pattern: `NewClient(transport Transport, opts ...ClientOption) *Client`. Options: `WithRequestTimeout(time.Duration)`. Client must track pending requests by ID, route incoming server requests to registered handlers, and route incoming notifications to registered listeners. All tests in `client_test.go` must pass.
+- [x] Create `client_test.go` with tests using MockTransport: sending a request and receiving a response, notification listener dispatch, unknown method handling, timeout behavior.
+- [x] Create `client.go` with `Client` struct using functional options pattern: `NewClient(transport Transport, opts ...ClientOption) *Client`. Options: `WithRequestTimeout(time.Duration)`. Client must track pending requests by ID, route incoming server requests to registered handlers, and route incoming notifications to registered listeners. All tests in `client_test.go` must pass.
 
 ### Phase 2: V1 Handshake
 

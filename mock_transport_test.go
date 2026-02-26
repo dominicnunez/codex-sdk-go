@@ -50,6 +50,13 @@ func (m *MockTransport) Send(ctx context.Context, req codex.Request) (codex.Resp
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	// Check context cancellation first
+	select {
+	case <-ctx.Done():
+		return codex.Response{}, ctx.Err()
+	default:
+	}
+
 	if m.closed {
 		return codex.Response{}, fmt.Errorf("transport closed")
 	}
