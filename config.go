@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 )
 
 // ConfigReadParams represents parameters for config/read request
@@ -186,7 +187,7 @@ func (w *ConfigLayerSourceWrapper) UnmarshalJSON(data []byte) error {
 
 	typeBytes, ok := obj["type"]
 	if !ok {
-		return nil
+		return fmt.Errorf("config layer source: missing type key")
 	}
 
 	var typeStr string
@@ -229,6 +230,8 @@ func (w *ConfigLayerSourceWrapper) UnmarshalJSON(data []byte) error {
 		w.Value = v
 	case "legacyManagedConfigTomlFromMdm":
 		w.Value = LegacyManagedConfigTomlFromMdmConfigLayerSource{}
+	default:
+		return fmt.Errorf("unknown config layer source type: %s", typeStr)
 	}
 
 	return nil
@@ -296,7 +299,7 @@ func (w ConfigLayerSourceWrapper) MarshalJSON() ([]byte, error) {
 		})
 	}
 
-	return json.Marshal(nil)
+	return nil, fmt.Errorf("unknown ConfigLayerSource type: %T", w.Value)
 }
 
 // ConfigRequirementsReadResponse represents response from config/requirements/read request
