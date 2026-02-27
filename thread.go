@@ -167,11 +167,17 @@ func (s *SessionSourceWrapper) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	// Try sub-agent object
-	var subAgent SessionSourceSubAgent
-	if err := json.Unmarshal(data, &subAgent); err == nil {
-		s.Value = subAgent
-		return nil
+	// Try sub-agent object — validate that the discriminating "subAgent" key
+	// is actually present, otherwise any JSON object would match
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err == nil {
+		if _, hasKey := raw["subAgent"]; hasKey {
+			var subAgent SessionSourceSubAgent
+			if err := json.Unmarshal(data, &subAgent); err == nil {
+				s.Value = subAgent
+				return nil
+			}
+		}
 	}
 
 	// Default to unknown
@@ -284,11 +290,17 @@ func (a *AskForApprovalWrapper) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	// Try reject object
-	var reject ApprovalPolicyReject
-	if err := json.Unmarshal(data, &reject); err == nil {
-		a.Value = reject
-		return nil
+	// Try reject object — validate that the discriminating "reject" key
+	// is present, otherwise any JSON object would silently match
+	var rawObj map[string]json.RawMessage
+	if err := json.Unmarshal(data, &rawObj); err == nil {
+		if _, hasKey := rawObj["reject"]; hasKey {
+			var reject ApprovalPolicyReject
+			if err := json.Unmarshal(data, &reject); err == nil {
+				a.Value = reject
+				return nil
+			}
+		}
 	}
 
 	// Default to untrusted
@@ -413,7 +425,7 @@ func (s SandboxPolicyWrapper) MarshalJSON() ([]byte, error) {
 type ThreadStartParams struct {
 	ApprovalPolicy        *AskForApproval `json:"approvalPolicy,omitempty"`
 	BaseInstructions      *string         `json:"baseInstructions,omitempty"`
-	Config                *interface{}    `json:"config,omitempty"`
+	Config                json.RawMessage `json:"config,omitempty"`
 	Cwd                   *string         `json:"cwd,omitempty"`
 	DeveloperInstructions *string         `json:"developerInstructions,omitempty"`
 	Ephemeral             *bool           `json:"ephemeral,omitempty"`
@@ -521,7 +533,7 @@ type ThreadResumeParams struct {
 	ThreadID              string          `json:"threadId"`
 	ApprovalPolicy        *AskForApproval `json:"approvalPolicy,omitempty"`
 	BaseInstructions      *string         `json:"baseInstructions,omitempty"`
-	Config                *interface{}    `json:"config,omitempty"`
+	Config                json.RawMessage `json:"config,omitempty"`
 	Cwd                   *string         `json:"cwd,omitempty"`
 	DeveloperInstructions *string         `json:"developerInstructions,omitempty"`
 	Model                 *string         `json:"model,omitempty"`
@@ -554,7 +566,7 @@ type ThreadForkParams struct {
 	ThreadID              string          `json:"threadId"`
 	ApprovalPolicy        *AskForApproval `json:"approvalPolicy,omitempty"`
 	BaseInstructions      *string         `json:"baseInstructions,omitempty"`
-	Config                *interface{}    `json:"config,omitempty"`
+	Config                json.RawMessage `json:"config,omitempty"`
 	Cwd                   *string         `json:"cwd,omitempty"`
 	DeveloperInstructions *string         `json:"developerInstructions,omitempty"`
 	Model                 *string         `json:"model,omitempty"`
