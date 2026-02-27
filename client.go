@@ -165,61 +165,63 @@ func (c *Client) handleRequest(ctx context.Context, req Request) (Response, erro
 	handlers := c.approvalHandlers
 	c.approvalMu.RUnlock()
 
-	// Route based on method to the appropriate approval handler
+	// Route based on method to the appropriate approval handler.
+	// Each handler function is passed from the snapshot to avoid a
+	// TOCTOU race — no second lock acquisition needed in the helpers.
 	switch req.Method {
 	case "applyPatchApproval":
 		if handlers.OnApplyPatchApproval == nil {
 			return methodNotFoundResponse(req.ID), nil
 		}
-		return c.handleApplyPatchApproval(ctx, req)
+		return handleApproval(ctx, req, handlers.OnApplyPatchApproval)
 
 	case "item/commandExecution/requestApproval":
 		if handlers.OnCommandExecutionRequestApproval == nil {
 			return methodNotFoundResponse(req.ID), nil
 		}
-		return c.handleCommandExecutionRequestApproval(ctx, req)
+		return handleApproval(ctx, req, handlers.OnCommandExecutionRequestApproval)
 
 	case "execCommandApproval":
 		if handlers.OnExecCommandApproval == nil {
 			return methodNotFoundResponse(req.ID), nil
 		}
-		return c.handleExecCommandApproval(ctx, req)
+		return handleApproval(ctx, req, handlers.OnExecCommandApproval)
 
 	case "item/fileChange/requestApproval":
 		if handlers.OnFileChangeRequestApproval == nil {
 			return methodNotFoundResponse(req.ID), nil
 		}
-		return c.handleFileChangeRequestApproval(ctx, req)
+		return handleApproval(ctx, req, handlers.OnFileChangeRequestApproval)
 
 	case "skill/requestApproval":
 		if handlers.OnSkillRequestApproval == nil {
 			return methodNotFoundResponse(req.ID), nil
 		}
-		return c.handleSkillRequestApproval(ctx, req)
+		return handleApproval(ctx, req, handlers.OnSkillRequestApproval)
 
 	case "item/tool/call":
 		if handlers.OnDynamicToolCall == nil {
 			return methodNotFoundResponse(req.ID), nil
 		}
-		return c.handleDynamicToolCall(ctx, req)
+		return handleApproval(ctx, req, handlers.OnDynamicToolCall)
 
 	case "item/tool/requestUserInput":
 		if handlers.OnToolRequestUserInput == nil {
 			return methodNotFoundResponse(req.ID), nil
 		}
-		return c.handleToolRequestUserInput(ctx, req)
+		return handleApproval(ctx, req, handlers.OnToolRequestUserInput)
 
 	case "fuzzyFileSearch":
 		if handlers.OnFuzzyFileSearch == nil {
 			return methodNotFoundResponse(req.ID), nil
 		}
-		return c.handleFuzzyFileSearch(ctx, req)
+		return handleApproval(ctx, req, handlers.OnFuzzyFileSearch)
 
 	case "account/chatgptAuthTokens/refresh":
 		if handlers.OnChatgptAuthTokensRefresh == nil {
 			return methodNotFoundResponse(req.ID), nil
 		}
-		return c.handleChatgptAuthTokensRefresh(ctx, req)
+		return handleApproval(ctx, req, handlers.OnChatgptAuthTokensRefresh)
 
 	default:
 		// Unknown method - return method not found error
@@ -239,225 +241,15 @@ func methodNotFoundResponse(id RequestID) Response {
 	}
 }
 
-// Individual approval handler methods
-
-func (c *Client) handleApplyPatchApproval(ctx context.Context, req Request) (Response, error) {
-	var params ApplyPatchApprovalParams
+// handleApproval is a generic helper that unmarshals params, calls the handler,
+// and marshals the result into a JSON-RPC response. The handler function is passed
+// from the snapshot taken in handleRequest, so no additional lock is needed.
+func handleApproval[P any, R any](ctx context.Context, req Request, handler func(context.Context, P) (R, error)) (Response, error) {
+	var params P
 	if err := json.Unmarshal(req.Params, &params); err != nil {
 		return Response{}, errInvalidParams
 	}
 
-	c.approvalMu.RLock()
-	handler := c.approvalHandlers.OnApplyPatchApproval
-	c.approvalMu.RUnlock()
-	result, err := handler(ctx, params)
-	if err != nil {
-		return Response{}, err
-	}
-
-	resultJSON, err := json.Marshal(result)
-	if err != nil {
-		return Response{}, err
-	}
-
-	return Response{
-		JSONRPC: "2.0",
-		ID:      req.ID,
-		Result:  resultJSON,
-	}, nil
-}
-
-func (c *Client) handleCommandExecutionRequestApproval(ctx context.Context, req Request) (Response, error) {
-	var params CommandExecutionRequestApprovalParams
-	if err := json.Unmarshal(req.Params, &params); err != nil {
-		return Response{}, errInvalidParams
-	}
-
-	c.approvalMu.RLock()
-	handler := c.approvalHandlers.OnCommandExecutionRequestApproval
-	c.approvalMu.RUnlock()
-	result, err := handler(ctx, params)
-	if err != nil {
-		return Response{}, err
-	}
-
-	resultJSON, err := json.Marshal(result)
-	if err != nil {
-		return Response{}, err
-	}
-
-	return Response{
-		JSONRPC: "2.0",
-		ID:      req.ID,
-		Result:  resultJSON,
-	}, nil
-}
-
-func (c *Client) handleExecCommandApproval(ctx context.Context, req Request) (Response, error) {
-	var params ExecCommandApprovalParams
-	if err := json.Unmarshal(req.Params, &params); err != nil {
-		return Response{}, errInvalidParams
-	}
-
-	c.approvalMu.RLock()
-	handler := c.approvalHandlers.OnExecCommandApproval
-	c.approvalMu.RUnlock()
-	result, err := handler(ctx, params)
-	if err != nil {
-		return Response{}, err
-	}
-
-	resultJSON, err := json.Marshal(result)
-	if err != nil {
-		return Response{}, err
-	}
-
-	return Response{
-		JSONRPC: "2.0",
-		ID:      req.ID,
-		Result:  resultJSON,
-	}, nil
-}
-
-func (c *Client) handleFileChangeRequestApproval(ctx context.Context, req Request) (Response, error) {
-	var params FileChangeRequestApprovalParams
-	if err := json.Unmarshal(req.Params, &params); err != nil {
-		return Response{}, errInvalidParams
-	}
-
-	c.approvalMu.RLock()
-	handler := c.approvalHandlers.OnFileChangeRequestApproval
-	c.approvalMu.RUnlock()
-	result, err := handler(ctx, params)
-	if err != nil {
-		return Response{}, err
-	}
-
-	resultJSON, err := json.Marshal(result)
-	if err != nil {
-		return Response{}, err
-	}
-
-	return Response{
-		JSONRPC: "2.0",
-		ID:      req.ID,
-		Result:  resultJSON,
-	}, nil
-}
-
-func (c *Client) handleSkillRequestApproval(ctx context.Context, req Request) (Response, error) {
-	var params SkillRequestApprovalParams
-	if err := json.Unmarshal(req.Params, &params); err != nil {
-		return Response{}, errInvalidParams
-	}
-
-	c.approvalMu.RLock()
-	handler := c.approvalHandlers.OnSkillRequestApproval
-	c.approvalMu.RUnlock()
-	result, err := handler(ctx, params)
-	if err != nil {
-		return Response{}, err
-	}
-
-	resultJSON, err := json.Marshal(result)
-	if err != nil {
-		return Response{}, err
-	}
-
-	return Response{
-		JSONRPC: "2.0",
-		ID:      req.ID,
-		Result:  resultJSON,
-	}, nil
-}
-
-func (c *Client) handleDynamicToolCall(ctx context.Context, req Request) (Response, error) {
-	var params DynamicToolCallParams
-	if err := json.Unmarshal(req.Params, &params); err != nil {
-		return Response{}, errInvalidParams
-	}
-
-	c.approvalMu.RLock()
-	handler := c.approvalHandlers.OnDynamicToolCall
-	c.approvalMu.RUnlock()
-	result, err := handler(ctx, params)
-	if err != nil {
-		return Response{}, err
-	}
-
-	resultJSON, err := json.Marshal(result)
-	if err != nil {
-		return Response{}, err
-	}
-
-	return Response{
-		JSONRPC: "2.0",
-		ID:      req.ID,
-		Result:  resultJSON,
-	}, nil
-}
-
-func (c *Client) handleToolRequestUserInput(ctx context.Context, req Request) (Response, error) {
-	var params ToolRequestUserInputParams
-	if err := json.Unmarshal(req.Params, &params); err != nil {
-		return Response{}, errInvalidParams
-	}
-
-	c.approvalMu.RLock()
-	handler := c.approvalHandlers.OnToolRequestUserInput
-	c.approvalMu.RUnlock()
-	result, err := handler(ctx, params)
-	if err != nil {
-		return Response{}, err
-	}
-
-	resultJSON, err := json.Marshal(result)
-	if err != nil {
-		return Response{}, err
-	}
-
-	return Response{
-		JSONRPC: "2.0",
-		ID:      req.ID,
-		Result:  resultJSON,
-	}, nil
-}
-
-func (c *Client) handleFuzzyFileSearch(ctx context.Context, req Request) (Response, error) {
-	var params FuzzyFileSearchParams
-	if err := json.Unmarshal(req.Params, &params); err != nil {
-		return Response{}, errInvalidParams
-	}
-
-	c.approvalMu.RLock()
-	handler := c.approvalHandlers.OnFuzzyFileSearch
-	c.approvalMu.RUnlock()
-	result, err := handler(ctx, params)
-	if err != nil {
-		return Response{}, err
-	}
-
-	resultJSON, err := json.Marshal(result)
-	if err != nil {
-		return Response{}, err
-	}
-
-	return Response{
-		JSONRPC: "2.0",
-		ID:      req.ID,
-		Result:  resultJSON,
-	}, nil
-}
-
-func (c *Client) handleChatgptAuthTokensRefresh(ctx context.Context, req Request) (Response, error) {
-	var params ChatgptAuthTokensRefreshParams
-	if err := json.Unmarshal(req.Params, &params); err != nil {
-		return Response{}, errInvalidParams
-	}
-
-	c.approvalMu.RLock()
-	handler := c.approvalHandlers.OnChatgptAuthTokensRefresh
-	c.approvalMu.RUnlock()
 	result, err := handler(ctx, params)
 	if err != nil {
 		return Response{}, err
