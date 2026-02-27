@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 )
 
 // ReviewDelivery specifies where to run the review.
@@ -95,7 +96,7 @@ func (w *ReviewTargetWrapper) UnmarshalJSON(data []byte) error {
 
 	typeStr, ok := raw["type"].(string)
 	if !ok {
-		return nil
+		return fmt.Errorf("review target: missing or non-string type key")
 	}
 
 	switch typeStr {
@@ -119,6 +120,8 @@ func (w *ReviewTargetWrapper) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		w.Value = &target
+	default:
+		return fmt.Errorf("unknown review target type: %s", typeStr)
 	}
 
 	return nil
