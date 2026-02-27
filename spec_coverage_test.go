@@ -78,7 +78,8 @@ func TestSpecCoverage(t *testing.T) {
 			strings.Contains(m, "ServerNotification") || strings.Contains(m, "ClientNotification") ||
 			strings.Contains(m, "ServerRequest") || strings.Contains(m, "ClientRequest") ||
 			strings.Contains(m, "RequestId (") || // We use RequestID (different casing)
-			strings.Contains(m, "codex_app_server_protocol.schemas") { // Schema metadata file
+			strings.Contains(m, "codex_app_server_protocol.schemas") || // Schema metadata file
+			strings.Contains(m, "RawResponseItemCompletedNotification") { // Schema exists but not in ServerNotification.json
 			intentionalGaps = append(intentionalGaps, m)
 		} else {
 			actualGaps = append(actualGaps, m)

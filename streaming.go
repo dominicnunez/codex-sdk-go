@@ -86,17 +86,6 @@ type ItemCompletedNotification struct {
 	TurnID   string          `json:"turnId"`
 }
 
-// RawResponseItemCompletedNotification is sent when a raw response item completes.
-// Method: turn/rawResponseItemCompleted
-// The Item field contains a ResponseItem discriminated union from the Responses API.
-// Response items include: message, reasoning, local_shell_call, function_call, function_call_output,
-// custom_tool_call, custom_tool_call_output, web_search_call, ghost_snapshot, compaction, other.
-type RawResponseItemCompletedNotification struct {
-	Item     json.RawMessage `json:"item"` // ResponseItem discriminated union
-	ThreadID string          `json:"threadId"`
-	TurnID   string          `json:"turnId"`
-}
-
 // Listener registration methods on Client
 
 // OnAgentMessageDelta registers a listener for agent/messageDelta notifications.
@@ -188,13 +177,3 @@ func (c *Client) OnItemCompleted(handler func(ItemCompletedNotification)) {
 	})
 }
 
-// OnRawResponseItemCompleted registers a listener for turn/rawResponseItemCompleted notifications.
-func (c *Client) OnRawResponseItemCompleted(handler func(RawResponseItemCompletedNotification)) {
-	c.OnNotification("item/rawResponseItemCompleted", func(ctx context.Context, notif Notification) {
-		var n RawResponseItemCompletedNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
-			return
-		}
-		handler(n)
-	})
-}
