@@ -45,7 +45,7 @@ func (c *Client) Initialize(ctx context.Context, params InitializeParams) (Initi
 
 	// Create request
 	req := Request{
-		JSONRPC: "2.0",
+		JSONRPC: jsonrpcVersion,
 		ID:      RequestID{Value: c.nextRequestID()},
 		Method:  "initialize",
 		Params:  paramsJSON,

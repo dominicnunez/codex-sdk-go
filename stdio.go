@@ -298,7 +298,7 @@ func (t *StdioTransport) handleRequest(data []byte) {
 	if handler == nil {
 		// No handler registered - send method not found error
 		errorResp := Response{
-			JSONRPC: "2.0",
+			JSONRPC: jsonrpcVersion,
 			ID:      req.ID,
 			Error: &Error{
 				Code:    ErrCodeMethodNotFound,
@@ -320,7 +320,7 @@ func (t *StdioTransport) handleRequest(data []byte) {
 				code = ErrCodeInvalidParams
 			}
 			errorResp := Response{
-				JSONRPC: "2.0",
+				JSONRPC: jsonrpcVersion,
 				ID:      req.ID,
 				Error: &Error{
 					Code:    code,
@@ -332,7 +332,7 @@ func (t *StdioTransport) handleRequest(data []byte) {
 		}
 
 		// Ensure response has correct ID and version
-		resp.JSONRPC = "2.0"
+		resp.JSONRPC = jsonrpcVersion
 		resp.ID = req.ID
 		_ = t.writeMessage(resp) // Error writing response - nothing more we can do (already in goroutine)
 	}()

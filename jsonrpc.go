@@ -2,6 +2,9 @@ package codex
 
 import "encoding/json"
 
+// jsonrpcVersion is the protocol version string for JSON-RPC 2.0.
+const jsonrpcVersion = "2.0"
+
 // JSON-RPC 2.0 error codes
 const (
 	ErrCodeParseError     = -32700 // Invalid JSON was received

@@ -232,7 +232,7 @@ func (c *Client) handleRequest(ctx context.Context, req Request) (Response, erro
 // methodNotFoundResponse creates a JSON-RPC method-not-found error response.
 func methodNotFoundResponse(id RequestID) Response {
 	return Response{
-		JSONRPC: "2.0",
+		JSONRPC: jsonrpcVersion,
 		ID:      id,
 		Error: &Error{
 			Code:    ErrCodeMethodNotFound,
@@ -261,7 +261,7 @@ func handleApproval[P any, R any](ctx context.Context, req Request, handler func
 	}
 
 	return Response{
-		JSONRPC: "2.0",
+		JSONRPC: jsonrpcVersion,
 		ID:      req.ID,
 		Result:  resultJSON,
 	}, nil
@@ -288,7 +288,7 @@ func (c *Client) sendRequest(ctx context.Context, method string, params interfac
 
 	// Create request
 	req := Request{
-		JSONRPC: "2.0",
+		JSONRPC: jsonrpcVersion,
 		Method:  method,
 		Params:  paramsJSON,
 		ID:      RequestID{Value: c.nextRequestID()},
@@ -321,7 +321,7 @@ func (c *Client) sendRequestRaw(ctx context.Context, method string, params inter
 
 	// Create request
 	req := Request{
-		JSONRPC: "2.0",
+		JSONRPC: jsonrpcVersion,
 		Method:  method,
 		Params:  paramsJSON,
 		ID:      RequestID{Value: c.nextRequestID()},
