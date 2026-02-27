@@ -25,6 +25,9 @@ type StdioTransport struct {
 	notifHandler  NotificationHandler
 	readerStopped chan struct{}
 	once          sync.Once
+	scanErr       error // set by readLoop when scanner fails
+	ctx           context.Context
+	cancelCtx     context.CancelFunc
 }
 
 // normalizeID normalizes request IDs for map key matching.
@@ -51,11 +54,14 @@ func normalizeID(id interface{}) interface{} {
 // Typically, reader is os.Stdin and writer is os.Stdout.
 // The transport starts a background goroutine to read incoming messages.
 func NewStdioTransport(reader io.Reader, writer io.Writer) *StdioTransport {
+	ctx, cancel := context.WithCancel(context.Background())
 	t := &StdioTransport{
 		reader:        reader,
 		writer:        writer,
 		pendingReqs:   make(map[interface{}]chan Response),
 		readerStopped: make(chan struct{}),
+		ctx:           ctx,
+		cancelCtx:     cancel,
 	}
 	go t.readLoop()
 	return t
@@ -121,7 +127,17 @@ func (t *StdioTransport) Notify(ctx context.Context, notif Notification) error {
 	}
 	t.mu.Unlock()
 
-	return t.writeMessage(notif)
+	writeDone := make(chan error, 1)
+	go func() {
+		writeDone <- t.writeMessage(notif)
+	}()
+
+	select {
+	case err := <-writeDone:
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // OnRequest registers a handler for incoming JSON-RPC requests from the server.
@@ -148,6 +164,7 @@ func (t *StdioTransport) Close() error {
 	}
 
 	t.closed = true
+	t.cancelCtx()
 
 	// Unblock all pending request waiters by sending zero-value responses.
 	// We send rather than close because handleResponse may concurrently
@@ -161,6 +178,14 @@ func (t *StdioTransport) Close() error {
 	}
 
 	return nil
+}
+
+// ScanErr returns the error (if any) from the reader goroutine's scanner.
+// Returns nil if the reader stopped due to EOF or hasn't stopped yet.
+func (t *StdioTransport) ScanErr() error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.scanErr
 }
 
 // writeMessage writes a JSON-RPC message as newline-delimited JSON
@@ -225,6 +250,12 @@ func (t *StdioTransport) readLoop() {
 
 		// Unknown message type - skip it
 	}
+
+	if err := scanner.Err(); err != nil {
+		t.mu.Lock()
+		t.scanErr = err
+		t.mu.Unlock()
+	}
 }
 
 // handleResponse routes an incoming response to the pending request channel
@@ -278,10 +309,9 @@ func (t *StdioTransport) handleRequest(data []byte) {
 		return
 	}
 
-	// Dispatch to handler in goroutine
+	// Dispatch to handler in goroutine with transport-scoped context
 	go func() {
-		ctx := context.Background()
-		resp, err := handler(ctx, req)
+		resp, err := handler(t.ctx, req)
 		if err != nil {
 			// Handler returned error - use generic message to avoid leaking
 			// internal details across the trust boundary
@@ -324,9 +354,8 @@ func (t *StdioTransport) handleNotification(data []byte) {
 		return
 	}
 
-	// Dispatch to handler in goroutine
+	// Dispatch to handler in goroutine with transport-scoped context
 	go func() {
-		ctx := context.Background()
-		handler(ctx, notif)
+		handler(t.ctx, notif)
 	}()
 }
