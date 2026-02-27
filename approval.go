@@ -167,8 +167,8 @@ type NetworkPolicyAmendmentDecision struct {
 
 // NetworkPolicyAmendment defines a network policy rule.
 type NetworkPolicyAmendment struct {
-	Action string `json:"action"` // "allow" or "deny"
-	Host   string `json:"host"`
+	Action NetworkPolicyRuleAction `json:"action"`
+	Host   string                  `json:"host"`
 }
 
 // UnmarshalJSON implements custom unmarshaling for ReviewDecisionWrapper.
@@ -401,8 +401,8 @@ func (w CommandActionWrapper) MarshalJSON() ([]byte, error) {
 
 // NetworkApprovalContext provides context for network-related approval requests.
 type NetworkApprovalContext struct {
-	Host     string `json:"host"`
-	Protocol string `json:"protocol"` // "http", "https", "socks5Tcp", "socks5Udp"
+	Host     string                  `json:"host"`
+	Protocol NetworkApprovalProtocol `json:"protocol"`
 }
 
 // CommandExecutionRequestApprovalResponse represents the response to a command execution approval request.
@@ -674,7 +674,7 @@ type FileChangeRequestApprovalParams struct {
 
 // FileChangeRequestApprovalResponse represents the response to a file change approval request.
 type FileChangeRequestApprovalResponse struct {
-	Decision string `json:"decision"` // "accept", "acceptForSession", "decline", "cancel"
+	Decision FileChangeApprovalDecision `json:"decision"`
 }
 
 // ========== SkillRequestApproval (NEW - turn/start API) ==========
@@ -687,7 +687,7 @@ type SkillRequestApprovalParams struct {
 
 // SkillRequestApprovalResponse represents the response to a skill approval request.
 type SkillRequestApprovalResponse struct {
-	Decision string `json:"decision"` // "approve" or "decline"
+	Decision SkillApprovalDecision `json:"decision"`
 }
 
 // ========== DynamicToolCall (NEW - Direct Tool Execution) ==========
@@ -825,7 +825,7 @@ type ToolRequestUserInputAnswer struct {
 
 // ChatgptAuthTokensRefreshParams represents parameters for ChatGPT auth token refresh.
 type ChatgptAuthTokensRefreshParams struct {
-	Reason            string  `json:"reason"` // "unauthorized"
+	Reason            ChatgptAuthTokensRefreshReason `json:"reason"`
 	PreviousAccountID *string `json:"previousAccountId,omitempty"`
 }
 

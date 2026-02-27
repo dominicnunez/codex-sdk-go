@@ -23,12 +23,12 @@ type TurnStartParams struct {
 	Input          []UserInput     `json:"input"`
 	ApprovalPolicy *AskForApproval `json:"approvalPolicy,omitempty"`
 	Cwd            *string         `json:"cwd,omitempty"`
-	Effort         *string         `json:"effort,omitempty"`
-	Model          *string         `json:"model,omitempty"`
-	OutputSchema   interface{}     `json:"outputSchema,omitempty"`
-	Personality    *string         `json:"personality,omitempty"`
-	SandboxPolicy  *SandboxPolicy  `json:"sandboxPolicy,omitempty"`
-	Summary        *string         `json:"summary,omitempty"`
+	Effort         *ReasoningEffort         `json:"effort,omitempty"`
+	Model          *string                  `json:"model,omitempty"`
+	OutputSchema   interface{}              `json:"outputSchema,omitempty"`
+	Personality    *Personality             `json:"personality,omitempty"`
+	SandboxPolicy  *SandboxPolicy           `json:"sandboxPolicy,omitempty"`
+	Summary        *ReasoningSummaryWrapper  `json:"summary,omitempty"`
 }
 
 // UnmarshalJSON implements custom unmarshaling for TurnStartParams

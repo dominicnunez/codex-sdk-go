@@ -26,22 +26,22 @@ type Config struct {
 	CompactPrompt               *string                `json:"compact_prompt,omitempty"`
 	DeveloperInstructions       *string                `json:"developer_instructions,omitempty"`
 	ForcedChatgptWorkspaceID    *string                `json:"forced_chatgpt_workspace_id,omitempty"`
-	ForcedLoginMethod           *string                `json:"forced_login_method,omitempty"` // "chatgpt" | "api"
+	ForcedLoginMethod           *ForcedLoginMethod     `json:"forced_login_method,omitempty"`
 	Instructions                *string                `json:"instructions,omitempty"`
 	Model                       *string                `json:"model,omitempty"`
 	ModelAutoCompactTokenLimit  *int64                 `json:"model_auto_compact_token_limit,omitempty"`
 	ModelContextWindow          *int64                 `json:"model_context_window,omitempty"`
 	ModelProvider               *string                `json:"model_provider,omitempty"`
-	ModelReasoningEffort        *string                `json:"model_reasoning_effort,omitempty"` // "none" | "minimal" | "low" | "medium" | "high" | "xhigh"
+	ModelReasoningEffort        *ReasoningEffort       `json:"model_reasoning_effort,omitempty"`
 	ModelReasoningSummary       *ReasoningSummaryWrapper `json:"model_reasoning_summary,omitempty"`
-	ModelVerbosity              *string                `json:"model_verbosity,omitempty"` // "low" | "medium" | "high"
+	ModelVerbosity              *Verbosity             `json:"model_verbosity,omitempty"`
 	Profile                     *string                `json:"profile,omitempty"`
 	Profiles                    map[string]ProfileV2   `json:"profiles,omitempty"`
 	ReviewModel                 *string                `json:"review_model,omitempty"`
-	SandboxMode                 *string                `json:"sandbox_mode,omitempty"` // "read-only" | "workspace-write" | "danger-full-access"
+	SandboxMode                 *SandboxMode           `json:"sandbox_mode,omitempty"`
 	SandboxWorkspaceWrite       *SandboxWorkspaceWrite `json:"sandbox_workspace_write,omitempty"`
 	Tools                       *ToolsV2               `json:"tools,omitempty"`
-	WebSearch                   *string                `json:"web_search,omitempty"` // "disabled" | "cached" | "live"
+	WebSearch                   *WebSearchMode         `json:"web_search,omitempty"`
 }
 
 // AnalyticsConfig represents analytics configuration
@@ -103,10 +103,10 @@ type ProfileV2 struct {
 	ChatgptBaseURL       *string                  `json:"chatgpt_base_url,omitempty"`
 	Model                *string                  `json:"model,omitempty"`
 	ModelProvider        *string                  `json:"model_provider,omitempty"`
-	ModelReasoningEffort *string                  `json:"model_reasoning_effort,omitempty"`
+	ModelReasoningEffort *ReasoningEffort          `json:"model_reasoning_effort,omitempty"`
 	ModelReasoningSummary *ReasoningSummaryWrapper `json:"model_reasoning_summary,omitempty"`
-	ModelVerbosity       *string                  `json:"model_verbosity,omitempty"`
-	WebSearch            *string                  `json:"web_search,omitempty"`
+	ModelVerbosity       *Verbosity               `json:"model_verbosity,omitempty"`
+	WebSearch            *WebSearchMode           `json:"web_search,omitempty"`
 }
 
 // ConfigLayer represents a configuration layer
@@ -310,15 +310,15 @@ type ConfigRequirementsReadResponse struct {
 // ConfigRequirements represents configuration requirements
 type ConfigRequirements struct {
 	AllowedApprovalPolicies *[]AskForApprovalWrapper `json:"allowedApprovalPolicies,omitempty"`
-	AllowedSandboxModes     *[]string                `json:"allowedSandboxModes,omitempty"` // ["read-only", "workspace-write", ...]
-	AllowedWebSearchModes   *[]string                `json:"allowedWebSearchModes,omitempty"` // ["disabled", "cached", "live"]
-	EnforceResidency        *string                  `json:"enforceResidency,omitempty"` // "us"
+	AllowedSandboxModes     *[]SandboxMode           `json:"allowedSandboxModes,omitempty"`
+	AllowedWebSearchModes   *[]WebSearchMode         `json:"allowedWebSearchModes,omitempty"`
+	EnforceResidency        *ResidencyRequirement    `json:"enforceResidency,omitempty"`
 }
 
 // ConfigValueWriteParams represents parameters for config/value/write request
 type ConfigValueWriteParams struct {
 	KeyPath         string          `json:"keyPath"`
-	MergeStrategy   string          `json:"mergeStrategy"` // "replace" | "upsert"
+	MergeStrategy   MergeStrategy   `json:"mergeStrategy"`
 	Value           json.RawMessage `json:"value"`
 	FilePath        *string         `json:"filePath,omitempty"`
 	ExpectedVersion *string         `json:"expectedVersion,omitempty"`
@@ -334,14 +334,14 @@ type ConfigBatchWriteParams struct {
 // ConfigEdit represents a single edit in a batch write
 type ConfigEdit struct {
 	KeyPath       string          `json:"keyPath"`
-	MergeStrategy string          `json:"mergeStrategy"` // "replace" | "upsert"
+	MergeStrategy MergeStrategy   `json:"mergeStrategy"`
 	Value         json.RawMessage `json:"value"`
 }
 
 // ConfigWriteResponse represents response from config write operations
 type ConfigWriteResponse struct {
 	FilePath           string               `json:"filePath"`
-	Status             string               `json:"status"` // "ok" | "okOverridden"
+	Status             WriteStatus          `json:"status"`
 	Version            string               `json:"version"`
 	OverriddenMetadata *OverriddenMetadata  `json:"overriddenMetadata,omitempty"`
 }

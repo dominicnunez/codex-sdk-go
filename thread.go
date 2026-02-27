@@ -130,18 +130,18 @@ func (ThreadStatusSystemError) isThreadStatus() {}
 
 // ThreadStatusActive represents an active thread
 type ThreadStatusActive struct {
-	Type        string   `json:"type"`
-	ActiveFlags []string `json:"activeFlags"`
+	Type        string             `json:"type"`
+	ActiveFlags []ThreadActiveFlag `json:"activeFlags"`
 }
 
 func (ThreadStatusActive) isThreadStatus() {}
 
 // Turn represents a single turn in a conversation
 type Turn struct {
-	ID     string     `json:"id"`
-	Status string     `json:"status"` // "completed" | "interrupted" | "failed" | "inProgress"
-	Items  []string   `json:"items"`  // Simplified for now - actual type is []ThreadItem
-	Error  *TurnError `json:"error,omitempty"`
+	ID     string          `json:"id"`
+	Status TurnStatus      `json:"status"`
+	Items  json.RawMessage `json:"items"` // []ThreadItem discriminated union
+	Error  *TurnError      `json:"error,omitempty"`
 }
 
 // TurnError represents an error in a turn
@@ -482,8 +482,8 @@ type ThreadStartParams struct {
 	Ephemeral             *bool           `json:"ephemeral,omitempty"`
 	Model                 *string         `json:"model,omitempty"`
 	ModelProvider         *string         `json:"modelProvider,omitempty"`
-	Personality           *string         `json:"personality,omitempty"`
-	Sandbox               *string         `json:"sandbox,omitempty"`
+	Personality           *Personality    `json:"personality,omitempty"`
+	Sandbox               *SandboxMode    `json:"sandbox,omitempty"`
 	ServiceName           *string         `json:"serviceName,omitempty"`
 }
 
@@ -535,8 +535,8 @@ type ThreadListParams struct {
 	Limit          *uint32  `json:"limit,omitempty"`
 	ModelProviders []string `json:"modelProviders,omitempty"`
 	SearchTerm     *string  `json:"searchTerm,omitempty"`
-	SortKey        *string  `json:"sortKey,omitempty"`
-	SourceKinds    []string `json:"sourceKinds,omitempty"`
+	SortKey        *ThreadSortKey    `json:"sortKey,omitempty"`
+	SourceKinds    []ThreadSourceKind `json:"sourceKinds,omitempty"`
 }
 
 // ThreadListResponse is the response from listing threads
@@ -585,8 +585,8 @@ type ThreadResumeParams struct {
 	DeveloperInstructions *string         `json:"developerInstructions,omitempty"`
 	Model                 *string         `json:"model,omitempty"`
 	ModelProvider         *string         `json:"modelProvider,omitempty"`
-	Personality           *string         `json:"personality,omitempty"`
-	Sandbox               *string         `json:"sandbox,omitempty"`
+	Personality           *Personality    `json:"personality,omitempty"`
+	Sandbox               *SandboxMode    `json:"sandbox,omitempty"`
 }
 
 // ThreadResumeResponse is the response from resuming a thread
@@ -619,7 +619,7 @@ type ThreadForkParams struct {
 	DeveloperInstructions *string         `json:"developerInstructions,omitempty"`
 	Model                 *string         `json:"model,omitempty"`
 	ModelProvider         *string         `json:"modelProvider,omitempty"`
-	Sandbox               *string         `json:"sandbox,omitempty"`
+	Sandbox               *SandboxMode    `json:"sandbox,omitempty"`
 }
 
 // ThreadForkResponse is the response from forking a thread
@@ -727,7 +727,7 @@ type ThreadUnsubscribeParams struct {
 
 // ThreadUnsubscribeResponse is the response from unsubscribing from a thread
 type ThreadUnsubscribeResponse struct {
-	Status string `json:"status"` // notLoaded | notSubscribed | unsubscribed
+	Status ThreadUnsubscribeStatus `json:"status"`
 }
 
 // Unsubscribe unsubscribes from a thread
