@@ -148,9 +148,9 @@ type Turn struct {
 
 // TurnError represents an error in a turn
 type TurnError struct {
-	Message           string      `json:"message"`
-	CodexErrorInfo    interface{} `json:"codexErrorInfo,omitempty"`    // Simplified for now
-	AdditionalDetails *string     `json:"additionalDetails,omitempty"`
+	Message           string           `json:"message"`
+	CodexErrorInfo    json.RawMessage  `json:"codexErrorInfo,omitempty"`
+	AdditionalDetails *string          `json:"additionalDetails,omitempty"`
 }
 
 // SessionSourceWrapper wraps SessionSource for JSON marshaling
