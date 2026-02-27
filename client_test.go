@@ -3,10 +3,11 @@ package codex_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
-	"github.com/dominicnunez/codex-sdk-go"
+	codex "github.com/dominicnunez/codex-sdk-go"
 )
 
 // TestClientSendRequest verifies that the Client can send a request and receive a response.
@@ -139,12 +140,13 @@ func TestClientRequestTimeout(t *testing.T) {
 
 	_, err := client.Send(ctx, req)
 	if err == nil {
-		t.Fatal("expected timeout error, got nil")
+		t.Fatal("expected canceled error, got nil")
 	}
 
-	// Verify it's a timeout error
-	if !isTimeoutError(err) {
-		t.Errorf("expected timeout error, got: %v", err)
+	// Verify it's a CanceledError (not TimeoutError — cancellation is user-initiated)
+	var cancelErr *codex.CanceledError
+	if !errors.As(err, &cancelErr) {
+		t.Errorf("expected CanceledError, got: %v", err)
 	}
 }
 

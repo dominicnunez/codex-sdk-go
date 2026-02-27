@@ -118,7 +118,7 @@ func (c *Client) Send(ctx context.Context, req Request) (Response, error) {
 			return Response{}, NewTimeoutError("request timeout exceeded")
 		}
 		if ctx.Err() == context.Canceled {
-			return Response{}, NewTimeoutError("request cancelled")
+			return Response{}, NewCanceledError("request cancelled")
 		}
 		// Wrap other errors as transport errors
 		return Response{}, NewTransportError("failed to send request", err)

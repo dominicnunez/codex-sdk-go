@@ -113,3 +113,25 @@ func (e *TimeoutError) Is(target error) bool {
 	_, ok := target.(*TimeoutError)
 	return ok
 }
+
+// CanceledError represents an explicit context cancellation (user-initiated).
+// Distinct from TimeoutError which represents deadline-driven cancellation.
+type CanceledError struct {
+	msg string
+}
+
+// NewCanceledError creates a new CanceledError with the given message.
+func NewCanceledError(msg string) *CanceledError {
+	return &CanceledError{msg: msg}
+}
+
+// Error implements the error interface.
+func (e *CanceledError) Error() string {
+	return fmt.Sprintf("canceled: %s", e.msg)
+}
+
+// Is implements errors.Is by matching all CanceledError instances.
+func (e *CanceledError) Is(target error) bool {
+	_, ok := target.(*CanceledError)
+	return ok
+}
