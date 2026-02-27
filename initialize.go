@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 )
 
 // ClientInfo represents information about the client application.
@@ -57,6 +58,9 @@ func (c *Client) Initialize(ctx context.Context, params InitializeParams) (Initi
 	}
 
 	// Parse response
+	if resp.Result == nil {
+		return InitializeResponse{}, fmt.Errorf("initialize: server returned empty result")
+	}
 	var result InitializeResponse
 	if err := json.Unmarshal(resp.Result, &result); err != nil {
 		return InitializeResponse{}, err
