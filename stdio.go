@@ -283,13 +283,18 @@ func (t *StdioTransport) handleRequest(data []byte) {
 		ctx := context.Background()
 		resp, err := handler(ctx, req)
 		if err != nil {
-			// Handler returned error - convert to JSON-RPC error response
+			// Handler returned error - use generic message to avoid leaking
+			// internal details across the trust boundary
+			code := ErrCodeInternalError
+			if errors.Is(err, errInvalidParams) {
+				code = ErrCodeInvalidParams
+			}
 			errorResp := Response{
 				JSONRPC: "2.0",
 				ID:      req.ID,
 				Error: &Error{
-					Code:    ErrCodeInternalError,
-					Message: err.Error(),
+					Code:    code,
+					Message: "internal handler error",
 				},
 			}
 			_ = t.writeMessage(errorResp) // Error writing error response - nothing more we can do
