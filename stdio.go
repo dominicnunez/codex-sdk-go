@@ -149,11 +149,16 @@ func (t *StdioTransport) Close() error {
 
 	t.closed = true
 
-	// Close all pending request channels
-	for _, ch := range t.pendingReqs {
-		close(ch)
+	// Unblock all pending request waiters by sending zero-value responses.
+	// We send rather than close because handleResponse may concurrently
+	// hold a reference to the channel and attempt a send after Close.
+	for id, ch := range t.pendingReqs {
+		select {
+		case ch <- Response{}:
+		default:
+		}
+		delete(t.pendingReqs, id)
 	}
-	t.pendingReqs = make(map[interface{}]chan Response)
 
 	return nil
 }
@@ -233,6 +238,10 @@ func (t *StdioTransport) handleResponse(data []byte) {
 	normalizedID := normalizeID(resp.ID.Value)
 
 	t.mu.Lock()
+	if t.closed {
+		t.mu.Unlock()
+		return
+	}
 	respChan, ok := t.pendingReqs[normalizedID]
 	t.mu.Unlock()
 
@@ -240,7 +249,6 @@ func (t *StdioTransport) handleResponse(data []byte) {
 		select {
 		case respChan <- resp:
 		default:
-			// Channel is full or closed - drop the response
 		}
 	}
 }
