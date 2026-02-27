@@ -143,7 +143,7 @@ func TestCommandExecutionOutputDeltaNotification(t *testing.T) {
 	// Inject server notification
 	notif := codex.Notification{
 		JSONRPC: "2.0",
-		Method:  "command/executionOutputDelta",
+		Method:  "item/commandExecution/outputDelta",
 		Params: json.RawMessage(`{
 			"threadId": "thread-123",
 			"turnId": "turn-456",

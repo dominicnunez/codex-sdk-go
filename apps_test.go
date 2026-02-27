@@ -15,7 +15,7 @@ func TestAppsList(t *testing.T) {
 		client := codex.NewClient(mock)
 
 		// Mock response with single app
-		_ = mock.SetResponseData("apps/list", map[string]interface{}{
+		_ = mock.SetResponseData("app/list", map[string]interface{}{
 			"data": []map[string]interface{}{
 				{
 					"id":   "test-app-123",
@@ -47,7 +47,7 @@ func TestAppsList(t *testing.T) {
 		client := codex.NewClient(mock)
 
 		// Mock response with multiple apps and pagination
-		_ = mock.SetResponseData("apps/list", map[string]interface{}{
+		_ = mock.SetResponseData("app/list", map[string]interface{}{
 			"data": []map[string]interface{}{
 				{
 					"id":               "app-1",
@@ -154,7 +154,7 @@ func TestAppsList(t *testing.T) {
 		if req == nil {
 			t.Fatal("expected request to be sent")
 		}
-		if req.Method != "apps/list" {
+		if req.Method != "app/list" {
 			t.Errorf("expected method apps/list, got %s", req.Method)
 		}
 
@@ -180,7 +180,7 @@ func TestAppsList(t *testing.T) {
 		mock := NewMockTransport()
 		client := codex.NewClient(mock)
 
-		_ = mock.SetResponseData("apps/list", map[string]interface{}{
+		_ = mock.SetResponseData("app/list", map[string]interface{}{
 			"data": []map[string]interface{}{},
 		})
 
@@ -220,7 +220,7 @@ func TestAppListUpdatedNotification(t *testing.T) {
 	notifJSON, _ := json.Marshal(notifData)
 	mock.InjectServerNotification(context.Background(), codex.Notification{
 		JSONRPC: "2.0",
-		Method:  "app/listUpdated",
+		Method:  "app/list/updated",
 		Params:  notifJSON,
 	})
 

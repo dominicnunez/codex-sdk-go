@@ -179,7 +179,7 @@ func TestThreadList(t *testing.T) {
 		client := codex.NewClient(transport)
 
 	_ = transport.SetResponseData("thread/list", map[string]interface{}{
-			"threads": []interface{}{
+			"data": []interface{}{
 				map[string]interface{}{
 					"id":            "thread-1",
 					"cliVersion":    "1.0.0",
@@ -217,8 +217,8 @@ func TestThreadList(t *testing.T) {
 			t.Fatalf("Thread.List failed: %v", err)
 		}
 
-		if len(response.Threads) != 2 {
-			t.Errorf("expected 2 threads, got %d", len(response.Threads))
+		if len(response.Data) != 2 {
+			t.Errorf("expected 2 threads, got %d", len(response.Data))
 		}
 
 		// Verify method
@@ -236,20 +236,9 @@ func TestThreadLoadedList(t *testing.T) {
 
 	client := codex.NewClient(transport)
 
-_ = transport.SetResponseData("thread/loadedList", map[string]interface{}{
-		"threads": []interface{}{
-			map[string]interface{}{
-				"id":            "thread-loaded",
-				"cliVersion":    "1.0.0",
-				"createdAt":     int64(1234567890),
-				"cwd":           "/test/dir",
-				"modelProvider": "openai",
-				"preview":       "loaded thread",
-				"source":        "cli",
-				"status":        map[string]interface{}{"type": "idle"},
-				"turns":         []interface{}{},
-				"updatedAt":     int64(1234567890),
-			},
+_ = transport.SetResponseData("thread/loaded/list", map[string]interface{}{
+		"data": []interface{}{
+			"thread-loaded",
 		},
 	})
 
@@ -263,12 +252,12 @@ _ = transport.SetResponseData("thread/loadedList", map[string]interface{}{
 		t.Fatalf("Thread.LoadedList failed: %v", err)
 	}
 
-	if len(response.Threads) != 1 {
-		t.Errorf("expected 1 thread, got %d", len(response.Threads))
+	if len(response.Data) != 1 {
+		t.Errorf("expected 1 thread ID, got %d", len(response.Data))
 	}
 
 	req := transport.GetSentRequest(0)
-	if req.Method != "thread/loadedList" {
+	if req.Method != "thread/loaded/list" {
 		t.Errorf("expected method 'thread/loadedList', got %q", req.Method)
 	}
 }
@@ -428,7 +417,7 @@ func TestThreadSetName(t *testing.T) {
 
 	client := codex.NewClient(transport)
 
-	_ = transport.SetResponseData("thread/setName", map[string]interface{}{
+	_ = transport.SetResponseData("thread/name/set", map[string]interface{}{
 		"thread": map[string]interface{}{
 			"id":            "thread-123",
 			"cliVersion":    "1.0.0",
@@ -461,7 +450,7 @@ func TestThreadSetName(t *testing.T) {
 	_ = response
 
 	req := transport.GetSentRequest(0)
-	if req.Method != "thread/setName" {
+	if req.Method != "thread/name/set" {
 		t.Errorf("expected method 'thread/setName', got %q", req.Method)
 	}
 }
@@ -590,7 +579,7 @@ func TestThreadCompactStart(t *testing.T) {
 
 	client := codex.NewClient(transport)
 
-	_ = transport.SetResponseData("thread/compactStart", map[string]interface{}{
+	_ = transport.SetResponseData("thread/compact/start", map[string]interface{}{
 		"threadId": "compact-thread-id",
 	})
 
@@ -610,7 +599,7 @@ func TestThreadCompactStart(t *testing.T) {
 	_ = response
 
 	req := transport.GetSentRequest(0)
-	if req.Method != "thread/compactStart" {
+	if req.Method != "thread/compact/start" {
 		t.Errorf("expected method 'thread/compactStart', got %q", req.Method)
 	}
 }

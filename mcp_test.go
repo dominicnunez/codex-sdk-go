@@ -81,7 +81,7 @@ func TestMcpListServerStatus(t *testing.T) {
 			mock := NewMockTransport()
 			client := codex.NewClient(mock)
 
-			_ = mock.SetResponseData("mcp/listServerStatus", tt.responseData)
+			_ = mock.SetResponseData("mcpServerStatus/list", tt.responseData)
 
 			resp, err := client.Mcp.ListServerStatus(context.Background(), tt.params)
 			if err != nil {
@@ -142,7 +142,7 @@ func TestMcpOauthLogin(t *testing.T) {
 			mock := NewMockTransport()
 			client := codex.NewClient(mock)
 
-			_ = mock.SetResponseData("mcp/server/oauthLogin", tt.responseData)
+			_ = mock.SetResponseData("mcpServer/oauth/login", tt.responseData)
 
 			resp, err := client.Mcp.OauthLogin(context.Background(), tt.params)
 			if err != nil {
@@ -161,7 +161,7 @@ func TestMcpRefresh(t *testing.T) {
 	client := codex.NewClient(mock)
 
 	// Empty response per spec
-	_ = mock.SetResponseData("mcp/server/refresh", map[string]interface{}{})
+	_ = mock.SetResponseData("config/mcpServer/reload", map[string]interface{}{})
 
 	_, err := client.Mcp.Refresh(context.Background())
 	if err != nil {
@@ -173,8 +173,8 @@ func TestMcpRefresh(t *testing.T) {
 	if req == nil {
 		t.Fatal("no request sent")
 	}
-	if req.Method != "mcp/server/refresh" {
-		t.Errorf("got method %q, want %q", req.Method, "mcp/server/refresh")
+	if req.Method != "config/mcpServer/reload" {
+		t.Errorf("got method %q, want %q", req.Method, "config/mcpServer/reload")
 	}
 }
 
@@ -222,7 +222,7 @@ func TestMcpOauthLoginCompletedNotification(t *testing.T) {
 			paramsJSON, _ := json.Marshal(tt.jsonData)
 			mock.InjectServerNotification(context.Background(), codex.Notification{
 				JSONRPC: "2.0",
-				Method:  "mcp/server/oauthLoginCompleted",
+				Method:  "mcpServer/oauthLogin/completed",
 				Params:  json.RawMessage(paramsJSON),
 			})
 
@@ -271,7 +271,7 @@ func TestMcpToolCallProgressNotification(t *testing.T) {
 	paramsJSON, _ := json.Marshal(jsonData)
 	mock.InjectServerNotification(context.Background(), codex.Notification{
 		JSONRPC: "2.0",
-		Method:  "mcp/toolCallProgress",
+		Method:  "item/mcpToolCall/progress",
 		Params:  json.RawMessage(paramsJSON),
 	})
 

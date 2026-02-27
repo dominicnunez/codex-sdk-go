@@ -164,7 +164,7 @@ func (s *SkillsService) List(ctx context.Context, params SkillsListParams) (Skil
 // ConfigWrite enables or disables a skill
 func (s *SkillsService) ConfigWrite(ctx context.Context, params SkillsConfigWriteParams) (SkillsConfigWriteResponse, error) {
 	var resp SkillsConfigWriteResponse
-	if err := s.client.sendRequest(ctx, "skills/configWrite", params, &resp); err != nil {
+	if err := s.client.sendRequest(ctx, "skills/config/write", params, &resp); err != nil {
 		return SkillsConfigWriteResponse{}, err
 	}
 	return resp, nil
@@ -173,7 +173,7 @@ func (s *SkillsService) ConfigWrite(ctx context.Context, params SkillsConfigWrit
 // RemoteRead retrieves available remote skills from the skill library
 func (s *SkillsService) RemoteRead(ctx context.Context, params SkillsRemoteReadParams) (SkillsRemoteReadResponse, error) {
 	var resp SkillsRemoteReadResponse
-	if err := s.client.sendRequest(ctx, "skills/remoteRead", params, &resp); err != nil {
+	if err := s.client.sendRequest(ctx, "skills/remote/list", params, &resp); err != nil {
 		return SkillsRemoteReadResponse{}, err
 	}
 	return resp, nil
@@ -182,7 +182,7 @@ func (s *SkillsService) RemoteRead(ctx context.Context, params SkillsRemoteReadP
 // RemoteWrite installs a remote skill to the local system
 func (s *SkillsService) RemoteWrite(ctx context.Context, params SkillsRemoteWriteParams) (SkillsRemoteWriteResponse, error) {
 	var resp SkillsRemoteWriteResponse
-	if err := s.client.sendRequest(ctx, "skills/remoteWrite", params, &resp); err != nil {
+	if err := s.client.sendRequest(ctx, "skills/remote/export", params, &resp); err != nil {
 		return SkillsRemoteWriteResponse{}, err
 	}
 	return resp, nil

@@ -101,7 +101,7 @@ type RawResponseItemCompletedNotification struct {
 
 // OnAgentMessageDelta registers a listener for agent/messageDelta notifications.
 func (c *Client) OnAgentMessageDelta(handler func(AgentMessageDeltaNotification)) {
-	c.OnNotification("agent/messageDelta", func(ctx context.Context, notif Notification) {
+	c.OnNotification("item/agentMessage/delta", func(ctx context.Context, notif Notification) {
 		var n AgentMessageDeltaNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
 			// Silently ignore unmarshal errors (notification is malformed)
@@ -113,7 +113,7 @@ func (c *Client) OnAgentMessageDelta(handler func(AgentMessageDeltaNotification)
 
 // OnFileChangeOutputDelta registers a listener for turn/fileChangeOutputDelta notifications.
 func (c *Client) OnFileChangeOutputDelta(handler func(FileChangeOutputDeltaNotification)) {
-	c.OnNotification("turn/fileChangeOutputDelta", func(ctx context.Context, notif Notification) {
+	c.OnNotification("item/fileChange/outputDelta", func(ctx context.Context, notif Notification) {
 		var n FileChangeOutputDeltaNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
 			return
@@ -124,7 +124,7 @@ func (c *Client) OnFileChangeOutputDelta(handler func(FileChangeOutputDeltaNotif
 
 // OnPlanDelta registers a listener for turn/planDelta notifications.
 func (c *Client) OnPlanDelta(handler func(PlanDeltaNotification)) {
-	c.OnNotification("turn/planDelta", func(ctx context.Context, notif Notification) {
+	c.OnNotification("item/plan/delta", func(ctx context.Context, notif Notification) {
 		var n PlanDeltaNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
 			return
@@ -135,7 +135,7 @@ func (c *Client) OnPlanDelta(handler func(PlanDeltaNotification)) {
 
 // OnReasoningTextDelta registers a listener for turn/reasoningTextDelta notifications.
 func (c *Client) OnReasoningTextDelta(handler func(ReasoningTextDeltaNotification)) {
-	c.OnNotification("turn/reasoningTextDelta", func(ctx context.Context, notif Notification) {
+	c.OnNotification("item/reasoning/textDelta", func(ctx context.Context, notif Notification) {
 		var n ReasoningTextDeltaNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
 			return
@@ -146,7 +146,7 @@ func (c *Client) OnReasoningTextDelta(handler func(ReasoningTextDeltaNotificatio
 
 // OnReasoningSummaryTextDelta registers a listener for turn/reasoningSummaryTextDelta notifications.
 func (c *Client) OnReasoningSummaryTextDelta(handler func(ReasoningSummaryTextDeltaNotification)) {
-	c.OnNotification("turn/reasoningSummaryTextDelta", func(ctx context.Context, notif Notification) {
+	c.OnNotification("item/reasoning/summaryTextDelta", func(ctx context.Context, notif Notification) {
 		var n ReasoningSummaryTextDeltaNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
 			return
@@ -157,7 +157,7 @@ func (c *Client) OnReasoningSummaryTextDelta(handler func(ReasoningSummaryTextDe
 
 // OnReasoningSummaryPartAdded registers a listener for turn/reasoningSummaryPartAdded notifications.
 func (c *Client) OnReasoningSummaryPartAdded(handler func(ReasoningSummaryPartAddedNotification)) {
-	c.OnNotification("turn/reasoningSummaryPartAdded", func(ctx context.Context, notif Notification) {
+	c.OnNotification("item/reasoning/summaryPartAdded", func(ctx context.Context, notif Notification) {
 		var n ReasoningSummaryPartAddedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
 			return
@@ -168,7 +168,7 @@ func (c *Client) OnReasoningSummaryPartAdded(handler func(ReasoningSummaryPartAd
 
 // OnItemStarted registers a listener for turn/itemStarted notifications.
 func (c *Client) OnItemStarted(handler func(ItemStartedNotification)) {
-	c.OnNotification("turn/itemStarted", func(ctx context.Context, notif Notification) {
+	c.OnNotification("item/started", func(ctx context.Context, notif Notification) {
 		var n ItemStartedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
 			return
@@ -179,7 +179,7 @@ func (c *Client) OnItemStarted(handler func(ItemStartedNotification)) {
 
 // OnItemCompleted registers a listener for turn/itemCompleted notifications.
 func (c *Client) OnItemCompleted(handler func(ItemCompletedNotification)) {
-	c.OnNotification("turn/itemCompleted", func(ctx context.Context, notif Notification) {
+	c.OnNotification("item/completed", func(ctx context.Context, notif Notification) {
 		var n ItemCompletedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
 			return
@@ -190,7 +190,7 @@ func (c *Client) OnItemCompleted(handler func(ItemCompletedNotification)) {
 
 // OnRawResponseItemCompleted registers a listener for turn/rawResponseItemCompleted notifications.
 func (c *Client) OnRawResponseItemCompleted(handler func(RawResponseItemCompletedNotification)) {
-	c.OnNotification("turn/rawResponseItemCompleted", func(ctx context.Context, notif Notification) {
+	c.OnNotification("item/rawResponseItemCompleted", func(ctx context.Context, notif Notification) {
 		var n RawResponseItemCompletedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
 			return

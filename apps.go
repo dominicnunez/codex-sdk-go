@@ -90,13 +90,13 @@ func newAppsService(client *Client) *AppsService {
 // List retrieves the list of available apps/connectors.
 func (s *AppsService) List(ctx context.Context, params AppsListParams) (AppsListResponse, error) {
 	var resp AppsListResponse
-	err := s.client.sendRequest(ctx, "apps/list", params, &resp)
+	err := s.client.sendRequest(ctx, "app/list", params, &resp)
 	return resp, err
 }
 
 // OnAppListUpdated registers a listener for app/listUpdated notifications.
 func (c *Client) OnAppListUpdated(handler func(AppListUpdatedNotification)) {
-	c.OnNotification("app/listUpdated", func(ctx context.Context, notif Notification) {
+	c.OnNotification("app/list/updated", func(ctx context.Context, notif Notification) {
 		var params AppListUpdatedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
 			return

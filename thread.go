@@ -37,11 +37,9 @@ type Thread struct {
 
 // GitInfo contains git repository information
 type GitInfo struct {
-	Branch         string  `json:"branch"`
-	CurrentCommit  string  `json:"currentCommit"`
-	RemoteURL      *string `json:"remoteUrl,omitempty"`
-	TrackedBranch  *string `json:"trackedBranch,omitempty"`
-	WorkingDirty   bool    `json:"workingDirty"`
+	Branch    *string `json:"branch,omitempty"`
+	OriginURL *string `json:"originUrl,omitempty"`
+	SHA       *string `json:"sha,omitempty"`
 }
 
 // SessionSource represents the source of a thread session
@@ -334,8 +332,8 @@ func (SandboxPolicyDangerFullAccess) isSandboxPolicy() {}
 
 // SandboxPolicyReadOnly allows read-only access
 type SandboxPolicyReadOnly struct {
-	Type   string          `json:"type"`
-	Access *ReadOnlyAccess `json:"access,omitempty"`
+	Type   string                `json:"type"`
+	Access *ReadOnlyAccessWrapper `json:"access,omitempty"`
 }
 
 func (SandboxPolicyReadOnly) isSandboxPolicy() {}
@@ -343,32 +341,85 @@ func (SandboxPolicyReadOnly) isSandboxPolicy() {}
 // SandboxPolicyExternalSandbox uses external sandbox
 type SandboxPolicyExternalSandbox struct {
 	Type          string         `json:"type"`
-	NetworkAccess *NetworkAccess `json:"networkAccess,omitempty"`
+	NetworkAccess *NetworkAccess `json:"networkAccess,omitempty"` // "restricted" or "enabled"
 }
 
 func (SandboxPolicyExternalSandbox) isSandboxPolicy() {}
 
 // SandboxPolicyWorkspaceWrite allows workspace writes
 type SandboxPolicyWorkspaceWrite struct {
-	Type                 string          `json:"type"`
-	ExcludeSlashTmp      *bool           `json:"excludeSlashTmp,omitempty"`
-	ExcludeTmpdirEnvVar  *bool           `json:"excludeTmpdirEnvVar,omitempty"`
-	NetworkAccess        *bool           `json:"networkAccess,omitempty"`
-	ReadOnlyAccess       *ReadOnlyAccess `json:"readOnlyAccess,omitempty"`
-	WritableRoots        []string        `json:"writableRoots,omitempty"`
+	Type                string                 `json:"type"`
+	ExcludeSlashTmp     *bool                  `json:"excludeSlashTmp,omitempty"`
+	ExcludeTmpdirEnvVar *bool                  `json:"excludeTmpdirEnvVar,omitempty"`
+	NetworkAccess       *bool                  `json:"networkAccess,omitempty"`
+	ReadOnlyAccess      *ReadOnlyAccessWrapper `json:"readOnlyAccess,omitempty"`
+	WritableRoots       []string               `json:"writableRoots,omitempty"`
 }
 
 func (SandboxPolicyWorkspaceWrite) isSandboxPolicy() {}
 
-// ReadOnlyAccess represents read-only access configuration
-type ReadOnlyAccess struct {
-	// Simplified for now
+// ReadOnlyAccess is a discriminated union for read-only access configuration
+type ReadOnlyAccess interface {
+	isReadOnlyAccess()
 }
 
-// NetworkAccess represents network access configuration
-type NetworkAccess struct {
-	// Simplified for now
+// ReadOnlyAccessRestricted restricts read access to specific roots
+type ReadOnlyAccessRestricted struct {
+	Type                    string   `json:"type"`
+	IncludePlatformDefaults *bool    `json:"includePlatformDefaults,omitempty"`
+	ReadableRoots           []string `json:"readableRoots,omitempty"`
 }
+
+func (ReadOnlyAccessRestricted) isReadOnlyAccess() {}
+
+// ReadOnlyAccessFullAccess allows full read access
+type ReadOnlyAccessFullAccess struct {
+	Type string `json:"type"`
+}
+
+func (ReadOnlyAccessFullAccess) isReadOnlyAccess() {}
+
+// ReadOnlyAccessWrapper wraps the ReadOnlyAccess discriminated union for JSON
+type ReadOnlyAccessWrapper struct {
+	Value ReadOnlyAccess
+}
+
+// UnmarshalJSON for ReadOnlyAccessWrapper
+func (w *ReadOnlyAccessWrapper) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	switch raw.Type {
+	case "restricted":
+		var v ReadOnlyAccessRestricted
+		if err := json.Unmarshal(data, &v); err != nil {
+			return err
+		}
+		w.Value = v
+	case "fullAccess":
+		w.Value = ReadOnlyAccessFullAccess{Type: "fullAccess"}
+	default:
+		return fmt.Errorf("unknown ReadOnlyAccess type: %s", raw.Type)
+	}
+	return nil
+}
+
+// MarshalJSON for ReadOnlyAccessWrapper
+func (w ReadOnlyAccessWrapper) MarshalJSON() ([]byte, error) {
+	return json.Marshal(w.Value)
+}
+
+// NetworkAccess represents network access control
+type NetworkAccess string
+
+const (
+	NetworkAccessRestricted NetworkAccess = "restricted"
+	NetworkAccessEnabled    NetworkAccess = "enabled"
+)
 
 // SandboxPolicyWrapper wraps SandboxPolicy for JSON marshaling
 type SandboxPolicyWrapper struct {
@@ -438,12 +489,13 @@ type ThreadStartParams struct {
 
 // ThreadStartResponse is the response from starting a thread
 type ThreadStartResponse struct {
-	ApprovalPolicy AskForApprovalWrapper `json:"approvalPolicy"`
-	Cwd            string                `json:"cwd"`
-	Model          string                `json:"model"`
-	ModelProvider  string                `json:"modelProvider"`
-	Sandbox        SandboxPolicyWrapper  `json:"sandbox"`
-	Thread         Thread                `json:"thread"`
+	ApprovalPolicy  AskForApprovalWrapper `json:"approvalPolicy"`
+	Cwd             string                `json:"cwd"`
+	Model           string                `json:"model"`
+	ModelProvider   string                `json:"modelProvider"`
+	ReasoningEffort *ReasoningEffort      `json:"reasoningEffort,omitempty"`
+	Sandbox         SandboxPolicyWrapper  `json:"sandbox"`
+	Thread          Thread                `json:"thread"`
 }
 
 // Start initiates a new thread
@@ -463,12 +515,7 @@ type ThreadReadParams struct {
 
 // ThreadReadResponse is the response from reading a thread
 type ThreadReadResponse struct {
-	ApprovalPolicy AskForApprovalWrapper `json:"approvalPolicy"`
-	Cwd            string                `json:"cwd"`
-	Model          string                `json:"model"`
-	ModelProvider  string                `json:"modelProvider"`
-	Sandbox        SandboxPolicyWrapper  `json:"sandbox"`
-	Thread         Thread                `json:"thread"`
+	Thread Thread `json:"thread"`
 }
 
 // Read retrieves thread details
@@ -494,7 +541,7 @@ type ThreadListParams struct {
 
 // ThreadListResponse is the response from listing threads
 type ThreadListResponse struct {
-	Threads    []Thread `json:"threads"`
+	Data       []Thread `json:"data"`
 	NextCursor *string  `json:"nextCursor,omitempty"`
 }
 
@@ -515,14 +562,14 @@ type ThreadLoadedListParams struct {
 
 // ThreadLoadedListResponse is the response from listing loaded threads
 type ThreadLoadedListResponse struct {
-	Threads    []Thread `json:"threads"`
+	Data       []string `json:"data"`
 	NextCursor *string  `json:"nextCursor,omitempty"`
 }
 
 // LoadedList retrieves loaded threads
 func (s *ThreadService) LoadedList(ctx context.Context, params ThreadLoadedListParams) (ThreadLoadedListResponse, error) {
 	var response ThreadLoadedListResponse
-	if err := s.client.sendRequest(ctx, "thread/loadedList", params, &response); err != nil {
+	if err := s.client.sendRequest(ctx, "thread/loaded/list", params, &response); err != nil {
 		return ThreadLoadedListResponse{}, err
 	}
 	return response, nil
@@ -544,12 +591,13 @@ type ThreadResumeParams struct {
 
 // ThreadResumeResponse is the response from resuming a thread
 type ThreadResumeResponse struct {
-	ApprovalPolicy AskForApprovalWrapper `json:"approvalPolicy"`
-	Cwd            string                `json:"cwd"`
-	Model          string                `json:"model"`
-	ModelProvider  string                `json:"modelProvider"`
-	Sandbox        SandboxPolicyWrapper  `json:"sandbox"`
-	Thread         Thread                `json:"thread"`
+	ApprovalPolicy  AskForApprovalWrapper `json:"approvalPolicy"`
+	Cwd             string                `json:"cwd"`
+	Model           string                `json:"model"`
+	ModelProvider   string                `json:"modelProvider"`
+	ReasoningEffort *ReasoningEffort      `json:"reasoningEffort,omitempty"`
+	Sandbox         SandboxPolicyWrapper  `json:"sandbox"`
+	Thread          Thread                `json:"thread"`
 }
 
 // Resume resumes an existing thread
@@ -576,12 +624,13 @@ type ThreadForkParams struct {
 
 // ThreadForkResponse is the response from forking a thread
 type ThreadForkResponse struct {
-	ApprovalPolicy AskForApprovalWrapper `json:"approvalPolicy"`
-	Cwd            string                `json:"cwd"`
-	Model          string                `json:"model"`
-	ModelProvider  string                `json:"modelProvider"`
-	Sandbox        SandboxPolicyWrapper  `json:"sandbox"`
-	Thread         Thread                `json:"thread"`
+	ApprovalPolicy  AskForApprovalWrapper `json:"approvalPolicy"`
+	Cwd             string                `json:"cwd"`
+	Model           string                `json:"model"`
+	ModelProvider   string                `json:"modelProvider"`
+	ReasoningEffort *ReasoningEffort      `json:"reasoningEffort,omitempty"`
+	Sandbox         SandboxPolicyWrapper  `json:"sandbox"`
+	Thread          Thread                `json:"thread"`
 }
 
 // Fork creates a fork of a thread
@@ -627,7 +676,7 @@ type ThreadSetNameResponse struct {
 // SetName updates the name of a thread
 func (s *ThreadService) SetName(ctx context.Context, params ThreadSetNameParams) (ThreadSetNameResponse, error) {
 	var response ThreadSetNameResponse
-	if err := s.client.sendRequest(ctx, "thread/setName", params, &response); err != nil {
+	if err := s.client.sendRequest(ctx, "thread/name/set", params, &response); err != nil {
 		return ThreadSetNameResponse{}, err
 	}
 	return response, nil
@@ -703,7 +752,7 @@ type ThreadCompactStartResponse struct {
 // CompactStart initiates thread compaction
 func (s *ThreadService) CompactStart(ctx context.Context, params ThreadCompactStartParams) (ThreadCompactStartResponse, error) {
 	var response ThreadCompactStartResponse
-	if err := s.client.sendRequest(ctx, "thread/compactStart", params, &response); err != nil {
+	if err := s.client.sendRequest(ctx, "thread/compact/start", params, &response); err != nil {
 		return ThreadCompactStartResponse{}, err
 	}
 	return response, nil

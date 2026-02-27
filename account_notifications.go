@@ -5,9 +5,18 @@ import (
 	"encoding/json"
 )
 
+// AuthMode represents the authentication mode
+type AuthMode string
+
+const (
+	AuthModeAPIKey            AuthMode = "apikey"
+	AuthModeChatGPT           AuthMode = "chatgpt"
+	AuthModeChatGPTAuthTokens AuthMode = "chatgptAuthTokens"
+)
+
 // AccountUpdatedNotification is sent when account information changes
 type AccountUpdatedNotification struct {
-	AuthMode *string `json:"authMode,omitempty"`
+	AuthMode *AuthMode `json:"authMode,omitempty"`
 }
 
 // AccountLoginCompletedNotification is sent when a login attempt completes
@@ -35,7 +44,7 @@ func (c *Client) OnAccountUpdated(handler func(AccountUpdatedNotification)) {
 
 // OnAccountLoginCompleted registers a listener for account/loginCompleted notifications
 func (c *Client) OnAccountLoginCompleted(handler func(AccountLoginCompletedNotification)) {
-	c.OnNotification("account/loginCompleted", func(ctx context.Context, notif Notification) {
+	c.OnNotification("account/login/completed", func(ctx context.Context, notif Notification) {
 		var n AccountLoginCompletedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
 			return
@@ -46,7 +55,7 @@ func (c *Client) OnAccountLoginCompleted(handler func(AccountLoginCompletedNotif
 
 // OnAccountRateLimitsUpdated registers a listener for account/rateLimitsUpdated notifications
 func (c *Client) OnAccountRateLimitsUpdated(handler func(AccountRateLimitsUpdatedNotification)) {
-	c.OnNotification("account/rateLimitsUpdated", func(ctx context.Context, notif Notification) {
+	c.OnNotification("account/rateLimits/updated", func(ctx context.Context, notif Notification) {
 		var n AccountRateLimitsUpdatedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
 			return

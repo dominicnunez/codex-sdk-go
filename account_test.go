@@ -61,7 +61,7 @@ func TestAccountGet(t *testing.T) {
 			transport := NewMockTransport()
 			client := codex.NewClient(transport)
 
-			_ = transport.SetResponseData("account/get", tt.response)
+			_ = transport.SetResponseData("account/read", tt.response)
 
 			ctx := context.Background()
 			resp, err := client.Account.Get(ctx, tt.params)
@@ -72,7 +72,7 @@ func TestAccountGet(t *testing.T) {
 
 			if err == nil {
 				req := transport.GetSentRequest(0)
-				if req.Method != "account/get" {
+				if req.Method != "account/read" {
 					t.Errorf("expected method account/get, got %s", req.Method)
 				}
 
@@ -94,7 +94,7 @@ func TestAccountGetRateLimits(t *testing.T) {
 	transport := NewMockTransport()
 	client := codex.NewClient(transport)
 
-	_ = transport.SetResponseData("account/getRateLimits", map[string]interface{}{
+	_ = transport.SetResponseData("account/rateLimits/read", map[string]interface{}{
 		"rateLimits": map[string]interface{}{
 			"limitId":   "codex",
 			"limitName": "Codex Rate Limit",
@@ -129,7 +129,7 @@ func TestAccountGetRateLimits(t *testing.T) {
 	}
 
 	req := transport.GetSentRequest(0)
-	if req.Method != "account/getRateLimits" {
+	if req.Method != "account/rateLimits/read" {
 		t.Errorf("expected method account/getRateLimits, got %s", req.Method)
 	}
 
@@ -188,7 +188,7 @@ func TestAccountLogin(t *testing.T) {
 			transport := NewMockTransport()
 			client := codex.NewClient(transport)
 
-			_ = transport.SetResponseData("account/login", tt.response)
+			_ = transport.SetResponseData("account/login/start", tt.response)
 
 			ctx := context.Background()
 			resp, err := client.Account.Login(ctx, tt.params)
@@ -199,7 +199,7 @@ func TestAccountLogin(t *testing.T) {
 
 			if err == nil {
 				req := transport.GetSentRequest(0)
-				if req.Method != "account/login" {
+				if req.Method != "account/login/start" {
 					t.Errorf("expected method account/login, got %s", req.Method)
 				}
 
@@ -337,19 +337,19 @@ func TestAccountUpdatedNotification(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		authMode *string
+		authMode *codex.AuthMode
 	}{
 		{
 			name:     "apikey_mode",
-			authMode: ptr("apikey"),
+			authMode: authModePtr(codex.AuthModeAPIKey),
 		},
 		{
 			name:     "chatgpt_mode",
-			authMode: ptr("chatgpt"),
+			authMode: authModePtr(codex.AuthModeChatGPT),
 		},
 		{
 			name:     "chatgpt_auth_tokens_mode",
-			authMode: ptr("chatgptAuthTokens"),
+			authMode: authModePtr(codex.AuthModeChatGPTAuthTokens),
 		},
 		{
 			name:     "no_auth_mode",
@@ -360,7 +360,7 @@ func TestAccountUpdatedNotification(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			notificationReceived := false
-			var receivedAuthMode *string
+			var receivedAuthMode *codex.AuthMode
 
 			client.OnAccountUpdated(func(notif codex.AccountUpdatedNotification) {
 				notificationReceived = true
@@ -369,7 +369,7 @@ func TestAccountUpdatedNotification(t *testing.T) {
 
 			params := map[string]interface{}{}
 			if tt.authMode != nil {
-				params["authMode"] = *tt.authMode
+				params["authMode"] = string(*tt.authMode)
 			}
 			paramsJSON, _ := json.Marshal(params)
 
@@ -391,6 +391,10 @@ func TestAccountUpdatedNotification(t *testing.T) {
 			}
 		})
 	}
+}
+
+func authModePtr(m codex.AuthMode) *codex.AuthMode {
+	return &m
 }
 
 func TestAccountLoginCompletedNotification(t *testing.T) {
@@ -444,7 +448,7 @@ func TestAccountLoginCompletedNotification(t *testing.T) {
 
 			transport.InjectServerNotification(context.Background(), codex.Notification{
 				JSONRPC: "2.0",
-				Method:  "account/loginCompleted",
+				Method:  "account/login/completed",
 				Params:  paramsJSON,
 			})
 
@@ -506,7 +510,7 @@ func TestAccountRateLimitsUpdatedNotification(t *testing.T) {
 
 	transport.InjectServerNotification(context.Background(), codex.Notification{
 		JSONRPC: "2.0",
-		Method:  "account/rateLimitsUpdated",
+		Method:  "account/rateLimits/updated",
 		Params:  paramsJSON,
 	})
 

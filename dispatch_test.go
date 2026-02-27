@@ -95,8 +95,8 @@ func TestKnownNotificationDispatch(t *testing.T) {
 			expectCalled: true,
 		},
 		{
-			name:   "notification/config/warning",
-			method: "notification/config/warning",
+			name:   "configWarning",
+			method: "configWarning",
 			registerFunc: func() {
 				client.OnConfigWarning(func(n codex.ConfigWarningNotification) {})
 			},
@@ -106,8 +106,8 @@ func TestKnownNotificationDispatch(t *testing.T) {
 			expectCalled: true,
 		},
 		{
-			name:   "notification/model/rerouted",
-			method: "notification/model/rerouted",
+			name:   "model/rerouted",
+			method: "model/rerouted",
 			registerFunc: func() {
 				client.OnModelRerouted(func(n codex.ModelReroutedNotification) {})
 			},
@@ -121,8 +121,8 @@ func TestKnownNotificationDispatch(t *testing.T) {
 			expectCalled: true,
 		},
 		{
-			name:   "app/listUpdated",
-			method: "app/listUpdated",
+			name:   "app/list/updated",
+			method: "app/list/updated",
 			registerFunc: func() {
 				client.OnAppListUpdated(func(n codex.AppListUpdatedNotification) {})
 			},
@@ -132,8 +132,8 @@ func TestKnownNotificationDispatch(t *testing.T) {
 			expectCalled: true,
 		},
 		{
-			name:   "agent/messageDelta",
-			method: "agent/messageDelta",
+			name:   "item/agentMessage/delta",
+			method: "item/agentMessage/delta",
 			registerFunc: func() {
 				client.OnAgentMessageDelta(func(n codex.AgentMessageDeltaNotification) {})
 			},
@@ -201,19 +201,19 @@ func TestKnownNotificationDispatch(t *testing.T) {
 				client.OnAccountUpdated(func(n codex.AccountUpdatedNotification) {
 					called = true
 				})
-			case "notification/config/warning":
+			case "configWarning":
 				client.OnConfigWarning(func(n codex.ConfigWarningNotification) {
 					called = true
 				})
-			case "notification/model/rerouted":
+			case "model/rerouted":
 				client.OnModelRerouted(func(n codex.ModelReroutedNotification) {
 					called = true
 				})
-			case "app/listUpdated":
+			case "app/list/updated":
 				client.OnAppListUpdated(func(n codex.AppListUpdatedNotification) {
 					called = true
 				})
-			case "agent/messageDelta":
+			case "item/agentMessage/delta":
 				client.OnAgentMessageDelta(func(n codex.AgentMessageDeltaNotification) {
 					called = true
 				})

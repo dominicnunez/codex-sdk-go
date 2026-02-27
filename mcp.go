@@ -113,7 +113,7 @@ func newMcpService(client *Client) *McpService {
 // ListServerStatus retrieves the status of all configured MCP servers.
 func (s *McpService) ListServerStatus(ctx context.Context, params ListMcpServerStatusParams) (ListMcpServerStatusResponse, error) {
 	var resp ListMcpServerStatusResponse
-	if err := s.client.sendRequest(ctx, "mcp/listServerStatus", params, &resp); err != nil {
+	if err := s.client.sendRequest(ctx, "mcpServerStatus/list", params, &resp); err != nil {
 		return ListMcpServerStatusResponse{}, err
 	}
 	return resp, nil
@@ -122,7 +122,7 @@ func (s *McpService) ListServerStatus(ctx context.Context, params ListMcpServerS
 // OauthLogin initiates OAuth login flow for an MCP server.
 func (s *McpService) OauthLogin(ctx context.Context, params McpServerOauthLoginParams) (McpServerOauthLoginResponse, error) {
 	var resp McpServerOauthLoginResponse
-	if err := s.client.sendRequest(ctx, "mcp/server/oauthLogin", params, &resp); err != nil {
+	if err := s.client.sendRequest(ctx, "mcpServer/oauth/login", params, &resp); err != nil {
 		return McpServerOauthLoginResponse{}, err
 	}
 	return resp, nil
@@ -131,7 +131,7 @@ func (s *McpService) OauthLogin(ctx context.Context, params McpServerOauthLoginP
 // Refresh refreshes MCP server connections.
 func (s *McpService) Refresh(ctx context.Context) (McpServerRefreshResponse, error) {
 	var resp McpServerRefreshResponse
-	if err := s.client.sendRequest(ctx, "mcp/server/refresh", nil, &resp); err != nil {
+	if err := s.client.sendRequest(ctx, "config/mcpServer/reload", nil, &resp); err != nil {
 		return McpServerRefreshResponse{}, err
 	}
 	return resp, nil
@@ -139,7 +139,7 @@ func (s *McpService) Refresh(ctx context.Context) (McpServerRefreshResponse, err
 
 // OnMcpServerOauthLoginCompleted registers a listener for OAuth login completion notifications.
 func (c *Client) OnMcpServerOauthLoginCompleted(handler func(McpServerOauthLoginCompletedNotification)) {
-	c.OnNotification("mcp/server/oauthLoginCompleted", func(ctx context.Context, notif Notification) {
+	c.OnNotification("mcpServer/oauthLogin/completed", func(ctx context.Context, notif Notification) {
 		var params McpServerOauthLoginCompletedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
 			return
@@ -150,7 +150,7 @@ func (c *Client) OnMcpServerOauthLoginCompleted(handler func(McpServerOauthLogin
 
 // OnMcpToolCallProgress registers a listener for MCP tool call progress notifications.
 func (c *Client) OnMcpToolCallProgress(handler func(McpToolCallProgressNotification)) {
-	c.OnNotification("mcp/toolCallProgress", func(ctx context.Context, notif Notification) {
+	c.OnNotification("item/mcpToolCall/progress", func(ctx context.Context, notif Notification) {
 		var params McpToolCallProgressNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
 			return

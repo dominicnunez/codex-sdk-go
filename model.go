@@ -123,7 +123,7 @@ func (s *ModelService) List(ctx context.Context, params ModelListParams) (ModelL
 
 // OnModelRerouted registers a listener for model reroute notifications.
 func (c *Client) OnModelRerouted(handler func(ModelReroutedNotification)) {
-	c.OnNotification("notification/model/rerouted", func(ctx context.Context, notif Notification) {
+	c.OnNotification("model/rerouted", func(ctx context.Context, notif Notification) {
 		var n ModelReroutedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
 			return

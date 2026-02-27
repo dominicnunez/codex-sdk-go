@@ -251,7 +251,7 @@ func TestTurnPlanUpdatedNotification(t *testing.T) {
 	// Inject server notification
 	notif := codex.Notification{
 		JSONRPC: "2.0",
-		Method:  "turn/planUpdated",
+		Method:  "turn/plan/updated",
 		Params: json.RawMessage(`{
 			"threadId": "thread-123",
 			"turnId": "turn-456",
@@ -297,7 +297,7 @@ func TestTurnDiffUpdatedNotification(t *testing.T) {
 	// Inject server notification
 	notif := codex.Notification{
 		JSONRPC: "2.0",
-		Method:  "turn/diffUpdated",
+		Method:  "turn/diff/updated",
 		Params: json.RawMessage(`{
 			"threadId": "thread-123",
 			"turnId": "turn-456",

@@ -184,7 +184,7 @@ func TestModelReroutedNotification(t *testing.T) {
 	// Inject notification from server
 	notif := codex.Notification{
 		JSONRPC: "2.0",
-		Method:  "notification/model/rerouted",
+		Method:  "model/rerouted",
 		Params: json.RawMessage(`{
 			"threadId": "thread-123",
 			"turnId": "turn-456",

@@ -136,7 +136,7 @@ func TestConfigReadRequirements(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := NewMockTransport()
-			_ = mock.SetResponseData("config/requirements/read", tt.mockResponse)
+			_ = mock.SetResponseData("configRequirements/read", tt.mockResponse)
 			client := codex.NewClient(mock)
 
 			resp, err := client.Config.ReadRequirements(context.Background())
@@ -148,7 +148,7 @@ func TestConfigReadRequirements(t *testing.T) {
 
 			// Verify method name
 			req := mock.GetSentRequest(0)
-			if req == nil || req.Method != "config/requirements/read" {
+			if req == nil || req.Method != "configRequirements/read" {
 				t.Errorf("expected method config/requirements/read, got %v", req)
 			}
 		})
@@ -285,7 +285,7 @@ func TestConfigBatchWrite(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := NewMockTransport()
-			_ = mock.SetResponseData("config/batch/write", tt.mockResponse)
+			_ = mock.SetResponseData("config/batchWrite", tt.mockResponse)
 			client := codex.NewClient(mock)
 
 			resp, err := client.Config.BatchWrite(context.Background(), tt.params)
@@ -297,7 +297,7 @@ func TestConfigBatchWrite(t *testing.T) {
 
 			// Verify method name
 			req := mock.GetSentRequest(0)
-			if req == nil || req.Method != "config/batch/write" {
+			if req == nil || req.Method != "config/batchWrite" {
 				t.Errorf("expected method config/batch/write, got %v", req)
 			}
 		})
@@ -317,7 +317,7 @@ func TestConfigWarningNotification(t *testing.T) {
 	// Inject notification from server
 	notif := codex.Notification{
 		JSONRPC: "2.0",
-		Method:  "notification/config/warning",
+		Method:  "configWarning",
 		Params:  json.RawMessage(`{"summary": "Invalid config value", "details": "The value 'foo' is not valid for key 'model'", "path": "/home/user/.claude/config.toml"}`),
 	}
 

@@ -392,7 +392,7 @@ func (s *ConfigService) Read(ctx context.Context, params ConfigReadParams) (Conf
 // ReadRequirements reads configuration requirements
 func (s *ConfigService) ReadRequirements(ctx context.Context) (ConfigRequirementsReadResponse, error) {
 	var resp ConfigRequirementsReadResponse
-	err := s.client.sendRequest(ctx, "config/requirements/read", nil, &resp)
+	err := s.client.sendRequest(ctx, "configRequirements/read", nil, &resp)
 	return resp, err
 }
 
@@ -406,13 +406,13 @@ func (s *ConfigService) Write(ctx context.Context, params ConfigValueWriteParams
 // BatchWrite writes multiple config values atomically
 func (s *ConfigService) BatchWrite(ctx context.Context, params ConfigBatchWriteParams) (ConfigWriteResponse, error) {
 	var resp ConfigWriteResponse
-	err := s.client.sendRequest(ctx, "config/batch/write", params, &resp)
+	err := s.client.sendRequest(ctx, "config/batchWrite", params, &resp)
 	return resp, err
 }
 
 // OnConfigWarning registers a listener for config warning notifications
 func (c *Client) OnConfigWarning(handler func(ConfigWarningNotification)) {
-	c.OnNotification("notification/config/warning", func(ctx context.Context, notif Notification) {
+	c.OnNotification("configWarning", func(ctx context.Context, notif Notification) {
 		var n ConfigWarningNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
 			return

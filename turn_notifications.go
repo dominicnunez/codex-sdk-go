@@ -70,7 +70,7 @@ type TurnPlanStep struct {
 
 // OnTurnPlanUpdated registers a listener for turn/planUpdated notifications
 func (c *Client) OnTurnPlanUpdated(handler func(TurnPlanUpdatedNotification)) {
-	c.OnNotification("turn/planUpdated", func(ctx context.Context, notif Notification) {
+	c.OnNotification("turn/plan/updated", func(ctx context.Context, notif Notification) {
 		var params TurnPlanUpdatedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
 			return
@@ -90,7 +90,7 @@ type TurnDiffUpdatedNotification struct {
 
 // OnTurnDiffUpdated registers a listener for turn/diffUpdated notifications
 func (c *Client) OnTurnDiffUpdated(handler func(TurnDiffUpdatedNotification)) {
-	c.OnNotification("turn/diffUpdated", func(ctx context.Context, notif Notification) {
+	c.OnNotification("turn/diff/updated", func(ctx context.Context, notif Notification) {
 		var params TurnDiffUpdatedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
 			return

@@ -255,7 +255,7 @@ func TestSkillsConfigWrite(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := NewMockTransport()
-			_ = mock.SetResponseData("skills/configWrite", tt.mockResponse)
+			_ = mock.SetResponseData("skills/config/write", tt.mockResponse)
 			client := codex.NewClient(mock)
 
 			resp, err := client.Skills.ConfigWrite(context.Background(), tt.params)
@@ -269,7 +269,7 @@ func TestSkillsConfigWrite(t *testing.T) {
 			if len(mock.SentRequests) != 1 {
 				t.Fatalf("expected 1 request, got %d", len(mock.SentRequests))
 			}
-			if mock.SentRequests[0].Method != "skills/configWrite" {
+			if mock.SentRequests[0].Method != "skills/config/write" {
 				t.Errorf("expected method = skills/configWrite, got %s", mock.SentRequests[0].Method)
 			}
 		})
@@ -340,7 +340,7 @@ func TestSkillsRemoteRead(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := NewMockTransport()
-			_ = mock.SetResponseData("skills/remoteRead", tt.mockResponse)
+			_ = mock.SetResponseData("skills/remote/list", tt.mockResponse)
 			client := codex.NewClient(mock)
 
 			resp, err := client.Skills.RemoteRead(context.Background(), tt.params)
@@ -354,7 +354,7 @@ func TestSkillsRemoteRead(t *testing.T) {
 			if len(mock.SentRequests) != 1 {
 				t.Fatalf("expected 1 request, got %d", len(mock.SentRequests))
 			}
-			if mock.SentRequests[0].Method != "skills/remoteRead" {
+			if mock.SentRequests[0].Method != "skills/remote/list" {
 				t.Errorf("expected method = skills/remoteRead, got %s", mock.SentRequests[0].Method)
 			}
 		})
@@ -391,7 +391,7 @@ func TestSkillsRemoteWrite(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := NewMockTransport()
-			_ = mock.SetResponseData("skills/remoteWrite", tt.mockResponse)
+			_ = mock.SetResponseData("skills/remote/export", tt.mockResponse)
 			client := codex.NewClient(mock)
 
 			resp, err := client.Skills.RemoteWrite(context.Background(), tt.params)
@@ -405,7 +405,7 @@ func TestSkillsRemoteWrite(t *testing.T) {
 			if len(mock.SentRequests) != 1 {
 				t.Fatalf("expected 1 request, got %d", len(mock.SentRequests))
 			}
-			if mock.SentRequests[0].Method != "skills/remoteWrite" {
+			if mock.SentRequests[0].Method != "skills/remote/export" {
 				t.Errorf("expected method = skills/remoteWrite, got %s", mock.SentRequests[0].Method)
 			}
 		})

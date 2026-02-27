@@ -268,7 +268,7 @@ func newAccountService(client *Client) *AccountService {
 // Get retrieves the current account information
 func (s *AccountService) Get(ctx context.Context, params GetAccountParams) (GetAccountResponse, error) {
 	var resp GetAccountResponse
-	if err := s.client.sendRequest(ctx, "account/get", params, &resp); err != nil {
+	if err := s.client.sendRequest(ctx, "account/read", params, &resp); err != nil {
 		return GetAccountResponse{}, err
 	}
 	return resp, nil
@@ -277,7 +277,7 @@ func (s *AccountService) Get(ctx context.Context, params GetAccountParams) (GetA
 // GetRateLimits retrieves the current rate limit information
 func (s *AccountService) GetRateLimits(ctx context.Context) (GetAccountRateLimitsResponse, error) {
 	var resp GetAccountRateLimitsResponse
-	if err := s.client.sendRequest(ctx, "account/getRateLimits", nil, &resp); err != nil {
+	if err := s.client.sendRequest(ctx, "account/rateLimits/read", nil, &resp); err != nil {
 		return GetAccountRateLimitsResponse{}, err
 	}
 	return resp, nil
@@ -285,7 +285,7 @@ func (s *AccountService) GetRateLimits(ctx context.Context) (GetAccountRateLimit
 
 // Login initiates an account login
 func (s *AccountService) Login(ctx context.Context, params LoginAccountParams) (LoginAccountResponse, error) {
-	respData, err := s.client.sendRequestRaw(ctx, "account/login", params)
+	respData, err := s.client.sendRequestRaw(ctx, "account/login/start", params)
 	if err != nil {
 		return nil, err
 	}

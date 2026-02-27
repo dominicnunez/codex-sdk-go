@@ -19,16 +19,16 @@ func newTurnService(client *Client) *TurnService {
 
 // TurnStartParams are the parameters for turn/start
 type TurnStartParams struct {
-	ThreadID       string       `json:"threadId"`
-	Input          []UserInput  `json:"input"`
-	ApprovalPolicy *string      `json:"approvalPolicy,omitempty"` // Simplified for now
-	Cwd            *string      `json:"cwd,omitempty"`
-	Effort         *string      `json:"effort,omitempty"`
-	Model          *string      `json:"model,omitempty"`
-	OutputSchema   interface{}  `json:"outputSchema,omitempty"`
-	Personality    *string      `json:"personality,omitempty"`
-	SandboxPolicy  *string      `json:"sandboxPolicy,omitempty"` // Simplified for now
-	Summary        *string      `json:"summary,omitempty"`
+	ThreadID       string          `json:"threadId"`
+	Input          []UserInput     `json:"input"`
+	ApprovalPolicy *AskForApproval `json:"approvalPolicy,omitempty"`
+	Cwd            *string         `json:"cwd,omitempty"`
+	Effort         *string         `json:"effort,omitempty"`
+	Model          *string         `json:"model,omitempty"`
+	OutputSchema   interface{}     `json:"outputSchema,omitempty"`
+	Personality    *string         `json:"personality,omitempty"`
+	SandboxPolicy  *SandboxPolicy  `json:"sandboxPolicy,omitempty"`
+	Summary        *string         `json:"summary,omitempty"`
 }
 
 // UnmarshalJSON implements custom unmarshaling for TurnStartParams
@@ -145,7 +145,8 @@ type UserInput interface {
 
 // TextUserInput represents text input
 type TextUserInput struct {
-	Text string `json:"text"`
+	Text         string        `json:"text"`
+	TextElements []TextElement `json:"text_elements,omitempty"`
 }
 
 func (t *TextUserInput) userInput() {}

@@ -106,7 +106,7 @@ func (c *Client) OnThreadUnarchived(handler func(ThreadUnarchivedNotification)) 
 
 // OnThreadNameUpdated registers a listener for thread/nameUpdated notifications
 func (c *Client) OnThreadNameUpdated(handler func(ThreadNameUpdatedNotification)) {
-	c.OnNotification("thread/nameUpdated", func(ctx context.Context, notif Notification) {
+	c.OnNotification("thread/name/updated", func(ctx context.Context, notif Notification) {
 		var notification ThreadNameUpdatedNotification
 		if err := json.Unmarshal(notif.Params, &notification); err != nil {
 			return
@@ -117,7 +117,7 @@ func (c *Client) OnThreadNameUpdated(handler func(ThreadNameUpdatedNotification)
 
 // OnThreadStatusChanged registers a listener for thread/statusChanged notifications
 func (c *Client) OnThreadStatusChanged(handler func(ThreadStatusChangedNotification)) {
-	c.OnNotification("thread/statusChanged", func(ctx context.Context, notif Notification) {
+	c.OnNotification("thread/status/changed", func(ctx context.Context, notif Notification) {
 		var notification ThreadStatusChangedNotification
 		if err := json.Unmarshal(notif.Params, &notification); err != nil {
 			return
@@ -128,7 +128,7 @@ func (c *Client) OnThreadStatusChanged(handler func(ThreadStatusChangedNotificat
 
 // OnThreadTokenUsageUpdated registers a listener for thread/tokenUsageUpdated notifications
 func (c *Client) OnThreadTokenUsageUpdated(handler func(ThreadTokenUsageUpdatedNotification)) {
-	c.OnNotification("thread/tokenUsageUpdated", func(ctx context.Context, notif Notification) {
+	c.OnNotification("thread/tokenUsage/updated", func(ctx context.Context, notif Notification) {
 		var notification ThreadTokenUsageUpdatedNotification
 		if err := json.Unmarshal(notif.Params, &notification); err != nil {
 			return

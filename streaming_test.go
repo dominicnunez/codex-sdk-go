@@ -69,7 +69,7 @@ func TestAgentMessageDelta(t *testing.T) {
 			// Inject notification
 			mock.InjectServerNotification(context.Background(), codex.Notification{
 				JSONRPC: "2.0",
-				Method:  "agent/messageDelta",
+				Method:  "item/agentMessage/delta",
 				Params:  json.RawMessage(tt.json),
 			})
 
@@ -128,7 +128,7 @@ func TestFileChangeOutputDelta(t *testing.T) {
 
 			mock.InjectServerNotification(context.Background(), codex.Notification{
 				JSONRPC: "2.0",
-				Method:  "turn/fileChangeOutputDelta",
+				Method:  "item/fileChange/outputDelta",
 				Params:  json.RawMessage(tt.json),
 			})
 
@@ -187,7 +187,7 @@ func TestPlanDelta(t *testing.T) {
 
 			mock.InjectServerNotification(context.Background(), codex.Notification{
 				JSONRPC: "2.0",
-				Method:  "turn/planDelta",
+				Method:  "item/plan/delta",
 				Params:  json.RawMessage(tt.json),
 			})
 
@@ -265,7 +265,7 @@ func TestReasoningTextDelta(t *testing.T) {
 
 			mock.InjectServerNotification(context.Background(), codex.Notification{
 				JSONRPC: "2.0",
-				Method:  "turn/reasoningTextDelta",
+				Method:  "item/reasoning/textDelta",
 				Params:  json.RawMessage(tt.json),
 			})
 
@@ -329,7 +329,7 @@ func TestReasoningSummaryTextDelta(t *testing.T) {
 
 			mock.InjectServerNotification(context.Background(), codex.Notification{
 				JSONRPC: "2.0",
-				Method:  "turn/reasoningSummaryTextDelta",
+				Method:  "item/reasoning/summaryTextDelta",
 				Params:  json.RawMessage(tt.json),
 			})
 
@@ -406,7 +406,7 @@ func TestReasoningSummaryPartAdded(t *testing.T) {
 
 			mock.InjectServerNotification(context.Background(), codex.Notification{
 				JSONRPC: "2.0",
-				Method:  "turn/reasoningSummaryPartAdded",
+				Method:  "item/reasoning/summaryPartAdded",
 				Params:  json.RawMessage(tt.json),
 			})
 
@@ -470,7 +470,7 @@ func TestItemStarted(t *testing.T) {
 
 			mock.InjectServerNotification(context.Background(), codex.Notification{
 				JSONRPC: "2.0",
-				Method:  "turn/itemStarted",
+				Method:  "item/started",
 				Params:  json.RawMessage(tt.json),
 			})
 
@@ -531,7 +531,7 @@ func TestItemCompleted(t *testing.T) {
 
 			mock.InjectServerNotification(context.Background(), codex.Notification{
 				JSONRPC: "2.0",
-				Method:  "turn/itemCompleted",
+				Method:  "item/completed",
 				Params:  json.RawMessage(tt.json),
 			})
 
@@ -592,7 +592,7 @@ func TestRawResponseItemCompleted(t *testing.T) {
 
 			mock.InjectServerNotification(context.Background(), codex.Notification{
 				JSONRPC: "2.0",
-				Method:  "turn/rawResponseItemCompleted",
+				Method:  "item/rawResponseItemCompleted",
 				Params:  json.RawMessage(tt.json),
 			})
 

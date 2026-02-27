@@ -51,7 +51,7 @@ func newExternalAgentService(client *Client) *ExternalAgentService {
 // ConfigDetect detects external agent configurations in specified directories.
 func (s *ExternalAgentService) ConfigDetect(ctx context.Context, params ExternalAgentConfigDetectParams) (ExternalAgentConfigDetectResponse, error) {
 	var resp ExternalAgentConfigDetectResponse
-	if err := s.client.sendRequest(ctx, "externalAgent/configDetect", params, &resp); err != nil {
+	if err := s.client.sendRequest(ctx, "externalAgentConfig/detect", params, &resp); err != nil {
 		return ExternalAgentConfigDetectResponse{}, err
 	}
 	return resp, nil
@@ -60,7 +60,7 @@ func (s *ExternalAgentService) ConfigDetect(ctx context.Context, params External
 // ConfigImport imports detected external agent configurations.
 func (s *ExternalAgentService) ConfigImport(ctx context.Context, params ExternalAgentConfigImportParams) (ExternalAgentConfigImportResponse, error) {
 	var resp ExternalAgentConfigImportResponse
-	if err := s.client.sendRequest(ctx, "externalAgent/configImport", params, &resp); err != nil {
+	if err := s.client.sendRequest(ctx, "externalAgentConfig/import", params, &resp); err != nil {
 		return ExternalAgentConfigImportResponse{}, err
 	}
 	return resp, nil

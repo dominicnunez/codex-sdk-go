@@ -402,7 +402,7 @@ func TestThreadNotificationListenerRegistration(t *testing.T) {
 
 		mock.InjectServerNotification(ctx, codex.Notification{
 			JSONRPC: "2.0",
-			Method:  "thread/nameUpdated",
+			Method:  "thread/name/updated",
 			Params:  json.RawMessage(`{"threadId": "thread-202", "threadName": "New Name"}`),
 		})
 
@@ -425,7 +425,7 @@ func TestThreadNotificationListenerRegistration(t *testing.T) {
 
 		mock.InjectServerNotification(ctx, codex.Notification{
 			JSONRPC: "2.0",
-			Method:  "thread/statusChanged",
+			Method:  "thread/status/changed",
 			Params:  json.RawMessage(`{"threadId": "thread-303", "status": {"type": "idle"}}`),
 		})
 
@@ -468,7 +468,7 @@ func TestThreadNotificationListenerRegistration(t *testing.T) {
 		}`
 		mock.InjectServerNotification(ctx, codex.Notification{
 			JSONRPC: "2.0",
-			Method:  "thread/tokenUsageUpdated",
+			Method:  "thread/tokenUsage/updated",
 			Params:  json.RawMessage(notificationJSON),
 		})
 
