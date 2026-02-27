@@ -107,7 +107,7 @@ package codex
 //
 // MCP notifications:
 //   - mcp/server/oauthLoginCompleted
-//   - mcp/tool/callProgress
+//   - mcp/toolCallProgress
 //
 // Command notifications:
 //   - command/executionOutputDelta
