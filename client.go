@@ -43,9 +43,10 @@ type Client struct {
 	Command       *CommandService
 	Review        *ReviewService
 	Feedback      *FeedbackService
-	ExternalAgent *ExternalAgentService
-	Experimental  *ExperimentalService
-	System        *SystemService
+	ExternalAgent   *ExternalAgentService
+	Experimental    *ExperimentalService
+	System          *SystemService
+	FuzzyFileSearch *FuzzyFileSearchService
 }
 
 // ClientOption configures a Client.
@@ -86,6 +87,7 @@ func NewClient(transport Transport, opts ...ClientOption) *Client {
 	c.ExternalAgent = newExternalAgentService(c)
 	c.Experimental = newExperimentalService(c)
 	c.System = newSystemService(c)
+	c.FuzzyFileSearch = newFuzzyFileSearchService(c)
 
 	// Register the transport's notification handler to route to our listeners
 	transport.OnNotify(c.handleNotification)
@@ -210,12 +212,6 @@ func (c *Client) handleRequest(ctx context.Context, req Request) (Response, erro
 			return methodNotFoundResponse(req.ID), nil
 		}
 		return handleApproval(ctx, req, handlers.OnToolRequestUserInput)
-
-	case "fuzzyFileSearch":
-		if handlers.OnFuzzyFileSearch == nil {
-			return methodNotFoundResponse(req.ID), nil
-		}
-		return handleApproval(ctx, req, handlers.OnFuzzyFileSearch)
 
 	case "account/chatgptAuthTokens/refresh":
 		if handlers.OnChatgptAuthTokensRefresh == nil {

@@ -210,7 +210,6 @@ func TestApprovalHandlerDispatch(t *testing.T) {
 	var skillCalled bool
 	var toolCallCalled bool
 	var userInputCalled bool
-	var fuzzySearchCalled bool
 	var authRefreshCalled bool
 
 	handlers := codex.ApprovalHandlers{
@@ -258,14 +257,6 @@ func TestApprovalHandlerDispatch(t *testing.T) {
 			return codex.ToolRequestUserInputResponse{
 				Answers: map[string]codex.ToolRequestUserInputAnswer{
 					"q1": {Answers: []string{"answer"}},
-				},
-			}, nil
-		},
-		OnFuzzyFileSearch: func(ctx context.Context, params codex.FuzzyFileSearchParams) (codex.FuzzyFileSearchResponse, error) {
-			fuzzySearchCalled = true
-			return codex.FuzzyFileSearchResponse{
-				Files: []codex.FuzzyFileSearchResult{
-					{Path: "/file.go", FileName: "file.go", Root: "/", Score: 100},
 				},
 			}, nil
 		},
@@ -340,18 +331,10 @@ func TestApprovalHandlerDispatch(t *testing.T) {
 		Params:  json.RawMessage(`{"itemId":"i1","threadId":"t1","turnId":"tu1","questions":[{"id":"q1","header":"H","question":"Q"}]}`),
 	})
 
-	// 8. FuzzyFileSearch
+	// 8. ChatgptAuthTokensRefresh
 	_, _ = mock.InjectServerRequest(ctx, codex.Request{
 		JSONRPC: "2.0",
 		ID:      codex.RequestID{Value: 8},
-		Method:  "fuzzyFileSearch",
-		Params:  json.RawMessage(`{"query":"test","roots":["/"]}`),
-	})
-
-	// 9. ChatgptAuthTokensRefresh
-	_, _ = mock.InjectServerRequest(ctx, codex.Request{
-		JSONRPC: "2.0",
-		ID:      codex.RequestID{Value: 9},
 		Method:  "account/chatgptAuthTokens/refresh",
 		Params:  json.RawMessage(`{"reason":"unauthorized"}`),
 	})
@@ -377,9 +360,6 @@ func TestApprovalHandlerDispatch(t *testing.T) {
 	}
 	if !userInputCalled {
 		t.Error("ToolRequestUserInput handler not called")
-	}
-	if !fuzzySearchCalled {
-		t.Error("FuzzyFileSearch handler not called")
 	}
 	if !authRefreshCalled {
 		t.Error("ChatgptAuthTokensRefresh handler not called")
@@ -477,10 +457,10 @@ func TestApprovalEndToEnd(t *testing.T) {
 	}
 }
 
-// TestApprovalHandlersCompleteness verifies all 9 server→client request handler fields exist
+// TestApprovalHandlersCompleteness verifies all 8 server→client request handler fields exist
 func TestApprovalHandlersCompleteness(t *testing.T) {
-	// This test ensures ApprovalHandlers struct has all 9 handler fields
-	// as specified in the PRD architecture overview
+	// This test ensures ApprovalHandlers struct has all 8 handler fields
+	// as specified in ServerRequest.json
 	handlers := codex.ApprovalHandlers{
 		OnApplyPatchApproval:              func(context.Context, codex.ApplyPatchApprovalParams) (codex.ApplyPatchApprovalResponse, error) { return codex.ApplyPatchApprovalResponse{}, nil },
 		OnCommandExecutionRequestApproval: func(context.Context, codex.CommandExecutionRequestApprovalParams) (codex.CommandExecutionRequestApprovalResponse, error) { return codex.CommandExecutionRequestApprovalResponse{}, nil },
@@ -489,7 +469,6 @@ func TestApprovalHandlersCompleteness(t *testing.T) {
 		OnSkillRequestApproval:            func(context.Context, codex.SkillRequestApprovalParams) (codex.SkillRequestApprovalResponse, error) { return codex.SkillRequestApprovalResponse{}, nil },
 		OnDynamicToolCall:                 func(context.Context, codex.DynamicToolCallParams) (codex.DynamicToolCallResponse, error) { return codex.DynamicToolCallResponse{}, nil },
 		OnToolRequestUserInput:            func(context.Context, codex.ToolRequestUserInputParams) (codex.ToolRequestUserInputResponse, error) { return codex.ToolRequestUserInputResponse{}, nil },
-		OnFuzzyFileSearch:                 func(context.Context, codex.FuzzyFileSearchParams) (codex.FuzzyFileSearchResponse, error) { return codex.FuzzyFileSearchResponse{}, nil },
 		OnChatgptAuthTokensRefresh:        func(context.Context, codex.ChatgptAuthTokensRefreshParams) (codex.ChatgptAuthTokensRefreshResponse, error) { return codex.ChatgptAuthTokensRefreshResponse{}, nil },
 	}
 
@@ -498,7 +477,7 @@ func TestApprovalHandlersCompleteness(t *testing.T) {
 	client := codex.NewClient(mock)
 	client.SetApprovalHandlers(handlers)
 
-	// Count: 9 server→client request types
+	// Count: 8 server→client request types
 	// 1. ApplyPatchApproval
 	// 2. CommandExecutionRequestApproval
 	// 3. ExecCommandApproval
@@ -506,8 +485,7 @@ func TestApprovalHandlersCompleteness(t *testing.T) {
 	// 5. SkillRequestApproval
 	// 6. DynamicToolCall
 	// 7. ToolRequestUserInput
-	// 8. FuzzyFileSearch
-	// 9. ChatgptAuthTokensRefresh
+	// 8. ChatgptAuthTokensRefresh
 
 	// This test will fail to compile if any handler field is missing or has wrong signature
 }

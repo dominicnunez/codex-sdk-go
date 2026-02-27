@@ -17,7 +17,6 @@ type ApprovalHandlers struct {
 	OnSkillRequestApproval            func(context.Context, SkillRequestApprovalParams) (SkillRequestApprovalResponse, error)
 	OnDynamicToolCall                 func(context.Context, DynamicToolCallParams) (DynamicToolCallResponse, error)
 	OnToolRequestUserInput            func(context.Context, ToolRequestUserInputParams) (ToolRequestUserInputResponse, error)
-	OnFuzzyFileSearch                 func(context.Context, FuzzyFileSearchParams) (FuzzyFileSearchResponse, error)
 	OnChatgptAuthTokensRefresh        func(context.Context, ChatgptAuthTokensRefreshParams) (ChatgptAuthTokensRefreshResponse, error)
 }
 
@@ -820,29 +819,6 @@ type ToolRequestUserInputResponse struct {
 // ToolRequestUserInputAnswer represents an answer to a question.
 type ToolRequestUserInputAnswer struct {
 	Answers []string `json:"answers"`
-}
-
-// ========== FuzzyFileSearch (File Search Tool) ==========
-
-// FuzzyFileSearchParams represents parameters for fuzzy file search.
-type FuzzyFileSearchParams struct {
-	Query             string   `json:"query"`
-	Roots             []string `json:"roots"`
-	CancellationToken *string  `json:"cancellationToken,omitempty"`
-}
-
-// FuzzyFileSearchResponse represents the response containing search results.
-type FuzzyFileSearchResponse struct {
-	Files []FuzzyFileSearchResult `json:"files"`
-}
-
-// FuzzyFileSearchResult represents a single file search result.
-type FuzzyFileSearchResult struct {
-	Path     string    `json:"path"`
-	FileName string    `json:"file_name"`
-	Root     string    `json:"root"`
-	Score    uint32    `json:"score"`
-	Indices  *[]uint32 `json:"indices,omitempty"`
 }
 
 // ========== ChatgptAuthTokensRefresh (Authentication Token Refresh) ==========

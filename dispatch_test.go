@@ -373,20 +373,6 @@ func TestKnownApprovalHandlerDispatch(t *testing.T) {
 			expectCalled: true,
 		},
 		{
-			name:   "fuzzyFileSearch",
-			method: "fuzzyFileSearch",
-			params: map[string]interface{}{
-				"query":     "test.txt",
-				"sessionId": "session-123",
-			},
-			handler: func(ah *codex.ApprovalHandlers) {
-				ah.OnFuzzyFileSearch = func(ctx context.Context, p codex.FuzzyFileSearchParams) (codex.FuzzyFileSearchResponse, error) {
-					return codex.FuzzyFileSearchResponse{Files: []codex.FuzzyFileSearchResult{}}, nil
-				}
-			},
-			expectCalled: true,
-		},
-		{
 			name:   "account/chatgptAuthTokens/refresh",
 			method: "account/chatgptAuthTokens/refresh",
 			params: map[string]interface{}{
