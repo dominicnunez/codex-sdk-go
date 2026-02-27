@@ -53,10 +53,19 @@ type TurnPlanUpdatedNotification struct {
 	Explanation *string        `json:"explanation,omitempty"`
 }
 
+// TurnPlanStepStatus represents the status of a plan step.
+type TurnPlanStepStatus string
+
+const (
+	TurnPlanStepStatusPending    TurnPlanStepStatus = "pending"
+	TurnPlanStepStatusInProgress TurnPlanStepStatus = "inProgress"
+	TurnPlanStepStatusCompleted  TurnPlanStepStatus = "completed"
+)
+
 // TurnPlanStep represents a step in a turn plan
 type TurnPlanStep struct {
-	Step   string `json:"step"`
-	Status string `json:"status"` // "pending" | "inProgress" | "completed"
+	Step   string             `json:"step"`
+	Status TurnPlanStepStatus `json:"status"`
 }
 
 // OnTurnPlanUpdated registers a listener for turn/planUpdated notifications
