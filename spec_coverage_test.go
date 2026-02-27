@@ -66,29 +66,52 @@ func TestSpecCoverage(t *testing.T) {
 
 	t.Logf("Coverage: %d/%d types implemented", len(found), len(schemaToType))
 
-	// Filter missing types into intentional gaps vs actual gaps
-	var intentionalGaps []string
+	// Classify missing types: implemented differently vs actually missing.
+	//
+	// "Implemented differently" means the spec type has a Go equivalent under
+	// a different name or pattern:
+	//
+	//   JSON-RPC envelope types (6) — implemented as Request, Response,
+	//     Notification, Error, RequestID in jsonrpc.go with Go-idiomatic names.
+	//     JSONRPCMessage is a union of the other three; Go uses separate types.
+	//
+	//   Method dispatch enums (4) — ClientRequest, ServerRequest,
+	//     ServerNotification, ClientNotification are string enums listing every
+	//     method name. Go dispatches via switch statements and per-service
+	//     method strings instead of a standalone enum type.
+	//
+	//   RequestId (1) — implemented as RequestID (Go convention capitalizes
+	//     acronyms).
+	//
+	//   codex_app_server_protocol.schemas (1) — root schema container file,
+	//     not a type. All nested definitions are implemented as individual
+	//     Go types in their respective domain files.
+	//
+	//   RawResponseItemCompletedNotification (1) — schema file exists at
+	//     specs/v2/ but the type is not referenced in ServerNotification.json.
+	//     It is not part of the wire protocol; implementing it would be dead code.
+	//
+	var implementedDifferently []string
 	var actualGaps []string
 
 	for _, m := range missing {
-		// These are intentional - they're low-level protocol types or union/enum dispatch types
 		if strings.Contains(m, "JSONRPCRequest") || strings.Contains(m, "JSONRPCResponse") ||
 			strings.Contains(m, "JSONRPCNotification") || strings.Contains(m, "JSONRPCMessage") ||
 			strings.Contains(m, "JSONRPCError") || strings.Contains(m, "JSONRPCErrorError") ||
 			strings.Contains(m, "ServerNotification") || strings.Contains(m, "ClientNotification") ||
 			strings.Contains(m, "ServerRequest") || strings.Contains(m, "ClientRequest") ||
-			strings.Contains(m, "RequestId (") || // We use RequestID (different casing)
-			strings.Contains(m, "codex_app_server_protocol.schemas") || // Schema metadata file
-			strings.Contains(m, "RawResponseItemCompletedNotification") { // Schema exists but not in ServerNotification.json
-			intentionalGaps = append(intentionalGaps, m)
+			strings.Contains(m, "RequestId (") ||
+			strings.Contains(m, "codex_app_server_protocol.schemas") ||
+			strings.Contains(m, "RawResponseItemCompletedNotification") {
+			implementedDifferently = append(implementedDifferently, m)
 		} else {
 			actualGaps = append(actualGaps, m)
 		}
 	}
 
-	if len(intentionalGaps) > 0 {
-		t.Logf("Intentional gaps (low-level protocol types or union types):")
-		for _, g := range intentionalGaps {
+	if len(implementedDifferently) > 0 {
+		t.Logf("Implemented differently (Go-idiomatic equivalents exist):")
+		for _, g := range implementedDifferently {
 			t.Logf("  - %s", g)
 		}
 	}
