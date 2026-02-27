@@ -143,6 +143,11 @@ type ApiKeyLoginAccountParams struct {
 
 func (p *ApiKeyLoginAccountParams) loginParamsType() string { return "apiKey" }
 
+// String redacts the API key to prevent accidental credential leaks in logs.
+func (p *ApiKeyLoginAccountParams) String() string {
+	return fmt.Sprintf("ApiKeyLoginAccountParams{Type:%s, ApiKey:[REDACTED]}", p.Type)
+}
+
 // ChatgptLoginAccountParams represents ChatGPT OAuth login parameters
 type ChatgptLoginAccountParams struct {
 	Type string `json:"type"`
@@ -159,6 +164,11 @@ type ChatgptAuthTokensLoginAccountParams struct {
 }
 
 func (p *ChatgptAuthTokensLoginAccountParams) loginParamsType() string { return "chatgptAuthTokens" }
+
+// String redacts the access token to prevent accidental credential leaks in logs.
+func (p *ChatgptAuthTokensLoginAccountParams) String() string {
+	return fmt.Sprintf("ChatgptAuthTokensLoginAccountParams{Type:%s, AccessToken:[REDACTED], ChatgptAccountId:%s}", p.Type, p.ChatgptAccountId)
+}
 
 // LoginAccountResponse is an interface for login response variants
 type LoginAccountResponse interface {

@@ -859,3 +859,8 @@ type ChatgptAuthTokensRefreshResponse struct {
 	ChatgptAccountID  string  `json:"chatgptAccountId"`
 	ChatgptPlanType   *string `json:"chatgptPlanType,omitempty"`
 }
+
+// String redacts the access token to prevent accidental credential leaks in logs.
+func (r *ChatgptAuthTokensRefreshResponse) String() string {
+	return fmt.Sprintf("ChatgptAuthTokensRefreshResponse{AccessToken:[REDACTED], ChatgptAccountID:%s}", r.ChatgptAccountID)
+}
