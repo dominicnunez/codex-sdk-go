@@ -64,6 +64,17 @@ referenced in ServerNotification.json" and "is not part of the wire protocol; im
 would be dead code." The test at line 105 explicitly exempts it. The server never emits this
 notification — `ServerNotification.json` does not reference it — so there is nothing to drop.
 
+### AppsListParams.ForceRefetch described as missing omitempty but it has omitempty
+
+**Location:** `apps.go:11` — ForceRefetch field tag
+**Date:** 2026-02-27
+
+**Reason:** The audit claims `ForceRefetch bool` has "no `omitempty` tag" and that "the zero value
+`false` is always serialized." This is factually wrong. The actual field declaration is
+`ForceRefetch bool \`json:"forceRefetch,omitempty"\`` — it already has omitempty. With `bool` +
+`omitempty`, the `false` value is *omitted* (not sent), which is the opposite of what the audit
+describes. The stated problem ("missing omitempty sends false as default") does not occur.
+
 ### Scanner buffer sizes are named constants, not magic numbers
 
 **Location:** `stdio.go:226-227` — readLoop buffer constants
