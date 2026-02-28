@@ -420,6 +420,10 @@ func (s *ConfigService) BatchWrite(ctx context.Context, params ConfigBatchWriteP
 
 // OnConfigWarning registers a listener for config warning notifications
 func (c *Client) OnConfigWarning(handler func(ConfigWarningNotification)) {
+	if handler == nil {
+		c.OnNotification("configWarning", nil)
+		return
+	}
 	c.OnNotification("configWarning", func(ctx context.Context, notif Notification) {
 		var n ConfigWarningNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {

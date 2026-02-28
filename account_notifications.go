@@ -33,6 +33,10 @@ type AccountRateLimitsUpdatedNotification struct {
 
 // OnAccountUpdated registers a listener for account/updated notifications
 func (c *Client) OnAccountUpdated(handler func(AccountUpdatedNotification)) {
+	if handler == nil {
+		c.OnNotification("account/updated", nil)
+		return
+	}
 	c.OnNotification("account/updated", func(ctx context.Context, notif Notification) {
 		var n AccountUpdatedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
@@ -44,6 +48,10 @@ func (c *Client) OnAccountUpdated(handler func(AccountUpdatedNotification)) {
 
 // OnAccountLoginCompleted registers a listener for account/loginCompleted notifications
 func (c *Client) OnAccountLoginCompleted(handler func(AccountLoginCompletedNotification)) {
+	if handler == nil {
+		c.OnNotification("account/login/completed", nil)
+		return
+	}
 	c.OnNotification("account/login/completed", func(ctx context.Context, notif Notification) {
 		var n AccountLoginCompletedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
@@ -55,6 +63,10 @@ func (c *Client) OnAccountLoginCompleted(handler func(AccountLoginCompletedNotif
 
 // OnAccountRateLimitsUpdated registers a listener for account/rateLimitsUpdated notifications
 func (c *Client) OnAccountRateLimitsUpdated(handler func(AccountRateLimitsUpdatedNotification)) {
+	if handler == nil {
+		c.OnNotification("account/rateLimits/updated", nil)
+		return
+	}
 	c.OnNotification("account/rateLimits/updated", func(ctx context.Context, notif Notification) {
 		var n AccountRateLimitsUpdatedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {

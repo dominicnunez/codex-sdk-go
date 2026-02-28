@@ -15,6 +15,10 @@ type TurnStartedNotification struct {
 
 // OnTurnStarted registers a listener for turn/started notifications
 func (c *Client) OnTurnStarted(handler func(TurnStartedNotification)) {
+	if handler == nil {
+		c.OnNotification("turn/started", nil)
+		return
+	}
 	c.OnNotification("turn/started", func(ctx context.Context, notif Notification) {
 		var params TurnStartedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
@@ -34,6 +38,10 @@ type TurnCompletedNotification struct {
 
 // OnTurnCompleted registers a listener for turn/completed notifications
 func (c *Client) OnTurnCompleted(handler func(TurnCompletedNotification)) {
+	if handler == nil {
+		c.OnNotification("turn/completed", nil)
+		return
+	}
 	c.OnNotification("turn/completed", func(ctx context.Context, notif Notification) {
 		var params TurnCompletedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
@@ -70,6 +78,10 @@ type TurnPlanStep struct {
 
 // OnTurnPlanUpdated registers a listener for turn/planUpdated notifications
 func (c *Client) OnTurnPlanUpdated(handler func(TurnPlanUpdatedNotification)) {
+	if handler == nil {
+		c.OnNotification("turn/plan/updated", nil)
+		return
+	}
 	c.OnNotification("turn/plan/updated", func(ctx context.Context, notif Notification) {
 		var params TurnPlanUpdatedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
@@ -90,6 +102,10 @@ type TurnDiffUpdatedNotification struct {
 
 // OnTurnDiffUpdated registers a listener for turn/diffUpdated notifications
 func (c *Client) OnTurnDiffUpdated(handler func(TurnDiffUpdatedNotification)) {
+	if handler == nil {
+		c.OnNotification("turn/diff/updated", nil)
+		return
+	}
 	c.OnNotification("turn/diff/updated", func(ctx context.Context, notif Notification) {
 		var params TurnDiffUpdatedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {

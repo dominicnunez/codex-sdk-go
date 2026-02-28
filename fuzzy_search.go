@@ -58,6 +58,10 @@ func (s *FuzzyFileSearchService) Search(ctx context.Context, params FuzzyFileSea
 
 // OnFuzzyFileSearchSessionCompleted registers a listener for fuzzyFileSearch/sessionCompleted notifications.
 func (c *Client) OnFuzzyFileSearchSessionCompleted(handler func(FuzzyFileSearchSessionCompletedNotification)) {
+	if handler == nil {
+		c.OnNotification("fuzzyFileSearch/sessionCompleted", nil)
+		return
+	}
 	c.OnNotification("fuzzyFileSearch/sessionCompleted", func(ctx context.Context, notif Notification) {
 		var params FuzzyFileSearchSessionCompletedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
@@ -69,6 +73,10 @@ func (c *Client) OnFuzzyFileSearchSessionCompleted(handler func(FuzzyFileSearchS
 
 // OnFuzzyFileSearchSessionUpdated registers a listener for fuzzyFileSearch/sessionUpdated notifications.
 func (c *Client) OnFuzzyFileSearchSessionUpdated(handler func(FuzzyFileSearchSessionUpdatedNotification)) {
+	if handler == nil {
+		c.OnNotification("fuzzyFileSearch/sessionUpdated", nil)
+		return
+	}
 	c.OnNotification("fuzzyFileSearch/sessionUpdated", func(ctx context.Context, notif Notification) {
 		var params FuzzyFileSearchSessionUpdatedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {

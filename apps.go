@@ -98,6 +98,10 @@ func (s *AppsService) List(ctx context.Context, params AppsListParams) (AppsList
 
 // OnAppListUpdated registers a listener for app/listUpdated notifications.
 func (c *Client) OnAppListUpdated(handler func(AppListUpdatedNotification)) {
+	if handler == nil {
+		c.OnNotification("app/list/updated", nil)
+		return
+	}
 	c.OnNotification("app/list/updated", func(ctx context.Context, notif Notification) {
 		var params AppListUpdatedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {

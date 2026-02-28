@@ -48,6 +48,10 @@ func (s *CommandService) Exec(ctx context.Context, params CommandExecParams) (Co
 
 // OnCommandExecutionOutputDelta registers a listener for command execution output delta notifications
 func (c *Client) OnCommandExecutionOutputDelta(handler func(CommandExecutionOutputDeltaNotification)) {
+	if handler == nil {
+		c.OnNotification("item/commandExecution/outputDelta", nil)
+		return
+	}
 	c.OnNotification("item/commandExecution/outputDelta", func(ctx context.Context, notif Notification) {
 		var notification CommandExecutionOutputDeltaNotification
 		if err := json.Unmarshal(notif.Params, &notification); err != nil {

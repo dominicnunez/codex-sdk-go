@@ -138,6 +138,10 @@ func (s *McpService) Refresh(ctx context.Context) (McpServerRefreshResponse, err
 
 // OnMcpServerOauthLoginCompleted registers a listener for OAuth login completion notifications.
 func (c *Client) OnMcpServerOauthLoginCompleted(handler func(McpServerOauthLoginCompletedNotification)) {
+	if handler == nil {
+		c.OnNotification("mcpServer/oauthLogin/completed", nil)
+		return
+	}
 	c.OnNotification("mcpServer/oauthLogin/completed", func(ctx context.Context, notif Notification) {
 		var params McpServerOauthLoginCompletedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
@@ -149,6 +153,10 @@ func (c *Client) OnMcpServerOauthLoginCompleted(handler func(McpServerOauthLogin
 
 // OnMcpToolCallProgress registers a listener for MCP tool call progress notifications.
 func (c *Client) OnMcpToolCallProgress(handler func(McpToolCallProgressNotification)) {
+	if handler == nil {
+		c.OnNotification("item/mcpToolCall/progress", nil)
+		return
+	}
 	c.OnNotification("item/mcpToolCall/progress", func(ctx context.Context, notif Notification) {
 		var params McpToolCallProgressNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
