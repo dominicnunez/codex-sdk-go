@@ -12,6 +12,22 @@ import (
 
 var errInvalidParams = errors.New("invalid params")
 
+// wireMarshaler is implemented by types whose MarshalJSON is redacted for safety.
+// marshalForWire uses this to get the unredacted representation for protocol serialization.
+type wireMarshaler interface {
+	marshalWire() ([]byte, error)
+}
+
+// marshalForWire marshals v for wire-protocol use. If v implements wireMarshaler
+// (because its MarshalJSON redacts sensitive fields), the unredacted wire
+// representation is returned instead.
+func marshalForWire(v interface{}) ([]byte, error) {
+	if wm, ok := v.(wireMarshaler); ok {
+		return wm.marshalWire()
+	}
+	return json.Marshal(v)
+}
+
 // Client is the main entry point for interacting with the Codex JSON-RPC server.
 // It uses a Transport for bidirectional communication and provides typed methods
 // for all protocol operations.
@@ -252,7 +268,7 @@ func handleApproval[P any, R any](ctx context.Context, req Request, handler func
 		return Response{}, err
 	}
 
-	resultJSON, err := json.Marshal(result)
+	resultJSON, err := marshalForWire(result)
 	if err != nil {
 		return Response{}, err
 	}
@@ -277,7 +293,7 @@ func (c *Client) nextRequestID() uint64 {
 // sendRequest is a helper that sends a typed request and unmarshals the response.
 func (c *Client) sendRequest(ctx context.Context, method string, params interface{}, result interface{}) error {
 	// Marshal params to JSON
-	paramsJSON, err := json.Marshal(params)
+	paramsJSON, err := marshalForWire(params)
 	if err != nil {
 		return fmt.Errorf("marshal request params for %s: %w", method, err)
 	}
@@ -313,7 +329,7 @@ func (c *Client) sendRequest(ctx context.Context, method string, params interfac
 // This is useful for union types where the result needs custom unmarshaling.
 func (c *Client) sendRequestRaw(ctx context.Context, method string, params interface{}) (json.RawMessage, error) {
 	// Marshal params to JSON
-	paramsJSON, err := json.Marshal(params)
+	paramsJSON, err := marshalForWire(params)
 	if err != nil {
 		return nil, fmt.Errorf("marshal request params for %s: %w", method, err)
 	}

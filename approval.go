@@ -848,6 +848,27 @@ type ChatgptAuthTokensRefreshResponse struct {
 	ChatgptPlanType   *string `json:"chatgptPlanType,omitempty"`
 }
 
+// MarshalJSON redacts the access token to prevent accidental credential leaks
+// via structured logging, debug serializers, or error payloads.
+// Use marshalWire for intentional wire-protocol serialization.
+func (r *ChatgptAuthTokensRefreshResponse) MarshalJSON() ([]byte, error) {
+	type redacted struct {
+		AccessToken      string  `json:"accessToken"`
+		ChatgptAccountID string  `json:"chatgptAccountId"`
+		ChatgptPlanType  *string `json:"chatgptPlanType,omitempty"`
+	}
+	return json.Marshal(redacted{
+		AccessToken:      "[REDACTED]",
+		ChatgptAccountID: r.ChatgptAccountID,
+		ChatgptPlanType:  r.ChatgptPlanType,
+	})
+}
+
+func (r *ChatgptAuthTokensRefreshResponse) marshalWire() ([]byte, error) {
+	type wire ChatgptAuthTokensRefreshResponse
+	return json.Marshal((*wire)(r))
+}
+
 // String redacts the access token to prevent accidental credential leaks in logs.
 func (r *ChatgptAuthTokensRefreshResponse) String() string {
 	return fmt.Sprintf("ChatgptAuthTokensRefreshResponse{AccessToken:[REDACTED], ChatgptAccountID:%s}", r.ChatgptAccountID)

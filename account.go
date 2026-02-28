@@ -143,6 +143,24 @@ type ApiKeyLoginAccountParams struct {
 
 func (p *ApiKeyLoginAccountParams) loginParamsType() string { return "apiKey" }
 
+// MarshalJSON redacts the API key to prevent accidental credential leaks
+// via structured logging, debug serializers, or error payloads.
+func (p *ApiKeyLoginAccountParams) MarshalJSON() ([]byte, error) {
+	type redacted struct {
+		Type   string `json:"type"`
+		ApiKey string `json:"apiKey"`
+	}
+	return json.Marshal(redacted{
+		Type:   p.Type,
+		ApiKey: "[REDACTED]",
+	})
+}
+
+func (p *ApiKeyLoginAccountParams) marshalWire() ([]byte, error) {
+	type wire ApiKeyLoginAccountParams
+	return json.Marshal((*wire)(p))
+}
+
 // String redacts the API key to prevent accidental credential leaks in logs.
 func (p *ApiKeyLoginAccountParams) String() string {
 	return fmt.Sprintf("ApiKeyLoginAccountParams{Type:%s, ApiKey:[REDACTED]}", p.Type)
@@ -172,6 +190,28 @@ type ChatgptAuthTokensLoginAccountParams struct {
 }
 
 func (p *ChatgptAuthTokensLoginAccountParams) loginParamsType() string { return "chatgptAuthTokens" }
+
+// MarshalJSON redacts the access token to prevent accidental credential leaks
+// via structured logging, debug serializers, or error payloads.
+func (p *ChatgptAuthTokensLoginAccountParams) MarshalJSON() ([]byte, error) {
+	type redacted struct {
+		Type             string  `json:"type"`
+		AccessToken      string  `json:"accessToken"`
+		ChatgptAccountId string  `json:"chatgptAccountId"`
+		ChatgptPlanType  *string `json:"chatgptPlanType,omitempty"`
+	}
+	return json.Marshal(redacted{
+		Type:             p.Type,
+		AccessToken:      "[REDACTED]",
+		ChatgptAccountId: p.ChatgptAccountId,
+		ChatgptPlanType:  p.ChatgptPlanType,
+	})
+}
+
+func (p *ChatgptAuthTokensLoginAccountParams) marshalWire() ([]byte, error) {
+	type wire ChatgptAuthTokensLoginAccountParams
+	return json.Marshal((*wire)(p))
+}
 
 // String redacts the access token to prevent accidental credential leaks in logs.
 func (p *ChatgptAuthTokensLoginAccountParams) String() string {

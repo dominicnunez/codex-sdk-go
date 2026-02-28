@@ -1,6 +1,7 @@
 package codex_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -37,6 +38,23 @@ func TestCredentialTypesRedactWithAllFormatVerbs(t *testing.T) {
 				ChatgptAccountID: "acct-456",
 			},
 		},
+	}
+
+	// Verify json.Marshal also redacts
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%s/json.Marshal", tt.name), func(t *testing.T) {
+			data, err := json.Marshal(tt.value)
+			if err != nil {
+				t.Fatalf("json.Marshal failed: %v", err)
+			}
+			output := string(data)
+			if strings.Contains(output, secret) {
+				t.Errorf("%s leaked credential via json.Marshal: %s", tt.name, output)
+			}
+			if !strings.Contains(output, "[REDACTED]") {
+				t.Errorf("%s json.Marshal did not include [REDACTED]: %s", tt.name, output)
+			}
+		})
 	}
 
 	verbs := []string{"%v", "%+v", "%#v", "%s"}
