@@ -250,14 +250,16 @@ func (t *StdioTransport) readLoop() {
 			continue
 		}
 
+			hasID := len(msg.ID) > 0 && string(msg.ID) != "null"
+
 		// Response: has ID but no method
-		if len(msg.ID) > 0 && msg.Method == "" {
+		if hasID && msg.Method == "" {
 			t.handleResponse(line)
 			continue
 		}
 
 		// Request: has both ID and method
-		if len(msg.ID) > 0 && msg.Method != "" {
+		if hasID && msg.Method != "" {
 			t.handleRequest(line)
 			continue
 		}
