@@ -148,6 +148,14 @@ func (p *ApiKeyLoginAccountParams) String() string {
 	return fmt.Sprintf("ApiKeyLoginAccountParams{Type:%s, ApiKey:[REDACTED]}", p.Type)
 }
 
+// GoString implements fmt.GoStringer to redact credentials from %#v.
+func (p *ApiKeyLoginAccountParams) GoString() string { return p.String() }
+
+// Format implements fmt.Formatter to redact credentials from all format verbs.
+func (p *ApiKeyLoginAccountParams) Format(f fmt.State, verb rune) {
+	fmt.Fprint(f, p.String())
+}
+
 // ChatgptLoginAccountParams represents ChatGPT OAuth login parameters
 type ChatgptLoginAccountParams struct {
 	Type string `json:"type"`
@@ -168,6 +176,14 @@ func (p *ChatgptAuthTokensLoginAccountParams) loginParamsType() string { return 
 // String redacts the access token to prevent accidental credential leaks in logs.
 func (p *ChatgptAuthTokensLoginAccountParams) String() string {
 	return fmt.Sprintf("ChatgptAuthTokensLoginAccountParams{Type:%s, AccessToken:[REDACTED], ChatgptAccountId:%s}", p.Type, p.ChatgptAccountId)
+}
+
+// GoString implements fmt.GoStringer to redact credentials from %#v.
+func (p *ChatgptAuthTokensLoginAccountParams) GoString() string { return p.String() }
+
+// Format implements fmt.Formatter to redact credentials from all format verbs.
+func (p *ChatgptAuthTokensLoginAccountParams) Format(f fmt.State, verb rune) {
+	fmt.Fprint(f, p.String())
 }
 
 // LoginAccountResponse is an interface for login response variants

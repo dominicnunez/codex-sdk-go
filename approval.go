@@ -830,3 +830,11 @@ type ChatgptAuthTokensRefreshResponse struct {
 func (r *ChatgptAuthTokensRefreshResponse) String() string {
 	return fmt.Sprintf("ChatgptAuthTokensRefreshResponse{AccessToken:[REDACTED], ChatgptAccountID:%s}", r.ChatgptAccountID)
 }
+
+// GoString implements fmt.GoStringer to redact credentials from %#v.
+func (r *ChatgptAuthTokensRefreshResponse) GoString() string { return r.String() }
+
+// Format implements fmt.Formatter to redact credentials from all format verbs.
+func (r *ChatgptAuthTokensRefreshResponse) Format(f fmt.State, verb rune) {
+	fmt.Fprint(f, r.String())
+}
