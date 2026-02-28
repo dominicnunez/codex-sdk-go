@@ -157,6 +157,8 @@ func newReviewService(client *Client) *ReviewService {
 // Start initiates a code review based on the provided parameters.
 func (s *ReviewService) Start(ctx context.Context, params ReviewStartParams) (ReviewStartResponse, error) {
 	var resp ReviewStartResponse
-	err := s.client.sendRequest(ctx, "review/start", params, &resp)
-	return resp, err
+	if err := s.client.sendRequest(ctx, "review/start", params, &resp); err != nil {
+		return ReviewStartResponse{}, err
+	}
+	return resp, nil
 }

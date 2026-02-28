@@ -90,8 +90,10 @@ func newAppsService(client *Client) *AppsService {
 // List retrieves the list of available apps/connectors.
 func (s *AppsService) List(ctx context.Context, params AppsListParams) (AppsListResponse, error) {
 	var resp AppsListResponse
-	err := s.client.sendRequest(ctx, "app/list", params, &resp)
-	return resp, err
+	if err := s.client.sendRequest(ctx, "app/list", params, &resp); err != nil {
+		return AppsListResponse{}, err
+	}
+	return resp, nil
 }
 
 // OnAppListUpdated registers a listener for app/listUpdated notifications.

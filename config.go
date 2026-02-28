@@ -391,29 +391,37 @@ func newConfigService(client *Client) *ConfigService {
 // Read reads the current configuration
 func (s *ConfigService) Read(ctx context.Context, params ConfigReadParams) (ConfigReadResponse, error) {
 	var resp ConfigReadResponse
-	err := s.client.sendRequest(ctx, "config/read", params, &resp)
-	return resp, err
+	if err := s.client.sendRequest(ctx, "config/read", params, &resp); err != nil {
+		return ConfigReadResponse{}, err
+	}
+	return resp, nil
 }
 
 // ReadRequirements reads configuration requirements
 func (s *ConfigService) ReadRequirements(ctx context.Context) (ConfigRequirementsReadResponse, error) {
 	var resp ConfigRequirementsReadResponse
-	err := s.client.sendRequest(ctx, "configRequirements/read", nil, &resp)
-	return resp, err
+	if err := s.client.sendRequest(ctx, "configRequirements/read", nil, &resp); err != nil {
+		return ConfigRequirementsReadResponse{}, err
+	}
+	return resp, nil
 }
 
 // Write writes a single config value
 func (s *ConfigService) Write(ctx context.Context, params ConfigValueWriteParams) (ConfigWriteResponse, error) {
 	var resp ConfigWriteResponse
-	err := s.client.sendRequest(ctx, "config/value/write", params, &resp)
-	return resp, err
+	if err := s.client.sendRequest(ctx, "config/value/write", params, &resp); err != nil {
+		return ConfigWriteResponse{}, err
+	}
+	return resp, nil
 }
 
 // BatchWrite writes multiple config values atomically
 func (s *ConfigService) BatchWrite(ctx context.Context, params ConfigBatchWriteParams) (ConfigWriteResponse, error) {
 	var resp ConfigWriteResponse
-	err := s.client.sendRequest(ctx, "config/batchWrite", params, &resp)
-	return resp, err
+	if err := s.client.sendRequest(ctx, "config/batchWrite", params, &resp); err != nil {
+		return ConfigWriteResponse{}, err
+	}
+	return resp, nil
 }
 
 // OnConfigWarning registers a listener for config warning notifications
