@@ -61,7 +61,6 @@ func TestCommandExec(t *testing.T) {
 				Command: []string{"cat", "/etc/passwd"},
 				SandboxPolicy: &codex.SandboxPolicyWrapper{
 					Value: codex.SandboxPolicyReadOnly{
-						Type: "readOnly",
 					},
 				},
 			},

@@ -136,29 +136,22 @@ type ThreadStatus interface {
 }
 
 // ThreadStatusNotLoaded represents a not-loaded thread
-type ThreadStatusNotLoaded struct {
-	Type string `json:"type"`
-}
+type ThreadStatusNotLoaded struct{}
 
 func (ThreadStatusNotLoaded) isThreadStatus() {}
 
 // ThreadStatusIdle represents an idle thread
-type ThreadStatusIdle struct {
-	Type string `json:"type"`
-}
+type ThreadStatusIdle struct{}
 
 func (ThreadStatusIdle) isThreadStatus() {}
 
 // ThreadStatusSystemError represents a thread with a system error
-type ThreadStatusSystemError struct {
-	Type string `json:"type"`
-}
+type ThreadStatusSystemError struct{}
 
 func (ThreadStatusSystemError) isThreadStatus() {}
 
 // ThreadStatusActive represents an active thread
 type ThreadStatusActive struct {
-	Type        string             `json:"type"`
 	ActiveFlags []ThreadActiveFlag `json:"activeFlags"`
 }
 
@@ -332,17 +325,22 @@ func (t ThreadStatusWrapper) MarshalJSON() ([]byte, error) {
 	}
 	switch v := t.Value.(type) {
 	case ThreadStatusNotLoaded:
-		v.Type = "notLoaded"
-		return json.Marshal(v)
+		return json.Marshal(struct {
+			Type string `json:"type"`
+		}{Type: "notLoaded"})
 	case ThreadStatusIdle:
-		v.Type = "idle"
-		return json.Marshal(v)
+		return json.Marshal(struct {
+			Type string `json:"type"`
+		}{Type: "idle"})
 	case ThreadStatusSystemError:
-		v.Type = "systemError"
-		return json.Marshal(v)
+		return json.Marshal(struct {
+			Type string `json:"type"`
+		}{Type: "systemError"})
 	case ThreadStatusActive:
-		v.Type = "active"
-		return json.Marshal(v)
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			ThreadStatusActive
+		}{Type: "active", ThreadStatusActive: v})
 	case UnknownThreadStatus:
 		return v.MarshalJSON()
 	default:
@@ -448,15 +446,12 @@ type SandboxPolicy interface {
 }
 
 // SandboxPolicyDangerFullAccess allows full system access
-type SandboxPolicyDangerFullAccess struct {
-	Type string `json:"type"`
-}
+type SandboxPolicyDangerFullAccess struct{}
 
 func (SandboxPolicyDangerFullAccess) isSandboxPolicy() {}
 
 // SandboxPolicyReadOnly allows read-only access
 type SandboxPolicyReadOnly struct {
-	Type   string                `json:"type"`
 	Access *ReadOnlyAccessWrapper `json:"access,omitempty"`
 }
 
@@ -464,7 +459,6 @@ func (SandboxPolicyReadOnly) isSandboxPolicy() {}
 
 // SandboxPolicyExternalSandbox uses external sandbox
 type SandboxPolicyExternalSandbox struct {
-	Type          string         `json:"type"`
 	NetworkAccess *NetworkAccess `json:"networkAccess,omitempty"` // "restricted" or "enabled"
 }
 
@@ -472,7 +466,6 @@ func (SandboxPolicyExternalSandbox) isSandboxPolicy() {}
 
 // SandboxPolicyWorkspaceWrite allows workspace writes
 type SandboxPolicyWorkspaceWrite struct {
-	Type                string                 `json:"type"`
 	ExcludeSlashTmp     *bool                  `json:"excludeSlashTmp,omitempty"`
 	ExcludeTmpdirEnvVar *bool                  `json:"excludeTmpdirEnvVar,omitempty"`
 	NetworkAccess       *bool                  `json:"networkAccess,omitempty"`
@@ -504,7 +497,6 @@ type ReadOnlyAccess interface {
 
 // ReadOnlyAccessRestricted restricts read access to specific roots
 type ReadOnlyAccessRestricted struct {
-	Type                    string   `json:"type"`
 	IncludePlatformDefaults *bool    `json:"includePlatformDefaults,omitempty"`
 	ReadableRoots           []string `json:"readableRoots,omitempty"`
 }
@@ -512,9 +504,7 @@ type ReadOnlyAccessRestricted struct {
 func (ReadOnlyAccessRestricted) isReadOnlyAccess() {}
 
 // ReadOnlyAccessFullAccess allows full read access
-type ReadOnlyAccessFullAccess struct {
-	Type string `json:"type"`
-}
+type ReadOnlyAccessFullAccess struct{}
 
 func (ReadOnlyAccessFullAccess) isReadOnlyAccess() {}
 
@@ -555,7 +545,7 @@ func (w *ReadOnlyAccessWrapper) UnmarshalJSON(data []byte) error {
 		}
 		w.Value = v
 	case "fullAccess":
-		w.Value = ReadOnlyAccessFullAccess{Type: "fullAccess"}
+		w.Value = ReadOnlyAccessFullAccess{}
 	default:
 		w.Value = UnknownReadOnlyAccess{Type: raw.Type, Raw: append(json.RawMessage(nil), data...)}
 	}
@@ -571,11 +561,14 @@ func (w ReadOnlyAccessWrapper) MarshalJSON() ([]byte, error) {
 	}
 	switch v := w.Value.(type) {
 	case ReadOnlyAccessRestricted:
-		v.Type = "restricted"
-		return json.Marshal(v)
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			ReadOnlyAccessRestricted
+		}{Type: "restricted", ReadOnlyAccessRestricted: v})
 	case ReadOnlyAccessFullAccess:
-		v.Type = "fullAccess"
-		return json.Marshal(v)
+		return json.Marshal(struct {
+			Type string `json:"type"`
+		}{Type: "fullAccess"})
 	case UnknownReadOnlyAccess:
 		return v.MarshalJSON()
 	default:
@@ -646,17 +639,24 @@ func (s SandboxPolicyWrapper) MarshalJSON() ([]byte, error) {
 	}
 	switch v := s.Value.(type) {
 	case SandboxPolicyDangerFullAccess:
-		v.Type = "dangerFullAccess"
-		return json.Marshal(v)
+		return json.Marshal(struct {
+			Type string `json:"type"`
+		}{Type: "dangerFullAccess"})
 	case SandboxPolicyReadOnly:
-		v.Type = "readOnly"
-		return json.Marshal(v)
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			SandboxPolicyReadOnly
+		}{Type: "readOnly", SandboxPolicyReadOnly: v})
 	case SandboxPolicyExternalSandbox:
-		v.Type = "externalSandbox"
-		return json.Marshal(v)
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			SandboxPolicyExternalSandbox
+		}{Type: "externalSandbox", SandboxPolicyExternalSandbox: v})
 	case SandboxPolicyWorkspaceWrite:
-		v.Type = "workspaceWrite"
-		return json.Marshal(v)
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			SandboxPolicyWorkspaceWrite
+		}{Type: "workspaceWrite", SandboxPolicyWorkspaceWrite: v})
 	case UnknownSandboxPolicy:
 		return v.MarshalJSON()
 	default:
