@@ -310,6 +310,33 @@ patterns where the sentinel carries the code but not a specific message. The nil
 path (`e.err == nil && t.err == nil`) is unreachable since `NewRPCError` is never called with nil,
 but the nil guard is a defensive correctness check, not dead logic worth removing.
 
+### Notify goroutine can write to writer after context cancellation
+
+**Location:** `stdio.go:153-156` — Notify write goroutine
+**Date:** 2026-02-27
+
+**Reason:** Same root cause as the existing Send goroutine exception. When `Notify` returns
+early via `ctx.Done()` or `readerStopped`, the goroutine running `writeMessage` continues and
+may deliver a notification the caller believes was not sent. The write itself is safe (protected
+by `writeMu`), and notifications are fire-and-forget by definition — a delivered notification
+has no negative side effect. Fixing this requires `io.WriteCloser` (same API change discussed
+in the Send exception), which is disproportionate to the severity.
+
+### TurnStartParams custom UnmarshalJSON does not round-trip ApprovalPolicy and SandboxPolicy
+
+**Location:** `turn.go:34-60` — TurnStartParams.UnmarshalJSON Alias delegation
+**Date:** 2026-02-27
+
+**Reason:** The `type Alias` trick delegates non-Input fields to default `encoding/json`
+unmarshaling, which cannot populate bare interface fields (`*AskForApproval`, `*SandboxPolicy`)
+without a registered custom unmarshaler. These fields are always nil after unmarshaling even
+when present in JSON. This is the same root cause as the existing "Params structs use bare
+interface instead of wrapper type" exception — changing the field types to wrapper types would
+fix it but is prohibited by spec compliance rules (public API types map 1:1 to schemas). In
+practice, `TurnStartParams` is constructed by SDK callers and marshaled for sending; the
+unmarshal path is only used when the SDK receives these params in tests or echo scenarios,
+not in normal client operation.
+
 ### Notify may succeed even if the transport reader has just stopped
 
 **Location:** `stdio.go:135-156` — Notify method
