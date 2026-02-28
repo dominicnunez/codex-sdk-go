@@ -215,6 +215,19 @@ silently discarded" exceptions — surfacing internal errors from goroutine-disp
 requires API additions disproportionate to the severity. Consumers who need observability can
 wrap their handler functions with their own error logging before passing them to the SDK.
 
+### readLoop starts before handlers are registered, risking dropped early messages
+
+**Location:** `stdio.go:85-86` — NewStdioTransport starts readLoop immediately
+**Date:** 2026-02-27
+
+**Reason:** Fixing this requires either adding a `Start()` method to the public API (breaking
+the constructor-starts-transport contract) or buffering messages internally until handlers are set
+(adding complexity and a new failure mode). In practice, the JSON-RPC protocol requires the client
+to send `initialize` before the server sends any messages, so the handler registration in
+`NewClient` always completes before any server messages arrive. The theoretical race window
+(goroutine scheduling between `go t.readLoop()` and `transport.OnNotify`/`transport.OnRequest`)
+is not reachable under the protocol's actual message ordering.
+
 ## Intentional Design Decisions
 
 <!-- Findings that describe behavior which is correct by design -->
