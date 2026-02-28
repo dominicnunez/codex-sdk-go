@@ -13,6 +13,20 @@
 
 <!-- Findings where the audit misread the code or described behavior that doesn't occur -->
 
+### handleApproval marshal error does not leak internal structure
+
+**Location:** `client.go:254-256` — json.Marshal error in handleApproval
+**Date:** 2026-02-27
+
+**Reason:** The audit claims the raw `json.Marshal` error leaks type information across the trust
+boundary and is "visible in any error-logging or debugging path before it reaches the transport."
+This is incorrect. The error propagates directly to `handleRequest` in `stdio.go:314`, which
+immediately replaces it with a hardcoded `"internal handler error"` message (stdio.go:327) before
+sending the JSON-RPC response. The original error string is never logged, stored, or exposed to
+any external party. There is no logging or debugging path in this code — the error goes from
+`handleApproval` return → `handleRequest` goroutine → generic error response. The internal type
+information never crosses any trust boundary.
+
 ## Won't Fix
 
 <!-- Real findings not worth fixing — architectural cost, external constraints, etc. -->
