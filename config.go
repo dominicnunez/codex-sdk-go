@@ -86,7 +86,7 @@ func (w ReasoningSummaryWrapper) MarshalJSON() ([]byte, error) {
 	if mode, ok := w.Value.(ReasoningSummaryMode); ok {
 		return json.Marshal(string(mode))
 	}
-	return json.Marshal(nil)
+	return nil, fmt.Errorf("unknown ReasoningSummary type: %T", w.Value)
 }
 
 // SandboxWorkspaceWrite represents workspace write settings
