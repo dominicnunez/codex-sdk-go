@@ -150,6 +150,8 @@ func (t *StdioTransport) Notify(ctx context.Context, notif Notification) error {
 		return err
 	case <-ctx.Done():
 		return ctx.Err()
+	case <-t.readerStopped:
+		return NewTransportError("notify failed", errors.New("transport reader stopped"))
 	}
 }
 
