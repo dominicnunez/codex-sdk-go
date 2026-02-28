@@ -31,12 +31,17 @@ type StdioTransport struct {
 }
 
 // normalizeID normalizes request IDs for map key matching.
-// JSON unmarshals all numbers as float64, so we normalize all numeric
-// types to uint64 to avoid precision loss for values above 2^53.
+// JSON unmarshals all numbers as float64, so we normalize non-negative
+// integer-valued floats to uint64 for consistent map lookups.
+// Negative or fractional values are kept as float64 to avoid silent wrapping.
 func normalizeID(id interface{}) interface{} {
 	switch v := id.(type) {
 	case float64:
-		return uint64(v)
+		u := uint64(v)
+		if v >= 0 && v == float64(u) {
+			return u
+		}
+		return v
 	case int64:
 		return uint64(v)
 	case int:
