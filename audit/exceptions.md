@@ -13,6 +13,42 @@
 
 <!-- Findings where the audit misread the code or described behavior that doesn't occur -->
 
+### ReviewDecisionWrapper unmarshal correctly handles double-nested network_policy_amendment
+
+**Location:** `approval.go:198-204` — ReviewDecisionWrapper.UnmarshalJSON
+**Date:** 2026-02-27
+
+**Reason:** The audit claims that unmarshaling `raw` (the value at key `"network_policy_amendment"`)
+into `NetworkPolicyAmendmentDecision` loses data because the struct expects a `"network_policy_amendment"`
+JSON field that isn't present. This is incorrect. The spec (`ExecCommandApprovalResponse.json:71-82`,
+`ApplyPatchApprovalResponse.json:71-82`) defines double nesting: the outer object has key
+`"network_policy_amendment"` whose value is another object with an inner `"network_policy_amendment"`
+key containing the actual `NetworkPolicyAmendment` data. So `raw` is
+`{"network_policy_amendment":{"action":"...","host":"..."}}`, which correctly deserializes into
+`NetworkPolicyAmendmentDecision{NetworkPolicyAmendment: ...}`. The roundtrip is not broken.
+
+### RawResponseItemCompletedNotification intentionally omitted from Go types
+
+**Location:** `specs/v2/RawResponseItemCompletedNotification.json` — no Go counterpart
+**Date:** 2026-02-27
+
+**Reason:** The audit claims the spec has no Go type and `TestSpecCoverage` may not catch it.
+This is incorrect. `spec_coverage_test.go:90-92` explicitly documents that this schema "is not
+referenced in ServerNotification.json" and "is not part of the wire protocol; implementing it
+would be dead code." The test at line 105 explicitly exempts it. The server never emits this
+notification — `ServerNotification.json` does not reference it — so there is nothing to drop.
+
+### Scanner buffer sizes are named constants, not magic numbers
+
+**Location:** `stdio.go:226-227` — readLoop buffer constants
+**Date:** 2026-02-27
+
+**Reason:** The audit labels `initialBufferSize` and `maxMessageSize` as "magic numbers" but
+the code defines them as named constants with descriptive comments (`// 64KB`, `// 10MB —
+file diffs and base64 payloads exceed the default`). They are appropriately scoped to the
+function that uses them. The actual concern — that callers can't tune them without modifying
+source — is a feature request for configurability, not a code quality defect.
+
 ### handleApproval marshal error does not leak internal structure
 
 **Location:** `client.go:254-256` — json.Marshal error in handleApproval
@@ -67,6 +103,18 @@ errors (breaking change). The silent-drop behavior is consistent with JSON-RPC 2
 semantics where the server doesn't expect acknowledgment. Malformed notifications from the server
 indicate a protocol-level bug that would manifest in other ways. The risk of silent data loss is
 low relative to the API churn required to surface these errors.
+
+### McpToolCallResult.Content and MCP metadata fields use untyped interface{}
+
+**Location:** `event_types.go:197` — McpToolCallResult.Content, also `mcp.go` Resource/Tool metadata fields
+**Date:** 2026-02-27
+
+**Reason:** The upstream spec defines `McpToolCallResult.content` as `{"items": true, "type": "array"}`
+— an array of any type, with no discriminated union or typed structure. Similarly, `Resource.Icons`,
+`Resource.Meta`, `Tool.InputSchema`, etc. use open schemas (`true`) that accept arbitrary JSON.
+Introducing typed content parts (e.g. `[]McpContentPart`) would be speculative — the spec deliberately
+leaves these open for forward compatibility. Using `[]interface{}` (or `json.RawMessage`) is the
+correct mapping for `"items": true`. Callers who need specific types can type-assert or re-unmarshal.
 
 ## Intentional Design Decisions
 
