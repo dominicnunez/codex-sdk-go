@@ -24,6 +24,7 @@ type TurnStartParams struct {
 	Cwd            *string         `json:"cwd,omitempty"`
 	Effort         *ReasoningEffort         `json:"effort,omitempty"`
 	Model          *string                  `json:"model,omitempty"`
+	// OutputSchema optionally constrains the model's structured output to conform to a JSON Schema.
 	OutputSchema   interface{}              `json:"outputSchema,omitempty"`
 	Personality    *Personality             `json:"personality,omitempty"`
 	SandboxPolicy  *SandboxPolicy           `json:"sandboxPolicy,omitempty"`
