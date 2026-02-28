@@ -276,7 +276,7 @@ func handleApproval[P any, R any](ctx context.Context, req Request, handler func
 
 	resultJSON, err := marshalForWire(result)
 	if err != nil {
-		return Response{}, err
+		return Response{}, fmt.Errorf("marshal %s result: %w: %w", req.Method, errInvalidParams, err)
 	}
 
 	return Response{
