@@ -81,7 +81,7 @@ func (w *ReasoningSummaryWrapper) UnmarshalJSON(data []byte) error {
 
 func (w ReasoningSummaryWrapper) MarshalJSON() ([]byte, error) {
 	if w.Value == nil {
-		return json.Marshal(nil)
+		return []byte("null"), nil
 	}
 	if mode, ok := w.Value.(ReasoningSummaryMode); ok {
 		return json.Marshal(string(mode))
@@ -245,7 +245,7 @@ func (w *ConfigLayerSourceWrapper) UnmarshalJSON(data []byte) error {
 
 func (w ConfigLayerSourceWrapper) MarshalJSON() ([]byte, error) {
 	if w.Value == nil {
-		return json.Marshal(nil)
+		return []byte("null"), nil
 	}
 
 	switch v := w.Value.(type) {
