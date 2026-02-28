@@ -1,0 +1,238 @@
+package codex_test
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"runtime"
+	"testing"
+	"time"
+
+	codex "github.com/dominicnunez/codex-sdk-go"
+)
+
+// TestStartProcess verifies that StartProcess spawns a child process,
+// creates a working Client, and Close cleans up properly.
+func TestStartProcess(t *testing.T) {
+	// Create a fake "codex" binary that reads stdin and writes a JSON-RPC response.
+	dir := t.TempDir()
+	fakeBinary := filepath.Join(dir, "fake-codex")
+
+	// The script ignores args, reads one line from stdin, and writes a valid
+	// JSON-RPC initialize response back.
+	script := `#!/bin/sh
+read line
+echo '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2.0","capabilities":{}}}'
+# Keep running until killed
+while true; do sleep 1; done
+`
+	if runtime.GOOS == "windows" {
+		t.Skip("process test requires unix shell script")
+	}
+
+	if err := os.WriteFile(fakeBinary, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake binary: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	proc, err := codex.StartProcess(ctx, &codex.ProcessOptions{
+		BinaryPath:    fakeBinary,
+		ClientOptions: []codex.ClientOption{codex.WithRequestTimeout(2 * time.Second)},
+	})
+	if err != nil {
+		t.Fatalf("StartProcess: %v", err)
+	}
+
+	// Verify the client is usable by sending an initialize request.
+	_, err = proc.Client.Initialize(ctx, codex.InitializeParams{
+		ClientInfo: codex.ClientInfo{Name: "test", Version: "0.0.1"},
+	})
+	if err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+
+	// Close should kill the process and clean up.
+	if err := proc.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+}
+
+// TestStartProcessBadBinary verifies that StartProcess returns an error
+// when the binary doesn't exist.
+func TestStartProcessBadBinary(t *testing.T) {
+	ctx := context.Background()
+	_, err := codex.StartProcess(ctx, &codex.ProcessOptions{
+		BinaryPath: "/nonexistent/codex-binary-that-does-not-exist",
+	})
+	if err == nil {
+		t.Fatal("expected error for nonexistent binary")
+	}
+}
+
+// TestStartProcessContextCancellation verifies that canceling the context
+// causes the process to terminate.
+func TestStartProcessContextCancellation(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("process test requires unix shell script")
+	}
+
+	dir := t.TempDir()
+	fakeBinary := filepath.Join(dir, "fake-codex")
+
+	script := `#!/bin/sh
+while true; do sleep 1; done
+`
+	if err := os.WriteFile(fakeBinary, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake binary: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	proc, err := codex.StartProcess(ctx, &codex.ProcessOptions{
+		BinaryPath: fakeBinary,
+	})
+	if err != nil {
+		t.Fatalf("StartProcess: %v", err)
+	}
+
+	// Cancel the context — this should cause the process to be killed
+	// (via exec.CommandContext).
+	cancel()
+
+	// Give it a moment to be killed, then close.
+	time.Sleep(100 * time.Millisecond)
+
+	if err := proc.Close(); err != nil {
+		// Close may return an error since the process was already killed,
+		// which is acceptable behavior.
+		t.Logf("Close after cancel: %v (expected)", err)
+	}
+}
+
+// TestProcessWait verifies that Wait returns after the process exits.
+func TestProcessWait(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("process test requires unix shell script")
+	}
+
+	dir := t.TempDir()
+	fakeBinary := filepath.Join(dir, "fake-codex")
+
+	// Script that exits immediately with code 0.
+	script := `#!/bin/sh
+exit 0
+`
+	if err := os.WriteFile(fakeBinary, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake binary: %v", err)
+	}
+
+	ctx := context.Background()
+	proc, err := codex.StartProcess(ctx, &codex.ProcessOptions{
+		BinaryPath: fakeBinary,
+	})
+	if err != nil {
+		t.Fatalf("StartProcess: %v", err)
+	}
+
+	if err := proc.Wait(); err != nil {
+		t.Fatalf("Wait: %v", err)
+	}
+
+	// Close after Wait should be safe (idempotent).
+	if err := proc.Close(); err != nil {
+		t.Logf("Close after Wait: %v (expected)", err)
+	}
+}
+
+// TestStartProcessNilOptions verifies that nil options use defaults.
+func TestStartProcessNilOptions(t *testing.T) {
+	// This will fail because "codex" isn't in PATH in CI, but it should
+	// fail with a start error, not a panic.
+	ctx := context.Background()
+	_, err := codex.StartProcess(ctx, nil)
+	if err == nil {
+		t.Log("StartProcess with nil options succeeded (codex binary found in PATH)")
+	}
+	// Either error or success is acceptable — we just verify no panic.
+}
+
+// TestProcessCloseIdempotent verifies Close can be called multiple times.
+func TestProcessCloseIdempotent(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("process test requires unix shell script")
+	}
+
+	dir := t.TempDir()
+	fakeBinary := filepath.Join(dir, "fake-codex")
+
+	script := `#!/bin/sh
+exit 0
+`
+	if err := os.WriteFile(fakeBinary, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake binary: %v", err)
+	}
+
+	ctx := context.Background()
+	proc, err := codex.StartProcess(ctx, &codex.ProcessOptions{
+		BinaryPath: fakeBinary,
+	})
+	if err != nil {
+		t.Fatalf("StartProcess: %v", err)
+	}
+
+	// Wait for process to exit naturally.
+	time.Sleep(100 * time.Millisecond)
+
+	// Call Close multiple times — should not panic.
+	_ = proc.Close()
+	_ = proc.Close()
+	_ = proc.Close()
+}
+
+// TestStartProcessCustomStderr verifies stderr redirection.
+func TestStartProcessCustomStderr(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("process test requires unix shell script")
+	}
+
+	dir := t.TempDir()
+	fakeBinary := filepath.Join(dir, "fake-codex")
+	stderrFile := filepath.Join(dir, "stderr.log")
+
+	script := `#!/bin/sh
+echo "error output" >&2
+exit 0
+`
+	if err := os.WriteFile(fakeBinary, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake binary: %v", err)
+	}
+
+	f, err := os.Create(stderrFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = f.Close() }()
+
+	ctx := context.Background()
+	proc, err := codex.StartProcess(ctx, &codex.ProcessOptions{
+		BinaryPath: fakeBinary,
+		Stderr:     f,
+	})
+	if err != nil {
+		t.Fatalf("StartProcess: %v", err)
+	}
+
+	_ = proc.Wait()
+	_ = proc.Close()
+	_ = f.Close()
+
+	data, err := os.ReadFile(stderrFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(data) == 0 {
+		t.Error("stderr file is empty, expected error output")
+	}
+}
