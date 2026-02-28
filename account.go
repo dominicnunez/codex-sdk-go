@@ -268,6 +268,18 @@ func (r *ChatgptAuthTokensLoginAccountResponse) loginResponseType() string {
 	return "chatgptAuthTokens"
 }
 
+// UnknownLoginAccountResponse represents an unrecognized login response type from a newer protocol version.
+type UnknownLoginAccountResponse struct {
+	Type string          `json:"type"`
+	Raw  json.RawMessage `json:"-"`
+}
+
+func (u *UnknownLoginAccountResponse) loginResponseType() string { return u.Type }
+
+func (u *UnknownLoginAccountResponse) MarshalJSON() ([]byte, error) {
+	return u.Raw, nil
+}
+
 // UnmarshalLoginAccountResponse unmarshals a LoginAccountResponse from JSON
 func UnmarshalLoginAccountResponse(data []byte) (LoginAccountResponse, error) {
 	var typeCheck struct {
@@ -297,7 +309,7 @@ func UnmarshalLoginAccountResponse(data []byte) (LoginAccountResponse, error) {
 		}
 		return &resp, nil
 	default:
-		return nil, fmt.Errorf("unknown login response type: %s", typeCheck.Type)
+		return &UnknownLoginAccountResponse{Type: typeCheck.Type, Raw: append(json.RawMessage(nil), data...)}, nil
 	}
 }
 
