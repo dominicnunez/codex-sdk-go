@@ -13,12 +13,12 @@ import (
 func TestThreadStart(t *testing.T) {
 	t.Run("start thread with minimal params", func(t *testing.T) {
 		transport := NewMockTransport()
-		defer transport.Close()
+		defer func() { _ = transport.Close() }()
 
 		client := codex.NewClient(transport)
 
 		// Inject a mock response (simplified for now - full implementation will parse ThreadStartResponse.json)
-	_ = transport.SetResponseData("thread/start", map[string]interface{}{
+		_ = transport.SetResponseData("thread/start", map[string]interface{}{
 			"thread": map[string]interface{}{
 				"id":            "thread-123",
 				"cliVersion":    "1.0.0",
@@ -67,11 +67,11 @@ func TestThreadStart(t *testing.T) {
 
 	t.Run("start thread with all optional params", func(t *testing.T) {
 		transport := NewMockTransport()
-		defer transport.Close()
+		defer func() { _ = transport.Close() }()
 
 		client := codex.NewClient(transport)
 
-	_ = transport.SetResponseData("thread/start", map[string]interface{}{
+		_ = transport.SetResponseData("thread/start", map[string]interface{}{
 			"thread": map[string]interface{}{
 				"id":            "thread-456",
 				"cliVersion":    "1.0.0",
@@ -118,11 +118,11 @@ func TestThreadStart(t *testing.T) {
 func TestThreadRead(t *testing.T) {
 	t.Run("read thread without turns", func(t *testing.T) {
 		transport := NewMockTransport()
-		defer transport.Close()
+		defer func() { _ = transport.Close() }()
 
 		client := codex.NewClient(transport)
 
-	_ = transport.SetResponseData("thread/read", map[string]interface{}{
+		_ = transport.SetResponseData("thread/read", map[string]interface{}{
 			"approvalPolicy": "untrusted",
 			"cwd":            "/test/dir",
 			"model":          "gpt-4",
@@ -174,11 +174,11 @@ func TestThreadRead(t *testing.T) {
 func TestThreadList(t *testing.T) {
 	t.Run("list all threads", func(t *testing.T) {
 		transport := NewMockTransport()
-		defer transport.Close()
+		defer func() { _ = transport.Close() }()
 
 		client := codex.NewClient(transport)
 
-	_ = transport.SetResponseData("thread/list", map[string]interface{}{
+		_ = transport.SetResponseData("thread/list", map[string]interface{}{
 			"data": []interface{}{
 				map[string]interface{}{
 					"id":            "thread-1",
@@ -232,11 +232,11 @@ func TestThreadList(t *testing.T) {
 // TestThreadLoadedList tests the ThreadService.LoadedList method
 func TestThreadLoadedList(t *testing.T) {
 	transport := NewMockTransport()
-	defer transport.Close()
+	defer func() { _ = transport.Close() }()
 
 	client := codex.NewClient(transport)
 
-_ = transport.SetResponseData("thread/loaded/list", map[string]interface{}{
+	_ = transport.SetResponseData("thread/loaded/list", map[string]interface{}{
 		"data": []interface{}{
 			"thread-loaded",
 		},
@@ -265,11 +265,11 @@ _ = transport.SetResponseData("thread/loaded/list", map[string]interface{}{
 // TestThreadResume tests the ThreadService.Resume method
 func TestThreadResume(t *testing.T) {
 	transport := NewMockTransport()
-	defer transport.Close()
+	defer func() { _ = transport.Close() }()
 
 	client := codex.NewClient(transport)
 
-_ = transport.SetResponseData("thread/resume", map[string]interface{}{
+	_ = transport.SetResponseData("thread/resume", map[string]interface{}{
 		"approvalPolicy": "untrusted",
 		"cwd":            "/test/dir",
 		"model":          "gpt-4",
@@ -314,11 +314,11 @@ _ = transport.SetResponseData("thread/resume", map[string]interface{}{
 // TestThreadFork tests the ThreadService.Fork method
 func TestThreadFork(t *testing.T) {
 	transport := NewMockTransport()
-	defer transport.Close()
+	defer func() { _ = transport.Close() }()
 
 	client := codex.NewClient(transport)
 
-_ = transport.SetResponseData("thread/fork", map[string]interface{}{
+	_ = transport.SetResponseData("thread/fork", map[string]interface{}{
 		"approvalPolicy": "untrusted",
 		"cwd":            "/test/dir",
 		"model":          "gpt-4",
@@ -363,11 +363,11 @@ _ = transport.SetResponseData("thread/fork", map[string]interface{}{
 // TestThreadRollback tests the ThreadService.Rollback method
 func TestThreadRollback(t *testing.T) {
 	transport := NewMockTransport()
-	defer transport.Close()
+	defer func() { _ = transport.Close() }()
 
 	client := codex.NewClient(transport)
 
-_ = transport.SetResponseData("thread/rollback", map[string]interface{}{
+	_ = transport.SetResponseData("thread/rollback", map[string]interface{}{
 		"approvalPolicy": "untrusted",
 		"cwd":            "/test/dir",
 		"model":          "gpt-4",
@@ -413,7 +413,7 @@ _ = transport.SetResponseData("thread/rollback", map[string]interface{}{
 // TestThreadSetName tests the ThreadService.SetName method
 func TestThreadSetName(t *testing.T) {
 	transport := NewMockTransport()
-	defer transport.Close()
+	defer func() { _ = transport.Close() }()
 
 	client := codex.NewClient(transport)
 
@@ -458,7 +458,7 @@ func TestThreadSetName(t *testing.T) {
 // TestThreadArchive tests the ThreadService.Archive method
 func TestThreadArchive(t *testing.T) {
 	transport := NewMockTransport()
-	defer transport.Close()
+	defer func() { _ = transport.Close() }()
 
 	client := codex.NewClient(transport)
 
@@ -501,7 +501,7 @@ func TestThreadArchive(t *testing.T) {
 // TestThreadUnarchive tests the ThreadService.Unarchive method
 func TestThreadUnarchive(t *testing.T) {
 	transport := NewMockTransport()
-	defer transport.Close()
+	defer func() { _ = transport.Close() }()
 
 	client := codex.NewClient(transport)
 
@@ -545,7 +545,7 @@ func TestThreadUnarchive(t *testing.T) {
 // TestThreadUnsubscribe tests the ThreadService.Unsubscribe method
 func TestThreadUnsubscribe(t *testing.T) {
 	transport := NewMockTransport()
-	defer transport.Close()
+	defer func() { _ = transport.Close() }()
 
 	client := codex.NewClient(transport)
 
@@ -575,7 +575,7 @@ func TestThreadUnsubscribe(t *testing.T) {
 // TestThreadCompactStart tests the ThreadService.CompactStart method
 func TestThreadCompactStart(t *testing.T) {
 	transport := NewMockTransport()
-	defer transport.Close()
+	defer func() { _ = transport.Close() }()
 
 	client := codex.NewClient(transport)
 
@@ -607,12 +607,12 @@ func TestThreadCompactStart(t *testing.T) {
 // TestThreadServiceMethodSignatures ensures all methods exist on ThreadService
 func TestThreadServiceMethodSignatures(t *testing.T) {
 	transport := NewMockTransport()
-	defer transport.Close()
+	defer func() { _ = transport.Close() }()
 
 	client := codex.NewClient(transport)
 
 	// This test will fail to compile if any method is missing
-	var service *codex.ThreadService = client.Thread
+	var service = client.Thread
 
 	if service == nil {
 		t.Fatal("Thread service should not be nil")

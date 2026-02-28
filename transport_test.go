@@ -94,11 +94,14 @@ func TestTransportConcurrentSend(t *testing.T) {
 			ctx := context.Background()
 
 			for j := 0; j < requestsPerGoroutine; j++ {
-				method := "method1"
-				if j%3 == 1 {
+				var method string
+				switch j % 3 {
+				case 1:
 					method = "method2"
-				} else if j%3 == 2 {
+				case 2:
 					method = "method3"
+				default:
+					method = "method1"
 				}
 
 				req := codex.Request{
@@ -248,8 +251,8 @@ func TestTransportConcurrentHandlers(t *testing.T) {
 	// j%2==0 (requests): j=0,2,4 → 3 requests per goroutine
 	// j%2!=0 (notifications): j=1,3 → 2 notifications per goroutine
 	mu.Lock()
-	expectedRequests := numGoroutines * 3  // j=0,2,4
-	expectedNotifications := numGoroutines * 2  // j=1,3
+	expectedRequests := numGoroutines * 3      // j=0,2,4
+	expectedNotifications := numGoroutines * 2 // j=1,3
 	actualRequests := requestCount
 	actualNotifications := notificationCount
 	mu.Unlock()

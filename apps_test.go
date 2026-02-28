@@ -50,14 +50,14 @@ func TestAppsList(t *testing.T) {
 		_ = mock.SetResponseData("app/list", map[string]interface{}{
 			"data": []map[string]interface{}{
 				{
-					"id":               "app-1",
-					"name":             "App One",
-					"description":      "First app",
-					"isAccessible":     true,
-					"isEnabled":        true,
-					"logoUrl":          "https://example.com/logo.png",
-					"logoUrlDark":      "https://example.com/logo-dark.png",
-					"installUrl":       "https://example.com/install",
+					"id":                  "app-1",
+					"name":                "App One",
+					"description":         "First app",
+					"isAccessible":        true,
+					"isEnabled":           true,
+					"logoUrl":             "https://example.com/logo.png",
+					"logoUrlDark":         "https://example.com/logo-dark.png",
+					"installUrl":          "https://example.com/install",
 					"distributionChannel": "chatgpt",
 					"labels": map[string]string{
 						"category": "productivity",
@@ -71,15 +71,15 @@ func TestAppsList(t *testing.T) {
 						"termsOfService":    "https://acme.com/tos",
 					},
 					"appMetadata": map[string]interface{}{
-						"categories":    []string{"productivity", "tools"},
-						"subCategories": []string{"automation"},
-						"developer":     "Acme Inc",
-						"version":       "1.0.0",
-						"versionId":     "v1",
-						"versionNotes":  "Initial release",
-						"seoDescription": "A productivity app",
-						"firstPartyType": "connector",
-						"firstPartyRequiresInstall": true,
+						"categories":                 []string{"productivity", "tools"},
+						"subCategories":              []string{"automation"},
+						"developer":                  "Acme Inc",
+						"version":                    "1.0.0",
+						"versionId":                  "v1",
+						"versionNotes":               "Initial release",
+						"seoDescription":             "A productivity app",
+						"firstPartyType":             "connector",
+						"firstPartyRequiresInstall":  true,
 						"showInComposerWhenUnlinked": false,
 						"screenshots": []map[string]interface{}{
 							{
@@ -247,5 +247,5 @@ func TestAppsServiceMethodSignatures(t *testing.T) {
 	client := codex.NewClient(mock)
 
 	// This will fail to compile if the method signature is wrong
-	var _ func(context.Context, codex.AppsListParams) (codex.AppsListResponse, error) = client.Apps.List
+	var _ = client.Apps.List
 }

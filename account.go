@@ -117,8 +117,8 @@ func (a *AccountWrapper) MarshalJSON() ([]byte, error) {
 
 // GetAccountRateLimitsResponse is the response from account/getRateLimits
 type GetAccountRateLimitsResponse struct {
-	RateLimits           RateLimitSnapshot             `json:"rateLimits"`
-	RateLimitsByLimitId  map[string]*RateLimitSnapshot `json:"rateLimitsByLimitId,omitempty"`
+	RateLimits          RateLimitSnapshot             `json:"rateLimits"`
+	RateLimitsByLimitId map[string]*RateLimitSnapshot `json:"rateLimitsByLimitId,omitempty"`
 }
 
 // RateLimitSnapshot represents rate limit information
@@ -140,9 +140,9 @@ type CreditsSnapshot struct {
 
 // RateLimitWindow represents a rate limit time window
 type RateLimitWindow struct {
-	UsedPercent         int32  `json:"usedPercent"`
-	ResetsAt            *int64 `json:"resetsAt,omitempty"`
-	WindowDurationMins  *int64 `json:"windowDurationMins,omitempty"`
+	UsedPercent        int32  `json:"usedPercent"`
+	ResetsAt           *int64 `json:"resetsAt,omitempty"`
+	WindowDurationMins *int64 `json:"windowDurationMins,omitempty"`
 }
 
 // LoginAccountParams is an interface for login parameter variants
@@ -186,7 +186,7 @@ func (p *ApiKeyLoginAccountParams) GoString() string { return p.String() }
 
 // Format implements fmt.Formatter to redact credentials from all format verbs.
 func (p *ApiKeyLoginAccountParams) Format(f fmt.State, verb rune) {
-	fmt.Fprint(f, p.String())
+	_, _ = fmt.Fprint(f, p.String())
 }
 
 // ChatgptLoginAccountParams represents ChatGPT OAuth login parameters
@@ -198,10 +198,10 @@ func (*ChatgptLoginAccountParams) isLoginAccountParams() {}
 
 // ChatgptAuthTokensLoginAccountParams represents external auth token login parameters
 type ChatgptAuthTokensLoginAccountParams struct {
-	Type              string  `json:"type"`
-	AccessToken       string  `json:"accessToken"`
-	ChatgptAccountId  string  `json:"chatgptAccountId"`
-	ChatgptPlanType   *string `json:"chatgptPlanType,omitempty"`
+	Type             string  `json:"type"`
+	AccessToken      string  `json:"accessToken"`
+	ChatgptAccountId string  `json:"chatgptAccountId"`
+	ChatgptPlanType  *string `json:"chatgptPlanType,omitempty"`
 }
 
 func (*ChatgptAuthTokensLoginAccountParams) isLoginAccountParams() {}
@@ -238,7 +238,7 @@ func (p *ChatgptAuthTokensLoginAccountParams) GoString() string { return p.Strin
 
 // Format implements fmt.Formatter to redact credentials from all format verbs.
 func (p *ChatgptAuthTokensLoginAccountParams) Format(f fmt.State, verb rune) {
-	fmt.Fprint(f, p.String())
+	_, _ = fmt.Fprint(f, p.String())
 }
 
 // LoginAccountResponse is an interface for login response variants

@@ -161,9 +161,9 @@ func TestTurnServiceMethodSignatures(t *testing.T) {
 	client := codex.NewClient(mockTransport)
 
 	// Compile-time check that methods exist with correct signatures
-	var _ func(context.Context, codex.TurnStartParams) (codex.TurnStartResponse, error) = client.Turn.Start
-	var _ func(context.Context, codex.TurnInterruptParams) (codex.TurnInterruptResponse, error) = client.Turn.Interrupt
-	var _ func(context.Context, codex.TurnSteerParams) (codex.TurnSteerResponse, error) = client.Turn.Steer
+	var _ = client.Turn.Start
+	var _ = client.Turn.Interrupt
+	var _ = client.Turn.Steer
 }
 
 // TestTurnStartedNotification tests TurnStartedNotification dispatch

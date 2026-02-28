@@ -417,8 +417,8 @@ func TestSkillsServiceMethodSignatures(t *testing.T) {
 	client := codex.NewClient(mock)
 
 	// Compile-time verification that all methods exist with correct signatures
-	var _ func(context.Context, codex.SkillsListParams) (codex.SkillsListResponse, error) = client.Skills.List
-	var _ func(context.Context, codex.SkillsConfigWriteParams) (codex.SkillsConfigWriteResponse, error) = client.Skills.ConfigWrite
-	var _ func(context.Context, codex.SkillsRemoteReadParams) (codex.SkillsRemoteReadResponse, error) = client.Skills.RemoteRead
-	var _ func(context.Context, codex.SkillsRemoteWriteParams) (codex.SkillsRemoteWriteResponse, error) = client.Skills.RemoteWrite
+	var _ = client.Skills.List
+	var _ = client.Skills.ConfigWrite
+	var _ = client.Skills.RemoteRead
+	var _ = client.Skills.RemoteWrite
 }

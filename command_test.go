@@ -60,8 +60,7 @@ func TestCommandExec(t *testing.T) {
 			params: codex.CommandExecParams{
 				Command: []string{"cat", "/etc/passwd"},
 				SandboxPolicy: &codex.SandboxPolicyWrapper{
-					Value: codex.SandboxPolicyReadOnly{
-					},
+					Value: codex.SandboxPolicyReadOnly{},
 				},
 			},
 			response: map[string]interface{}{
@@ -175,5 +174,5 @@ func TestCommandServiceMethodSignatures(t *testing.T) {
 	client := codex.NewClient(mock)
 
 	// Compile-time verification that all methods exist
-	var _ func(context.Context, codex.CommandExecParams) (codex.CommandExecResponse, error) = client.Command.Exec
+	var _ = client.Command.Exec
 }

@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -18,13 +19,13 @@ func TestStdioNewlineDelimitedJSON(t *testing.T) {
 	// Create pipes to simulate stdin/stdout
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()
-	defer clientReader.Close()
-	defer serverWriter.Close()
-	defer serverReader.Close()
-	defer clientWriter.Close()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
 
 	transport := codex.NewStdioTransport(clientReader, clientWriter)
-	defer transport.Close()
+	defer func() { _ = transport.Close() }()
 
 	// Start a goroutine to read from the server side and verify format
 	received := make(chan string, 1)
@@ -103,13 +104,13 @@ func TestStdioNewlineDelimitedJSON(t *testing.T) {
 func TestStdioConcurrentRequestDispatch(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()
-	defer clientReader.Close()
-	defer serverWriter.Close()
-	defer serverReader.Close()
-	defer clientWriter.Close()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
 
 	transport := codex.NewStdioTransport(clientReader, clientWriter)
-	defer transport.Close()
+	defer func() { _ = transport.Close() }()
 
 	// Track received requests
 	var receivedRequests sync.Map
@@ -154,13 +155,13 @@ func TestStdioConcurrentRequestDispatch(t *testing.T) {
 func TestStdioResponseRequestIDMatching(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()
-	defer clientReader.Close()
-	defer serverWriter.Close()
-	defer serverReader.Close()
-	defer clientWriter.Close()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
 
 	transport := codex.NewStdioTransport(clientReader, clientWriter)
-	defer transport.Close()
+	defer func() { _ = transport.Close() }()
 
 	// Read requests on the server side
 	sentRequests := make(chan codex.Request, 3)
@@ -277,13 +278,13 @@ func TestStdioResponseRequestIDMatching(t *testing.T) {
 func TestStdioNotificationDispatch(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()
-	defer clientReader.Close()
-	defer serverWriter.Close()
-	defer serverReader.Close()
-	defer clientWriter.Close()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
 
 	transport := codex.NewStdioTransport(clientReader, clientWriter)
-	defer transport.Close()
+	defer func() { _ = transport.Close() }()
 
 	// Track received notifications
 	received := make(chan string, 3)
@@ -330,13 +331,13 @@ func TestStdioNotificationDispatch(t *testing.T) {
 func TestStdioMixedMessageTypes(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()
-	defer clientReader.Close()
-	defer serverWriter.Close()
-	defer serverReader.Close()
-	defer clientWriter.Close()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
 
 	transport := codex.NewStdioTransport(clientReader, clientWriter)
-	defer transport.Close()
+	defer func() { _ = transport.Close() }()
 
 	// Track received server→client requests and notifications
 	var requestCount, notifCount int
@@ -435,10 +436,10 @@ func TestStdioMixedMessageTypes(t *testing.T) {
 func TestStdioCloseStopsCommunication(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()
-	defer clientReader.Close()
-	defer serverWriter.Close()
-	defer serverReader.Close()
-	defer clientWriter.Close()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
 
 	transport := codex.NewStdioTransport(clientReader, clientWriter)
 
@@ -479,13 +480,13 @@ func TestStdioCloseStopsCommunication(t *testing.T) {
 func TestStdioInvalidJSON(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()
-	defer clientReader.Close()
-	defer serverWriter.Close()
-	defer serverReader.Close()
-	defer clientWriter.Close()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
 
 	transport := codex.NewStdioTransport(clientReader, clientWriter)
-	defer transport.Close()
+	defer func() { _ = transport.Close() }()
 
 	// Send invalid JSON from server
 	invalidLines := []string{
@@ -526,13 +527,13 @@ func TestStdioInvalidJSON(t *testing.T) {
 func TestStdioContextCancellation(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()
-	defer clientReader.Close()
-	defer serverWriter.Close()
-	defer serverReader.Close()
-	defer clientWriter.Close()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
 
 	transport := codex.NewStdioTransport(clientReader, clientWriter)
-	defer transport.Close()
+	defer func() { _ = transport.Close() }()
 
 	// Create a context that we'll cancel
 	ctx, cancel := context.WithCancel(context.Background())
@@ -575,13 +576,13 @@ func TestStdioContextCancellation(t *testing.T) {
 func TestStdioRequestHandlerPanicRecovery(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()
-	defer clientReader.Close()
-	defer serverWriter.Close()
-	defer serverReader.Close()
-	defer clientWriter.Close()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
 
 	transport := codex.NewStdioTransport(clientReader, clientWriter)
-	defer transport.Close()
+	defer func() { _ = transport.Close() }()
 
 	transport.OnRequest(func(ctx context.Context, req codex.Request) (codex.Response, error) {
 		panic("handler blew up")
@@ -624,20 +625,20 @@ func TestStdioRequestHandlerPanicRecovery(t *testing.T) {
 func TestStdioNotificationHandlerPanicWithoutOnPanic(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()
-	defer clientReader.Close()
-	defer serverWriter.Close()
-	defer serverReader.Close()
-	defer clientWriter.Close()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
 
 	transport := codex.NewStdioTransport(clientReader, clientWriter)
-	defer transport.Close()
+	defer func() { _ = transport.Close() }()
 
 	received := make(chan string, 2)
-	callCount := 0
+	var callCount atomic.Int32
 	// No OnPanic registered — panic must be silently recovered
 	transport.OnNotify(func(ctx context.Context, notif codex.Notification) {
-		callCount++
-		if callCount == 1 {
+		n := callCount.Add(1)
+		if n == 1 {
 			panic("no OnPanic registered")
 		}
 		received <- notif.Method
@@ -671,13 +672,13 @@ func TestStdioNotificationHandlerPanicWithoutOnPanic(t *testing.T) {
 func TestStdioNotificationHandlerPanicRecovery(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()
-	defer clientReader.Close()
-	defer serverWriter.Close()
-	defer serverReader.Close()
-	defer clientWriter.Close()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
 
 	transport := codex.NewStdioTransport(clientReader, clientWriter)
-	defer transport.Close()
+	defer func() { _ = transport.Close() }()
 
 	received := make(chan string, 2)
 	panicCaught := make(chan any, 1)
@@ -726,13 +727,13 @@ func TestStdioNotificationHandlerPanicRecovery(t *testing.T) {
 func TestStdioHandleResponseUnmarshalError(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()
-	defer clientReader.Close()
-	defer serverWriter.Close()
-	defer serverReader.Close()
-	defer clientWriter.Close()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
 
 	transport := codex.NewStdioTransport(clientReader, clientWriter)
-	defer transport.Close()
+	defer func() { _ = transport.Close() }()
 
 	// Drain requests from the server side
 	go func() {

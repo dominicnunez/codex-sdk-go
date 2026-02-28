@@ -33,11 +33,11 @@ func (c *Client) SetApprovalHandlers(handlers ApprovalHandlers) {
 //
 // Deprecated: Use FileChangeRequestApprovalParams instead.
 type ApplyPatchApprovalParams struct {
-	CallID         string                     `json:"callId"`
-	ConversationID string                     `json:"conversationId"`
+	CallID         string                       `json:"callId"`
+	ConversationID string                       `json:"conversationId"`
 	FileChanges    map[string]FileChangeWrapper `json:"fileChanges"`
-	GrantRoot      *string                    `json:"grantRoot,omitempty"`
-	Reason         *string                    `json:"reason,omitempty"`
+	GrantRoot      *string                      `json:"grantRoot,omitempty"`
+	Reason         *string                      `json:"reason,omitempty"`
 }
 
 // FileChange is a discriminated union for file changes (add/delete/update).
@@ -285,17 +285,17 @@ func (w ReviewDecisionWrapper) MarshalJSON() ([]byte, error) {
 
 // CommandExecutionRequestApprovalParams represents parameters for command execution approval.
 type CommandExecutionRequestApprovalParams struct {
-	ItemID                           string                          `json:"itemId"`
-	ThreadID                         string                          `json:"threadId"`
-	TurnID                           string                          `json:"turnId"`
-	ApprovalID                       *string                         `json:"approvalId,omitempty"`
-	Command                          *string                         `json:"command,omitempty"`
-	Cwd                              *string                         `json:"cwd,omitempty"`
-	CommandActions                   *[]CommandActionWrapper         `json:"commandActions,omitempty"`
-	NetworkApprovalContext           *NetworkApprovalContext         `json:"networkApprovalContext,omitempty"`
-	ProposedExecpolicyAmendment      *[]string                       `json:"proposedExecpolicyAmendment,omitempty"`
-	ProposedNetworkPolicyAmendments  *[]NetworkPolicyAmendment       `json:"proposedNetworkPolicyAmendments,omitempty"`
-	Reason                           *string                         `json:"reason,omitempty"`
+	ItemID                          string                    `json:"itemId"`
+	ThreadID                        string                    `json:"threadId"`
+	TurnID                          string                    `json:"turnId"`
+	ApprovalID                      *string                   `json:"approvalId,omitempty"`
+	Command                         *string                   `json:"command,omitempty"`
+	Cwd                             *string                   `json:"cwd,omitempty"`
+	CommandActions                  *[]CommandActionWrapper   `json:"commandActions,omitempty"`
+	NetworkApprovalContext          *NetworkApprovalContext   `json:"networkApprovalContext,omitempty"`
+	ProposedExecpolicyAmendment     *[]string                 `json:"proposedExecpolicyAmendment,omitempty"`
+	ProposedNetworkPolicyAmendments *[]NetworkPolicyAmendment `json:"proposedNetworkPolicyAmendments,omitempty"`
+	Reason                          *string                   `json:"reason,omitempty"`
 }
 
 // CommandAction is a discriminated union for parsed command actions.
@@ -755,8 +755,8 @@ type DynamicToolCallParams struct {
 
 // DynamicToolCallResponse represents the response to a dynamic tool call.
 type DynamicToolCallResponse struct {
-	Success      bool                                        `json:"success"`
-	ContentItems []DynamicToolCallOutputContentItemWrapper  `json:"contentItems"`
+	Success      bool                                      `json:"success"`
+	ContentItems []DynamicToolCallOutputContentItemWrapper `json:"contentItems"`
 }
 
 // DynamicToolCallOutputContentItem is a discriminated union for tool output content.
@@ -864,12 +864,12 @@ type ToolRequestUserInputParams struct {
 
 // ToolRequestUserInputQuestion represents a question to ask the user.
 type ToolRequestUserInputQuestion struct {
-	ID       string                          `json:"id"`
-	Header   string                          `json:"header"`
-	Question string                          `json:"question"`
-	IsSecret bool                            `json:"isSecret"`
-	IsOther  bool                            `json:"isOther"`
-	Options  *[]ToolRequestUserInputOption   `json:"options,omitempty"`
+	ID       string                        `json:"id"`
+	Header   string                        `json:"header"`
+	Question string                        `json:"question"`
+	IsSecret bool                          `json:"isSecret"`
+	IsOther  bool                          `json:"isOther"`
+	Options  *[]ToolRequestUserInputOption `json:"options,omitempty"`
 }
 
 // ToolRequestUserInputOption represents a selectable option for a question.
@@ -893,14 +893,14 @@ type ToolRequestUserInputAnswer struct {
 // ChatgptAuthTokensRefreshParams represents parameters for ChatGPT auth token refresh.
 type ChatgptAuthTokensRefreshParams struct {
 	Reason            ChatgptAuthTokensRefreshReason `json:"reason"`
-	PreviousAccountID *string `json:"previousAccountId,omitempty"`
+	PreviousAccountID *string                        `json:"previousAccountId,omitempty"`
 }
 
 // ChatgptAuthTokensRefreshResponse represents the response containing new auth tokens.
 type ChatgptAuthTokensRefreshResponse struct {
-	AccessToken       string  `json:"accessToken"`
-	ChatgptAccountID  string  `json:"chatgptAccountId"`
-	ChatgptPlanType   *string `json:"chatgptPlanType,omitempty"`
+	AccessToken      string  `json:"accessToken"`
+	ChatgptAccountID string  `json:"chatgptAccountId"`
+	ChatgptPlanType  *string `json:"chatgptPlanType,omitempty"`
 }
 
 // MarshalJSON redacts the access token to prevent accidental credential leaks
@@ -934,5 +934,5 @@ func (r *ChatgptAuthTokensRefreshResponse) GoString() string { return r.String()
 
 // Format implements fmt.Formatter to redact credentials from all format verbs.
 func (r *ChatgptAuthTokensRefreshResponse) Format(f fmt.State, verb rune) {
-	fmt.Fprint(f, r.String())
+	_, _ = fmt.Fprint(f, r.String())
 }

@@ -355,7 +355,7 @@ func TestMockTransportReset(t *testing.T) {
 	_, _ = mock.Send(ctx, codex.Request{JSONRPC: "2.0", ID: codex.RequestID{Value: "1"}, Method: "method1"})
 	_ = mock.Notify(ctx, codex.Notification{JSONRPC: "2.0", Method: "notif1"})
 	mock.SetSendError(errors.New("test error"))
-	mock.Close()
+	_ = mock.Close()
 
 	// Reset
 	mock.Reset()

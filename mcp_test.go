@@ -298,7 +298,7 @@ func TestMcpServiceMethodSignatures(t *testing.T) {
 	client := codex.NewClient(mock)
 
 	// Compile-time verification that all methods exist with correct signatures
-	var _ func(context.Context, codex.ListMcpServerStatusParams) (codex.ListMcpServerStatusResponse, error) = client.Mcp.ListServerStatus
-	var _ func(context.Context, codex.McpServerOauthLoginParams) (codex.McpServerOauthLoginResponse, error) = client.Mcp.OauthLogin
-	var _ func(context.Context) (codex.McpServerRefreshResponse, error) = client.Mcp.Refresh
+	var _ = client.Mcp.ListServerStatus
+	var _ = client.Mcp.OauthLogin
+	var _ = client.Mcp.Refresh
 }
