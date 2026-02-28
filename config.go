@@ -142,12 +142,27 @@ type MdmConfigLayerSource struct {
 
 func (MdmConfigLayerSource) isConfigLayerSource() {}
 
+func (s MdmConfigLayerSource) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Type   string `json:"type"`
+		Domain string `json:"domain"`
+		Key    string `json:"key"`
+	}{Type: "mdm", Domain: s.Domain, Key: s.Key})
+}
+
 // SystemConfigLayerSource represents system managed config file
 type SystemConfigLayerSource struct {
 	File string `json:"file"`
 }
 
 func (SystemConfigLayerSource) isConfigLayerSource() {}
+
+func (s SystemConfigLayerSource) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Type string `json:"type"`
+		File string `json:"file"`
+	}{Type: "system", File: s.File})
+}
 
 // UserConfigLayerSource represents user config from $CODEX_HOME/config.toml
 type UserConfigLayerSource struct {
@@ -156,6 +171,13 @@ type UserConfigLayerSource struct {
 
 func (UserConfigLayerSource) isConfigLayerSource() {}
 
+func (s UserConfigLayerSource) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Type string `json:"type"`
+		File string `json:"file"`
+	}{Type: "user", File: s.File})
+}
+
 // ProjectConfigLayerSource represents project .codex/ folder
 type ProjectConfigLayerSource struct {
 	DotCodexFolder string `json:"dotCodexFolder"`
@@ -163,10 +185,23 @@ type ProjectConfigLayerSource struct {
 
 func (ProjectConfigLayerSource) isConfigLayerSource() {}
 
+func (s ProjectConfigLayerSource) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Type           string `json:"type"`
+		DotCodexFolder string `json:"dotCodexFolder"`
+	}{Type: "project", DotCodexFolder: s.DotCodexFolder})
+}
+
 // SessionFlagsConfigLayerSource represents session-layer overrides
 type SessionFlagsConfigLayerSource struct{}
 
 func (SessionFlagsConfigLayerSource) isConfigLayerSource() {}
+
+func (SessionFlagsConfigLayerSource) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Type string `json:"type"`
+	}{Type: "sessionFlags"})
+}
 
 // LegacyManagedConfigTomlFromFileConfigLayerSource represents legacy managed_config.toml from file
 type LegacyManagedConfigTomlFromFileConfigLayerSource struct {
@@ -175,10 +210,23 @@ type LegacyManagedConfigTomlFromFileConfigLayerSource struct {
 
 func (LegacyManagedConfigTomlFromFileConfigLayerSource) isConfigLayerSource() {}
 
+func (s LegacyManagedConfigTomlFromFileConfigLayerSource) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Type string `json:"type"`
+		File string `json:"file"`
+	}{Type: "legacyManagedConfigTomlFromFile", File: s.File})
+}
+
 // LegacyManagedConfigTomlFromMdmConfigLayerSource represents legacy managed_config.toml from MDM
 type LegacyManagedConfigTomlFromMdmConfigLayerSource struct{}
 
 func (LegacyManagedConfigTomlFromMdmConfigLayerSource) isConfigLayerSource() {}
+
+func (LegacyManagedConfigTomlFromMdmConfigLayerSource) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Type string `json:"type"`
+	}{Type: "legacyManagedConfigTomlFromMdm"})
+}
 
 // ConfigLayerSourceWrapper wraps ConfigLayerSource for JSON marshaling
 type ConfigLayerSourceWrapper struct {
@@ -188,7 +236,7 @@ type ConfigLayerSourceWrapper struct {
 func (w *ConfigLayerSourceWrapper) UnmarshalJSON(data []byte) error {
 	var obj map[string]json.RawMessage
 	if err := json.Unmarshal(data, &obj); err != nil {
-		return err
+		return fmt.Errorf("config layer source: %w", err)
 	}
 
 	typeBytes, ok := obj["type"]
