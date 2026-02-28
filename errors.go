@@ -101,13 +101,9 @@ type TimeoutError struct {
 	cause error
 }
 
-// NewTimeoutError creates a new TimeoutError with the given message and optional cause.
-func NewTimeoutError(msg string, cause ...error) *TimeoutError {
-	e := &TimeoutError{msg: msg}
-	if len(cause) > 0 {
-		e.cause = cause[0]
-	}
-	return e
+// NewTimeoutError creates a new TimeoutError with the given message and cause.
+func NewTimeoutError(msg string, cause error) *TimeoutError {
+	return &TimeoutError{msg: msg, cause: cause}
 }
 
 // Error implements the error interface.
@@ -137,13 +133,9 @@ type CanceledError struct {
 	cause error
 }
 
-// NewCanceledError creates a new CanceledError with the given message and optional cause.
-func NewCanceledError(msg string, cause ...error) *CanceledError {
-	e := &CanceledError{msg: msg}
-	if len(cause) > 0 {
-		e.cause = cause[0]
-	}
-	return e
+// NewCanceledError creates a new CanceledError with the given message and cause.
+func NewCanceledError(msg string, cause error) *CanceledError {
+	return &CanceledError{msg: msg, cause: cause}
 }
 
 // Error implements the error interface.

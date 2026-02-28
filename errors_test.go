@@ -109,7 +109,7 @@ func TestTransportError(t *testing.T) {
 // TestTimeoutError verifies TimeoutError type and works with errors.Is/As.
 func TestTimeoutError(t *testing.T) {
 	// Create a timeout error
-	timeoutErr := codex.NewTimeoutError("request timed out after 5s")
+	timeoutErr := codex.NewTimeoutError("request timed out after 5s", nil)
 
 	// Verify error message
 	msg := timeoutErr.Error()
@@ -124,7 +124,7 @@ func TestTimeoutError(t *testing.T) {
 	}
 
 	// Test errors.Is behavior with sentinel
-	sentinelErr := codex.NewTimeoutError("another timeout message")
+	sentinelErr := codex.NewTimeoutError("another timeout message", nil)
 	if !errors.Is(timeoutErr, sentinelErr) {
 		t.Error("errors.Is should match all TimeoutErrors")
 	}
@@ -178,7 +178,7 @@ func TestErrorTypesSeparation(t *testing.T) {
 	})
 
 	transportErr := codex.NewTransportError("transport failed", io.ErrUnexpectedEOF)
-	timeoutErr := codex.NewTimeoutError("timeout")
+	timeoutErr := codex.NewTimeoutError("timeout", nil)
 
 	// RPCError should not match other types
 	if errors.Is(rpcErr, transportErr) {
