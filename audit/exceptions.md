@@ -317,6 +317,20 @@ each (once in MarshalJSON, once in the UnmarshalJSON switch), and the roundtrip 
 tests. Introducing constants for seven single-use pairs adds indirection without meaningful
 safety gain.
 
+### readLoop double-parses every incoming JSON message for routing
+
+**Location:** `stdio.go:271-303` — readLoop routing parse
+**Date:** 2026-02-28
+
+**Reason:** Every incoming message is fully tokenized twice: once in readLoop to extract
+routing fields (id, method), and again in the handler to unmarshal the full typed struct.
+Fixing this requires replacing the standard json.Unmarshal routing parse with a custom
+tokenizer or streaming decoder that stops after finding the two top-level routing keys.
+This is a significant change to core transport parsing for a low-severity performance
+concern. The current double-parse is correct and simple. For the vast majority of messages
+(small JSON-RPC payloads), the overhead is negligible. The only case where it matters is
+large file diffs, which are infrequent relative to total message volume.
+
 ### TurnStartParams and TurnSteerParams reset struct on partial unmarshal failure
 
 **Location:** `turn.go:44-47`, `turn.go:116-119` — `*p = TurnStartParams{}` on error
@@ -564,3 +578,17 @@ fires, `Notify` returns nil even though the transport is dying. This is benign: 
 is fire-and-forget by definition, and the next Send call will fail with the transport error.
 Fixing this requires the same `io.WriteCloser` API change discussed in the Send goroutine
 exception, which is disproportionate to the severity.
+
+### Zero-field union variants skip unmarshal while variants with fields do not
+
+**Location:** `event_types.go:186-204` — PatchChangeKindWrapper.UnmarshalJSON, also `thread.go:287-311` — ThreadStatusWrapper.UnmarshalJSON
+**Date:** 2026-02-28
+
+**Reason:** The "add" and "delete" PatchChangeKind branches (and notLoaded/idle/systemError
+ThreadStatus branches) construct zero-value structs directly without unmarshaling, while
+"update" and "active" unmarshal to capture their fields. This asymmetry is intentional:
+unmarshaling into a zero-field struct is wasted work that parses the entire JSON payload
+only to discard every field. If the spec adds fields to these types, the struct definitions
+will gain fields and the unmarshal call must be added — but that's a spec change that
+requires code updates regardless. The current code is correct for the current spec and
+avoids unnecessary work.
