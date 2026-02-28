@@ -215,7 +215,7 @@ func (w *ReviewDecisionWrapper) UnmarshalJSON(data []byte) error {
 	// Dispatch on which key is present in the JSON object
 	var keys map[string]json.RawMessage
 	if err := json.Unmarshal(data, &keys); err != nil {
-		return fmt.Errorf("unable to unmarshal ReviewDecision")
+		return fmt.Errorf("unable to unmarshal ReviewDecision: %w", err)
 	}
 
 	if raw, ok := keys["approved_execpolicy_amendment"]; ok {
@@ -472,7 +472,7 @@ func (w *CommandExecutionApprovalDecisionWrapper) UnmarshalJSON(data []byte) err
 	// Dispatch on which key is present in the JSON object
 	var keys map[string]json.RawMessage
 	if err := json.Unmarshal(data, &keys); err != nil {
-		return fmt.Errorf("unable to unmarshal CommandExecutionApprovalDecision")
+		return fmt.Errorf("unable to unmarshal CommandExecutionApprovalDecision: %w", err)
 	}
 
 	if raw, ok := keys["acceptWithExecpolicyAmendment"]; ok {
