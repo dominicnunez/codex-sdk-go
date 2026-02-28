@@ -6,8 +6,8 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  issues: write
-  contents: read
+  contents: write
+  pull-requests: write
 
 jobs:
   check-upstream:
@@ -137,27 +137,53 @@ jobs:
           $(echo -e "${del_section}")
 
           ### Next Steps
-          1. Review the changes above
-          2. Update \`specs/\` directory to match upstream
-          3. Add/update Go types for new/modified schemas
-          4. Run \`go test -run TestSpecCoverage\` to verify
-          5. Update \`specs/.upstream-sha\` with: \`${short_upstream}\`"
+          1. Review the synced \`specs/\` changes in this PR
+          2. Add/update Go types for new/modified schemas
+          3. Run \`go test -run TestSpecCoverage\` to verify
+          4. Merge when ready"
 
           # Strip leading whitespace from indented heredoc-style string
           body="$(echo "${body}" | sed 's/^          //')"
 
-          # --- 6. Ensure the label exists ---
-          gh label create "${label}" --description "Upstream spec schema changes" --color "D93F0B" 2>/dev/null || true
-
-          # --- 7. Close stale spec-sync issues ---
-          gh issue list --label "${label}" --state open --json number --jq '.[].number' | while read -r num; do
-            gh issue close "${num}" --comment "Superseded by newer spec-sync check."
+          # --- 6. Sync upstream schemas into specs/ ---
+          rsync -a --delete --include='*.json' --exclude='*' "${tmpdir}/" "${local_specs}/"
+          for subdir in v1 v2; do
+            if [ -d "${tmpdir}/${subdir}" ]; then
+              rsync -a --delete --include='*.json' --exclude='*' "${tmpdir}/${subdir}/" "${local_specs}/${subdir}/"
+            else
+              rm -rf "${local_specs}/${subdir}"
+            fi
           done
 
-          # --- 8. Open new issue ---
-          gh issue create \
+          echo "${upstream_sha}" > "${local_specs}/.upstream-sha"
+
+          if git diff --quiet "${local_specs}"; then
+            echo "No effective file changes after sync."
+            exit 0
+          fi
+
+          # --- 7. Branch, commit, push ---
+          branch="spec-sync/${short_upstream}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "${branch}"
+          git add "${local_specs}"
+          git commit -m "chore(specs): sync upstream schemas to ${short_upstream}"
+          git push --force origin "${branch}"
+
+          # --- 8. Ensure the label exists ---
+          gh label create "${label}" --description "Upstream spec schema changes" --color "D93F0B" 2>/dev/null || true
+
+          # --- 9. Close stale spec-sync PRs ---
+          gh pr list --label "${label}" --state open --json number --jq '.[].number' | while read -r num; do
+            gh pr close "${num}" --comment "Superseded by newer spec-sync."
+          done
+
+          # --- 10. Open PR ---
+          gh pr create \
             --title "spec-sync: upstream schemas changed (${short_upstream})" \
             --body "${body}" \
-            --label "${label}"
+            --label "${label}" \
+            --head "${branch}"
 
-          echo "Issue created."
+          echo "PR created."
