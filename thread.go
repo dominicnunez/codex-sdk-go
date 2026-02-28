@@ -136,6 +136,18 @@ type ThreadStatusActive struct {
 
 func (ThreadStatusActive) isThreadStatus() {}
 
+// UnknownThreadStatus represents an unrecognized thread status type from a newer protocol version.
+type UnknownThreadStatus struct {
+	Type string          `json:"type"`
+	Raw  json.RawMessage `json:"-"`
+}
+
+func (UnknownThreadStatus) isThreadStatus() {}
+
+func (u UnknownThreadStatus) MarshalJSON() ([]byte, error) {
+	return u.Raw, nil
+}
+
 // Turn represents a single turn in a conversation
 type Turn struct {
 	ID     string          `json:"id"`
@@ -165,7 +177,7 @@ func (s *SessionSourceWrapper) UnmarshalJSON(data []byte) error {
 		case SessionSourceCLI, SessionSourceVSCode, SessionSourceExec, SessionSourceAppServer, SessionSourceUnknown:
 			s.Value = sessionSourceLiteral(literal)
 		default:
-			return fmt.Errorf("unknown session source: %s", literal)
+			s.Value = sessionSourceLiteral(literal)
 		}
 		return nil
 	}
@@ -192,12 +204,7 @@ func unmarshalSubAgentSource(data json.RawMessage) (SubAgentSource, error) {
 	// Try string literal first
 	var literal string
 	if err := json.Unmarshal(data, &literal); err == nil {
-		switch subAgentSourceLiteral(literal) {
-		case SubAgentSourceReview, SubAgentSourceCompact, SubAgentSourceMemoryConsolidation:
-			return subAgentSourceLiteral(literal), nil
-		default:
-			return nil, fmt.Errorf("unknown sub-agent source: %s", literal)
-		}
+		return subAgentSourceLiteral(literal), nil
 	}
 
 	// Try object variants
@@ -280,7 +287,7 @@ func (t *ThreadStatusWrapper) UnmarshalJSON(data []byte) error {
 		}
 		t.Value = status
 	default:
-		return fmt.Errorf("unknown thread status type: %s", raw.Type)
+		t.Value = UnknownThreadStatus{Type: raw.Type, Raw: append(json.RawMessage(nil), data...)}
 	}
 
 	return nil
@@ -322,6 +329,17 @@ type ApprovalPolicyReject struct {
 
 func (ApprovalPolicyReject) isAskForApproval() {}
 
+// UnknownAskForApproval represents an unrecognized approval policy shape from a newer protocol version.
+type UnknownAskForApproval struct {
+	Raw json.RawMessage `json:"-"`
+}
+
+func (UnknownAskForApproval) isAskForApproval() {}
+
+func (u UnknownAskForApproval) MarshalJSON() ([]byte, error) {
+	return u.Raw, nil
+}
+
 // AskForApprovalWrapper wraps AskForApproval for JSON marshaling
 type AskForApprovalWrapper struct {
 	Value AskForApproval
@@ -332,12 +350,7 @@ func (a *AskForApprovalWrapper) UnmarshalJSON(data []byte) error {
 	// Try string literal first
 	var literal string
 	if err := json.Unmarshal(data, &literal); err == nil {
-		switch approvalPolicyLiteral(literal) {
-		case ApprovalPolicyUntrusted, ApprovalPolicyOnFailure, ApprovalPolicyOnRequest, ApprovalPolicyNever:
-			a.Value = approvalPolicyLiteral(literal)
-		default:
-			return fmt.Errorf("unknown approval policy: %s", literal)
-		}
+		a.Value = approvalPolicyLiteral(literal)
 		return nil
 	}
 
@@ -355,7 +368,9 @@ func (a *AskForApprovalWrapper) UnmarshalJSON(data []byte) error {
 		}
 	}
 
-	return fmt.Errorf("unable to unmarshal AskForApproval")
+	// Unknown shape — preserve raw JSON for forward compatibility
+	a.Value = UnknownAskForApproval{Raw: append(json.RawMessage(nil), data...)}
+	return nil
 }
 
 // MarshalJSON for AskForApprovalWrapper
@@ -368,6 +383,8 @@ func (a AskForApprovalWrapper) MarshalJSON() ([]byte, error) {
 		return json.Marshal(string(v))
 	case ApprovalPolicyReject:
 		return json.Marshal(v)
+	case UnknownAskForApproval:
+		return v.Raw, nil
 	default:
 		return nil, fmt.Errorf("unknown AskForApproval type: %T", v)
 	}
@@ -413,6 +430,18 @@ type SandboxPolicyWorkspaceWrite struct {
 
 func (SandboxPolicyWorkspaceWrite) isSandboxPolicy() {}
 
+// UnknownSandboxPolicy represents an unrecognized sandbox policy type from a newer protocol version.
+type UnknownSandboxPolicy struct {
+	Type string          `json:"type"`
+	Raw  json.RawMessage `json:"-"`
+}
+
+func (UnknownSandboxPolicy) isSandboxPolicy() {}
+
+func (u UnknownSandboxPolicy) MarshalJSON() ([]byte, error) {
+	return u.Raw, nil
+}
+
 // ReadOnlyAccess is a discriminated union for read-only access configuration
 type ReadOnlyAccess interface {
 	isReadOnlyAccess()
@@ -433,6 +462,18 @@ type ReadOnlyAccessFullAccess struct {
 }
 
 func (ReadOnlyAccessFullAccess) isReadOnlyAccess() {}
+
+// UnknownReadOnlyAccess represents an unrecognized read-only access type from a newer protocol version.
+type UnknownReadOnlyAccess struct {
+	Type string          `json:"type"`
+	Raw  json.RawMessage `json:"-"`
+}
+
+func (UnknownReadOnlyAccess) isReadOnlyAccess() {}
+
+func (u UnknownReadOnlyAccess) MarshalJSON() ([]byte, error) {
+	return u.Raw, nil
+}
 
 // ReadOnlyAccessWrapper wraps the ReadOnlyAccess discriminated union for JSON
 type ReadOnlyAccessWrapper struct {
@@ -458,7 +499,7 @@ func (w *ReadOnlyAccessWrapper) UnmarshalJSON(data []byte) error {
 	case "fullAccess":
 		w.Value = ReadOnlyAccessFullAccess{Type: "fullAccess"}
 	default:
-		return fmt.Errorf("unknown ReadOnlyAccess type: %s", raw.Type)
+		w.Value = UnknownReadOnlyAccess{Type: raw.Type, Raw: append(json.RawMessage(nil), data...)}
 	}
 	return nil
 }
@@ -519,7 +560,7 @@ func (s *SandboxPolicyWrapper) UnmarshalJSON(data []byte) error {
 		}
 		s.Value = policy
 	default:
-		return fmt.Errorf("unknown sandbox policy type: %s", raw.Type)
+		s.Value = UnknownSandboxPolicy{Type: raw.Type, Raw: append(json.RawMessage(nil), data...)}
 	}
 
 	return nil
