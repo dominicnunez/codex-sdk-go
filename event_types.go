@@ -125,7 +125,9 @@ type AddPatchChangeKind struct{}
 func (AddPatchChangeKind) patchChangeKind() {}
 
 func (a AddPatchChangeKind) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]string{"type": "add"})
+	return json.Marshal(struct {
+		Type string `json:"type"`
+	}{Type: "add"})
 }
 
 // DeletePatchChangeKind represents deleting a file.
@@ -134,7 +136,9 @@ type DeletePatchChangeKind struct{}
 func (DeletePatchChangeKind) patchChangeKind() {}
 
 func (d DeletePatchChangeKind) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]string{"type": "delete"})
+	return json.Marshal(struct {
+		Type string `json:"type"`
+	}{Type: "delete"})
 }
 
 // UpdatePatchChangeKind represents updating a file (optionally moving it).
@@ -145,11 +149,10 @@ type UpdatePatchChangeKind struct {
 func (UpdatePatchChangeKind) patchChangeKind() {}
 
 func (u UpdatePatchChangeKind) MarshalJSON() ([]byte, error) {
-	m := map[string]interface{}{"type": "update"}
-	if u.MovePath != nil {
-		m["move_path"] = *u.MovePath
-	}
-	return json.Marshal(m)
+	return json.Marshal(struct {
+		Type     string  `json:"type"`
+		MovePath *string `json:"move_path,omitempty"`
+	}{Type: "update", MovePath: u.MovePath})
 }
 
 // UnknownPatchChangeKind represents an unrecognized patch change type from a newer protocol version.
@@ -229,14 +232,11 @@ type SearchWebSearchAction struct {
 func (SearchWebSearchAction) webSearchAction() {}
 
 func (s SearchWebSearchAction) MarshalJSON() ([]byte, error) {
-	m := map[string]interface{}{"type": "search"}
-	if s.Query != nil {
-		m["query"] = *s.Query
-	}
-	if s.Queries != nil {
-		m["queries"] = *s.Queries
-	}
-	return json.Marshal(m)
+	return json.Marshal(struct {
+		Type    string    `json:"type"`
+		Query   *string   `json:"query,omitempty"`
+		Queries *[]string `json:"queries,omitempty"`
+	}{Type: "search", Query: s.Query, Queries: s.Queries})
 }
 
 // OpenPageWebSearchAction represents opening a page.
@@ -247,11 +247,10 @@ type OpenPageWebSearchAction struct {
 func (OpenPageWebSearchAction) webSearchAction() {}
 
 func (o OpenPageWebSearchAction) MarshalJSON() ([]byte, error) {
-	m := map[string]interface{}{"type": "openPage"}
-	if o.URL != nil {
-		m["url"] = *o.URL
-	}
-	return json.Marshal(m)
+	return json.Marshal(struct {
+		Type string  `json:"type"`
+		URL  *string `json:"url,omitempty"`
+	}{Type: "openPage", URL: o.URL})
 }
 
 // FindInPageWebSearchAction represents finding text in a page.
@@ -263,14 +262,11 @@ type FindInPageWebSearchAction struct {
 func (FindInPageWebSearchAction) webSearchAction() {}
 
 func (f FindInPageWebSearchAction) MarshalJSON() ([]byte, error) {
-	m := map[string]interface{}{"type": "findInPage"}
-	if f.URL != nil {
-		m["url"] = *f.URL
-	}
-	if f.Pattern != nil {
-		m["pattern"] = *f.Pattern
-	}
-	return json.Marshal(m)
+	return json.Marshal(struct {
+		Type    string  `json:"type"`
+		URL     *string `json:"url,omitempty"`
+		Pattern *string `json:"pattern,omitempty"`
+	}{Type: "findInPage", URL: f.URL, Pattern: f.Pattern})
 }
 
 // OtherWebSearchAction represents an unspecified web search action.
@@ -279,7 +275,9 @@ type OtherWebSearchAction struct{}
 func (OtherWebSearchAction) webSearchAction() {}
 
 func (o OtherWebSearchAction) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]string{"type": "other"})
+	return json.Marshal(struct {
+		Type string `json:"type"`
+	}{Type: "other"})
 }
 
 // UnknownWebSearchAction represents an unrecognized web search action type from a newer protocol version.
