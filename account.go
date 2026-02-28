@@ -352,7 +352,7 @@ func newAccountService(client *Client) *AccountService {
 // Get retrieves the current account information
 func (s *AccountService) Get(ctx context.Context, params GetAccountParams) (GetAccountResponse, error) {
 	var resp GetAccountResponse
-	if err := s.client.sendRequest(ctx, "account/read", params, &resp); err != nil {
+	if err := s.client.sendRequest(ctx, methodAccountRead, params, &resp); err != nil {
 		return GetAccountResponse{}, err
 	}
 	return resp, nil
@@ -361,7 +361,7 @@ func (s *AccountService) Get(ctx context.Context, params GetAccountParams) (GetA
 // GetRateLimits retrieves the current rate limit information
 func (s *AccountService) GetRateLimits(ctx context.Context) (GetAccountRateLimitsResponse, error) {
 	var resp GetAccountRateLimitsResponse
-	if err := s.client.sendRequest(ctx, "account/rateLimits/read", nil, &resp); err != nil {
+	if err := s.client.sendRequest(ctx, methodAccountRateLimitsRead, nil, &resp); err != nil {
 		return GetAccountRateLimitsResponse{}, err
 	}
 	return resp, nil
@@ -369,7 +369,7 @@ func (s *AccountService) GetRateLimits(ctx context.Context) (GetAccountRateLimit
 
 // Login initiates an account login
 func (s *AccountService) Login(ctx context.Context, params LoginAccountParams) (LoginAccountResponse, error) {
-	respData, err := s.client.sendRequestRaw(ctx, "account/login/start", params)
+	respData, err := s.client.sendRequestRaw(ctx, methodAccountLoginStart, params)
 	if err != nil {
 		return nil, err
 	}
@@ -379,7 +379,7 @@ func (s *AccountService) Login(ctx context.Context, params LoginAccountParams) (
 // CancelLogin cancels an in-progress login
 func (s *AccountService) CancelLogin(ctx context.Context, params CancelLoginAccountParams) (CancelLoginAccountResponse, error) {
 	var resp CancelLoginAccountResponse
-	if err := s.client.sendRequest(ctx, "account/login/cancel", params, &resp); err != nil {
+	if err := s.client.sendRequest(ctx, methodAccountLoginCancel, params, &resp); err != nil {
 		return CancelLoginAccountResponse{}, err
 	}
 	return resp, nil
@@ -387,7 +387,7 @@ func (s *AccountService) CancelLogin(ctx context.Context, params CancelLoginAcco
 
 // Logout logs out of the current account
 func (s *AccountService) Logout(ctx context.Context) (LogoutAccountResponse, error) {
-	if err := s.client.sendRequest(ctx, "account/logout", nil, nil); err != nil {
+	if err := s.client.sendRequest(ctx, methodAccountLogout, nil, nil); err != nil {
 		return LogoutAccountResponse{}, err
 	}
 	return LogoutAccountResponse{}, nil

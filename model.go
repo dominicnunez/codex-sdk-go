@@ -92,7 +92,7 @@ func newModelService(client *Client) *ModelService {
 // List retrieves the list of available models.
 func (s *ModelService) List(ctx context.Context, params ModelListParams) (ModelListResponse, error) {
 	var resp ModelListResponse
-	if err := s.client.sendRequest(ctx, "model/list", params, &resp); err != nil {
+	if err := s.client.sendRequest(ctx, methodModelList, params, &resp); err != nil {
 		return ModelListResponse{}, err
 	}
 	return resp, nil
@@ -101,10 +101,10 @@ func (s *ModelService) List(ctx context.Context, params ModelListParams) (ModelL
 // OnModelRerouted registers a listener for model reroute notifications.
 func (c *Client) OnModelRerouted(handler func(ModelReroutedNotification)) {
 	if handler == nil {
-		c.OnNotification("model/rerouted", nil)
+		c.OnNotification(notifyModelRerouted, nil)
 		return
 	}
-	c.OnNotification("model/rerouted", func(ctx context.Context, notif Notification) {
+	c.OnNotification(notifyModelRerouted, func(ctx context.Context, notif Notification) {
 		var n ModelReroutedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
 			return

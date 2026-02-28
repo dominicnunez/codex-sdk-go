@@ -204,49 +204,49 @@ func (c *Client) handleRequest(ctx context.Context, req Request) (Response, erro
 	// Each handler function is passed from the snapshot to avoid a
 	// TOCTOU race — no second lock acquisition needed in the helpers.
 	switch req.Method {
-	case "applyPatchApproval":
+	case methodApplyPatchApproval:
 		if handlers.OnApplyPatchApproval == nil {
 			return methodNotFoundResponse(req.ID), nil
 		}
 		return handleApproval(ctx, req, handlers.OnApplyPatchApproval)
 
-	case "item/commandExecution/requestApproval":
+	case methodCommandExecutionRequestApproval:
 		if handlers.OnCommandExecutionRequestApproval == nil {
 			return methodNotFoundResponse(req.ID), nil
 		}
 		return handleApproval(ctx, req, handlers.OnCommandExecutionRequestApproval)
 
-	case "execCommandApproval":
+	case methodExecCommandApproval:
 		if handlers.OnExecCommandApproval == nil {
 			return methodNotFoundResponse(req.ID), nil
 		}
 		return handleApproval(ctx, req, handlers.OnExecCommandApproval)
 
-	case "item/fileChange/requestApproval":
+	case methodFileChangeRequestApproval:
 		if handlers.OnFileChangeRequestApproval == nil {
 			return methodNotFoundResponse(req.ID), nil
 		}
 		return handleApproval(ctx, req, handlers.OnFileChangeRequestApproval)
 
-	case "skill/requestApproval":
+	case methodSkillRequestApproval:
 		if handlers.OnSkillRequestApproval == nil {
 			return methodNotFoundResponse(req.ID), nil
 		}
 		return handleApproval(ctx, req, handlers.OnSkillRequestApproval)
 
-	case "item/tool/call":
+	case methodDynamicToolCall:
 		if handlers.OnDynamicToolCall == nil {
 			return methodNotFoundResponse(req.ID), nil
 		}
 		return handleApproval(ctx, req, handlers.OnDynamicToolCall)
 
-	case "item/tool/requestUserInput":
+	case methodToolRequestUserInput:
 		if handlers.OnToolRequestUserInput == nil {
 			return methodNotFoundResponse(req.ID), nil
 		}
 		return handleApproval(ctx, req, handlers.OnToolRequestUserInput)
 
-	case "account/chatgptAuthTokens/refresh":
+	case methodChatgptAuthTokensRefresh:
 		if handlers.OnChatgptAuthTokensRefresh == nil {
 			return methodNotFoundResponse(req.ID), nil
 		}

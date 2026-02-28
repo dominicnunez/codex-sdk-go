@@ -67,7 +67,7 @@ func newExperimentalService(c *Client) *ExperimentalService {
 // FeatureList retrieves the list of experimental features
 func (s *ExperimentalService) FeatureList(ctx context.Context, params ExperimentalFeatureListParams) (ExperimentalFeatureListResponse, error) {
 	var resp ExperimentalFeatureListResponse
-	if err := s.client.sendRequest(ctx, "experimentalFeature/list", params, &resp); err != nil {
+	if err := s.client.sendRequest(ctx, methodExperimentalFeatureList, params, &resp); err != nil {
 		return ExperimentalFeatureListResponse{}, err
 	}
 	return resp, nil

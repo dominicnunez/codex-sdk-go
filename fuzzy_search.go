@@ -50,7 +50,7 @@ func newFuzzyFileSearchService(client *Client) *FuzzyFileSearchService {
 // Search performs a fuzzy file search.
 func (s *FuzzyFileSearchService) Search(ctx context.Context, params FuzzyFileSearchParams) (FuzzyFileSearchResponse, error) {
 	var resp FuzzyFileSearchResponse
-	if err := s.client.sendRequest(ctx, "fuzzyFileSearch", params, &resp); err != nil {
+	if err := s.client.sendRequest(ctx, methodFuzzyFileSearch, params, &resp); err != nil {
 		return FuzzyFileSearchResponse{}, err
 	}
 	return resp, nil
@@ -59,10 +59,10 @@ func (s *FuzzyFileSearchService) Search(ctx context.Context, params FuzzyFileSea
 // OnFuzzyFileSearchSessionCompleted registers a listener for fuzzyFileSearch/sessionCompleted notifications.
 func (c *Client) OnFuzzyFileSearchSessionCompleted(handler func(FuzzyFileSearchSessionCompletedNotification)) {
 	if handler == nil {
-		c.OnNotification("fuzzyFileSearch/sessionCompleted", nil)
+		c.OnNotification(notifyFuzzyFileSearchSessionCompleted, nil)
 		return
 	}
-	c.OnNotification("fuzzyFileSearch/sessionCompleted", func(ctx context.Context, notif Notification) {
+	c.OnNotification(notifyFuzzyFileSearchSessionCompleted, func(ctx context.Context, notif Notification) {
 		var params FuzzyFileSearchSessionCompletedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
 			return
@@ -74,10 +74,10 @@ func (c *Client) OnFuzzyFileSearchSessionCompleted(handler func(FuzzyFileSearchS
 // OnFuzzyFileSearchSessionUpdated registers a listener for fuzzyFileSearch/sessionUpdated notifications.
 func (c *Client) OnFuzzyFileSearchSessionUpdated(handler func(FuzzyFileSearchSessionUpdatedNotification)) {
 	if handler == nil {
-		c.OnNotification("fuzzyFileSearch/sessionUpdated", nil)
+		c.OnNotification(notifyFuzzyFileSearchSessionUpdated, nil)
 		return
 	}
-	c.OnNotification("fuzzyFileSearch/sessionUpdated", func(ctx context.Context, notif Notification) {
+	c.OnNotification(notifyFuzzyFileSearchSessionUpdated, func(ctx context.Context, notif Notification) {
 		var params FuzzyFileSearchSessionUpdatedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
 			return

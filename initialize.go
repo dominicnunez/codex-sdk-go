@@ -36,7 +36,7 @@ type InitializeResponse struct {
 // This is the v1 handshake that must be performed before using v2 protocol methods.
 func (c *Client) Initialize(ctx context.Context, params InitializeParams) (InitializeResponse, error) {
 	var result InitializeResponse
-	if err := c.sendRequest(ctx, "initialize", params, &result); err != nil {
+	if err := c.sendRequest(ctx, methodInitialize, params, &result); err != nil {
 		return InitializeResponse{}, err
 	}
 	return result, nil

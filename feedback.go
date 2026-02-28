@@ -34,7 +34,7 @@ func newFeedbackService(client *Client) *FeedbackService {
 // Upload submits user feedback to the server.
 func (s *FeedbackService) Upload(ctx context.Context, params FeedbackUploadParams) (FeedbackUploadResponse, error) {
 	var resp FeedbackUploadResponse
-	if err := s.client.sendRequest(ctx, "feedback/upload", params, &resp); err != nil {
+	if err := s.client.sendRequest(ctx, methodFeedbackUpload, params, &resp); err != nil {
 		return FeedbackUploadResponse{}, err
 	}
 	return resp, nil

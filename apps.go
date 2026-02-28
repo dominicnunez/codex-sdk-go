@@ -90,7 +90,7 @@ func newAppsService(client *Client) *AppsService {
 // List retrieves the list of available apps/connectors.
 func (s *AppsService) List(ctx context.Context, params AppsListParams) (AppsListResponse, error) {
 	var resp AppsListResponse
-	if err := s.client.sendRequest(ctx, "app/list", params, &resp); err != nil {
+	if err := s.client.sendRequest(ctx, methodAppList, params, &resp); err != nil {
 		return AppsListResponse{}, err
 	}
 	return resp, nil
@@ -99,10 +99,10 @@ func (s *AppsService) List(ctx context.Context, params AppsListParams) (AppsList
 // OnAppListUpdated registers a listener for app/listUpdated notifications.
 func (c *Client) OnAppListUpdated(handler func(AppListUpdatedNotification)) {
 	if handler == nil {
-		c.OnNotification("app/list/updated", nil)
+		c.OnNotification(notifyAppListUpdated, nil)
 		return
 	}
-	c.OnNotification("app/list/updated", func(ctx context.Context, notif Notification) {
+	c.OnNotification(notifyAppListUpdated, func(ctx context.Context, notif Notification) {
 		var params AppListUpdatedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
 			return

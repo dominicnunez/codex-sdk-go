@@ -693,7 +693,7 @@ type ThreadStartResponse struct {
 // Start initiates a new thread
 func (s *ThreadService) Start(ctx context.Context, params ThreadStartParams) (ThreadStartResponse, error) {
 	var response ThreadStartResponse
-	if err := s.client.sendRequest(ctx, "thread/start", params, &response); err != nil {
+	if err := s.client.sendRequest(ctx, methodThreadStart, params, &response); err != nil {
 		return ThreadStartResponse{}, err
 	}
 	return response, nil
@@ -713,7 +713,7 @@ type ThreadReadResponse struct {
 // Read retrieves thread details
 func (s *ThreadService) Read(ctx context.Context, params ThreadReadParams) (ThreadReadResponse, error) {
 	var response ThreadReadResponse
-	if err := s.client.sendRequest(ctx, "thread/read", params, &response); err != nil {
+	if err := s.client.sendRequest(ctx, methodThreadRead, params, &response); err != nil {
 		return ThreadReadResponse{}, err
 	}
 	return response, nil
@@ -740,7 +740,7 @@ type ThreadListResponse struct {
 // List retrieves a list of threads
 func (s *ThreadService) List(ctx context.Context, params ThreadListParams) (ThreadListResponse, error) {
 	var response ThreadListResponse
-	if err := s.client.sendRequest(ctx, "thread/list", params, &response); err != nil {
+	if err := s.client.sendRequest(ctx, methodThreadList, params, &response); err != nil {
 		return ThreadListResponse{}, err
 	}
 	return response, nil
@@ -761,7 +761,7 @@ type ThreadLoadedListResponse struct {
 // LoadedList retrieves loaded threads
 func (s *ThreadService) LoadedList(ctx context.Context, params ThreadLoadedListParams) (ThreadLoadedListResponse, error) {
 	var response ThreadLoadedListResponse
-	if err := s.client.sendRequest(ctx, "thread/loaded/list", params, &response); err != nil {
+	if err := s.client.sendRequest(ctx, methodThreadLoadedList, params, &response); err != nil {
 		return ThreadLoadedListResponse{}, err
 	}
 	return response, nil
@@ -795,7 +795,7 @@ type ThreadResumeResponse struct {
 // Resume resumes an existing thread
 func (s *ThreadService) Resume(ctx context.Context, params ThreadResumeParams) (ThreadResumeResponse, error) {
 	var response ThreadResumeResponse
-	if err := s.client.sendRequest(ctx, "thread/resume", params, &response); err != nil {
+	if err := s.client.sendRequest(ctx, methodThreadResume, params, &response); err != nil {
 		return ThreadResumeResponse{}, err
 	}
 	return response, nil
@@ -828,7 +828,7 @@ type ThreadForkResponse struct {
 // Fork creates a fork of a thread
 func (s *ThreadService) Fork(ctx context.Context, params ThreadForkParams) (ThreadForkResponse, error) {
 	var response ThreadForkResponse
-	if err := s.client.sendRequest(ctx, "thread/fork", params, &response); err != nil {
+	if err := s.client.sendRequest(ctx, methodThreadFork, params, &response); err != nil {
 		return ThreadForkResponse{}, err
 	}
 	return response, nil
@@ -848,7 +848,7 @@ type ThreadRollbackResponse struct {
 // Rollback rolls back a thread by N turns
 func (s *ThreadService) Rollback(ctx context.Context, params ThreadRollbackParams) (ThreadRollbackResponse, error) {
 	var response ThreadRollbackResponse
-	if err := s.client.sendRequest(ctx, "thread/rollback", params, &response); err != nil {
+	if err := s.client.sendRequest(ctx, methodThreadRollback, params, &response); err != nil {
 		return ThreadRollbackResponse{}, err
 	}
 	return response, nil
@@ -867,7 +867,7 @@ type ThreadSetNameResponse struct {
 
 // SetName updates the name of a thread
 func (s *ThreadService) SetName(ctx context.Context, params ThreadSetNameParams) (ThreadSetNameResponse, error) {
-	if err := s.client.sendRequest(ctx, "thread/name/set", params, nil); err != nil {
+	if err := s.client.sendRequest(ctx, methodThreadNameSet, params, nil); err != nil {
 		return ThreadSetNameResponse{}, err
 	}
 	return ThreadSetNameResponse{}, nil
@@ -885,7 +885,7 @@ type ThreadArchiveResponse struct {
 
 // Archive archives a thread
 func (s *ThreadService) Archive(ctx context.Context, params ThreadArchiveParams) (ThreadArchiveResponse, error) {
-	if err := s.client.sendRequest(ctx, "thread/archive", params, nil); err != nil {
+	if err := s.client.sendRequest(ctx, methodThreadArchive, params, nil); err != nil {
 		return ThreadArchiveResponse{}, err
 	}
 	return ThreadArchiveResponse{}, nil
@@ -904,7 +904,7 @@ type ThreadUnarchiveResponse struct {
 // Unarchive unarchives a thread
 func (s *ThreadService) Unarchive(ctx context.Context, params ThreadUnarchiveParams) (ThreadUnarchiveResponse, error) {
 	var response ThreadUnarchiveResponse
-	if err := s.client.sendRequest(ctx, "thread/unarchive", params, &response); err != nil {
+	if err := s.client.sendRequest(ctx, methodThreadUnarchive, params, &response); err != nil {
 		return ThreadUnarchiveResponse{}, err
 	}
 	return response, nil
@@ -923,7 +923,7 @@ type ThreadUnsubscribeResponse struct {
 // Unsubscribe unsubscribes from a thread
 func (s *ThreadService) Unsubscribe(ctx context.Context, params ThreadUnsubscribeParams) (ThreadUnsubscribeResponse, error) {
 	var response ThreadUnsubscribeResponse
-	if err := s.client.sendRequest(ctx, "thread/unsubscribe", params, &response); err != nil {
+	if err := s.client.sendRequest(ctx, methodThreadUnsubscribe, params, &response); err != nil {
 		return ThreadUnsubscribeResponse{}, err
 	}
 	return response, nil
@@ -941,7 +941,7 @@ type ThreadCompactStartResponse struct {
 
 // CompactStart initiates thread compaction
 func (s *ThreadService) CompactStart(ctx context.Context, params ThreadCompactStartParams) (ThreadCompactStartResponse, error) {
-	if err := s.client.sendRequest(ctx, "thread/compact/start", params, nil); err != nil {
+	if err := s.client.sendRequest(ctx, methodThreadCompactStart, params, nil); err != nil {
 		return ThreadCompactStartResponse{}, err
 	}
 	return ThreadCompactStartResponse{}, nil

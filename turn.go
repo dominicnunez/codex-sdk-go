@@ -68,7 +68,7 @@ type TurnStartResponse struct {
 // Start starts a new turn in a thread
 func (s *TurnService) Start(ctx context.Context, params TurnStartParams) (TurnStartResponse, error) {
 	var resp TurnStartResponse
-	if err := s.client.sendRequest(ctx, "turn/start", params, &resp); err != nil {
+	if err := s.client.sendRequest(ctx, methodTurnStart, params, &resp); err != nil {
 		return TurnStartResponse{}, err
 	}
 	return resp, nil
@@ -87,7 +87,7 @@ type TurnInterruptResponse struct{}
 
 // Interrupt interrupts an active turn
 func (s *TurnService) Interrupt(ctx context.Context, params TurnInterruptParams) (TurnInterruptResponse, error) {
-	if err := s.client.sendRequest(ctx, "turn/interrupt", params, nil); err != nil {
+	if err := s.client.sendRequest(ctx, methodTurnInterrupt, params, nil); err != nil {
 		return TurnInterruptResponse{}, err
 	}
 	return TurnInterruptResponse{}, nil
@@ -139,7 +139,7 @@ type TurnSteerResponse struct {
 // Steer steers an active turn with new input
 func (s *TurnService) Steer(ctx context.Context, params TurnSteerParams) (TurnSteerResponse, error) {
 	var resp TurnSteerResponse
-	if err := s.client.sendRequest(ctx, "turn/steer", params, &resp); err != nil {
+	if err := s.client.sendRequest(ctx, methodTurnSteer, params, &resp); err != nil {
 		return TurnSteerResponse{}, err
 	}
 	return resp, nil

@@ -51,10 +51,10 @@ type ThreadRealtimeOutputAudioDeltaNotification struct {
 // OnThreadRealtimeStarted registers a listener for thread/realtime/started notifications.
 func (c *Client) OnThreadRealtimeStarted(handler func(ThreadRealtimeStartedNotification)) {
 	if handler == nil {
-		c.OnNotification("thread/realtime/started", nil)
+		c.OnNotification(notifyRealtimeStarted, nil)
 		return
 	}
-	c.OnNotification("thread/realtime/started", func(ctx context.Context, notif Notification) {
+	c.OnNotification(notifyRealtimeStarted, func(ctx context.Context, notif Notification) {
 		var params ThreadRealtimeStartedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
 			return
@@ -66,10 +66,10 @@ func (c *Client) OnThreadRealtimeStarted(handler func(ThreadRealtimeStartedNotif
 // OnThreadRealtimeClosed registers a listener for thread/realtime/closed notifications.
 func (c *Client) OnThreadRealtimeClosed(handler func(ThreadRealtimeClosedNotification)) {
 	if handler == nil {
-		c.OnNotification("thread/realtime/closed", nil)
+		c.OnNotification(notifyRealtimeClosed, nil)
 		return
 	}
-	c.OnNotification("thread/realtime/closed", func(ctx context.Context, notif Notification) {
+	c.OnNotification(notifyRealtimeClosed, func(ctx context.Context, notif Notification) {
 		var params ThreadRealtimeClosedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
 			return
@@ -81,10 +81,10 @@ func (c *Client) OnThreadRealtimeClosed(handler func(ThreadRealtimeClosedNotific
 // OnThreadRealtimeError registers a listener for thread/realtime/error notifications.
 func (c *Client) OnThreadRealtimeError(handler func(ThreadRealtimeErrorNotification)) {
 	if handler == nil {
-		c.OnNotification("thread/realtime/error", nil)
+		c.OnNotification(notifyRealtimeError, nil)
 		return
 	}
-	c.OnNotification("thread/realtime/error", func(ctx context.Context, notif Notification) {
+	c.OnNotification(notifyRealtimeError, func(ctx context.Context, notif Notification) {
 		var params ThreadRealtimeErrorNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
 			return
@@ -96,10 +96,10 @@ func (c *Client) OnThreadRealtimeError(handler func(ThreadRealtimeErrorNotificat
 // OnThreadRealtimeItemAdded registers a listener for thread/realtime/itemAdded notifications.
 func (c *Client) OnThreadRealtimeItemAdded(handler func(ThreadRealtimeItemAddedNotification)) {
 	if handler == nil {
-		c.OnNotification("thread/realtime/itemAdded", nil)
+		c.OnNotification(notifyRealtimeItemAdded, nil)
 		return
 	}
-	c.OnNotification("thread/realtime/itemAdded", func(ctx context.Context, notif Notification) {
+	c.OnNotification(notifyRealtimeItemAdded, func(ctx context.Context, notif Notification) {
 		var params ThreadRealtimeItemAddedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
 			return
@@ -111,10 +111,10 @@ func (c *Client) OnThreadRealtimeItemAdded(handler func(ThreadRealtimeItemAddedN
 // OnThreadRealtimeOutputAudioDelta registers a listener for thread/realtime/outputAudio/delta notifications.
 func (c *Client) OnThreadRealtimeOutputAudioDelta(handler func(ThreadRealtimeOutputAudioDeltaNotification)) {
 	if handler == nil {
-		c.OnNotification("thread/realtime/outputAudio/delta", nil)
+		c.OnNotification(notifyRealtimeOutputAudioDelta, nil)
 		return
 	}
-	c.OnNotification("thread/realtime/outputAudio/delta", func(ctx context.Context, notif Notification) {
+	c.OnNotification(notifyRealtimeOutputAudioDelta, func(ctx context.Context, notif Notification) {
 		var params ThreadRealtimeOutputAudioDeltaNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
 			return

@@ -385,7 +385,7 @@ func newConfigService(client *Client) *ConfigService {
 // Read reads the current configuration
 func (s *ConfigService) Read(ctx context.Context, params ConfigReadParams) (ConfigReadResponse, error) {
 	var resp ConfigReadResponse
-	if err := s.client.sendRequest(ctx, "config/read", params, &resp); err != nil {
+	if err := s.client.sendRequest(ctx, methodConfigRead, params, &resp); err != nil {
 		return ConfigReadResponse{}, err
 	}
 	return resp, nil
@@ -394,7 +394,7 @@ func (s *ConfigService) Read(ctx context.Context, params ConfigReadParams) (Conf
 // ReadRequirements reads configuration requirements
 func (s *ConfigService) ReadRequirements(ctx context.Context) (ConfigRequirementsReadResponse, error) {
 	var resp ConfigRequirementsReadResponse
-	if err := s.client.sendRequest(ctx, "configRequirements/read", nil, &resp); err != nil {
+	if err := s.client.sendRequest(ctx, methodConfigRequirementsRead, nil, &resp); err != nil {
 		return ConfigRequirementsReadResponse{}, err
 	}
 	return resp, nil
@@ -403,7 +403,7 @@ func (s *ConfigService) ReadRequirements(ctx context.Context) (ConfigRequirement
 // Write writes a single config value
 func (s *ConfigService) Write(ctx context.Context, params ConfigValueWriteParams) (ConfigWriteResponse, error) {
 	var resp ConfigWriteResponse
-	if err := s.client.sendRequest(ctx, "config/value/write", params, &resp); err != nil {
+	if err := s.client.sendRequest(ctx, methodConfigValueWrite, params, &resp); err != nil {
 		return ConfigWriteResponse{}, err
 	}
 	return resp, nil
@@ -412,7 +412,7 @@ func (s *ConfigService) Write(ctx context.Context, params ConfigValueWriteParams
 // BatchWrite writes multiple config values atomically
 func (s *ConfigService) BatchWrite(ctx context.Context, params ConfigBatchWriteParams) (ConfigWriteResponse, error) {
 	var resp ConfigWriteResponse
-	if err := s.client.sendRequest(ctx, "config/batchWrite", params, &resp); err != nil {
+	if err := s.client.sendRequest(ctx, methodConfigBatchWrite, params, &resp); err != nil {
 		return ConfigWriteResponse{}, err
 	}
 	return resp, nil
@@ -421,10 +421,10 @@ func (s *ConfigService) BatchWrite(ctx context.Context, params ConfigBatchWriteP
 // OnConfigWarning registers a listener for config warning notifications
 func (c *Client) OnConfigWarning(handler func(ConfigWarningNotification)) {
 	if handler == nil {
-		c.OnNotification("configWarning", nil)
+		c.OnNotification(notifyConfigWarning, nil)
 		return
 	}
-	c.OnNotification("configWarning", func(ctx context.Context, notif Notification) {
+	c.OnNotification(notifyConfigWarning, func(ctx context.Context, notif Notification) {
 		var n ConfigWarningNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
 			return

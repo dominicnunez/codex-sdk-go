@@ -40,7 +40,7 @@ func newCommandService(client *Client) *CommandService {
 // Exec executes a command and returns the result
 func (s *CommandService) Exec(ctx context.Context, params CommandExecParams) (CommandExecResponse, error) {
 	var response CommandExecResponse
-	if err := s.client.sendRequest(ctx, "command/exec", params, &response); err != nil {
+	if err := s.client.sendRequest(ctx, methodCommandExec, params, &response); err != nil {
 		return CommandExecResponse{}, err
 	}
 	return response, nil
@@ -49,10 +49,10 @@ func (s *CommandService) Exec(ctx context.Context, params CommandExecParams) (Co
 // OnCommandExecutionOutputDelta registers a listener for command execution output delta notifications
 func (c *Client) OnCommandExecutionOutputDelta(handler func(CommandExecutionOutputDeltaNotification)) {
 	if handler == nil {
-		c.OnNotification("item/commandExecution/outputDelta", nil)
+		c.OnNotification(notifyCommandExecutionOutputDelta, nil)
 		return
 	}
-	c.OnNotification("item/commandExecution/outputDelta", func(ctx context.Context, notif Notification) {
+	c.OnNotification(notifyCommandExecutionOutputDelta, func(ctx context.Context, notif Notification) {
 		var notification CommandExecutionOutputDeltaNotification
 		if err := json.Unmarshal(notif.Params, &notification); err != nil {
 			return
