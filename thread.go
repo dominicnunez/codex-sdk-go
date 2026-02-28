@@ -173,12 +173,7 @@ func (s *SessionSourceWrapper) UnmarshalJSON(data []byte) error {
 	// Try string literal first
 	var literal string
 	if err := json.Unmarshal(data, &literal); err == nil {
-		switch sessionSourceLiteral(literal) {
-		case SessionSourceCLI, SessionSourceVSCode, SessionSourceExec, SessionSourceAppServer, SessionSourceUnknown:
-			s.Value = sessionSourceLiteral(literal)
-		default:
-			s.Value = sessionSourceLiteral(literal)
-		}
+		s.Value = sessionSourceLiteral(literal)
 		return nil
 	}
 
