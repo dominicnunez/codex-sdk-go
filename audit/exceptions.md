@@ -13,6 +13,18 @@
 
 <!-- Findings where the audit misread the code or described behavior that doesn't occur -->
 
+### AccountWrapper nil receiver check is reachable via pointer field
+
+**Location:** `account.go:96-97` — AccountWrapper.MarshalJSON pointer receiver
+**Date:** 2026-02-27
+
+**Reason:** The audit claims `AccountWrapper` is "used as a value type in struct fields" and
+therefore the `a == nil` check on the pointer receiver is unreachable dead code. This is incorrect.
+`GetAccountResponse` at `account.go:16` declares the field as `*AccountWrapper` (pointer), not
+`AccountWrapper` (value). When this pointer field is nil, `json.Marshal` calls
+`(*AccountWrapper)(nil).MarshalJSON()`, making the nil check both reachable and correct. The
+pointer receiver is appropriate here precisely because the field is a pointer type.
+
 ### ReviewDecisionWrapper unmarshal correctly handles double-nested network_policy_amendment
 
 **Location:** `approval.go:198-204` — ReviewDecisionWrapper.UnmarshalJSON
@@ -106,6 +118,18 @@ Fixing this requires either changing the public API to accept `io.WriteCloser` (
 or wrapping all writes in a deadline-aware layer that introduces complexity disproportionate
 to the risk. In practice, the writer is stdout to a child process — writes block only if the
 process is hung, at which point the entire SDK session is stuck regardless.
+
+### writeMessage errors silently discarded in handleRequest goroutine
+
+**Location:** `stdio.go:334, 356, 363` — three `_ = t.writeMessage()` calls
+**Date:** 2026-02-27
+
+**Reason:** Surfacing write errors requires new public API (a callback or `ScanErr()`-style
+retrieval method). The three call sites are in goroutines spawned by `handleRequest` where
+there is no caller to return an error to. The comments acknowledge "nothing more we can do."
+If a write fails, the server will time out the request — adding client-side signaling requires
+API surface disproportionate to the severity (Low) and the practical impact (writes to stdout
+rarely fail mid-session).
 
 ### Notification handlers silently swallow unmarshal errors
 
