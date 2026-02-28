@@ -297,8 +297,11 @@ func (c *Client) sendRequest(ctx context.Context, method string, params interfac
 		return err
 	}
 
-	// Unmarshal result if we have one
-	if result != nil && resp.Result != nil {
+	// Unmarshal result if caller expects one
+	if result != nil {
+		if resp.Result == nil {
+			return fmt.Errorf("%s: server returned empty result", method)
+		}
 		if err := json.Unmarshal(resp.Result, result); err != nil {
 			return fmt.Errorf("unmarshal response result for %s: %w", method, err)
 		}
