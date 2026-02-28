@@ -279,14 +279,14 @@ func TestMcpToolCallProgressNotification(t *testing.T) {
 		t.Fatal("notification handler not called")
 	}
 
-	if receivedNotif.ItemId != "item123" {
-		t.Errorf("got itemId=%q, want %q", receivedNotif.ItemId, "item123")
+	if receivedNotif.ItemID != "item123" {
+		t.Errorf("got itemId=%q, want %q", receivedNotif.ItemID, "item123")
 	}
-	if receivedNotif.ThreadId != "thread456" {
-		t.Errorf("got threadId=%q, want %q", receivedNotif.ThreadId, "thread456")
+	if receivedNotif.ThreadID != "thread456" {
+		t.Errorf("got threadId=%q, want %q", receivedNotif.ThreadID, "thread456")
 	}
-	if receivedNotif.TurnId != "turn789" {
-		t.Errorf("got turnId=%q, want %q", receivedNotif.TurnId, "turn789")
+	if receivedNotif.TurnID != "turn789" {
+		t.Errorf("got turnId=%q, want %q", receivedNotif.TurnID, "turn789")
 	}
 	if receivedNotif.Message != "Processing tool call..." {
 		t.Errorf("got message=%q, want %q", receivedNotif.Message, "Processing tool call...")

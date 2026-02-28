@@ -95,9 +95,9 @@ type McpServerOauthLoginCompletedNotification struct {
 
 // McpToolCallProgressNotification is sent to report progress of MCP tool calls.
 type McpToolCallProgressNotification struct {
-	ItemId   string `json:"itemId"`
-	ThreadId string `json:"threadId"`
-	TurnId   string `json:"turnId"`
+	ItemID   string `json:"itemId"`
+	ThreadID string `json:"threadId"`
+	TurnID   string `json:"turnId"`
 	Message  string `json:"message"`
 }
 
