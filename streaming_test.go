@@ -420,10 +420,8 @@ func TestReasoningSummaryPartAdded(t *testing.T) {
 	}
 }
 
-// TestItemStarted tests the turn/itemStarted notification with simplified ThreadItem
+// TestItemStarted tests the turn/itemStarted notification with typed ThreadItem
 func TestItemStarted(t *testing.T) {
-	// Test with a simple JSON object representing a ThreadItem
-	// We use json.RawMessage to avoid defining the full ThreadItem union in tests
 	tests := []struct {
 		name    string
 		json    string
@@ -443,9 +441,32 @@ func TestItemStarted(t *testing.T) {
 				if notif.TurnID != "turn-789" {
 					t.Errorf("got turnId %q, want %q", notif.TurnID, "turn-789")
 				}
-				// Item is json.RawMessage, just verify it's not empty
-				if len(notif.Item) == 0 {
-					t.Error("item is empty")
+				if notif.Item.Value == nil {
+					t.Fatal("item is nil")
+				}
+				um, ok := notif.Item.Value.(*codex.UserMessageThreadItem)
+				if !ok {
+					t.Fatalf("expected *UserMessageThreadItem, got %T", notif.Item.Value)
+				}
+				if um.ID != "item-123" {
+					t.Errorf("got item ID %q, want %q", um.ID, "item-123")
+				}
+			},
+		},
+		{
+			name: "agent message item",
+			json: `{
+				"item": {"type": "agentMessage", "id": "item-456", "text": "Hello!"},
+				"threadId": "thread-456",
+				"turnId": "turn-789"
+			}`,
+			checkFn: func(t *testing.T, notif codex.ItemStartedNotification) {
+				am, ok := notif.Item.Value.(*codex.AgentMessageThreadItem)
+				if !ok {
+					t.Fatalf("expected *AgentMessageThreadItem, got %T", notif.Item.Value)
+				}
+				if am.Text != "Hello!" {
+					t.Errorf("got text %q, want %q", am.Text, "Hello!")
 				}
 			},
 		},
@@ -505,8 +526,15 @@ func TestItemCompleted(t *testing.T) {
 				if notif.TurnID != "turn-789" {
 					t.Errorf("got turnId %q, want %q", notif.TurnID, "turn-789")
 				}
-				if len(notif.Item) == 0 {
-					t.Error("item is empty")
+				if notif.Item.Value == nil {
+					t.Fatal("item is nil")
+				}
+				am, ok := notif.Item.Value.(*codex.AgentMessageThreadItem)
+				if !ok {
+					t.Fatalf("expected *AgentMessageThreadItem, got %T", notif.Item.Value)
+				}
+				if am.Text != "Done!" {
+					t.Errorf("got text %q, want %q", am.Text, "Done!")
 				}
 			},
 		},

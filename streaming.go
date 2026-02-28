@@ -68,22 +68,18 @@ type ReasoningSummaryPartAddedNotification struct {
 
 // ItemStartedNotification is sent when a thread item starts.
 // Method: item/started
-// The Item field contains a ThreadItem discriminated union with many variants.
-// For simplicity, we use json.RawMessage to avoid defining all variants here.
-// Users can unmarshal Item to their own types if needed.
 type ItemStartedNotification struct {
-	Item     json.RawMessage `json:"item"` // ThreadItem discriminated union; see protocol spec for current variants
-	ThreadID string          `json:"threadId"`
-	TurnID   string          `json:"turnId"`
+	Item     ThreadItemWrapper `json:"item"`
+	ThreadID string            `json:"threadId"`
+	TurnID   string            `json:"turnId"`
 }
 
 // ItemCompletedNotification is sent when a thread item completes.
 // Method: item/completed
-// The Item field contains a ThreadItem discriminated union with many variants.
 type ItemCompletedNotification struct {
-	Item     json.RawMessage `json:"item"` // ThreadItem discriminated union
-	ThreadID string          `json:"threadId"`
-	TurnID   string          `json:"turnId"`
+	Item     ThreadItemWrapper `json:"item"`
+	ThreadID string            `json:"threadId"`
+	TurnID   string            `json:"turnId"`
 }
 
 // Listener registration methods on Client
