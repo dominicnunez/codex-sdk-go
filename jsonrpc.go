@@ -11,7 +11,7 @@ const (
 	ErrCodeInvalidRequest = -32600 // The JSON sent is not a valid Request object
 	ErrCodeMethodNotFound = -32601 // The method does not exist / is not available
 	ErrCodeInvalidParams  = -32602 // Invalid method parameter(s)
-	ErrCodeInternalError  = -32603 // Internal JSON-RPC error
+	ErrCodeInternalError  = -32603 // Internal error
 )
 
 // Request represents a JSON-RPC 2.0 request sent from client to server.
