@@ -186,9 +186,6 @@ func (w *PatchChangeKindWrapper) UnmarshalJSON(data []byte) error {
 }
 
 func (w PatchChangeKindWrapper) MarshalJSON() ([]byte, error) {
-	if w.Value == nil {
-		return json.Marshal(nil)
-	}
 	return json.Marshal(w.Value)
 }
 
@@ -314,8 +311,5 @@ func (w *WebSearchActionWrapper) UnmarshalJSON(data []byte) error {
 }
 
 func (w WebSearchActionWrapper) MarshalJSON() ([]byte, error) {
-	if w.Value == nil {
-		return json.Marshal(nil)
-	}
 	return json.Marshal(w.Value)
 }
