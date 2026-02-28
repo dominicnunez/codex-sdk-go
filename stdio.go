@@ -365,6 +365,10 @@ func (t *StdioTransport) handleRequest(data []byte) {
 
 	// Dispatch to handler in goroutine with transport-scoped context
 	go func() {
+		t.mu.Lock()
+		panicFn := t.panicHandler
+		t.mu.Unlock()
+
 		defer func() {
 			if r := recover(); r != nil {
 				errorResp := Response{
@@ -376,6 +380,9 @@ func (t *StdioTransport) handleRequest(data []byte) {
 					},
 				}
 				_ = t.writeMessage(errorResp)
+				if panicFn != nil {
+					panicFn(r)
+				}
 			}
 		}()
 
@@ -425,8 +432,12 @@ func (t *StdioTransport) handleNotification(data []byte) {
 	// Dispatch to handler in goroutine with transport-scoped context
 	go func() {
 		defer func() {
-			if r := recover(); r != nil && panicFn != nil {
-				panicFn(r)
+			if r := recover(); r != nil {
+				if panicFn != nil {
+					panicFn(r)
+				} else {
+					panic(r)
+				}
 			}
 		}()
 		handler(t.ctx, notif)

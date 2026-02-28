@@ -633,7 +633,11 @@ func TestStdioNotificationHandlerPanicRecovery(t *testing.T) {
 	defer transport.Close()
 
 	received := make(chan string, 2)
+	panicCaught := make(chan any, 1)
 	callCount := 0
+	transport.OnPanic(func(v any) {
+		panicCaught <- v
+	})
 	transport.OnNotify(func(ctx context.Context, notif codex.Notification) {
 		callCount++
 		if callCount == 1 {
@@ -647,8 +651,12 @@ func TestStdioNotificationHandlerPanicRecovery(t *testing.T) {
 	n1JSON, _ := json.Marshal(notif1)
 	_, _ = serverWriter.Write(append(n1JSON, '\n'))
 
-	// Brief wait for goroutine to recover
-	time.Sleep(50 * time.Millisecond)
+	// Wait for panic to be caught by OnPanic handler
+	select {
+	case <-panicCaught:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout: OnPanic handler was not called")
+	}
 
 	// Send second notification (should still work)
 	notif2 := codex.Notification{JSONRPC: "2.0", Method: "second/ok"}
