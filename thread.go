@@ -171,10 +171,11 @@ func (s *SessionSourceWrapper) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &raw); err == nil {
 		if _, hasKey := raw["subAgent"]; hasKey {
 			var subAgent SessionSourceSubAgent
-			if err := json.Unmarshal(data, &subAgent); err == nil {
-				s.Value = subAgent
-				return nil
+			if err := json.Unmarshal(data, &subAgent); err != nil {
+				return fmt.Errorf("unmarshal session source subAgent: %w", err)
 			}
+			s.Value = subAgent
+			return nil
 		}
 	}
 
@@ -235,7 +236,7 @@ func (t *ThreadStatusWrapper) UnmarshalJSON(data []byte) error {
 		}
 		t.Value = status
 	default:
-		t.Value = ThreadStatusIdle{Type: "idle"}
+		return fmt.Errorf("unknown thread status type: %s", raw.Type)
 	}
 
 	return nil
@@ -294,10 +295,11 @@ func (a *AskForApprovalWrapper) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &rawObj); err == nil {
 		if _, hasKey := rawObj["reject"]; hasKey {
 			var reject ApprovalPolicyReject
-			if err := json.Unmarshal(data, &reject); err == nil {
-				a.Value = reject
-				return nil
+			if err := json.Unmarshal(data, &reject); err != nil {
+				return fmt.Errorf("unmarshal approval policy reject: %w", err)
 			}
+			a.Value = reject
+			return nil
 		}
 	}
 
