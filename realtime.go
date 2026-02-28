@@ -35,7 +35,7 @@ type ThreadRealtimeItemAddedNotification struct {
 
 // ThreadRealtimeAudioChunk contains audio data and metadata.
 type ThreadRealtimeAudioChunk struct {
-	Data               string  `json:"data"`                         // Base64 encoded or raw audio bytes
+	Data               string  `json:"data"`                         // Base64-encoded audio bytes
 	NumChannels        uint16  `json:"numChannels"`                  // Number of audio channels
 	SampleRate         uint32  `json:"sampleRate"`                   // Sample rate in Hz
 	SamplesPerChannel  *uint32 `json:"samplesPerChannel,omitempty"`  // Number of samples per channel

@@ -72,7 +72,7 @@ type ReasoningSummaryPartAddedNotification struct {
 // For simplicity, we use json.RawMessage to avoid defining all variants here.
 // Users can unmarshal Item to their own types if needed.
 type ItemStartedNotification struct {
-	Item     json.RawMessage `json:"item"` // ThreadItem discriminated union (userMessage, agentMessage, plan, reasoning, commandExecution, fileChange, mcpToolCall, dynamicToolCall, collabAgentToolCall, webSearch, imageView, enteredReviewMode, exitedReviewMode, contextCompaction)
+	Item     json.RawMessage `json:"item"` // ThreadItem discriminated union; see protocol spec for current variants
 	ThreadID string          `json:"threadId"`
 	TurnID   string          `json:"turnId"`
 }
