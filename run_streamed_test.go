@@ -46,7 +46,7 @@ func TestRunStreamedSuccess(t *testing.T) {
 	})
 
 	var events []codex.Event
-	for event, err := range stream.Events {
+	for event, err := range stream.Events() {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -94,7 +94,7 @@ func TestRunStreamedContextCancellation(t *testing.T) {
 	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "This will time out"})
 
 	var gotErr error
-	for _, err := range stream.Events {
+	for _, err := range stream.Events() {
 		if err != nil {
 			gotErr = err
 			break
@@ -113,7 +113,7 @@ func TestRunStreamedEmptyPrompt(t *testing.T) {
 	stream := proc.RunStreamed(ctx, codex.RunOptions{})
 
 	var gotErr error
-	for _, err := range stream.Events {
+	for _, err := range stream.Events() {
 		if err != nil {
 			gotErr = err
 			break
@@ -143,7 +143,7 @@ func TestRunStreamedTurnError(t *testing.T) {
 
 	var gotErr error
 	var events []codex.Event
-	for event, err := range stream.Events {
+	for event, err := range stream.Events() {
 		if err != nil {
 			gotErr = err
 			break
@@ -200,7 +200,7 @@ func TestRunStreamedNoClobbering(t *testing.T) {
 	})
 
 	var streamGotItem bool
-	for event, err := range stream.Events {
+	for event, err := range stream.Events() {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -255,7 +255,7 @@ func TestRunStreamedMultipleEventTypes(t *testing.T) {
 	})
 
 	typeNames := make(map[string]bool)
-	for event, err := range stream.Events {
+	for event, err := range stream.Events() {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -302,7 +302,7 @@ func TestRunStreamedResultBeforeIteration(t *testing.T) {
 
 	// Drain the events iterator in another goroutine so the channel doesn't block.
 	go func() {
-		for range stream.Events {
+		for range stream.Events() {
 		}
 	}()
 
@@ -343,7 +343,7 @@ func TestRunStreamedInitializeFailure(t *testing.T) {
 	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "hello"})
 
 	var gotErr error
-	for _, err := range stream.Events {
+	for _, err := range stream.Events() {
 		if err != nil {
 			gotErr = err
 			break
@@ -376,7 +376,7 @@ func TestRunStreamedThreadStartFailure(t *testing.T) {
 	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "hello"})
 
 	var gotErr error
-	for _, err := range stream.Events {
+	for _, err := range stream.Events() {
 		if err != nil {
 			gotErr = err
 			break
@@ -422,7 +422,7 @@ func TestRunStreamedTurnStartFailure(t *testing.T) {
 	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "hello"})
 
 	var gotErr error
-	for _, err := range stream.Events {
+	for _, err := range stream.Events() {
 		if err != nil {
 			gotErr = err
 			break
@@ -479,7 +479,7 @@ func TestRunStreamedAllDeltaTypes(t *testing.T) {
 	})
 
 	typeNames := make(map[string]bool)
-	for event, err := range stream.Events {
+	for event, err := range stream.Events() {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -501,5 +501,134 @@ func TestRunStreamedAllDeltaTypes(t *testing.T) {
 		if !typeNames[expected] {
 			t.Errorf("missing event type %s", expected)
 		}
+	}
+}
+
+func TestRunStreamedEarlyBreak(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "hello"})
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Inject a delta then completion.
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/agentMessage/delta",
+		Params:  json.RawMessage(`{"delta":"Hi","itemId":"item-1","threadId":"thread-1","turnId":"turn-1"}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	// Break out of the Events loop after the first event.
+	count := 0
+	for range stream.Events() {
+		count++
+		break
+	}
+
+	if count != 1 {
+		t.Errorf("expected 1 event before break, got %d", count)
+	}
+
+	// The lifecycle goroutine should still complete and close done.
+	// Result() must not hang.
+	done := make(chan struct{})
+	go func() {
+		stream.Result()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("Result() hung after early break from Events()")
+	}
+}
+
+func TestRunStreamedInitRetry(t *testing.T) {
+	mock := NewMockTransport()
+
+	// First call: initialize fails.
+	mock.SetSendError(fmt.Errorf("connection refused"))
+
+	client := codex.NewClient(mock, codex.WithRequestTimeout(2*time.Second))
+	proc := codex.NewProcessFromClient(client)
+
+	ctx := context.Background()
+	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "hello"})
+
+	var gotErr error
+	for _, err := range stream.Events() {
+		if err != nil {
+			gotErr = err
+			break
+		}
+	}
+	if gotErr == nil {
+		t.Fatal("expected error from first init failure")
+	}
+
+	// Fix the transport — init should retry.
+	mock.SetSendError(nil)
+	_ = mock.SetResponseData("initialize", map[string]interface{}{
+		"userAgent": "codex-test/1.0",
+	})
+	_ = mock.SetResponseData("thread/start", map[string]interface{}{
+		"approvalPolicy": "never",
+		"cwd":            "/tmp",
+		"model":          "o3",
+		"modelProvider":  "openai",
+		"sandbox":        map[string]interface{}{"type": "readOnly"},
+		"thread": map[string]interface{}{
+			"id": "thread-1", "cliVersion": "1.0.0", "createdAt": 1700000000,
+			"cwd": "/tmp", "modelProvider": "openai", "preview": "", "source": "exec",
+			"status": map[string]interface{}{"type": "idle"}, "turns": []interface{}{},
+			"updatedAt": 1700000000, "ephemeral": true,
+		},
+	})
+	_ = mock.SetResponseData("turn/start", map[string]interface{}{
+		"turn": map[string]interface{}{
+			"id":     "turn-1",
+			"status": "inProgress",
+			"items":  []interface{}{},
+		},
+	})
+
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel2()
+
+	stream2 := proc.RunStreamed(ctx2, codex.RunOptions{Prompt: "retry"})
+
+	time.Sleep(50 * time.Millisecond)
+
+	mock.InjectServerNotification(ctx2, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	var events []codex.Event
+	for event, err := range stream2.Events() {
+		if err != nil {
+			t.Fatalf("unexpected error on retry: %v", err)
+		}
+		events = append(events, event)
+	}
+
+	// Should have at least a TurnCompleted event.
+	foundTC := false
+	for _, e := range events {
+		if _, ok := e.(*codex.TurnCompleted); ok {
+			foundTC = true
+		}
+	}
+	if !foundTC {
+		t.Error("expected TurnCompleted event after successful retry")
 	}
 }

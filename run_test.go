@@ -193,10 +193,10 @@ func TestRunInitializeFailure(t *testing.T) {
 		t.Errorf("error = %q, want it to mention 'initialize'", err)
 	}
 
-	// Second call should return the same cached error (initOnce).
+	// Second call retries (init is not latched on failure).
 	_, err2 := proc.Run(ctx, codex.RunOptions{Prompt: "hello again"})
 	if err2 == nil {
-		t.Fatal("expected cached initialize error on second call")
+		t.Fatal("expected initialize error on second call (still failing)")
 	}
 }
 
@@ -440,5 +440,91 @@ func TestRunMultipleItems(t *testing.T) {
 	// Response should be the last agentMessage text.
 	if result.result.Response != "Final answer" {
 		t.Errorf("Response = %q, want %q", result.result.Response, "Final answer")
+	}
+}
+
+func TestRunInitRetry(t *testing.T) {
+	mock := NewMockTransport()
+
+	// First call: init fails.
+	mock.SetSendError(fmt.Errorf("connection refused"))
+
+	client := codex.NewClient(mock, codex.WithRequestTimeout(2*time.Second))
+	proc := codex.NewProcessFromClient(client)
+
+	ctx := context.Background()
+	_, err := proc.Run(ctx, codex.RunOptions{Prompt: "hello"})
+	if err == nil {
+		t.Fatal("expected error from first init failure")
+	}
+
+	// Fix the transport — second call should retry and succeed.
+	mock.SetSendError(nil)
+	_ = mock.SetResponseData("initialize", map[string]interface{}{
+		"userAgent": "codex-test/1.0",
+	})
+	_ = mock.SetResponseData("thread/start", map[string]interface{}{
+		"approvalPolicy": "never",
+		"cwd":            "/tmp",
+		"model":          "o3",
+		"modelProvider":  "openai",
+		"sandbox":        map[string]interface{}{"type": "readOnly"},
+		"thread": map[string]interface{}{
+			"id": "thread-1", "cliVersion": "1.0.0", "createdAt": 1700000000,
+			"cwd": "/tmp", "modelProvider": "openai", "preview": "", "source": "exec",
+			"status": map[string]interface{}{"type": "idle"}, "turns": []interface{}{},
+			"updatedAt": 1700000000, "ephemeral": true,
+		},
+	})
+	_ = mock.SetResponseData("turn/start", map[string]interface{}{
+		"turn": map[string]interface{}{
+			"id":     "turn-1",
+			"status": "inProgress",
+			"items":  []interface{}{},
+		},
+	})
+
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel2()
+
+	type runResult struct {
+		result *codex.RunResult
+		err    error
+	}
+	ch := make(chan runResult, 1)
+
+	go func() {
+		r, err := proc.Run(ctx2, codex.RunOptions{Prompt: "retry"})
+		ch <- runResult{r, err}
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+
+	mock.InjectServerNotification(ctx2, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	result := <-ch
+	if result.err != nil {
+		t.Fatalf("Run() error on retry: %v", result.err)
+	}
+	if result.result == nil {
+		t.Fatal("expected non-nil result on successful retry")
+	}
+}
+
+func TestProcessCloseFromClient(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+	proc := codex.NewProcessFromClient(client)
+
+	// Close() and Wait() should not panic on a process with no cmd/transport.
+	if err := proc.Close(); err != nil {
+		t.Errorf("Close() error: %v", err)
+	}
+	if err := proc.Wait(); err != nil {
+		t.Errorf("Wait() error: %v", err)
 	}
 }
