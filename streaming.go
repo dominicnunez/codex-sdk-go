@@ -9,7 +9,7 @@ import (
 // These are server→client notifications for streaming turn events.
 
 // AgentMessageDeltaNotification is sent when agent message text is streamed.
-// Method: agent/messageDelta
+// Method: item/agentMessage/delta
 type AgentMessageDeltaNotification struct {
 	Delta    string `json:"delta"`
 	ItemID   string `json:"itemId"`
@@ -18,7 +18,7 @@ type AgentMessageDeltaNotification struct {
 }
 
 // FileChangeOutputDeltaNotification is sent when file change diff is streamed.
-// Method: turn/fileChangeOutputDelta
+// Method: item/fileChange/outputDelta
 type FileChangeOutputDeltaNotification struct {
 	Delta    string `json:"delta"`
 	ItemID   string `json:"itemId"`
@@ -27,7 +27,7 @@ type FileChangeOutputDeltaNotification struct {
 }
 
 // PlanDeltaNotification is sent when plan text is streamed.
-// Method: turn/planDelta
+// Method: item/plan/delta
 // EXPERIMENTAL - proposed plan streaming deltas for plan items.
 // Clients should not assume concatenated deltas match the completed plan item content.
 type PlanDeltaNotification struct {
@@ -38,7 +38,7 @@ type PlanDeltaNotification struct {
 }
 
 // ReasoningTextDeltaNotification is sent when reasoning content text is streamed.
-// Method: turn/reasoningTextDelta
+// Method: item/reasoning/textDelta
 type ReasoningTextDeltaNotification struct {
 	ContentIndex int64  `json:"contentIndex"` // Index within the reasoning content array
 	Delta        string `json:"delta"`
@@ -48,7 +48,7 @@ type ReasoningTextDeltaNotification struct {
 }
 
 // ReasoningSummaryTextDeltaNotification is sent when reasoning summary text is streamed.
-// Method: turn/reasoningSummaryTextDelta
+// Method: item/reasoning/summaryTextDelta
 type ReasoningSummaryTextDeltaNotification struct {
 	Delta        string `json:"delta"`
 	ItemID       string `json:"itemId"`
@@ -58,7 +58,7 @@ type ReasoningSummaryTextDeltaNotification struct {
 }
 
 // ReasoningSummaryPartAddedNotification is sent when a new reasoning summary part is added.
-// Method: turn/reasoningSummaryPartAdded
+// Method: item/reasoning/summaryPartAdded
 type ReasoningSummaryPartAddedNotification struct {
 	ItemID       string `json:"itemId"`
 	SummaryIndex int64  `json:"summaryIndex"` // Index of the newly added summary part
@@ -67,7 +67,7 @@ type ReasoningSummaryPartAddedNotification struct {
 }
 
 // ItemStartedNotification is sent when a thread item starts.
-// Method: turn/itemStarted
+// Method: item/started
 // The Item field contains a ThreadItem discriminated union with many variants.
 // For simplicity, we use json.RawMessage to avoid defining all variants here.
 // Users can unmarshal Item to their own types if needed.
@@ -78,7 +78,7 @@ type ItemStartedNotification struct {
 }
 
 // ItemCompletedNotification is sent when a thread item completes.
-// Method: turn/itemCompleted
+// Method: item/completed
 // The Item field contains a ThreadItem discriminated union with many variants.
 type ItemCompletedNotification struct {
 	Item     json.RawMessage `json:"item"` // ThreadItem discriminated union
@@ -88,7 +88,7 @@ type ItemCompletedNotification struct {
 
 // Listener registration methods on Client
 
-// OnAgentMessageDelta registers a listener for agent/messageDelta notifications.
+// OnAgentMessageDelta registers a listener for item/agentMessage/delta notifications.
 func (c *Client) OnAgentMessageDelta(handler func(AgentMessageDeltaNotification)) {
 	c.OnNotification("item/agentMessage/delta", func(ctx context.Context, notif Notification) {
 		var n AgentMessageDeltaNotification
@@ -100,7 +100,7 @@ func (c *Client) OnAgentMessageDelta(handler func(AgentMessageDeltaNotification)
 	})
 }
 
-// OnFileChangeOutputDelta registers a listener for turn/fileChangeOutputDelta notifications.
+// OnFileChangeOutputDelta registers a listener for item/fileChange/outputDelta notifications.
 func (c *Client) OnFileChangeOutputDelta(handler func(FileChangeOutputDeltaNotification)) {
 	c.OnNotification("item/fileChange/outputDelta", func(ctx context.Context, notif Notification) {
 		var n FileChangeOutputDeltaNotification
@@ -111,7 +111,7 @@ func (c *Client) OnFileChangeOutputDelta(handler func(FileChangeOutputDeltaNotif
 	})
 }
 
-// OnPlanDelta registers a listener for turn/planDelta notifications.
+// OnPlanDelta registers a listener for item/plan/delta notifications.
 func (c *Client) OnPlanDelta(handler func(PlanDeltaNotification)) {
 	c.OnNotification("item/plan/delta", func(ctx context.Context, notif Notification) {
 		var n PlanDeltaNotification
@@ -122,7 +122,7 @@ func (c *Client) OnPlanDelta(handler func(PlanDeltaNotification)) {
 	})
 }
 
-// OnReasoningTextDelta registers a listener for turn/reasoningTextDelta notifications.
+// OnReasoningTextDelta registers a listener for item/reasoning/textDelta notifications.
 func (c *Client) OnReasoningTextDelta(handler func(ReasoningTextDeltaNotification)) {
 	c.OnNotification("item/reasoning/textDelta", func(ctx context.Context, notif Notification) {
 		var n ReasoningTextDeltaNotification
@@ -133,7 +133,7 @@ func (c *Client) OnReasoningTextDelta(handler func(ReasoningTextDeltaNotificatio
 	})
 }
 
-// OnReasoningSummaryTextDelta registers a listener for turn/reasoningSummaryTextDelta notifications.
+// OnReasoningSummaryTextDelta registers a listener for item/reasoning/summaryTextDelta notifications.
 func (c *Client) OnReasoningSummaryTextDelta(handler func(ReasoningSummaryTextDeltaNotification)) {
 	c.OnNotification("item/reasoning/summaryTextDelta", func(ctx context.Context, notif Notification) {
 		var n ReasoningSummaryTextDeltaNotification
@@ -144,7 +144,7 @@ func (c *Client) OnReasoningSummaryTextDelta(handler func(ReasoningSummaryTextDe
 	})
 }
 
-// OnReasoningSummaryPartAdded registers a listener for turn/reasoningSummaryPartAdded notifications.
+// OnReasoningSummaryPartAdded registers a listener for item/reasoning/summaryPartAdded notifications.
 func (c *Client) OnReasoningSummaryPartAdded(handler func(ReasoningSummaryPartAddedNotification)) {
 	c.OnNotification("item/reasoning/summaryPartAdded", func(ctx context.Context, notif Notification) {
 		var n ReasoningSummaryPartAddedNotification
@@ -155,7 +155,7 @@ func (c *Client) OnReasoningSummaryPartAdded(handler func(ReasoningSummaryPartAd
 	})
 }
 
-// OnItemStarted registers a listener for turn/itemStarted notifications.
+// OnItemStarted registers a listener for item/started notifications.
 func (c *Client) OnItemStarted(handler func(ItemStartedNotification)) {
 	c.OnNotification("item/started", func(ctx context.Context, notif Notification) {
 		var n ItemStartedNotification
@@ -166,7 +166,7 @@ func (c *Client) OnItemStarted(handler func(ItemStartedNotification)) {
 	})
 }
 
-// OnItemCompleted registers a listener for turn/itemCompleted notifications.
+// OnItemCompleted registers a listener for item/completed notifications.
 func (c *Client) OnItemCompleted(handler func(ItemCompletedNotification)) {
 	c.OnNotification("item/completed", func(ctx context.Context, notif Notification) {
 		var n ItemCompletedNotification
