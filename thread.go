@@ -233,7 +233,7 @@ func (s SessionSourceWrapper) MarshalJSON() ([]byte, error) {
 	case SessionSourceSubAgent:
 		return json.Marshal(v)
 	default:
-		return json.Marshal("unknown")
+		return nil, fmt.Errorf("unknown SessionSource type: %T", v)
 	}
 }
 
@@ -360,7 +360,7 @@ func (a AskForApprovalWrapper) MarshalJSON() ([]byte, error) {
 	case ApprovalPolicyReject:
 		return json.Marshal(v)
 	default:
-		return json.Marshal("untrusted")
+		return nil, fmt.Errorf("unknown AskForApproval type: %T", v)
 	}
 }
 
