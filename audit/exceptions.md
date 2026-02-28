@@ -13,6 +13,21 @@
 
 <!-- Findings where the audit misread the code or described behavior that doesn't occur -->
 
+### Close cannot race with handleResponse to double-send on pending channel
+
+**Location:** `stdio.go:197-213` — Close() pending request cleanup loop
+**Date:** 2026-02-27
+
+**Reason:** The audit claims `Close()` and `handleResponse` can both send into the same `pending.ch`,
+causing a goroutine leak when `handleResponse`'s unconditional send blocks on a full buffer.
+This cannot happen. `Close()` sets `t.closed = true` at line 191 under the mutex before
+iterating `pendingReqs`. `handleResponse` at line 321 checks `t.closed` under the same mutex
+and returns immediately if true. So after `Close()` runs, no `handleResponse` call will ever
+proceed to delete an entry or send on a channel. In the reverse ordering — `handleResponse`
+acquires the lock first, deletes the entry, releases the lock, then sends — `Close()` will not
+find that entry in the map, so it never sends into the same channel. The two senders are
+mutually exclusive by the `t.closed` flag under `t.mu`.
+
 ### Wrapper MarshalJSON methods do not panic on nil interface Value
 
 **Location:** `approval.go:148-150`, `approval.go:409-411`, `approval.go:672-674`, `approval.go:802-804`, `review.go:87-89`, `event_types.go:188-190`, `event_types.go:313-315` — MarshalJSON on FileChangeWrapper, CommandActionWrapper, ParsedCommandWrapper, DynamicToolCallOutputContentItemWrapper, ReviewTargetWrapper, PatchChangeKindWrapper, WebSearchActionWrapper
@@ -227,6 +242,39 @@ to send `initialize` before the server sends any messages, so the handler regist
 `NewClient` always completes before any server messages arrive. The theoretical race window
 (goroutine scheduling between `go t.readLoop()` and `transport.OnNotify`/`transport.OnRequest`)
 is not reachable under the protocol's actual message ordering.
+
+### SessionSourceSubAgent relies on implicit marshaling for SubAgentSource variants
+
+**Location:** `thread.go:231-243` — SessionSourceWrapper.MarshalJSON
+**Date:** 2026-02-27
+
+**Reason:** The marshal path for `SessionSourceSubAgent` delegates to default `json.Marshal`,
+while the unmarshal path uses explicit dispatch. The audit flags this asymmetry as fragile,
+but all current `SubAgentSource` variants marshal correctly via struct tags. Adding an explicit
+`MarshalJSON` to mirror the unmarshal dispatch adds code without fixing any bug. If a new
+variant is added, the unmarshal dispatch already requires updating — the marshal side fails
+visibly (wrong output) rather than silently, which is an adequate safety net.
+
+### ConfigLayerSource type discriminator strings are hardcoded in each MarshalJSON
+
+**Location:** `config.go:134-218` — seven ConfigLayerSource MarshalJSON methods
+**Date:** 2026-02-27
+
+**Reason:** Each variant hardcodes its type string (e.g. `"mdm"`, `"system"`) in an anonymous
+struct literal. The audit suggests extracting named constants so marshal and unmarshal reference
+the same value. However, the type strings are trivial string literals that appear exactly twice
+each (once in MarshalJSON, once in the UnmarshalJSON switch), and the roundtrip is covered by
+tests. Introducing constants for seven single-use pairs adds indirection without meaningful
+safety gain.
+
+### TurnStartParams and TurnSteerParams reset struct on partial unmarshal failure
+
+**Location:** `turn.go:44-47`, `turn.go:116-119` — `*p = TurnStartParams{}` on error
+**Date:** 2026-02-27
+
+**Reason:** The audit itself concludes "No code change needed." The reset pattern is correct —
+it ensures no partial state leaks on error. The note that future modifications must include
+the reset is accurate but not actionable as a code change.
 
 ## Intentional Design Decisions
 
