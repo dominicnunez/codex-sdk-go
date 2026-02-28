@@ -145,7 +145,11 @@ func (c *Client) Send(ctx context.Context, req Request) (Response, error) {
 		if errors.Is(err, context.Canceled) {
 			return Response{}, NewCanceledError("request cancelled")
 		}
-		// Wrap other errors as transport errors
+		// Wrap as transport error if not already one
+		var te *TransportError
+		if errors.As(err, &te) {
+			return Response{}, err
+		}
 		return Response{}, NewTransportError("failed to send request", err)
 	}
 
