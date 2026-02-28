@@ -33,6 +33,7 @@ type StdioTransport struct {
 	readerStopped chan struct{}
 	once          sync.Once
 	scanErr       error // set by readLoop when scanner fails
+	panicHandler  func(v any)
 	ctx           context.Context
 	cancelCtx     context.CancelFunc
 }
@@ -169,6 +170,15 @@ func (t *StdioTransport) OnNotify(handler NotificationHandler) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.notifHandler = handler
+}
+
+// OnPanic registers a handler called when a notification handler panics.
+// The transport recovers from the panic and continues operating; this
+// callback provides observability into the recovered value.
+func (t *StdioTransport) OnPanic(handler func(v any)) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.panicHandler = handler
 }
 
 // Close shuts down the transport. Safe to call multiple times.
@@ -409,9 +419,17 @@ func (t *StdioTransport) handleNotification(data []byte) {
 		return
 	}
 
+	t.mu.Lock()
+	panicFn := t.panicHandler
+	t.mu.Unlock()
+
 	// Dispatch to handler in goroutine with transport-scoped context
 	go func() {
-		defer func() { recover() }()
+		defer func() {
+			if r := recover(); r != nil && panicFn != nil {
+				panicFn(r)
+			}
+		}()
 		handler(t.ctx, notif)
 	}()
 }
