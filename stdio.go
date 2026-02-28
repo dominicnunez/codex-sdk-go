@@ -97,6 +97,10 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 
 	// Create response channel and store with normalized ID for matching
 	normalizedID := normalizeID(req.ID.Value)
+	if _, exists := t.pendingReqs[normalizedID]; exists {
+		t.mu.Unlock()
+		return Response{}, NewTransportError("send failed", fmt.Errorf("duplicate request ID: %v", req.ID.Value))
+	}
 	respChan := make(chan Response, 1)
 	t.pendingReqs[normalizedID] = pendingReq{ch: respChan, id: req.ID}
 	t.mu.Unlock()
