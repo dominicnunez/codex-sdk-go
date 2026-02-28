@@ -48,4 +48,22 @@
 //	})
 //	if err != nil { ... }
 //	fmt.Println(result.Response)
+//
+// Using RunStreamed for streaming events via an iterator:
+//
+//	stream := proc.RunStreamed(ctx, codex.RunOptions{
+//		Prompt: "Fix the bug in main.go",
+//	})
+//	for event, err := range stream.Events {
+//		if err != nil { log.Fatal(err) }
+//		switch e := event.(type) {
+//		case *codex.TextDelta:
+//			fmt.Print(e.Delta)
+//		case *codex.ItemCompleted:
+//			fmt.Printf("\n[item completed: %T]\n", e.Item.Value)
+//		case *codex.TurnCompleted:
+//			fmt.Println("\n[turn done]")
+//		}
+//	}
+//	result = stream.Result()
 package codex
