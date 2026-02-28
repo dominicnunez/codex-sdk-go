@@ -192,6 +192,18 @@ type NetworkPolicyAmendment struct {
 	Host   string                  `json:"host"`
 }
 
+// UnknownReviewDecision represents an unrecognized review decision variant from a newer protocol version.
+type UnknownReviewDecision struct {
+	Raw json.RawMessage `json:"-"`
+}
+
+func (u UnknownReviewDecision) MarshalJSON() ([]byte, error) {
+	if u.Raw == nil {
+		return []byte("null"), nil
+	}
+	return u.Raw, nil
+}
+
 // Valid string values for ReviewDecision per spec.
 var validReviewDecisions = map[string]bool{
 	"approved":             true,
@@ -236,7 +248,8 @@ func (w *ReviewDecisionWrapper) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	return fmt.Errorf("unable to unmarshal ReviewDecision")
+	w.Value = UnknownReviewDecision{Raw: append(json.RawMessage(nil), data...)}
+	return nil
 }
 
 // MarshalJSON implements custom marshaling for ReviewDecisionWrapper.
@@ -258,10 +271,18 @@ func (w ReviewDecisionWrapper) MarshalJSON() ([]byte, error) {
 		})
 	case NetworkPolicyAmendmentDecision:
 		return json.Marshal(struct {
-			NetworkPolicyAmendment NetworkPolicyAmendment `json:"network_policy_amendment"`
+			NetworkPolicyAmendment struct {
+				NetworkPolicyAmendment NetworkPolicyAmendment `json:"network_policy_amendment"`
+			} `json:"network_policy_amendment"`
 		}{
-			NetworkPolicyAmendment: v.NetworkPolicyAmendment,
+			NetworkPolicyAmendment: struct {
+				NetworkPolicyAmendment NetworkPolicyAmendment `json:"network_policy_amendment"`
+			}{
+				NetworkPolicyAmendment: v.NetworkPolicyAmendment,
+			},
 		})
+	case UnknownReviewDecision:
+		return v.MarshalJSON()
 	default:
 		return nil, fmt.Errorf("unknown decision type: %T", v)
 	}
@@ -449,6 +470,19 @@ type ApplyNetworkPolicyAmendmentDecision struct {
 	NetworkPolicyAmendment NetworkPolicyAmendment `json:"network_policy_amendment"`
 }
 
+// UnknownCommandExecutionApprovalDecision represents an unrecognized command execution approval decision
+// variant from a newer protocol version.
+type UnknownCommandExecutionApprovalDecision struct {
+	Raw json.RawMessage `json:"-"`
+}
+
+func (u UnknownCommandExecutionApprovalDecision) MarshalJSON() ([]byte, error) {
+	if u.Raw == nil {
+		return []byte("null"), nil
+	}
+	return u.Raw, nil
+}
+
 // Valid string values for CommandExecutionApprovalDecision per spec.
 var validCommandExecutionDecisions = map[string]bool{
 	"accept":           true,
@@ -495,7 +529,8 @@ func (w *CommandExecutionApprovalDecisionWrapper) UnmarshalJSON(data []byte) err
 		return nil
 	}
 
-	return fmt.Errorf("unable to unmarshal CommandExecutionApprovalDecision")
+	w.Value = UnknownCommandExecutionApprovalDecision{Raw: append(json.RawMessage(nil), data...)}
+	return nil
 }
 
 // MarshalJSON implements custom marshaling for CommandExecutionApprovalDecisionWrapper.
@@ -527,6 +562,8 @@ func (w CommandExecutionApprovalDecisionWrapper) MarshalJSON() ([]byte, error) {
 				NetworkPolicyAmendment: v.NetworkPolicyAmendment,
 			},
 		})
+	case UnknownCommandExecutionApprovalDecision:
+		return v.MarshalJSON()
 	default:
 		return nil, fmt.Errorf("unknown decision type: %T", v)
 	}

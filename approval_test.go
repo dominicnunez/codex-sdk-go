@@ -87,6 +87,14 @@ func TestApplyPatchApprovalRoundTrip(t *testing.T) {
 				return ok && obj.NetworkPolicyAmendment.Action == "allow"
 			},
 		},
+		{
+			name:         "unknown_object_variant",
+			responseJSON: `{"decision":{"future_amendment_type":{"key":"value"}}}`,
+			checkFunc: func(r codex.ApplyPatchApprovalResponse) bool {
+				_, ok := r.Decision.Value.(codex.UnknownReviewDecision)
+				return ok
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -97,6 +105,19 @@ func TestApplyPatchApprovalRoundTrip(t *testing.T) {
 			}
 			if !tc.checkFunc(resp) {
 				t.Errorf("decision check failed")
+			}
+
+			// Verify round-trip
+			marshaled, err := json.Marshal(resp)
+			if err != nil {
+				t.Fatalf("Marshal response: %v", err)
+			}
+			var roundtrip codex.ApplyPatchApprovalResponse
+			if err := json.Unmarshal(marshaled, &roundtrip); err != nil {
+				t.Fatalf("Unmarshal roundtrip: %v", err)
+			}
+			if !tc.checkFunc(roundtrip) {
+				t.Errorf("roundtrip decision check failed")
 			}
 		})
 	}
@@ -182,6 +203,14 @@ func TestCommandExecutionRequestApprovalRoundTrip(t *testing.T) {
 				return ok && obj.NetworkPolicyAmendment.Action == "deny"
 			},
 		},
+		{
+			name:         "unknown_object_variant",
+			responseJSON: `{"decision":{"future_decision_type":{"data":123}}}`,
+			checkFunc: func(r codex.CommandExecutionRequestApprovalResponse) bool {
+				_, ok := r.Decision.Value.(codex.UnknownCommandExecutionApprovalDecision)
+				return ok
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -192,6 +221,19 @@ func TestCommandExecutionRequestApprovalRoundTrip(t *testing.T) {
 			}
 			if !tc.checkFunc(resp) {
 				t.Errorf("decision check failed")
+			}
+
+			// Verify round-trip
+			marshaled, err := json.Marshal(resp)
+			if err != nil {
+				t.Fatalf("Marshal response: %v", err)
+			}
+			var roundtrip codex.CommandExecutionRequestApprovalResponse
+			if err := json.Unmarshal(marshaled, &roundtrip); err != nil {
+				t.Fatalf("Unmarshal roundtrip: %v", err)
+			}
+			if !tc.checkFunc(roundtrip) {
+				t.Errorf("roundtrip decision check failed")
 			}
 		})
 	}
