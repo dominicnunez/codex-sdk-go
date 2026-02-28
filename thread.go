@@ -323,12 +323,31 @@ func (t *ThreadStatusWrapper) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// MarshalJSON for ThreadStatusWrapper
+// MarshalJSON for ThreadStatusWrapper injects the correct type discriminator
+// so that client-constructed values marshal correctly without requiring callers
+// to manually set the Type field.
 func (t ThreadStatusWrapper) MarshalJSON() ([]byte, error) {
 	if t.Value == nil {
 		return []byte("null"), nil
 	}
-	return json.Marshal(t.Value)
+	switch v := t.Value.(type) {
+	case ThreadStatusNotLoaded:
+		v.Type = "notLoaded"
+		return json.Marshal(v)
+	case ThreadStatusIdle:
+		v.Type = "idle"
+		return json.Marshal(v)
+	case ThreadStatusSystemError:
+		v.Type = "systemError"
+		return json.Marshal(v)
+	case ThreadStatusActive:
+		v.Type = "active"
+		return json.Marshal(v)
+	case UnknownThreadStatus:
+		return v.MarshalJSON()
+	default:
+		return nil, fmt.Errorf("unknown ThreadStatus type: %T", v)
+	}
 }
 
 // AskForApproval represents approval policy for operations
@@ -543,12 +562,25 @@ func (w *ReadOnlyAccessWrapper) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// MarshalJSON for ReadOnlyAccessWrapper
+// MarshalJSON for ReadOnlyAccessWrapper injects the correct type discriminator
+// so that client-constructed values marshal correctly without requiring callers
+// to manually set the Type field.
 func (w ReadOnlyAccessWrapper) MarshalJSON() ([]byte, error) {
 	if w.Value == nil {
 		return []byte("null"), nil
 	}
-	return json.Marshal(w.Value)
+	switch v := w.Value.(type) {
+	case ReadOnlyAccessRestricted:
+		v.Type = "restricted"
+		return json.Marshal(v)
+	case ReadOnlyAccessFullAccess:
+		v.Type = "fullAccess"
+		return json.Marshal(v)
+	case UnknownReadOnlyAccess:
+		return v.MarshalJSON()
+	default:
+		return nil, fmt.Errorf("unknown ReadOnlyAccess type: %T", v)
+	}
 }
 
 // NetworkAccess represents network access control
@@ -605,12 +637,31 @@ func (s *SandboxPolicyWrapper) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// MarshalJSON for SandboxPolicyWrapper
+// MarshalJSON for SandboxPolicyWrapper injects the correct type discriminator
+// so that client-constructed values marshal correctly without requiring callers
+// to manually set the Type field.
 func (s SandboxPolicyWrapper) MarshalJSON() ([]byte, error) {
 	if s.Value == nil {
 		return []byte("null"), nil
 	}
-	return json.Marshal(s.Value)
+	switch v := s.Value.(type) {
+	case SandboxPolicyDangerFullAccess:
+		v.Type = "dangerFullAccess"
+		return json.Marshal(v)
+	case SandboxPolicyReadOnly:
+		v.Type = "readOnly"
+		return json.Marshal(v)
+	case SandboxPolicyExternalSandbox:
+		v.Type = "externalSandbox"
+		return json.Marshal(v)
+	case SandboxPolicyWorkspaceWrite:
+		v.Type = "workspaceWrite"
+		return json.Marshal(v)
+	case UnknownSandboxPolicy:
+		return v.MarshalJSON()
+	default:
+		return nil, fmt.Errorf("unknown SandboxPolicy type: %T", v)
+	}
 }
 
 // ThreadStartParams are parameters for starting a new thread
