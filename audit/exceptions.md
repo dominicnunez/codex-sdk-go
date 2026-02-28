@@ -538,6 +538,19 @@ string for human-readable diagnostics, and `errors.Is(err, ErrEmptyResult)` work
 programmatic detection. The typed error pattern used by `RPCError`/`TransportError`/`TimeoutError`
 is justified by their higher severity and richer payloads.
 
+### Credential redaction on sensitive types can be bypassed if embedded in another struct
+
+**Location:** `approval.go:900-938` — ChatgptAuthTokensRefreshResponse, also `account.go:154-207` — ApiKeyLoginAccountParams, ChatgptAuthTokensLoginAccountParams
+**Date:** 2026-02-28
+
+**Reason:** These types implement MarshalJSON, String, GoString, and Format on pointer receivers
+to redact credentials. If embedded in another struct that overrides these methods, redaction would
+not apply. However, no struct in the codebase embeds these types, and the redaction works correctly
+for all current usage patterns. This is defense-in-depth by design — the types are terminal
+(never embedded), and the redaction methods cover all standard serialization paths. Adding
+compile-time enforcement (e.g. a noCopy-style marker) would be speculative prevention for a
+scenario that doesn't exist.
+
 ### Notify may succeed even if the transport reader has just stopped
 
 **Location:** `stdio.go:135-156` — Notify method
