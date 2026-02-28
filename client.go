@@ -354,5 +354,9 @@ func (c *Client) sendRequestRaw(ctx context.Context, method string, params inter
 		return nil, err
 	}
 
+	if resp.Result == nil {
+		return nil, fmt.Errorf("%s: %w", method, ErrEmptyResult)
+	}
+
 	return resp.Result, nil
 }
