@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -279,7 +280,7 @@ func (c *Client) sendRequest(ctx context.Context, method string, params interfac
 	// Marshal params to JSON
 	paramsJSON, err := json.Marshal(params)
 	if err != nil {
-		return err
+		return fmt.Errorf("marshal request params for %s: %w", method, err)
 	}
 
 	// Create request
@@ -299,7 +300,7 @@ func (c *Client) sendRequest(ctx context.Context, method string, params interfac
 	// Unmarshal result if we have one
 	if result != nil && resp.Result != nil {
 		if err := json.Unmarshal(resp.Result, result); err != nil {
-			return err
+			return fmt.Errorf("unmarshal response result for %s: %w", method, err)
 		}
 	}
 
@@ -312,7 +313,7 @@ func (c *Client) sendRequestRaw(ctx context.Context, method string, params inter
 	// Marshal params to JSON
 	paramsJSON, err := json.Marshal(params)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("marshal request params for %s: %w", method, err)
 	}
 
 	// Create request

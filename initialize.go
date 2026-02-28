@@ -40,7 +40,7 @@ func (c *Client) Initialize(ctx context.Context, params InitializeParams) (Initi
 	// Marshal params to JSON
 	paramsJSON, err := json.Marshal(params)
 	if err != nil {
-		return InitializeResponse{}, err
+		return InitializeResponse{}, fmt.Errorf("marshal request params for initialize: %w", err)
 	}
 
 	// Create request
@@ -63,7 +63,7 @@ func (c *Client) Initialize(ctx context.Context, params InitializeParams) (Initi
 	}
 	var result InitializeResponse
 	if err := json.Unmarshal(resp.Result, &result); err != nil {
-		return InitializeResponse{}, err
+		return InitializeResponse{}, fmt.Errorf("unmarshal response result for initialize: %w", err)
 	}
 
 	return result, nil
