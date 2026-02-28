@@ -13,6 +13,20 @@
 
 <!-- Findings where the audit misread the code or described behavior that doesn't occur -->
 
+### Wrapper MarshalJSON methods do not panic on nil interface Value
+
+**Location:** `approval.go:148-150`, `approval.go:409-411`, `approval.go:672-674`, `approval.go:802-804`, `review.go:87-89`, `event_types.go:188-190`, `event_types.go:313-315` — MarshalJSON on FileChangeWrapper, CommandActionWrapper, ParsedCommandWrapper, DynamicToolCallOutputContentItemWrapper, ReviewTargetWrapper, PatchChangeKindWrapper, WebSearchActionWrapper
+**Date:** 2026-02-27
+
+**Reason:** The audit claims these wrappers "panic on nil Value" because they call `json.Marshal(w.Value)`
+without a nil guard. This is incorrect. All `Value` fields are Go interface types (`FileChange`,
+`CommandAction`, `ParsedCommand`, `DynamicToolCallOutputContentItem`, `ReviewTarget`, `PatchChangeKind`,
+`WebSearchAction`). Calling `json.Marshal` on a nil interface value does NOT panic — it returns
+`[]byte("null"), nil`. The behavior is identical to the explicit `[]byte("null"), nil` pattern used
+by other wrappers. Furthermore, these `Value` fields are always populated by their corresponding
+`UnmarshalJSON` methods, which return errors on unknown types rather than leaving `Value` nil.
+There is no panic and no data corruption.
+
 ### AccountWrapper nil receiver check is reachable via pointer field
 
 **Location:** `account.go:96-97` — AccountWrapper.MarshalJSON pointer receiver
@@ -218,3 +232,30 @@ similar Go standard library APIs. Supporting multiple handlers adds complexity (
 ordering semantics, error aggregation) without clear benefit. The `OnNotification` doc comment
 states "Only one handler can be registered per method; subsequent calls replace the previous
 handler." This is documented behavior, not a bug.
+
+### Params structs use bare interface instead of wrapper type for approval and sandbox policy fields
+
+**Location:** `thread.go:538`, `thread.go:642`, `thread.go:676`, `turn.go:24`, `turn.go:30` — ApprovalPolicy and SandboxPolicy fields
+**Date:** 2026-02-27
+
+**Reason:** The params types (`ThreadStartParams`, `ThreadResumeParams`, `ThreadForkParams`,
+`TurnStartParams`) use `*AskForApproval` and `*SandboxPolicy` (bare interfaces) instead of
+`*AskForApprovalWrapper` / `*SandboxPolicyWrapper`. The wrapper types handle JSON marshaling
+correctly for structured variants (e.g. `ApprovalPolicyReject`), while the bare interface
+relies on default marshaling which happens to work for string literals but would produce
+incorrect output for struct-typed variants. Fixing this requires changing the public types of
+these fields, which breaks callers who construct params with the current signatures. Since
+these are public API types that map to spec schemas, the project's spec compliance rules
+prohibit changing their signatures. The common case (string literal policies) marshals
+correctly, and the structured variants are rarely used in client-to-server params.
+
+### Go type names use Execpolicy casing instead of ExecPolicy
+
+**Location:** `approval.go:165`, `approval.go:430` — ApprovedExecpolicyAmendmentDecision, AcceptWithExecpolicyAmendmentDecision
+**Date:** 2026-02-27
+
+**Reason:** The spec schema titles use this exact casing (`ApprovedExecpolicyAmendmentReviewDecision`,
+`AcceptWithExecpolicyAmendmentCommandExecutionApprovalDecision`). The Go types mirror the spec
+naming to maintain a clear 1:1 mapping. The project's spec compliance rules prohibit renaming
+public types that map to spec schemas. While `ExecPolicy` would be more idiomatic Go, diverging
+from the spec naming creates a maintenance burden and makes cross-referencing harder.
