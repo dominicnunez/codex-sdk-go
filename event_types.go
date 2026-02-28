@@ -2,7 +2,6 @@ package codex
 
 import (
 	"encoding/json"
-	"fmt"
 )
 
 // Shared Event Types
@@ -153,6 +152,18 @@ func (u UpdatePatchChangeKind) MarshalJSON() ([]byte, error) {
 	return json.Marshal(m)
 }
 
+// UnknownPatchChangeKind represents an unrecognized patch change type from a newer protocol version.
+type UnknownPatchChangeKind struct {
+	Type string          `json:"type"`
+	Raw  json.RawMessage `json:"-"`
+}
+
+func (UnknownPatchChangeKind) patchChangeKind() {}
+
+func (u UnknownPatchChangeKind) MarshalJSON() ([]byte, error) {
+	return u.Raw, nil
+}
+
 // PatchChangeKindWrapper wraps the PatchChangeKind discriminated union.
 type PatchChangeKindWrapper struct {
 	Value PatchChangeKind
@@ -181,7 +192,8 @@ func (w *PatchChangeKindWrapper) UnmarshalJSON(data []byte) error {
 		w.Value = &u
 		return nil
 	default:
-		return fmt.Errorf("unknown PatchChangeKind type: %s", typeCheck.Type)
+		w.Value = &UnknownPatchChangeKind{Type: typeCheck.Type, Raw: append(json.RawMessage(nil), data...)}
+		return nil
 	}
 }
 
@@ -267,6 +279,18 @@ func (o OtherWebSearchAction) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]string{"type": "other"})
 }
 
+// UnknownWebSearchAction represents an unrecognized web search action type from a newer protocol version.
+type UnknownWebSearchAction struct {
+	Type string          `json:"type"`
+	Raw  json.RawMessage `json:"-"`
+}
+
+func (UnknownWebSearchAction) webSearchAction() {}
+
+func (u UnknownWebSearchAction) MarshalJSON() ([]byte, error) {
+	return u.Raw, nil
+}
+
 // WebSearchActionWrapper wraps the WebSearchAction discriminated union.
 type WebSearchActionWrapper struct {
 	Value WebSearchAction
@@ -306,7 +330,8 @@ func (w *WebSearchActionWrapper) UnmarshalJSON(data []byte) error {
 		w.Value = &OtherWebSearchAction{}
 		return nil
 	default:
-		return fmt.Errorf("unknown WebSearchAction type: %s", typeCheck.Type)
+		w.Value = &UnknownWebSearchAction{Type: typeCheck.Type, Raw: append(json.RawMessage(nil), data...)}
+		return nil
 	}
 }
 

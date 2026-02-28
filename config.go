@@ -228,6 +228,18 @@ func (LegacyManagedConfigTomlFromMdmConfigLayerSource) MarshalJSON() ([]byte, er
 	}{Type: "legacyManagedConfigTomlFromMdm"})
 }
 
+// UnknownConfigLayerSource represents an unrecognized config layer source type from a newer protocol version.
+type UnknownConfigLayerSource struct {
+	Type string          `json:"type"`
+	Raw  json.RawMessage `json:"-"`
+}
+
+func (UnknownConfigLayerSource) isConfigLayerSource() {}
+
+func (u UnknownConfigLayerSource) MarshalJSON() ([]byte, error) {
+	return u.Raw, nil
+}
+
 // ConfigLayerSourceWrapper wraps ConfigLayerSource for JSON marshaling
 type ConfigLayerSourceWrapper struct {
 	Value ConfigLayerSource
@@ -285,7 +297,7 @@ func (w *ConfigLayerSourceWrapper) UnmarshalJSON(data []byte) error {
 	case "legacyManagedConfigTomlFromMdm":
 		w.Value = LegacyManagedConfigTomlFromMdmConfigLayerSource{}
 	default:
-		return fmt.Errorf("unknown config layer source type: %s", typeStr)
+		w.Value = UnknownConfigLayerSource{Type: typeStr, Raw: append(json.RawMessage(nil), data...)}
 	}
 
 	return nil
@@ -349,7 +361,7 @@ type OverriddenMetadata struct {
 	OverridingLayer  ConfigLayerMetadata `json:"overridingLayer"`
 }
 
-// ConfigWarningNotification represents notification/config/warning notification
+// ConfigWarningNotification represents the "configWarning" notification.
 type ConfigWarningNotification struct {
 	Summary string      `json:"summary"`
 	Details *string     `json:"details,omitempty"`
