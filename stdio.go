@@ -356,6 +356,20 @@ func (t *StdioTransport) handleRequest(data []byte) {
 
 	// Dispatch to handler in goroutine with transport-scoped context
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				errorResp := Response{
+					JSONRPC: jsonrpcVersion,
+					ID:      req.ID,
+					Error: &Error{
+						Code:    ErrCodeInternalError,
+						Message: "internal handler error",
+					},
+				}
+				_ = t.writeMessage(errorResp)
+			}
+		}()
+
 		resp, err := handler(t.ctx, req)
 		if err != nil {
 			// Handler returned error - use generic message to avoid leaking
@@ -401,6 +415,7 @@ func (t *StdioTransport) handleNotification(data []byte) {
 
 	// Dispatch to handler in goroutine with transport-scoped context
 	go func() {
+		defer func() { recover() }()
 		handler(t.ctx, notif)
 	}()
 }

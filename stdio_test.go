@@ -569,3 +569,98 @@ func TestStdioContextCancellation(t *testing.T) {
 		t.Fatal("timeout waiting for Send to return after context cancellation")
 	}
 }
+
+// TestStdioRequestHandlerPanicRecovery verifies that a panicking request handler
+// returns an internal error response instead of crashing the process.
+func TestStdioRequestHandlerPanicRecovery(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer clientReader.Close()
+	defer serverWriter.Close()
+	defer serverReader.Close()
+	defer clientWriter.Close()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer transport.Close()
+
+	transport.OnRequest(func(ctx context.Context, req codex.Request) (codex.Response, error) {
+		panic("handler blew up")
+	})
+
+	// Read the error response written back by the transport
+	responseChan := make(chan codex.Response, 1)
+	go func() {
+		scanner := bufio.NewScanner(serverReader)
+		for scanner.Scan() {
+			var resp codex.Response
+			if err := json.Unmarshal(scanner.Bytes(), &resp); err == nil && resp.Error != nil {
+				responseChan <- resp
+				return
+			}
+		}
+	}()
+
+	// Send a server→client request that will trigger the panicking handler
+	req := codex.Request{
+		JSONRPC: "2.0",
+		ID:      codex.RequestID{Value: "panic-test"},
+		Method:  "approval/commandExecution",
+	}
+	reqJSON, _ := json.Marshal(req)
+	_, _ = serverWriter.Write(append(reqJSON, '\n'))
+
+	select {
+	case resp := <-responseChan:
+		if resp.Error.Code != codex.ErrCodeInternalError {
+			t.Errorf("error code = %d; want %d", resp.Error.Code, codex.ErrCodeInternalError)
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout waiting for error response from panicking handler")
+	}
+}
+
+// TestStdioNotificationHandlerPanicRecovery verifies that a panicking notification
+// handler does not crash the process and the transport continues operating.
+func TestStdioNotificationHandlerPanicRecovery(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer clientReader.Close()
+	defer serverWriter.Close()
+	defer serverReader.Close()
+	defer clientWriter.Close()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer transport.Close()
+
+	received := make(chan string, 2)
+	callCount := 0
+	transport.OnNotify(func(ctx context.Context, notif codex.Notification) {
+		callCount++
+		if callCount == 1 {
+			panic("notification handler blew up")
+		}
+		received <- notif.Method
+	})
+
+	// Send first notification (will panic)
+	notif1 := codex.Notification{JSONRPC: "2.0", Method: "first/panic"}
+	n1JSON, _ := json.Marshal(notif1)
+	_, _ = serverWriter.Write(append(n1JSON, '\n'))
+
+	// Brief wait for goroutine to recover
+	time.Sleep(50 * time.Millisecond)
+
+	// Send second notification (should still work)
+	notif2 := codex.Notification{JSONRPC: "2.0", Method: "second/ok"}
+	n2JSON, _ := json.Marshal(notif2)
+	_, _ = serverWriter.Write(append(n2JSON, '\n'))
+
+	select {
+	case method := <-received:
+		if method != "second/ok" {
+			t.Errorf("received method = %s; want second/ok", method)
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout: transport stopped working after notification handler panic")
+	}
+}
