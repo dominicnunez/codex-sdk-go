@@ -194,6 +194,13 @@ func (m *MockTransport) GetSentRequest(index int) *codex.Request {
 	return &m.SentRequests[index]
 }
 
+// CallCount returns the total number of sent requests.
+func (m *MockTransport) CallCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.SentRequests)
+}
+
 // GetSentNotification returns the nth sent notification (0-indexed), or nil if not found.
 func (m *MockTransport) GetSentNotification(index int) *codex.Notification {
 	m.mu.Lock()

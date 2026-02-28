@@ -32,4 +32,20 @@
 //	resp, err := proc.Client.Initialize(ctx, codex.InitializeParams{
 //		ClientInfo: codex.ClientInfo{Name: "my-app", Version: "1.0.0"},
 //	})
+//
+// Using Run for a single-turn conversation (simplest usage):
+//
+//	proc, err := codex.StartProcess(ctx, &codex.ProcessOptions{
+//		Model:        "o3",
+//		Sandbox:      codex.SandboxModeReadOnly,
+//		ApprovalMode: "full-auto",
+//	})
+//	if err != nil { ... }
+//	defer proc.Close()
+//
+//	result, err := proc.Run(ctx, codex.RunOptions{
+//		Prompt: "Explain what this project does",
+//	})
+//	if err != nil { ... }
+//	fmt.Println(result.Response)
 package codex
