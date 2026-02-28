@@ -49,6 +49,18 @@ const (
 	fileChangeTypeUpdate = "update"
 )
 
+// UnknownFileChange represents an unrecognized file change type from a newer protocol version.
+type UnknownFileChange struct {
+	Type string          `json:"type"`
+	Raw  json.RawMessage `json:"-"`
+}
+
+func (u *UnknownFileChange) fileChange() {}
+
+func (u *UnknownFileChange) MarshalJSON() ([]byte, error) {
+	return u.Raw, nil
+}
+
 // FileChangeWrapper wraps a FileChange for JSON marshaling/unmarshaling.
 type FileChangeWrapper struct {
 	Value FileChange
@@ -138,7 +150,7 @@ func (w *FileChangeWrapper) UnmarshalJSON(data []byte) error {
 		}
 		w.Value = &upd
 	default:
-		return fmt.Errorf("unknown file change type: %s", raw.Type)
+		w.Value = &UnknownFileChange{Type: raw.Type, Raw: append(json.RawMessage(nil), data...)}
 	}
 
 	return nil
@@ -399,7 +411,11 @@ func (w *CommandActionWrapper) UnmarshalJSON(data []byte) error {
 		}
 		w.Value = &unknown
 	default:
-		return fmt.Errorf("unknown command action type: %s", raw.Type)
+		var unknown UnknownCommandAction
+		if err := json.Unmarshal(data, &unknown); err != nil {
+			return err
+		}
+		w.Value = &unknown
 	}
 
 	return nil
@@ -662,7 +678,11 @@ func (w *ParsedCommandWrapper) UnmarshalJSON(data []byte) error {
 		}
 		w.Value = &unknown
 	default:
-		return fmt.Errorf("unknown parsed command type: %s", raw.Type)
+		var unknown UnknownParsedCommand
+		if err := json.Unmarshal(data, &unknown); err != nil {
+			return err
+		}
+		w.Value = &unknown
 	}
 
 	return nil
@@ -730,6 +750,18 @@ type DynamicToolCallOutputContentItem interface {
 	dynamicToolCallOutputContentItem()
 }
 
+// UnknownDynamicToolCallOutputContentItem represents an unrecognized tool output content type from a newer protocol version.
+type UnknownDynamicToolCallOutputContentItem struct {
+	Type string          `json:"type"`
+	Raw  json.RawMessage `json:"-"`
+}
+
+func (u *UnknownDynamicToolCallOutputContentItem) dynamicToolCallOutputContentItem() {}
+
+func (u *UnknownDynamicToolCallOutputContentItem) MarshalJSON() ([]byte, error) {
+	return u.Raw, nil
+}
+
 // DynamicToolCallOutputContentItemWrapper wraps output content items for JSON marshaling.
 type DynamicToolCallOutputContentItemWrapper struct {
 	Value DynamicToolCallOutputContentItem
@@ -792,7 +824,7 @@ func (w *DynamicToolCallOutputContentItemWrapper) UnmarshalJSON(data []byte) err
 		}
 		w.Value = &image
 	default:
-		return fmt.Errorf("unknown tool output content type: %s", raw.Type)
+		w.Value = &UnknownDynamicToolCallOutputContentItem{Type: raw.Type, Raw: append(json.RawMessage(nil), data...)}
 	}
 
 	return nil
