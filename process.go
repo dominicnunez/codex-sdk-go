@@ -54,7 +54,8 @@ type Process struct {
 	cmd       *exec.Cmd
 	transport *StdioTransport
 	closeOnce sync.Once
-	initOnce  sync.Once
+	initMu    sync.Mutex
+	initDone  bool
 	initErr   error
 }
 
@@ -137,17 +138,19 @@ func StartProcess(ctx context.Context, opts *ProcessOptions) (*Process, error) {
 }
 
 // Close stops the child process and closes the transport.
-// Safe to call multiple times.
+// Safe to call multiple times. No-op when created via NewProcessFromClient.
 func (p *Process) Close() error {
 	var closeErr error
 	p.closeOnce.Do(func() {
 		// Close transport first to unblock any pending reads.
-		if err := p.transport.Close(); err != nil {
-			closeErr = err
+		if p.transport != nil {
+			if err := p.transport.Close(); err != nil {
+				closeErr = err
+			}
 		}
 
 		// Try graceful interrupt, then force kill after grace period.
-		if p.cmd.Process != nil {
+		if p.cmd != nil && p.cmd.Process != nil {
 			_ = p.cmd.Process.Signal(os.Interrupt)
 
 			done := make(chan struct{})
@@ -167,7 +170,30 @@ func (p *Process) Close() error {
 	return closeErr
 }
 
+// ensureInit runs the idempotent initialize handshake. On success the result is
+// latched so future calls return immediately. On failure the next call retries,
+// allowing recovery from transient errors.
+func (p *Process) ensureInit(ctx context.Context) error {
+	p.initMu.Lock()
+	defer p.initMu.Unlock()
+	if p.initDone {
+		return p.initErr
+	}
+	_, err := p.Client.Initialize(ctx, InitializeParams{
+		ClientInfo: ClientInfo{Name: "codex-sdk-go", Version: "0.1.0"},
+	})
+	if err != nil {
+		return fmt.Errorf("initialize: %w", err)
+	}
+	p.initDone = true
+	return nil
+}
+
 // Wait waits for the child process to exit and returns the exit error.
+// Returns nil immediately when created via NewProcessFromClient (no child process).
 func (p *Process) Wait() error {
+	if p.cmd == nil {
+		return nil
+	}
 	return p.cmd.Wait()
 }
