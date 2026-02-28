@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/dominicnunez/codex-sdk-go"
 )
@@ -262,3 +263,36 @@ func (m *MockTransport) Reset() {
 	m.notifyErr = nil
 	m.closed = false
 }
+
+// SlowMockTransport is a mock transport that delays responses by a fixed duration.
+// Used to test timeout behavior — Send blocks until the delay elapses or the
+// context is cancelled, whichever comes first.
+type SlowMockTransport struct {
+	delay time.Duration
+}
+
+// NewSlowMockTransport creates a SlowMockTransport with the given response delay.
+func NewSlowMockTransport(delay time.Duration) *SlowMockTransport {
+	return &SlowMockTransport{delay: delay}
+}
+
+func (s *SlowMockTransport) Send(ctx context.Context, req codex.Request) (codex.Response, error) {
+	select {
+	case <-time.After(s.delay):
+		return codex.Response{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Result:  json.RawMessage(`{}`),
+		}, nil
+	case <-ctx.Done():
+		return codex.Response{}, ctx.Err()
+	}
+}
+
+func (s *SlowMockTransport) Notify(_ context.Context, _ codex.Notification) error {
+	return nil
+}
+
+func (s *SlowMockTransport) OnRequest(_ codex.RequestHandler)     {}
+func (s *SlowMockTransport) OnNotify(_ codex.NotificationHandler) {}
+func (s *SlowMockTransport) Close() error                         { return nil }

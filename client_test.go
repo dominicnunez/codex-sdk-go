@@ -176,6 +176,26 @@ func TestClientDefaultTimeout(t *testing.T) {
 	if sentReq == nil {
 		t.Fatal("no request was sent")
 	}
+
+	// Now test that a slow response triggers a TimeoutError.
+	// Use a very short timeout so the mock's lack of response causes expiry.
+	shortTimeout := 25 * time.Millisecond
+	slowClient := codex.NewClient(NewSlowMockTransport(shortTimeout*2), codex.WithRequestTimeout(shortTimeout))
+
+	slowReq := codex.Request{
+		JSONRPC: "2.0",
+		ID:      codex.RequestID{Value: "timeout-fires"},
+		Method:  "test.slow",
+		Params:  json.RawMessage(`{}`),
+	}
+
+	_, err = slowClient.Send(context.Background(), slowReq)
+	if err == nil {
+		t.Fatal("expected TimeoutError, got nil")
+	}
+	if !isTimeoutError(err) {
+		t.Fatalf("expected TimeoutError, got: %T: %v", err, err)
+	}
 }
 
 // TestClientMultipleListeners verifies that multiple listeners for different methods work.
