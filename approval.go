@@ -818,8 +818,8 @@ type ToolRequestUserInputQuestion struct {
 	ID       string                          `json:"id"`
 	Header   string                          `json:"header"`
 	Question string                          `json:"question"`
-	IsSecret bool                            `json:"isSecret,omitempty"`
-	IsOther  bool                            `json:"isOther,omitempty"`
+	IsSecret bool                            `json:"isSecret"`
+	IsOther  bool                            `json:"isOther"`
 	Options  *[]ToolRequestUserInputOption   `json:"options,omitempty"`
 }
 

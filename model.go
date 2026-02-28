@@ -45,7 +45,7 @@ type Model struct {
 	// Input modalities supported by this model (e.g., "text", "image").
 	InputModalities []InputModality `json:"inputModalities,omitempty"`
 	// Whether the model supports personality customization.
-	SupportsPersonality bool `json:"supportsPersonality,omitempty"`
+	SupportsPersonality bool `json:"supportsPersonality"`
 	// Optional model ID to upgrade to.
 	Upgrade *string `json:"upgrade,omitempty"`
 }

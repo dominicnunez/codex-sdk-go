@@ -14,7 +14,7 @@ type ClientInfo struct {
 // InitializeCapabilities represents client-declared capabilities negotiated during initialize.
 type InitializeCapabilities struct {
 	// ExperimentalAPI opts into receiving experimental API methods and fields.
-	ExperimentalAPI bool `json:"experimentalApi,omitempty"`
+	ExperimentalAPI bool `json:"experimentalApi"`
 
 	// OptOutNotificationMethods are exact notification method names that should be suppressed
 	// for this connection (for example "codex/event/session_configured").

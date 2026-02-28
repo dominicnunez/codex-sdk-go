@@ -61,7 +61,7 @@ func TestInitializeParamsSerialization(t *testing.T) {
 					OptOutNotificationMethods: []string{"codex/event/session_configured", "codex/event/test"},
 				},
 			},
-			expected: `{"clientInfo":{"name":"test-client","version":"1.0.0"},"capabilities":{"optOutNotificationMethods":["codex/event/session_configured","codex/event/test"]}}`,
+			expected: `{"clientInfo":{"name":"test-client","version":"1.0.0"},"capabilities":{"experimentalApi":false,"optOutNotificationMethods":["codex/event/session_configured","codex/event/test"]}}`,
 		},
 		{
 			name: "params with all fields",
