@@ -71,6 +71,63 @@ func schemaFields(path string) (properties []string, required map[string]bool, e
 	return properties, required, nil
 }
 
+// schemaDefinitionVariantFields reads a spec file, looks up a definition by name,
+// finds the oneOf variant matching the given title, and returns its property names
+// and required set. Used for ThreadItem variants defined inside definitions.ThreadItem.oneOf.
+func schemaDefinitionVariantFields(path, defName, variantTitle string) (properties []string, required map[string]bool, err error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	var s schemaTopLevel
+	if err := json.Unmarshal(data, &s); err != nil {
+		return nil, nil, err
+	}
+	raw, ok := s.Definitions[defName]
+	if !ok {
+		return nil, nil, nil
+	}
+	var def struct {
+		OneOf []json.RawMessage `json:"oneOf"`
+	}
+	if err := json.Unmarshal(raw, &def); err != nil {
+		return nil, nil, err
+	}
+	for _, variant := range def.OneOf {
+		var v schemaTopLevel
+		if err := json.Unmarshal(variant, &v); err != nil {
+			continue
+		}
+		var titleCheck struct {
+			Title string `json:"title"`
+		}
+		if err := json.Unmarshal(variant, &titleCheck); err != nil {
+			continue
+		}
+		if titleCheck.Title != variantTitle {
+			continue
+		}
+		for k := range v.Properties {
+			properties = append(properties, k)
+		}
+		sort.Strings(properties)
+		required = make(map[string]bool, len(v.Required))
+		for _, r := range v.Required {
+			required[r] = true
+		}
+		return properties, required, nil
+	}
+	return nil, nil, nil
+}
+
+// definitionVariantEntry maps a spec file + definition + variant title to a Go struct type.
+type definitionVariantEntry struct {
+	specPath     string
+	defName      string
+	variantTitle string
+	goType       reflect.Type
+}
+
 // enumDef represents a parsed enum definition from a spec.
 type enumDef struct {
 	Enum  []string          `json:"enum"`
@@ -331,6 +388,62 @@ func testStructFields(t *testing.T) {
 				}
 
 				// Check required/optional alignment.
+				if required[prop] && fi.isOptional {
+					t.Errorf("schema requires %q but Go field %s.%s has omitempty", prop, entry.goType.Name(), fi.fieldName)
+				}
+			}
+		})
+	}
+
+	// ThreadItem variant structs — these live inside definitions.ThreadItem.oneOf
+	// in the ItemStartedNotification spec, not as separate spec files.
+	specFile := "specs/v2/ItemStartedNotification.json"
+	variantRegistry := []definitionVariantEntry{
+		{specFile, "ThreadItem", "UserMessageThreadItem", reflect.TypeOf(UserMessageThreadItem{})},
+		{specFile, "ThreadItem", "AgentMessageThreadItem", reflect.TypeOf(AgentMessageThreadItem{})},
+		{specFile, "ThreadItem", "PlanThreadItem", reflect.TypeOf(PlanThreadItem{})},
+		{specFile, "ThreadItem", "ReasoningThreadItem", reflect.TypeOf(ReasoningThreadItem{})},
+		{specFile, "ThreadItem", "CommandExecutionThreadItem", reflect.TypeOf(CommandExecutionThreadItem{})},
+		{specFile, "ThreadItem", "FileChangeThreadItem", reflect.TypeOf(FileChangeThreadItem{})},
+		{specFile, "ThreadItem", "McpToolCallThreadItem", reflect.TypeOf(McpToolCallThreadItem{})},
+		{specFile, "ThreadItem", "DynamicToolCallThreadItem", reflect.TypeOf(DynamicToolCallThreadItem{})},
+		{specFile, "ThreadItem", "CollabAgentToolCallThreadItem", reflect.TypeOf(CollabAgentToolCallThreadItem{})},
+		{specFile, "ThreadItem", "WebSearchThreadItem", reflect.TypeOf(WebSearchThreadItem{})},
+		{specFile, "ThreadItem", "ImageViewThreadItem", reflect.TypeOf(ImageViewThreadItem{})},
+		{specFile, "ThreadItem", "EnteredReviewModeThreadItem", reflect.TypeOf(EnteredReviewModeThreadItem{})},
+		{specFile, "ThreadItem", "ExitedReviewModeThreadItem", reflect.TypeOf(ExitedReviewModeThreadItem{})},
+		{specFile, "ThreadItem", "ContextCompactionThreadItem", reflect.TypeOf(ContextCompactionThreadItem{})},
+	}
+
+	for _, entry := range variantRegistry {
+		entry := entry
+		name := entry.specPath + "/definitions." + entry.defName + "." + entry.variantTitle
+		t.Run(name, func(t *testing.T) {
+			properties, required, err := schemaDefinitionVariantFields(
+				entry.specPath, entry.defName, entry.variantTitle,
+			)
+			if err != nil {
+				t.Fatalf("failed to parse schema variant: %v", err)
+			}
+			if len(properties) == 0 {
+				t.Skip("variant has no properties")
+			}
+
+			goFields := structJSONFields(entry.goType)
+
+			for _, prop := range properties {
+				// Skip the "type" discriminator field — it's handled by MarshalJSON/UnmarshalJSON,
+				// not stored as a struct field.
+				if prop == "type" {
+					continue
+				}
+
+				fi, ok := goFields[prop]
+				if !ok {
+					t.Errorf("schema property %q has no matching JSON field on %s", prop, entry.goType.Name())
+					continue
+				}
+
 				if required[prop] && fi.isOptional {
 					t.Errorf("schema requires %q but Go field %s.%s has omitempty", prop, entry.goType.Name(), fi.fieldName)
 				}
