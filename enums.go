@@ -225,6 +225,26 @@ const (
 	ResidencyRequirementUS ResidencyRequirement = "us"
 )
 
+// ReasoningEffort represents the reasoning effort level for a model.
+type ReasoningEffort string
+
+const (
+	ReasoningEffortNone    ReasoningEffort = "none"
+	ReasoningEffortMinimal ReasoningEffort = "minimal"
+	ReasoningEffortLow     ReasoningEffort = "low"
+	ReasoningEffortMedium  ReasoningEffort = "medium"
+	ReasoningEffortHigh    ReasoningEffort = "high"
+	ReasoningEffortXHigh   ReasoningEffort = "xhigh"
+)
+
+// InputModality represents a canonical user-input modality tag advertised by a model.
+type InputModality string
+
+const (
+	InputModalityText  InputModality = "text"
+	InputModalityImage InputModality = "image"
+)
+
 // ReasoningSummaryMode represents enum variant ("auto" | "concise" | "detailed" | "none")
 type ReasoningSummaryMode string
 

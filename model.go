@@ -50,19 +50,6 @@ type Model struct {
 	Upgrade *string `json:"upgrade,omitempty"`
 }
 
-// ReasoningEffort represents the reasoning effort level for a model.
-// See https://platform.openai.com/docs/guides/reasoning?api-mode=responses#get-started-with-reasoning
-type ReasoningEffort string
-
-const (
-	ReasoningEffortNone    ReasoningEffort = "none"
-	ReasoningEffortMinimal ReasoningEffort = "minimal"
-	ReasoningEffortLow     ReasoningEffort = "low"
-	ReasoningEffortMedium  ReasoningEffort = "medium"
-	ReasoningEffortHigh    ReasoningEffort = "high"
-	ReasoningEffortXHigh   ReasoningEffort = "xhigh"
-)
-
 // ReasoningEffortOption describes a supported reasoning effort level.
 type ReasoningEffortOption struct {
 	// The reasoning effort level.
@@ -70,16 +57,6 @@ type ReasoningEffortOption struct {
 	// Human-readable description of this effort level.
 	Description string `json:"description"`
 }
-
-// InputModality represents a canonical user-input modality tag advertised by a model.
-type InputModality string
-
-const (
-	// Plain text turns and tool payloads.
-	InputModalityText InputModality = "text"
-	// Image attachments included in user turns.
-	InputModalityImage InputModality = "image"
-)
 
 // ModelReroutedNotification is sent when a model is rerouted to a different model.
 type ModelReroutedNotification struct {
