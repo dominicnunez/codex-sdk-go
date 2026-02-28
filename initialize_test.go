@@ -3,6 +3,7 @@ package codex_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/dominicnunez/codex-sdk-go"
@@ -249,7 +250,7 @@ func TestClientInitializeError(t *testing.T) {
 
 	// Verify it's an RPCError
 	var rpcErr *codex.RPCError
-	if !codex.ErrorAs(err, &rpcErr) {
+	if !errors.As(err, &rpcErr) {
 		t.Fatalf("expected RPCError, got %T", err)
 	}
 	if rpcErr.Code() != -32600 {
