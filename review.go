@@ -89,14 +89,16 @@ func (w ReviewTargetWrapper) MarshalJSON() ([]byte, error) {
 }
 
 func (w *ReviewTargetWrapper) UnmarshalJSON(data []byte) error {
-	var raw map[string]interface{}
+	var raw struct {
+		Type string `json:"type"`
+	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
 
-	typeStr, ok := raw["type"].(string)
-	if !ok {
-		return fmt.Errorf("review target: missing or non-string type key")
+	typeStr := raw.Type
+	if typeStr == "" {
+		return fmt.Errorf("review target: missing or empty type key")
 	}
 
 	switch typeStr {
