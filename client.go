@@ -33,6 +33,13 @@ func marshalForWire(v interface{}) ([]byte, error) {
 	return json.Marshal(v)
 }
 
+// internalListener is a notification handler registered via addNotificationListener.
+// Each listener has a unique ID for unsubscription.
+type internalListener struct {
+	id      uint64
+	handler NotificationHandler
+}
+
 // Client is the main entry point for interacting with the Codex JSON-RPC server.
 // It uses a Transport for bidirectional communication and provides typed methods
 // for all protocol operations.
@@ -42,9 +49,12 @@ type Client struct {
 	// Request timeout (optional, can be overridden per-request via context)
 	requestTimeout time.Duration
 
-	// Notification listeners: method → handler function
+	// Notification listeners: method → handler function (public, replacement semantics)
 	notificationListeners map[string]NotificationHandler
-	listenersMu           sync.RWMutex
+	// Internal notification listeners: method → list of listeners (append semantics)
+	internalListeners   map[string][]internalListener
+	internalListenerSeq uint64
+	listenersMu         sync.RWMutex
 
 	// Approval handlers for server→client requests
 	approvalHandlers ApprovalHandlers
@@ -87,6 +97,7 @@ func NewClient(transport Transport, opts ...ClientOption) *Client {
 	c := &Client{
 		transport:             transport,
 		notificationListeners: make(map[string]NotificationHandler),
+		internalListeners:     make(map[string][]internalListener),
 	}
 
 	// Apply options
@@ -177,19 +188,48 @@ func (c *Client) OnNotification(method string, handler NotificationHandler) {
 }
 
 // handleNotification is the internal handler registered with the transport.
-// It routes incoming notifications to the appropriate registered listener.
+// It routes incoming notifications to the appropriate registered listener,
+// then dispatches to all internal listeners for the same method.
 func (c *Client) handleNotification(ctx context.Context, notif Notification) {
 	c.listenersMu.RLock()
-	handler, ok := c.notificationListeners[notif.Method]
+	handler := c.notificationListeners[notif.Method]
+	// Snapshot internal listeners so we can release the lock before calling.
+	internals := c.internalListeners[notif.Method]
 	c.listenersMu.RUnlock()
 
-	if !ok {
-		// Unknown notification method - ignore silently
-		return
+	if handler != nil {
+		handler(ctx, notif)
 	}
 
-	// Call the handler (in the same goroutine for now - transport already dispatches in goroutines)
-	handler(ctx, notif)
+	for _, il := range internals {
+		il.handler(ctx, notif)
+	}
+}
+
+// addNotificationListener appends an internal listener for the given method.
+// Returns an unsubscribe function that removes this specific listener.
+// Unlike OnNotification, multiple listeners can coexist for the same method.
+func (c *Client) addNotificationListener(method string, handler NotificationHandler) func() {
+	c.listenersMu.Lock()
+	c.internalListenerSeq++
+	id := c.internalListenerSeq
+	c.internalListeners[method] = append(c.internalListeners[method], internalListener{
+		id:      id,
+		handler: handler,
+	})
+	c.listenersMu.Unlock()
+
+	return func() {
+		c.listenersMu.Lock()
+		defer c.listenersMu.Unlock()
+		listeners := c.internalListeners[method]
+		for i, l := range listeners {
+			if l.id == id {
+				c.internalListeners[method] = append(listeners[:i], listeners[i+1:]...)
+				break
+			}
+		}
+	}
 }
 
 // handleRequest is the internal handler for server→client requests (approval flows).
