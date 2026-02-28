@@ -244,7 +244,7 @@ func methodNotFoundResponse(id RequestID) Response {
 func handleApproval[P any, R any](ctx context.Context, req Request, handler func(context.Context, P) (R, error)) (Response, error) {
 	var params P
 	if err := json.Unmarshal(req.Params, &params); err != nil {
-		return Response{}, errInvalidParams
+		return Response{}, fmt.Errorf("unmarshal %s params: %w", req.Method, errInvalidParams)
 	}
 
 	result, err := handler(ctx, params)
@@ -270,9 +270,8 @@ func (c *Client) Close() error {
 }
 
 // nextRequestID generates a unique request ID for outgoing requests.
-func (c *Client) nextRequestID() interface{} {
-	id := atomic.AddUint64(&c.requestIDCounter, 1)
-	return id
+func (c *Client) nextRequestID() uint64 {
+	return atomic.AddUint64(&c.requestIDCounter, 1)
 }
 
 // sendRequest is a helper that sends a typed request and unmarshals the response.
