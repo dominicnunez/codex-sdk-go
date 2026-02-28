@@ -1,9 +1,11 @@
 package codex_test
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/dominicnunez/codex-sdk-go"
@@ -130,6 +132,41 @@ func TestTimeoutError(t *testing.T) {
 	// TimeoutError should not match unrelated errors
 	if errors.Is(timeoutErr, io.EOF) {
 		t.Error("errors.Is should not match unrelated errors")
+	}
+}
+
+// TestRPCErrorDataExcludedFromErrorString verifies that the Data field
+// is not included in the Error() string but is accessible via Data().
+func TestRPCErrorDataExcludedFromErrorString(t *testing.T) {
+	data := json.RawMessage(`{"internal_path":"/var/secrets/key.pem"}`)
+	rpcErr := codex.NewRPCError(&codex.Error{
+		Code:    codex.ErrCodeInternalError,
+		Message: "something went wrong",
+		Data:    data,
+	})
+
+	errStr := rpcErr.Error()
+	if strings.Contains(errStr, "secrets") {
+		t.Errorf("Error() should not contain Data content, got: %s", errStr)
+	}
+	if strings.Contains(errStr, "internal_path") {
+		t.Errorf("Error() should not contain Data content, got: %s", errStr)
+	}
+
+	got := rpcErr.Data()
+	if string(got) != string(data) {
+		t.Errorf("Data() = %s; want %s", got, data)
+	}
+}
+
+// TestRPCErrorDataNilWhenAbsent verifies Data() returns nil when no data is set.
+func TestRPCErrorDataNilWhenAbsent(t *testing.T) {
+	rpcErr := codex.NewRPCError(&codex.Error{
+		Code:    codex.ErrCodeInternalError,
+		Message: "no data",
+	})
+	if rpcErr.Data() != nil {
+		t.Errorf("Data() should be nil when no data set, got: %s", rpcErr.Data())
 	}
 }
 

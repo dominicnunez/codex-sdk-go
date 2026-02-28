@@ -1,6 +1,7 @@
 package codex
 
 import (
+	"encoding/json"
 	"fmt"
 )
 
@@ -16,15 +17,11 @@ func NewRPCError(err *Error) *RPCError {
 }
 
 // Error implements the error interface.
-// Note: when Data is present, its raw content is included in the string.
-// Data is server-controlled and may contain sensitive information (internal
-// paths, tokens, PII). Callers who log or display this value should be aware.
+// Data is deliberately excluded — it is server-controlled and may contain
+// sensitive information. Use RPCError() or Data() to access it explicitly.
 func (e *RPCError) Error() string {
 	if e.err == nil {
 		return "rpc error: <nil>"
-	}
-	if len(e.err.Data) > 0 {
-		return fmt.Sprintf("rpc error: code=%d message=%q data=%s", e.err.Code, e.err.Message, string(e.err.Data))
 	}
 	return fmt.Sprintf("rpc error: code=%d message=%q", e.err.Code, e.err.Message)
 }
@@ -48,6 +45,15 @@ func (e *RPCError) Message() string {
 		return ""
 	}
 	return e.err.Message
+}
+
+// Data returns the raw JSON-RPC error data, if any.
+// This is server-controlled and may contain sensitive information.
+func (e *RPCError) Data() json.RawMessage {
+	if e.err == nil {
+		return nil
+	}
+	return e.err.Data
 }
 
 // Is implements errors.Is by comparing error codes.
