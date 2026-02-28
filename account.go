@@ -24,7 +24,7 @@ type AccountWrapper struct {
 
 // Account represents an account (apiKey or chatgpt)
 type Account interface {
-	accountType() string
+	isAccount()
 }
 
 // ApiKeyAccount represents an API key account
@@ -32,7 +32,7 @@ type ApiKeyAccount struct {
 	Type string `json:"type"`
 }
 
-func (a *ApiKeyAccount) accountType() string { return "apiKey" }
+func (*ApiKeyAccount) isAccount() {}
 
 // ChatgptAccount represents a ChatGPT account
 type ChatgptAccount struct {
@@ -41,7 +41,7 @@ type ChatgptAccount struct {
 	PlanType PlanType `json:"planType"`
 }
 
-func (c *ChatgptAccount) accountType() string { return "chatgpt" }
+func (*ChatgptAccount) isAccount() {}
 
 // UnknownAccount represents an unrecognized account type from a newer protocol version.
 type UnknownAccount struct {
@@ -49,7 +49,7 @@ type UnknownAccount struct {
 	Raw  json.RawMessage `json:"-"`
 }
 
-func (u *UnknownAccount) accountType() string { return u.Type }
+func (*UnknownAccount) isAccount() {}
 
 func (u *UnknownAccount) MarshalJSON() ([]byte, error) {
 	if u.Raw == nil {
@@ -147,7 +147,7 @@ type RateLimitWindow struct {
 
 // LoginAccountParams is an interface for login parameter variants
 type LoginAccountParams interface {
-	loginParamsType() string
+	isLoginAccountParams()
 }
 
 // ApiKeyLoginAccountParams represents API key login parameters
@@ -156,7 +156,7 @@ type ApiKeyLoginAccountParams struct {
 	ApiKey string `json:"apiKey"`
 }
 
-func (p *ApiKeyLoginAccountParams) loginParamsType() string { return "apiKey" }
+func (*ApiKeyLoginAccountParams) isLoginAccountParams() {}
 
 // MarshalJSON redacts the API key to prevent accidental credential leaks
 // via structured logging, debug serializers, or error payloads.
@@ -194,7 +194,7 @@ type ChatgptLoginAccountParams struct {
 	Type string `json:"type"`
 }
 
-func (p *ChatgptLoginAccountParams) loginParamsType() string { return "chatgpt" }
+func (*ChatgptLoginAccountParams) isLoginAccountParams() {}
 
 // ChatgptAuthTokensLoginAccountParams represents external auth token login parameters
 type ChatgptAuthTokensLoginAccountParams struct {
@@ -204,7 +204,7 @@ type ChatgptAuthTokensLoginAccountParams struct {
 	ChatgptPlanType   *string `json:"chatgptPlanType,omitempty"`
 }
 
-func (p *ChatgptAuthTokensLoginAccountParams) loginParamsType() string { return "chatgptAuthTokens" }
+func (*ChatgptAuthTokensLoginAccountParams) isLoginAccountParams() {}
 
 // MarshalJSON redacts the access token to prevent accidental credential leaks
 // via structured logging, debug serializers, or error payloads.
@@ -243,7 +243,7 @@ func (p *ChatgptAuthTokensLoginAccountParams) Format(f fmt.State, verb rune) {
 
 // LoginAccountResponse is an interface for login response variants
 type LoginAccountResponse interface {
-	loginResponseType() string
+	isLoginAccountResponse()
 }
 
 // ApiKeyLoginAccountResponse represents API key login response
@@ -251,7 +251,7 @@ type ApiKeyLoginAccountResponse struct {
 	Type string `json:"type"`
 }
 
-func (r *ApiKeyLoginAccountResponse) loginResponseType() string { return "apiKey" }
+func (*ApiKeyLoginAccountResponse) isLoginAccountResponse() {}
 
 // ChatgptLoginAccountResponse represents ChatGPT OAuth login response
 type ChatgptLoginAccountResponse struct {
@@ -260,16 +260,14 @@ type ChatgptLoginAccountResponse struct {
 	LoginId string `json:"loginId"`
 }
 
-func (r *ChatgptLoginAccountResponse) loginResponseType() string { return "chatgpt" }
+func (*ChatgptLoginAccountResponse) isLoginAccountResponse() {}
 
 // ChatgptAuthTokensLoginAccountResponse represents external auth token login response
 type ChatgptAuthTokensLoginAccountResponse struct {
 	Type string `json:"type"`
 }
 
-func (r *ChatgptAuthTokensLoginAccountResponse) loginResponseType() string {
-	return "chatgptAuthTokens"
-}
+func (*ChatgptAuthTokensLoginAccountResponse) isLoginAccountResponse() {}
 
 // UnknownLoginAccountResponse represents an unrecognized login response type from a newer protocol version.
 type UnknownLoginAccountResponse struct {
@@ -277,7 +275,7 @@ type UnknownLoginAccountResponse struct {
 	Raw  json.RawMessage `json:"-"`
 }
 
-func (u *UnknownLoginAccountResponse) loginResponseType() string { return u.Type }
+func (*UnknownLoginAccountResponse) isLoginAccountResponse() {}
 
 func (u *UnknownLoginAccountResponse) MarshalJSON() ([]byte, error) {
 	if u.Raw == nil {
