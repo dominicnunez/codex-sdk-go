@@ -149,11 +149,19 @@ func (p *Process) runStreamedLifecycle(ctx context.Context, opts RunOptions, ch 
 		return &FileChangeDelta{Delta: n.Delta, ItemID: n.ItemID}
 	})
 
-	streamListen(on, notifyItemStarted, ch, func(n ItemStartedNotification) Event {
-		return &ItemStarted{Item: n.Item}
+	// item/started: emit collab event before generic event when applicable.
+	on(notifyItemStarted, func(_ context.Context, notif Notification) {
+		var n ItemStartedNotification
+		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			return
+		}
+		if c, ok := n.Item.Value.(*CollabAgentToolCallThreadItem); ok {
+			streamSend(ch, eventOrErr{event: newCollabStarted(c)})
+		}
+		streamSend(ch, eventOrErr{event: &ItemStarted{Item: n.Item}})
 	})
 
-	// item/completed is special: also appends to the collected items slice.
+	// item/completed: emit collab event before generic event, and append to collected items.
 	on(notifyItemCompleted, func(_ context.Context, notif Notification) {
 		var n ItemCompletedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
@@ -162,6 +170,9 @@ func (p *Process) runStreamedLifecycle(ctx context.Context, opts RunOptions, ch 
 		itemsMu.Lock()
 		items = append(items, n.Item)
 		itemsMu.Unlock()
+		if c, ok := n.Item.Value.(*CollabAgentToolCallThreadItem); ok {
+			streamSend(ch, eventOrErr{event: newCollabCompleted(c)})
+		}
 		streamSend(ch, eventOrErr{event: &ItemCompleted{Item: n.Item}})
 	})
 

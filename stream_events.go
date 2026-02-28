@@ -71,6 +71,58 @@ type ItemCompleted struct {
 
 func (*ItemCompleted) streamEvent() {}
 
+// CollabToolCallStarted is emitted when a collab tool call begins (item/started
+// with a collabAgentToolCall item). Emitted before the generic ItemStarted event.
+type CollabToolCallStarted struct {
+	ID                string
+	Tool              CollabAgentTool
+	Status            CollabAgentToolCallStatus
+	AgentsStates      map[string]CollabAgentState
+	ReceiverThreadIds []string
+	SenderThreadId    string
+	Prompt            *string
+}
+
+func (*CollabToolCallStarted) streamEvent() {}
+
+// CollabToolCallCompleted is emitted when a collab tool call finishes (item/completed
+// with a collabAgentToolCall item). Emitted before the generic ItemCompleted event.
+type CollabToolCallCompleted struct {
+	ID                string
+	Tool              CollabAgentTool
+	Status            CollabAgentToolCallStatus
+	AgentsStates      map[string]CollabAgentState
+	ReceiverThreadIds []string
+	SenderThreadId    string
+	Prompt            *string
+}
+
+func (*CollabToolCallCompleted) streamEvent() {}
+
+func newCollabStarted(c *CollabAgentToolCallThreadItem) *CollabToolCallStarted {
+	return &CollabToolCallStarted{
+		ID:                c.ID,
+		Tool:              c.Tool,
+		Status:            c.Status,
+		AgentsStates:      c.AgentsStates,
+		ReceiverThreadIds: c.ReceiverThreadIds,
+		SenderThreadId:    c.SenderThreadId,
+		Prompt:            c.Prompt,
+	}
+}
+
+func newCollabCompleted(c *CollabAgentToolCallThreadItem) *CollabToolCallCompleted {
+	return &CollabToolCallCompleted{
+		ID:                c.ID,
+		Tool:              c.Tool,
+		Status:            c.Status,
+		AgentsStates:      c.AgentsStates,
+		ReceiverThreadIds: c.ReceiverThreadIds,
+		SenderThreadId:    c.SenderThreadId,
+		Prompt:            c.Prompt,
+	}
+}
+
 // TurnCompleted is emitted when the turn finishes.
 type TurnCompleted struct {
 	Turn Turn
