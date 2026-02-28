@@ -184,6 +184,237 @@ func TestConversationTurnStreamedEmptyPrompt(t *testing.T) {
 	}
 }
 
+func TestConversationStartWithAllOptions(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx := context.Background()
+	personality := codex.PersonalityFriendly
+	var approvalPolicy codex.AskForApproval = codex.ApprovalPolicyNever
+
+	_, err := proc.StartConversation(ctx, codex.ConversationOptions{
+		Instructions:   codex.Ptr("Be concise"),
+		Model:          codex.Ptr("o3"),
+		Personality:    &personality,
+		ApprovalPolicy: &approvalPolicy,
+	})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+
+	var threadReq *codex.Request
+	for i := 0; i < mock.CallCount(); i++ {
+		req := mock.GetSentRequest(i)
+		if req != nil && req.Method == "thread/start" {
+			threadReq = req
+			break
+		}
+	}
+	if threadReq == nil {
+		t.Fatal("thread/start request not found")
+	}
+
+	var params map[string]interface{}
+	if err := json.Unmarshal(threadReq.Params, &params); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if params["developerInstructions"] != "Be concise" {
+		t.Errorf("developerInstructions = %v, want 'Be concise'", params["developerInstructions"])
+	}
+	if params["model"] != "o3" {
+		t.Errorf("model = %v, want 'o3'", params["model"])
+	}
+	if params["personality"] != "friendly" {
+		t.Errorf("personality = %v, want 'friendly'", params["personality"])
+	}
+	if params["approvalPolicy"] != "never" {
+		t.Errorf("approvalPolicy = %v, want 'never'", params["approvalPolicy"])
+	}
+}
+
+func TestConversationTurnWithAllOptions(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+
+	effort := codex.ReasoningEffortHigh
+	ch := make(chan error, 1)
+	go func() {
+		_, err := conv.Turn(ctx, codex.TurnOptions{
+			Prompt: "hello",
+			Effort: &effort,
+			Model:  codex.Ptr("o3"),
+		})
+		ch <- err
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Find the turn/start request and verify it has effort and model.
+	var turnReq *codex.Request
+	for i := 0; i < mock.CallCount(); i++ {
+		req := mock.GetSentRequest(i)
+		if req != nil && req.Method == "turn/start" {
+			turnReq = req
+		}
+	}
+	if turnReq == nil {
+		t.Fatal("turn/start request not found")
+	}
+
+	var params map[string]interface{}
+	if err := json.Unmarshal(turnReq.Params, &params); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if params["effort"] != "high" {
+		t.Errorf("effort = %v, want 'high'", params["effort"])
+	}
+	if params["model"] != "o3" {
+		t.Errorf("model = %v, want 'o3'", params["model"])
+	}
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	if err := <-ch; err != nil {
+		t.Fatalf("Turn error: %v", err)
+	}
+}
+
+func TestConversationTurnError(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+
+	type turnResult struct {
+		result *codex.RunResult
+		err    error
+	}
+	ch := make(chan turnResult, 1)
+
+	go func() {
+		r, err := conv.Turn(ctx, codex.TurnOptions{Prompt: "fail"})
+		ch <- turnResult{r, err}
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"failed","items":[],"error":{"message":"rate limited"}}}`),
+	})
+
+	r := <-ch
+	if r.err == nil {
+		t.Fatal("expected error from turn error")
+	}
+	if r.result != nil {
+		t.Error("expected nil result on turn error")
+	}
+}
+
+func TestConversationTurnContextCancel(t *testing.T) {
+	proc, _ := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	defer cancel()
+
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+
+	_, err = conv.Turn(ctx, codex.TurnOptions{Prompt: "timeout"})
+	if err == nil {
+		t.Fatal("expected error from context cancellation")
+	}
+}
+
+func TestConversationTurnStreamedTurnError(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+
+	stream := conv.TurnStreamed(ctx, codex.TurnOptions{Prompt: "fail"})
+
+	time.Sleep(50 * time.Millisecond)
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"failed","items":[],"error":{"message":"model error"}}}`),
+	})
+
+	var gotErr error
+	var foundTC bool
+	for event, err := range stream.Events() {
+		if err != nil {
+			gotErr = err
+			break
+		}
+		if _, ok := event.(*codex.TurnCompleted); ok {
+			foundTC = true
+		}
+	}
+
+	if gotErr == nil {
+		t.Fatal("expected error from turn error")
+	}
+	if !foundTC {
+		t.Error("expected TurnCompleted event before error")
+	}
+	if stream.Result() != nil {
+		t.Error("expected nil Result() after turn error")
+	}
+}
+
+func TestConversationTurnStreamedContextCancel(t *testing.T) {
+	proc, _ := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	defer cancel()
+
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+
+	stream := conv.TurnStreamed(ctx, codex.TurnOptions{Prompt: "timeout"})
+
+	var gotErr error
+	for _, err := range stream.Events() {
+		if err != nil {
+			gotErr = err
+			break
+		}
+	}
+
+	if gotErr == nil {
+		t.Fatal("expected error from context cancellation")
+	}
+}
+
 func TestConversationWithCollaborationMode(t *testing.T) {
 	proc, mock := mockProcess(t)
 

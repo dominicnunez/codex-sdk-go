@@ -172,6 +172,18 @@ func TestAgentTrackerIgnoresNonCollabEvents(t *testing.T) {
 	}
 }
 
+func TestAgentTrackerAgentNotFound(t *testing.T) {
+	tracker := codex.NewAgentTracker()
+
+	info, ok := tracker.Agent("nonexistent")
+	if ok {
+		t.Error("Agent() returned true for nonexistent thread ID")
+	}
+	if info.ThreadID != "" {
+		t.Errorf("info.ThreadID = %q, want empty", info.ThreadID)
+	}
+}
+
 func TestAgentTrackerMultipleAgents(t *testing.T) {
 	tracker := codex.NewAgentTracker()
 

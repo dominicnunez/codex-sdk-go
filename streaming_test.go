@@ -420,6 +420,114 @@ func TestReasoningSummaryPartAdded(t *testing.T) {
 	}
 }
 
+// TestOnCollabToolCallStarted tests the collab-specific item/started listener.
+func TestOnCollabToolCallStarted(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+
+	var received *codex.CollabAgentToolCallThreadItem
+	client.OnCollabToolCallStarted(func(n codex.ItemStartedNotification, collab *codex.CollabAgentToolCallThreadItem) {
+		received = collab
+	})
+
+	// Inject a collab item/started notification.
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/started",
+		Params: json.RawMessage(`{
+			"threadId":"thread-1","turnId":"turn-1",
+			"item":{
+				"type":"collabAgentToolCall","id":"tc-1",
+				"tool":"spawnAgent","status":"inProgress",
+				"agentsStates":{"child-1":{"status":"pendingInit"}},
+				"receiverThreadIds":["child-1"],
+				"senderThreadId":"thread-1"
+			}
+		}`),
+	})
+
+	if received == nil {
+		t.Fatal("handler not called")
+	}
+	if received.Tool != codex.CollabAgentToolSpawnAgent {
+		t.Errorf("Tool = %q, want spawnAgent", received.Tool)
+	}
+	if received.ID != "tc-1" {
+		t.Errorf("ID = %q, want tc-1", received.ID)
+	}
+}
+
+// TestOnCollabToolCallStartedIgnoresNonCollab verifies the handler is not called for non-collab items.
+func TestOnCollabToolCallStartedIgnoresNonCollab(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+
+	called := false
+	client.OnCollabToolCallStarted(func(n codex.ItemStartedNotification, collab *codex.CollabAgentToolCallThreadItem) {
+		called = true
+	})
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/started",
+		Params:  json.RawMessage(`{"threadId":"t1","turnId":"t1","item":{"type":"agentMessage","id":"m1","text":"hi"}}`),
+	})
+
+	if called {
+		t.Error("handler should not be called for non-collab items")
+	}
+}
+
+// TestOnCollabToolCallStartedNilHandler verifies nil handler doesn't panic.
+func TestOnCollabToolCallStartedNilHandler(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+	client.OnCollabToolCallStarted(nil) // should not panic
+}
+
+// TestOnCollabToolCallCompleted tests the collab-specific item/completed listener.
+func TestOnCollabToolCallCompleted(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+
+	var received *codex.CollabAgentToolCallThreadItem
+	client.OnCollabToolCallCompleted(func(n codex.ItemCompletedNotification, collab *codex.CollabAgentToolCallThreadItem) {
+		received = collab
+	})
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params: json.RawMessage(`{
+			"threadId":"thread-1","turnId":"turn-1",
+			"item":{
+				"type":"collabAgentToolCall","id":"tc-1",
+				"tool":"closeAgent","status":"completed",
+				"agentsStates":{"child-1":{"status":"completed"}},
+				"receiverThreadIds":["child-1"],
+				"senderThreadId":"thread-1"
+			}
+		}`),
+	})
+
+	if received == nil {
+		t.Fatal("handler not called")
+	}
+	if received.Tool != codex.CollabAgentToolCloseAgent {
+		t.Errorf("Tool = %q, want closeAgent", received.Tool)
+	}
+	if received.Status != codex.CollabAgentToolCallStatusCompleted {
+		t.Errorf("Status = %q, want completed", received.Status)
+	}
+}
+
+// TestOnCollabToolCallCompletedNilHandler verifies nil handler doesn't panic.
+func TestOnCollabToolCallCompletedNilHandler(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+	client.OnCollabToolCallCompleted(nil) // should not panic
+}
+
 // TestItemStarted tests the turn/itemStarted notification with typed ThreadItem
 func TestItemStarted(t *testing.T) {
 	tests := []struct {
