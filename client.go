@@ -132,11 +132,13 @@ func (c *Client) Send(ctx context.Context, req Request) (Response, error) {
 	// Send the request
 	resp, err := c.transport.Send(ctx, req)
 	if err != nil {
-		// Check if it's a context timeout or cancellation
-		if ctx.Err() == context.DeadlineExceeded {
+		// Only translate to context errors when the transport error was
+		// actually caused by context cancellation/deadline, not when the
+		// context happens to be done concurrently for an unrelated reason.
+		if errors.Is(err, context.DeadlineExceeded) {
 			return Response{}, NewTimeoutError("request timeout exceeded")
 		}
-		if ctx.Err() == context.Canceled {
+		if errors.Is(err, context.Canceled) {
 			return Response{}, NewCanceledError("request cancelled")
 		}
 		// Wrap other errors as transport errors
