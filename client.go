@@ -141,10 +141,10 @@ func (c *Client) Send(ctx context.Context, req Request) (Response, error) {
 		// actually caused by context cancellation/deadline, not when the
 		// context happens to be done concurrently for an unrelated reason.
 		if errors.Is(err, context.DeadlineExceeded) {
-			return Response{}, NewTimeoutError("request timeout exceeded")
+			return Response{}, NewTimeoutError("request timeout exceeded", err)
 		}
 		if errors.Is(err, context.Canceled) {
-			return Response{}, NewCanceledError("request cancelled")
+			return Response{}, NewCanceledError("request cancelled", err)
 		}
 		// Wrap as transport error if not already one
 		var te *TransportError

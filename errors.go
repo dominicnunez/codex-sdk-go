@@ -86,19 +86,32 @@ func (e *TransportError) Unwrap() error {
 }
 
 // TimeoutError represents a request timeout.
-// It implements error, errors.Is, and errors.As.
+// It implements error, errors.Is, errors.As, and Unwrap.
 type TimeoutError struct {
-	msg string
+	msg   string
+	cause error
 }
 
-// NewTimeoutError creates a new TimeoutError with the given message.
-func NewTimeoutError(msg string) *TimeoutError {
-	return &TimeoutError{msg: msg}
+// NewTimeoutError creates a new TimeoutError with the given message and optional cause.
+func NewTimeoutError(msg string, cause ...error) *TimeoutError {
+	e := &TimeoutError{msg: msg}
+	if len(cause) > 0 {
+		e.cause = cause[0]
+	}
+	return e
 }
 
 // Error implements the error interface.
 func (e *TimeoutError) Error() string {
+	if e.cause != nil {
+		return fmt.Sprintf("timeout error: %s: %v", e.msg, e.cause)
+	}
 	return fmt.Sprintf("timeout error: %s", e.msg)
+}
+
+// Unwrap returns the underlying cause, enabling errors.Is to traverse the chain.
+func (e *TimeoutError) Unwrap() error {
+	return e.cause
 }
 
 // Is implements errors.Is by matching all TimeoutError instances.
@@ -111,17 +124,30 @@ func (e *TimeoutError) Is(target error) bool {
 // CanceledError represents an explicit context cancellation (user-initiated).
 // Distinct from TimeoutError which represents deadline-driven cancellation.
 type CanceledError struct {
-	msg string
+	msg   string
+	cause error
 }
 
-// NewCanceledError creates a new CanceledError with the given message.
-func NewCanceledError(msg string) *CanceledError {
-	return &CanceledError{msg: msg}
+// NewCanceledError creates a new CanceledError with the given message and optional cause.
+func NewCanceledError(msg string, cause ...error) *CanceledError {
+	e := &CanceledError{msg: msg}
+	if len(cause) > 0 {
+		e.cause = cause[0]
+	}
+	return e
 }
 
 // Error implements the error interface.
 func (e *CanceledError) Error() string {
+	if e.cause != nil {
+		return fmt.Sprintf("canceled: %s: %v", e.msg, e.cause)
+	}
 	return fmt.Sprintf("canceled: %s", e.msg)
+}
+
+// Unwrap returns the underlying cause, enabling errors.Is to traverse the chain.
+func (e *CanceledError) Unwrap() error {
+	return e.cause
 }
 
 // Is implements errors.Is by matching all CanceledError instances.
