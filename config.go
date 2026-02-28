@@ -54,11 +54,6 @@ type ReasoningSummary interface {
 	isReasoningSummary()
 }
 
-// ReasoningSummaryMode represents enum variant ("auto" | "concise" | "detailed" | "none")
-type ReasoningSummaryMode string
-
-func (ReasoningSummaryMode) isReasoningSummary() {}
-
 // ReasoningSummaryWrapper wraps ReasoningSummary for JSON marshaling
 type ReasoningSummaryWrapper struct {
 	Value ReasoningSummary

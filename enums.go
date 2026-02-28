@@ -225,7 +225,11 @@ const (
 	ResidencyRequirementUS ResidencyRequirement = "us"
 )
 
-// ReasoningSummaryMode constants for the reasoning summary enum values.
+// ReasoningSummaryMode represents enum variant ("auto" | "concise" | "detailed" | "none")
+type ReasoningSummaryMode string
+
+func (ReasoningSummaryMode) isReasoningSummary() {}
+
 const (
 	ReasoningSummaryModeAuto     ReasoningSummaryMode = "auto"
 	ReasoningSummaryModeConcise  ReasoningSummaryMode = "concise"
