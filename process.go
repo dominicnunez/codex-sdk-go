@@ -19,7 +19,8 @@ type ProcessOptions struct {
 	// Path to the codex binary. If empty, "codex" is resolved from PATH.
 	BinaryPath string
 
-	// Extra arguments passed after "codex exec --experimental-json".
+	// Extra arguments appended after all typed flags.
+	// Use for forward-compat with new CLI flags not yet covered by typed fields.
 	ExecArgs []string
 
 	// Environment variables for the child process. Nil inherits the parent environment.
@@ -33,6 +34,18 @@ type ProcessOptions struct {
 
 	// Client options forwarded to NewClient.
 	ClientOptions []ClientOption
+
+	// Model sets --model for the Codex CLI.
+	Model string
+
+	// Sandbox sets --sandbox (e.g. "read-only", "workspace-write", "danger-full-access").
+	Sandbox SandboxMode
+
+	// ApprovalMode sets --approval-mode (e.g. "full-auto", "suggest", "ask").
+	ApprovalMode string
+
+	// Config passes repeatable --config key=value flags.
+	Config map[string]string
 }
 
 // Process wraps a running Codex CLI child process and its connected Client.
@@ -41,6 +54,36 @@ type Process struct {
 	cmd       *exec.Cmd
 	transport *StdioTransport
 	closeOnce sync.Once
+	initOnce  sync.Once
+	initErr   error
+}
+
+// buildArgs constructs the CLI argument list from typed fields and ExecArgs.
+func (opts *ProcessOptions) buildArgs() []string {
+	args := []string{"exec", "--experimental-json"}
+
+	if opts.Model != "" {
+		args = append(args, "--model", opts.Model)
+	}
+	if opts.Sandbox != "" {
+		args = append(args, "--sandbox", string(opts.Sandbox))
+	}
+	if opts.ApprovalMode != "" {
+		args = append(args, "--approval-mode", opts.ApprovalMode)
+	}
+	for k, v := range opts.Config {
+		args = append(args, "--config", k+"="+v)
+	}
+
+	args = append(args, opts.ExecArgs...)
+	return args
+}
+
+// NewProcessFromClient wraps an existing Client in a Process. This is useful
+// for testing or when managing the Codex CLI process lifecycle externally.
+// Close on the returned Process is a no-op since there is no child process.
+func NewProcessFromClient(client *Client) *Process {
+	return &Process{Client: client}
 }
 
 // StartProcess spawns "codex exec --experimental-json" as a child process,
@@ -56,8 +99,7 @@ func StartProcess(ctx context.Context, opts *ProcessOptions) (*Process, error) {
 		binary = defaultBinaryName
 	}
 
-	args := []string{"exec", "--experimental-json"}
-	args = append(args, opts.ExecArgs...)
+	args := opts.buildArgs()
 
 	cmd := exec.CommandContext(ctx, binary, args...)
 	cmd.Env = opts.Env

@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -56,6 +58,110 @@ while true; do sleep 1; done
 	// Close should kill the process and clean up.
 	if err := proc.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
+	}
+}
+
+// TestStartProcessTypedArgs verifies that typed ProcessOptions fields produce
+// the correct CLI arguments passed to the child process.
+func TestStartProcessTypedArgs(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("process test requires unix shell script")
+	}
+
+	dir := t.TempDir()
+	fakeBinary := filepath.Join(dir, "fake-codex")
+	argsFile := filepath.Join(dir, "args.txt")
+
+	// Script dumps all args to a file, then exits.
+	script := `#!/bin/sh
+echo "$@" > ` + argsFile + `
+exit 0
+`
+	if err := os.WriteFile(fakeBinary, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake binary: %v", err)
+	}
+
+	ctx := context.Background()
+	proc, err := codex.StartProcess(ctx, &codex.ProcessOptions{
+		BinaryPath:   fakeBinary,
+		Model:        "o3",
+		Sandbox:      codex.SandboxModeReadOnly,
+		ApprovalMode: "full-auto",
+		Config:       map[string]string{"key1": "val1"},
+		ExecArgs:     []string{"--extra", "flag"},
+	})
+	if err != nil {
+		t.Fatalf("StartProcess: %v", err)
+	}
+
+	_ = proc.Wait()
+	_ = proc.Close()
+
+	data, err := os.ReadFile(argsFile)
+	if err != nil {
+		t.Fatalf("read args file: %v", err)
+	}
+	args := string(data)
+
+	for _, want := range []string{
+		"exec", "--experimental-json",
+		"--model o3",
+		"--sandbox read-only",
+		"--approval-mode full-auto",
+		"--config key1=val1",
+		"--extra flag",
+	} {
+		if !strings.Contains(args, want) {
+			t.Errorf("args %q missing expected substring %q", args, want)
+		}
+	}
+
+	// Verify --extra flag comes after typed flags (user overrides last)
+	modelIdx := strings.Index(args, "--model")
+	extraIdx := strings.Index(args, "--extra")
+	if extraIdx < modelIdx {
+		t.Errorf("ExecArgs should come after typed flags: model at %d, extra at %d", modelIdx, extraIdx)
+	}
+}
+
+// TestBuildArgsDefaults verifies that empty ProcessOptions produce minimal args.
+func TestBuildArgsDefaults(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("process test requires unix shell script")
+	}
+
+	dir := t.TempDir()
+	fakeBinary := filepath.Join(dir, "fake-codex")
+	argsFile := filepath.Join(dir, "args.txt")
+
+	script := `#!/bin/sh
+for arg in "$@"; do echo "$arg"; done > ` + argsFile + `
+exit 0
+`
+	if err := os.WriteFile(fakeBinary, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake binary: %v", err)
+	}
+
+	ctx := context.Background()
+	proc, err := codex.StartProcess(ctx, &codex.ProcessOptions{
+		BinaryPath: fakeBinary,
+	})
+	if err != nil {
+		t.Fatalf("StartProcess: %v", err)
+	}
+
+	_ = proc.Wait()
+	_ = proc.Close()
+
+	data, err := os.ReadFile(argsFile)
+	if err != nil {
+		t.Fatalf("read args file: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	want := []string{"exec", "--experimental-json"}
+	if !slices.Equal(lines, want) {
+		t.Errorf("default args = %v, want %v", lines, want)
 	}
 }
 
