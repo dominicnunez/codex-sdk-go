@@ -44,6 +44,55 @@ type RunResult struct {
 	Response string
 }
 
+// buildThreadParams converts RunOptions into ThreadStartParams.
+func buildThreadParams(opts RunOptions) ThreadStartParams {
+	params := ThreadStartParams{
+		Ephemeral: Ptr(true),
+	}
+	if opts.Instructions != nil {
+		params.DeveloperInstructions = opts.Instructions
+	}
+	if opts.Model != nil {
+		params.Model = opts.Model
+	}
+	if opts.Personality != nil {
+		params.Personality = opts.Personality
+	}
+	if opts.ApprovalPolicy != nil {
+		params.ApprovalPolicy = opts.ApprovalPolicy
+	}
+	return params
+}
+
+// buildTurnParams converts RunOptions and a thread ID into TurnStartParams.
+func buildTurnParams(opts RunOptions, threadID string) TurnStartParams {
+	params := TurnStartParams{
+		ThreadID: threadID,
+		Input:    []UserInput{&TextUserInput{Text: opts.Prompt}},
+	}
+	if opts.Effort != nil {
+		params.Effort = opts.Effort
+	}
+	return params
+}
+
+// buildRunResult assembles a RunResult from collected items and turn data.
+func buildRunResult(thread Thread, turn Turn, items []ThreadItemWrapper) *RunResult {
+	result := &RunResult{
+		Thread: thread,
+		Turn:   turn,
+		Items:  items,
+	}
+	// Extract response text from the last agentMessage item.
+	for i := len(items) - 1; i >= 0; i-- {
+		if msg, ok := items[i].Value.(*AgentMessageThreadItem); ok {
+			result.Response = msg.Text
+			break
+		}
+	}
+	return result
+}
+
 // Run executes a single-turn conversation: creates a thread, starts a turn
 // with the given prompt, collects items until the turn completes, and returns
 // the result. This is the simplest way to get a response from the Codex CLI.
@@ -52,34 +101,11 @@ func (p *Process) Run(ctx context.Context, opts RunOptions) (*RunResult, error) 
 		return nil, errors.New("prompt is required")
 	}
 
-	// Idempotent initialize handshake.
-	p.initOnce.Do(func() {
-		_, p.initErr = p.Client.Initialize(ctx, InitializeParams{
-			ClientInfo: ClientInfo{Name: "codex-sdk-go", Version: "0.1.0"},
-		})
-	})
-	if p.initErr != nil {
-		return nil, fmt.Errorf("initialize: %w", p.initErr)
+	if err := p.ensureInit(ctx); err != nil {
+		return nil, err
 	}
 
-	// Start a thread.
-	threadParams := ThreadStartParams{
-		Ephemeral: Ptr(true),
-	}
-	if opts.Instructions != nil {
-		threadParams.DeveloperInstructions = opts.Instructions
-	}
-	if opts.Model != nil {
-		threadParams.Model = opts.Model
-	}
-	if opts.Personality != nil {
-		threadParams.Personality = opts.Personality
-	}
-	if opts.ApprovalPolicy != nil {
-		threadParams.ApprovalPolicy = opts.ApprovalPolicy
-	}
-
-	threadResp, err := p.Client.Thread.Start(ctx, threadParams)
+	threadResp, err := p.Client.Thread.Start(ctx, buildThreadParams(opts))
 	if err != nil {
 		return nil, fmt.Errorf("thread/start: %w", err)
 	}
@@ -105,7 +131,10 @@ func (p *Process) Run(ctx context.Context, opts RunOptions) (*RunResult, error) 
 	unsubTurn := p.Client.addNotificationListener(notifyTurnCompleted, func(_ context.Context, notif Notification) {
 		var n TurnCompletedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
-			return
+			// Synthesize a failure so Run() doesn't hang on malformed JSON.
+			n = TurnCompletedNotification{
+				Turn: Turn{Error: &TurnError{Message: "failed to unmarshal turn/completed: " + err.Error()}},
+			}
 		}
 		select {
 		case done <- n:
@@ -116,16 +145,7 @@ func (p *Process) Run(ctx context.Context, opts RunOptions) (*RunResult, error) 
 	defer unsubItem()
 	defer unsubTurn()
 
-	// Start the turn.
-	turnParams := TurnStartParams{
-		ThreadID: threadResp.Thread.ID,
-		Input:    []UserInput{&TextUserInput{Text: opts.Prompt}},
-	}
-	if opts.Effort != nil {
-		turnParams.Effort = opts.Effort
-	}
-
-	if _, err := p.Client.Turn.Start(ctx, turnParams); err != nil {
+	if _, err := p.Client.Turn.Start(ctx, buildTurnParams(opts, threadResp.Thread.ID)); err != nil {
 		return nil, fmt.Errorf("turn/start: %w", err)
 	}
 
@@ -141,21 +161,7 @@ func (p *Process) Run(ctx context.Context, opts RunOptions) (*RunResult, error) 
 		copy(collectedItems, items)
 		mu.Unlock()
 
-		result := &RunResult{
-			Thread: threadResp.Thread,
-			Turn:   completed.Turn,
-			Items:  collectedItems,
-		}
-
-		// Extract response text from the last agentMessage item.
-		for i := len(collectedItems) - 1; i >= 0; i-- {
-			if msg, ok := collectedItems[i].Value.(*AgentMessageThreadItem); ok {
-				result.Response = msg.Text
-				break
-			}
-		}
-
-		return result, nil
+		return buildRunResult(threadResp.Thread, completed.Turn, collectedItems), nil
 
 	case <-ctx.Done():
 		return nil, ctx.Err()

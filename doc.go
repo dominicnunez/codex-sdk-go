@@ -54,7 +54,7 @@
 //	stream := proc.RunStreamed(ctx, codex.RunOptions{
 //		Prompt: "Fix the bug in main.go",
 //	})
-//	for event, err := range stream.Events {
+//	for event, err := range stream.Events() {
 //		if err != nil { log.Fatal(err) }
 //		switch e := event.(type) {
 //		case *codex.TextDelta:
