@@ -1,0 +1,163 @@
+name: Upstream Spec Sync Check
+
+on:
+  schedule:
+    - cron: '0 9 * * 1' # Monday 9am UTC
+  workflow_dispatch: {}
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  check-upstream:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for upstream schema changes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          upstream_repo="openai/codex"
+          upstream_path="codex-rs/app-server-protocol/schema/json"
+          local_specs="specs"
+          label="spec-sync"
+
+          # --- 1. Read baseline SHA ---
+          baseline_sha="$(cat "${local_specs}/.upstream-sha" | tr -d '[:space:]')"
+          echo "Baseline SHA: ${baseline_sha}"
+
+          # --- 2. Get current upstream HEAD for the schema path ---
+          upstream_sha="$(gh api "repos/${upstream_repo}/commits?path=${upstream_path}&per_page=1" --jq '.[0].sha')"
+          echo "Upstream SHA: ${upstream_sha}"
+
+          if [ "${baseline_sha}" = "${upstream_sha}" ]; then
+            echo "No upstream changes since last sync."
+            exit 0
+          fi
+
+          echo "Upstream has changed — comparing schemas..."
+
+          # --- 3. Download upstream schemas into temp dir ---
+          tmpdir="$(mktemp -d)"
+          trap 'rm -rf "${tmpdir}"' EXIT
+
+          download_dir() {
+            local api_path="$1"
+            local dest="$2"
+            mkdir -p "${dest}"
+            gh api "repos/${upstream_repo}/contents/${api_path}" --jq '.[] | select(.type == "file") | .download_url' | while read -r url; do
+              curl -sL -o "${dest}/$(basename "${url}")" "${url}"
+            done
+          }
+
+          download_dir "${upstream_path}" "${tmpdir}"
+          download_dir "${upstream_path}/v1" "${tmpdir}/v1"
+          download_dir "${upstream_path}/v2" "${tmpdir}/v2"
+
+          # --- 4. Diff upstream vs local ---
+          new_schemas=""
+          modified_schemas=""
+          deleted_schemas=""
+
+          # Find new and modified files
+          find "${tmpdir}" -name '*.json' -type f | while read -r upstream_file; do
+            rel="${upstream_file#${tmpdir}/}"
+            local_file="${local_specs}/${rel}"
+            if [ ! -f "${local_file}" ]; then
+              echo "NEW:${rel}" >> "${tmpdir}/.changes"
+            elif ! diff -q "${upstream_file}" "${local_file}" > /dev/null 2>&1; then
+              echo "MOD:${rel}" >> "${tmpdir}/.changes"
+            fi
+          done
+
+          # Find deleted files (in local but not upstream)
+          find "${local_specs}" -name '*.json' -type f | while read -r local_file; do
+            rel="${local_file#${local_specs}/}"
+            upstream_file="${tmpdir}/${rel}"
+            if [ ! -f "${upstream_file}" ]; then
+              echo "DEL:${rel}" >> "${tmpdir}/.changes"
+            fi
+          done
+
+          if [ ! -f "${tmpdir}/.changes" ]; then
+            echo "Schemas are identical despite SHA change (non-schema files changed upstream)."
+            exit 0
+          fi
+
+          # --- 5. Build the report ---
+          new_section=""
+          mod_section=""
+          del_section=""
+
+          while IFS= read -r line; do
+            kind="${line%%:*}"
+            schema="${line#*:}"
+            case "${kind}" in
+              NEW)
+                # Check if a Go type exists for this schema
+                type_name="$(basename "${schema}" .json)"
+                if grep -rq --include='*.go' "type ${type_name} " . 2>/dev/null; then
+                  new_section="${new_section}\n- \`${schema}\`"
+                else
+                  new_section="${new_section}\n- \`${schema}\` — **No Go type found**"
+                fi
+                ;;
+              MOD)
+                mod_section="${mod_section}\n- \`${schema}\`"
+                ;;
+              DEL)
+                del_section="${del_section}\n- \`${schema}\`"
+                ;;
+            esac
+          done < "${tmpdir}/.changes"
+
+          [ -z "${new_section}" ] && new_section="\n- (none)"
+          [ -z "${mod_section}" ] && mod_section="\n- (none)"
+          [ -z "${del_section}" ] && del_section="\n- (none)"
+
+          short_upstream="${upstream_sha:0:12}"
+          short_baseline="${baseline_sha:0:12}"
+
+          body="## Upstream Schema Changes Detected
+
+          **Upstream commit:** \`${short_upstream}\`
+          **Last synced:** \`${short_baseline}\`
+
+          ### New Schemas
+          $(echo -e "${new_section}")
+
+          ### Modified Schemas
+          $(echo -e "${mod_section}")
+
+          ### Deleted Schemas
+          $(echo -e "${del_section}")
+
+          ### Next Steps
+          1. Review the changes above
+          2. Update \`specs/\` directory to match upstream
+          3. Add/update Go types for new/modified schemas
+          4. Run \`go test -run TestSpecCoverage\` to verify
+          5. Update \`specs/.upstream-sha\` with: \`${short_upstream}\`"
+
+          # Strip leading whitespace from indented heredoc-style string
+          body="$(echo "${body}" | sed 's/^          //')"
+
+          # --- 6. Ensure the label exists ---
+          gh label create "${label}" --description "Upstream spec schema changes" --color "D93F0B" 2>/dev/null || true
+
+          # --- 7. Close stale spec-sync issues ---
+          gh issue list --label "${label}" --state open --json number --jq '.[].number' | while read -r num; do
+            gh issue close "${num}" --comment "Superseded by newer spec-sync check."
+          done
+
+          # --- 8. Open new issue ---
+          gh issue create \
+            --title "spec-sync: upstream schemas changed (${short_upstream})" \
+            --body "${body}" \
+            --label "${label}"
+
+          echo "Issue created."
