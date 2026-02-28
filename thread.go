@@ -385,7 +385,7 @@ func (a AskForApprovalWrapper) MarshalJSON() ([]byte, error) {
 	case ApprovalPolicyReject:
 		return json.Marshal(v)
 	case UnknownAskForApproval:
-		return v.Raw, nil
+		return v.MarshalJSON()
 	default:
 		return nil, fmt.Errorf("unknown AskForApproval type: %T", v)
 	}
