@@ -551,6 +551,119 @@ func TestRunStreamedEarlyBreak(t *testing.T) {
 	}
 }
 
+func TestRunStreamedCollabEvents(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "use agents"})
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Inject a collab item/started notification (spawnAgent).
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/started",
+		Params: json.RawMessage(`{
+			"threadId":"thread-1","turnId":"turn-1",
+			"item":{
+				"type":"collabAgentToolCall","id":"tc-1",
+				"tool":"spawnAgent","status":"inProgress",
+				"agentsStates":{"child-1":{"status":"pendingInit"}},
+				"receiverThreadIds":["child-1"],
+				"senderThreadId":"thread-1"
+			}
+		}`),
+	})
+
+	// Inject a collab item/completed notification.
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params: json.RawMessage(`{
+			"threadId":"thread-1","turnId":"turn-1",
+			"item":{
+				"type":"collabAgentToolCall","id":"tc-1",
+				"tool":"spawnAgent","status":"completed",
+				"agentsStates":{"child-1":{"status":"running"}},
+				"receiverThreadIds":["child-1"],
+				"senderThreadId":"thread-1"
+			}
+		}`),
+	})
+
+	// Complete the turn.
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	var events []codex.Event
+	for event, err := range stream.Events() {
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		events = append(events, event)
+	}
+
+	// Expected order: CollabToolCallStarted, ItemStarted, CollabToolCallCompleted, ItemCompleted, TurnCompleted
+	typeNames := make([]string, 0, len(events))
+	for _, e := range events {
+		switch e.(type) {
+		case *codex.CollabToolCallStarted:
+			typeNames = append(typeNames, "CollabToolCallStarted")
+		case *codex.CollabToolCallCompleted:
+			typeNames = append(typeNames, "CollabToolCallCompleted")
+		case *codex.ItemStarted:
+			typeNames = append(typeNames, "ItemStarted")
+		case *codex.ItemCompleted:
+			typeNames = append(typeNames, "ItemCompleted")
+		case *codex.TurnCompleted:
+			typeNames = append(typeNames, "TurnCompleted")
+		default:
+			typeNames = append(typeNames, fmt.Sprintf("unknown(%T)", e))
+		}
+	}
+
+	expected := []string{
+		"CollabToolCallStarted", "ItemStarted",
+		"CollabToolCallCompleted", "ItemCompleted",
+		"TurnCompleted",
+	}
+
+	if len(typeNames) != len(expected) {
+		t.Fatalf("got %d events %v, want %d events %v", len(typeNames), typeNames, len(expected), expected)
+	}
+	for i := range expected {
+		if typeNames[i] != expected[i] {
+			t.Errorf("events[%d] = %q, want %q", i, typeNames[i], expected[i])
+		}
+	}
+
+	// Verify the collab event data.
+	started := events[0].(*codex.CollabToolCallStarted)
+	if started.Tool != codex.CollabAgentToolSpawnAgent {
+		t.Errorf("started.Tool = %q, want spawnAgent", started.Tool)
+	}
+	if started.SenderThreadId != "thread-1" {
+		t.Errorf("started.SenderThreadId = %q, want 'thread-1'", started.SenderThreadId)
+	}
+
+	completed := events[2].(*codex.CollabToolCallCompleted)
+	if completed.Status != codex.CollabAgentToolCallStatusCompleted {
+		t.Errorf("completed.Status = %q, want completed", completed.Status)
+	}
+	state, ok := completed.AgentsStates["child-1"]
+	if !ok {
+		t.Fatal("child-1 not found in AgentsStates")
+	}
+	if state.Status != codex.CollabAgentStatusRunning {
+		t.Errorf("child-1 status = %q, want running", state.Status)
+	}
+}
+
 func TestRunStreamedInitRetry(t *testing.T) {
 	mock := NewMockTransport()
 
