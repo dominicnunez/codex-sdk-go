@@ -1,6 +1,7 @@
 package codex_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -56,6 +57,45 @@ func TestCredentialTypesRedactWithAllFormatVerbs(t *testing.T) {
 			}
 		})
 	}
+
+	// Verify handleApproval sends the unredacted token on the wire
+	t.Run("ChatgptAuthTokensRefresh/wireProtocol", func(t *testing.T) {
+		mock := NewMockTransport()
+		client := codex.NewClient(mock)
+
+		secret := "sk-live-super-secret-token-12345"
+		client.SetApprovalHandlers(codex.ApprovalHandlers{
+			OnChatgptAuthTokensRefresh: func(ctx context.Context, p codex.ChatgptAuthTokensRefreshParams) (codex.ChatgptAuthTokensRefreshResponse, error) {
+				return codex.ChatgptAuthTokensRefreshResponse{
+					AccessToken:      secret,
+					ChatgptAccountID: "acct-wire",
+				}, nil
+			},
+		})
+
+		req := codex.Request{
+			JSONRPC: "2.0",
+			Method:  "account/chatgptAuthTokens/refresh",
+			ID:      codex.RequestID{Value: float64(1)},
+			Params:  json.RawMessage(`{"reason":"expired"}`),
+		}
+
+		resp, err := mock.InjectServerRequest(context.Background(), req)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.Error != nil {
+			t.Fatalf("unexpected RPC error: %v", resp.Error)
+		}
+
+		wireJSON := string(resp.Result)
+		if !strings.Contains(wireJSON, secret) {
+			t.Errorf("wire response must contain unredacted token, got: %s", wireJSON)
+		}
+		if strings.Contains(wireJSON, "[REDACTED]") {
+			t.Errorf("wire response must not contain [REDACTED], got: %s", wireJSON)
+		}
+	})
 
 	verbs := []string{"%v", "%+v", "%#v", "%s"}
 
