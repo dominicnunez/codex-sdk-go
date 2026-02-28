@@ -305,8 +305,9 @@ func (t *StdioTransport) readLoop() {
 }
 
 // handleResponse routes an incoming response to the pending request channel.
-// It claims the channel and sends under the lock, preventing Close from
-// racing to send on the same channel.
+// It claims the channel under the lock via delete, then sends outside the
+// lock. The delete-then-unlock-then-send pattern ensures exclusive access
+// to the channel without holding the mutex during the send.
 func (t *StdioTransport) handleResponse(data []byte) {
 	var resp Response
 	if err := json.Unmarshal(data, &resp); err != nil {
@@ -324,9 +325,12 @@ func (t *StdioTransport) handleResponse(data []byte) {
 	pending, ok := t.pendingReqs[normalizedID]
 	if ok {
 		delete(t.pendingReqs, normalizedID)
-		pending.ch <- resp // safe: buffer 1, only one sender claims via delete
 	}
 	t.mu.Unlock()
+
+	if ok {
+		pending.ch <- resp // safe: buffer 1, only one sender claims via delete
+	}
 }
 
 // handleRequest dispatches an incoming server→client request to the handler
