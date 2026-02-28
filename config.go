@@ -295,65 +295,7 @@ func (w ConfigLayerSourceWrapper) MarshalJSON() ([]byte, error) {
 	if w.Value == nil {
 		return []byte("null"), nil
 	}
-
-	switch v := w.Value.(type) {
-	case MdmConfigLayerSource:
-		return json.Marshal(struct {
-			Type   string `json:"type"`
-			Domain string `json:"domain"`
-			Key    string `json:"key"`
-		}{
-			Type:   "mdm",
-			Domain: v.Domain,
-			Key:    v.Key,
-		})
-	case SystemConfigLayerSource:
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			File string `json:"file"`
-		}{
-			Type: "system",
-			File: v.File,
-		})
-	case UserConfigLayerSource:
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			File string `json:"file"`
-		}{
-			Type: "user",
-			File: v.File,
-		})
-	case ProjectConfigLayerSource:
-		return json.Marshal(struct {
-			Type           string `json:"type"`
-			DotCodexFolder string `json:"dotCodexFolder"`
-		}{
-			Type:           "project",
-			DotCodexFolder: v.DotCodexFolder,
-		})
-	case SessionFlagsConfigLayerSource:
-		return json.Marshal(struct {
-			Type string `json:"type"`
-		}{
-			Type: "sessionFlags",
-		})
-	case LegacyManagedConfigTomlFromFileConfigLayerSource:
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			File string `json:"file"`
-		}{
-			Type: "legacyManagedConfigTomlFromFile",
-			File: v.File,
-		})
-	case LegacyManagedConfigTomlFromMdmConfigLayerSource:
-		return json.Marshal(struct {
-			Type string `json:"type"`
-		}{
-			Type: "legacyManagedConfigTomlFromMdm",
-		})
-	}
-
-	return nil, fmt.Errorf("unknown ConfigLayerSource type: %T", w.Value)
+	return json.Marshal(w.Value)
 }
 
 // ConfigRequirementsReadResponse represents response from config/requirements/read request
