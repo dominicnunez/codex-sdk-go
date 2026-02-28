@@ -588,11 +588,7 @@ func (s *SandboxPolicyWrapper) UnmarshalJSON(data []byte) error {
 
 	switch raw.Type {
 	case "dangerFullAccess":
-		var policy SandboxPolicyDangerFullAccess
-		if err := json.Unmarshal(data, &policy); err != nil {
-			return err
-		}
-		s.Value = policy
+		s.Value = SandboxPolicyDangerFullAccess{}
 	case "readOnly":
 		var policy SandboxPolicyReadOnly
 		if err := json.Unmarshal(data, &policy); err != nil {
