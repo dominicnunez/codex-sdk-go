@@ -286,23 +286,11 @@ func (t *ThreadStatusWrapper) UnmarshalJSON(data []byte) error {
 
 	switch raw.Type {
 	case "notLoaded":
-		var status ThreadStatusNotLoaded
-		if err := json.Unmarshal(data, &status); err != nil {
-			return err
-		}
-		t.Value = status
+		t.Value = ThreadStatusNotLoaded{}
 	case "idle":
-		var status ThreadStatusIdle
-		if err := json.Unmarshal(data, &status); err != nil {
-			return err
-		}
-		t.Value = status
+		t.Value = ThreadStatusIdle{}
 	case "systemError":
-		var status ThreadStatusSystemError
-		if err := json.Unmarshal(data, &status); err != nil {
-			return err
-		}
-		t.Value = status
+		t.Value = ThreadStatusSystemError{}
 	case "active":
 		var status ThreadStatusActive
 		if err := json.Unmarshal(data, &status); err != nil {
