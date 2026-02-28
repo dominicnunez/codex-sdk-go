@@ -175,10 +175,10 @@ func (u UnknownThreadStatus) MarshalJSON() ([]byte, error) {
 
 // Turn represents a single turn in a conversation
 type Turn struct {
-	ID     string          `json:"id"`
-	Status TurnStatus      `json:"status"`
-	Items  json.RawMessage `json:"items"` // []ThreadItem discriminated union
-	Error  *TurnError      `json:"error,omitempty"`
+	ID     string              `json:"id"`
+	Status TurnStatus          `json:"status"`
+	Items  []ThreadItemWrapper `json:"items"`
+	Error  *TurnError          `json:"error,omitempty"`
 }
 
 // TurnError represents an error in a turn
