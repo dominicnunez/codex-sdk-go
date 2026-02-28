@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"runtime/debug"
 	"sync"
 )
 
@@ -432,8 +434,12 @@ func (t *StdioTransport) handleNotification(data []byte) {
 	// Dispatch to handler in goroutine with transport-scoped context
 	go func() {
 		defer func() {
-			if r := recover(); r != nil && panicFn != nil {
-				panicFn(r)
+			if r := recover(); r != nil {
+				if panicFn != nil {
+					panicFn(r)
+				} else {
+					fmt.Fprintf(os.Stderr, "codex: notification handler panicked: %v\n%s", r, debug.Stack())
+				}
 			}
 		}()
 		handler(t.ctx, notif)
