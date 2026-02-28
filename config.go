@@ -257,25 +257,25 @@ func (w *ConfigLayerSourceWrapper) UnmarshalJSON(data []byte) error {
 	case "mdm":
 		var v MdmConfigLayerSource
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return fmt.Errorf("config layer source %q: %w", typeStr, err)
 		}
 		w.Value = v
 	case "system":
 		var v SystemConfigLayerSource
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return fmt.Errorf("config layer source %q: %w", typeStr, err)
 		}
 		w.Value = v
 	case "user":
 		var v UserConfigLayerSource
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return fmt.Errorf("config layer source %q: %w", typeStr, err)
 		}
 		w.Value = v
 	case "project":
 		var v ProjectConfigLayerSource
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return fmt.Errorf("config layer source %q: %w", typeStr, err)
 		}
 		w.Value = v
 	case "sessionFlags":
@@ -283,7 +283,7 @@ func (w *ConfigLayerSourceWrapper) UnmarshalJSON(data []byte) error {
 	case "legacyManagedConfigTomlFromFile":
 		var v LegacyManagedConfigTomlFromFileConfigLayerSource
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return fmt.Errorf("config layer source %q: %w", typeStr, err)
 		}
 		w.Value = v
 	case "legacyManagedConfigTomlFromMdm":
