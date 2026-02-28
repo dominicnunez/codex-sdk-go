@@ -227,6 +227,9 @@ func unmarshalSubAgentSource(data json.RawMessage) (SubAgentSource, error) {
 
 // MarshalJSON for SessionSourceWrapper
 func (s SessionSourceWrapper) MarshalJSON() ([]byte, error) {
+	if s.Value == nil {
+		return []byte("null"), nil
+	}
 	switch v := s.Value.(type) {
 	case sessionSourceLiteral:
 		return json.Marshal(string(v))
@@ -285,6 +288,9 @@ func (t *ThreadStatusWrapper) UnmarshalJSON(data []byte) error {
 
 // MarshalJSON for ThreadStatusWrapper
 func (t ThreadStatusWrapper) MarshalJSON() ([]byte, error) {
+	if t.Value == nil {
+		return []byte("null"), nil
+	}
 	return json.Marshal(t.Value)
 }
 
@@ -354,6 +360,9 @@ func (a *AskForApprovalWrapper) UnmarshalJSON(data []byte) error {
 
 // MarshalJSON for AskForApprovalWrapper
 func (a AskForApprovalWrapper) MarshalJSON() ([]byte, error) {
+	if a.Value == nil {
+		return []byte("null"), nil
+	}
 	switch v := a.Value.(type) {
 	case approvalPolicyLiteral:
 		return json.Marshal(string(v))
@@ -456,6 +465,9 @@ func (w *ReadOnlyAccessWrapper) UnmarshalJSON(data []byte) error {
 
 // MarshalJSON for ReadOnlyAccessWrapper
 func (w ReadOnlyAccessWrapper) MarshalJSON() ([]byte, error) {
+	if w.Value == nil {
+		return []byte("null"), nil
+	}
 	return json.Marshal(w.Value)
 }
 
@@ -515,6 +527,9 @@ func (s *SandboxPolicyWrapper) UnmarshalJSON(data []byte) error {
 
 // MarshalJSON for SandboxPolicyWrapper
 func (s SandboxPolicyWrapper) MarshalJSON() ([]byte, error) {
+	if s.Value == nil {
+		return []byte("null"), nil
+	}
 	return json.Marshal(s.Value)
 }
 
