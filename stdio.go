@@ -10,6 +10,12 @@ import (
 	"sync"
 )
 
+// pendingReq holds a pending request's response channel and original ID.
+type pendingReq struct {
+	ch chan Response
+	id RequestID
+}
+
 // StdioTransport implements the Transport interface using stdin/stdout with newline-delimited JSON.
 // It supports bidirectional JSON-RPC 2.0 communication:
 // - Client→Server: Send requests and notifications
@@ -21,7 +27,7 @@ type StdioTransport struct {
 	mu            sync.Mutex
 	closed        bool
 	writeMu       sync.Mutex // separate mutex for write operations
-	pendingReqs   map[interface{}]chan Response
+	pendingReqs   map[interface{}]pendingReq
 	reqHandler    RequestHandler
 	notifHandler  NotificationHandler
 	readerStopped chan struct{}
@@ -71,7 +77,7 @@ func NewStdioTransport(reader io.Reader, writer io.Writer) *StdioTransport {
 	t := &StdioTransport{
 		reader:        reader,
 		writer:        writer,
-		pendingReqs:   make(map[interface{}]chan Response),
+		pendingReqs:   make(map[interface{}]pendingReq),
 		readerStopped: make(chan struct{}),
 		ctx:           ctx,
 		cancelCtx:     cancel,
@@ -92,7 +98,7 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 	// Create response channel and store with normalized ID for matching
 	normalizedID := normalizeID(req.ID.Value)
 	respChan := make(chan Response, 1)
-	t.pendingReqs[normalizedID] = respChan
+	t.pendingReqs[normalizedID] = pendingReq{ch: respChan, id: req.ID}
 	t.mu.Unlock()
 
 	// Cleanup on exit
@@ -184,20 +190,20 @@ func (t *StdioTransport) Close() error {
 	// Unblock all pending request waiters with an error response indicating
 	// the transport was closed. We send rather than close because
 	// handleResponse may concurrently hold a reference to the channel.
-	for id, ch := range t.pendingReqs {
+	for key, pending := range t.pendingReqs {
 		resp := Response{
 			JSONRPC: jsonrpcVersion,
-			ID:      RequestID{Value: id},
+			ID:      pending.id,
 			Error: &Error{
 				Code:    ErrCodeInternalError,
 				Message: "transport closed",
 			},
 		}
 		select {
-		case ch <- resp:
+		case pending.ch <- resp:
 		default:
 		}
-		delete(t.pendingReqs, id)
+		delete(t.pendingReqs, key)
 	}
 
 	return nil
@@ -300,10 +306,10 @@ func (t *StdioTransport) handleResponse(data []byte) {
 		t.mu.Unlock()
 		return
 	}
-	respChan, ok := t.pendingReqs[normalizedID]
+	pending, ok := t.pendingReqs[normalizedID]
 	if ok {
 		delete(t.pendingReqs, normalizedID)
-		respChan <- resp // safe: buffer 1, only one sender claims via delete
+		pending.ch <- resp // safe: buffer 1, only one sender claims via delete
 	}
 	t.mu.Unlock()
 }
