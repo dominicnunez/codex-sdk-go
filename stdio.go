@@ -231,10 +231,14 @@ func (t *StdioTransport) writeMessage(msg interface{}) error {
 	t.writeMu.Lock()
 	defer t.writeMu.Unlock()
 
-	// Write message with newline delimiter
+	// Write message with newline delimiter, handling short writes
 	data = append(data, '\n')
-	if _, err := t.writer.Write(data); err != nil {
-		return NewTransportError("write message", err)
+	for len(data) > 0 {
+		n, err := t.writer.Write(data)
+		if err != nil {
+			return NewTransportError("write message", err)
+		}
+		data = data[n:]
 	}
 
 	return nil
