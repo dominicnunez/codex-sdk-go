@@ -405,6 +405,18 @@ caller-convenience choice: SDK consumers construct these params and pass Go stru
 the primary use case. Other open-schema fields that use `json.RawMessage` (e.g. `Turn.Items`)
 are on response types where the SDK receives raw JSON — different direction, different tradeoff.
 
+### SessionSourceWrapper.MarshalJSON default case is an unreachable defensive guard
+
+**Location:** `thread.go:234-245` — MarshalJSON switch on SessionSource concrete types
+**Date:** 2026-02-27
+
+**Reason:** The default error branch in `SessionSourceWrapper.MarshalJSON` is only reachable if a
+caller manually assigns a type that satisfies `SessionSource` but isn't `sessionSourceLiteral` or
+`SessionSourceSubAgent`. Both `UnmarshalJSON` and all SDK code paths only produce these two concrete
+types, so the default branch is never triggered under normal usage. The `sessionSourceLiteral` case
+handles unknown string values correctly (forward compatibility), so re-marshaling unknown sources
+works. The default branch is a compile-time-unreachable defensive guard, not dead code worth removing.
+
 ### SessionSourceWrapper accepts any string without validation
 
 **Location:** `thread.go:176-179` — SessionSourceWrapper.UnmarshalJSON
@@ -473,6 +485,19 @@ that map to spec schemas. The JSON struct tag preserves wire compatibility regar
 `AuthorizationURL` would be more idiomatic Go, but the project's spec compliance rules
 prohibit renaming public fields that map to spec schemas. The JSON struct tag preserves
 wire compatibility regardless.
+
+### ErrEmptyResult is a plain sentinel without method context for errors.As
+
+**Location:** `client.go:329`, `client.go:362-364` — sendRequest and sendRequestRaw empty result handling
+**Date:** 2026-02-27
+
+**Reason:** Callers who want to know which method returned empty must parse the error string, since
+`ErrEmptyResult` is a plain `errors.New` sentinel — not a struct with fields. Introducing an
+`EmptyResultError` struct type with a `Method` field would add a new public type to the API for a
+Low severity ergonomic improvement. The method name is already present in the `fmt.Errorf` wrapper
+string for human-readable diagnostics, and `errors.Is(err, ErrEmptyResult)` works correctly for
+programmatic detection. The typed error pattern used by `RPCError`/`TransportError`/`TimeoutError`
+is justified by their higher severity and richer payloads.
 
 ### Notify may succeed even if the transport reader has just stopped
 
