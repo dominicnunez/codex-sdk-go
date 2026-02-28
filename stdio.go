@@ -7,8 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
-	"runtime/debug"
 	"sync"
 )
 
@@ -468,8 +466,6 @@ func (t *StdioTransport) handleNotification(data []byte) {
 			if r := recover(); r != nil {
 				if panicFn != nil {
 					panicFn(r)
-				} else {
-					fmt.Fprintf(os.Stderr, "codex: notification handler panicked: %v\n%s", r, debug.Stack())
 				}
 			}
 		}()
