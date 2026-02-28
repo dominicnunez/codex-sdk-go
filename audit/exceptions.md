@@ -13,6 +13,20 @@
 
 <!-- Findings where the audit misread the code or described behavior that doesn't occur -->
 
+### UpdatePatchChangeKind MarshalJSON inconsistency with AddPatchChangeKind and DeletePatchChangeKind
+
+**Location:** `event_types.go:147-153` — UpdatePatchChangeKind.MarshalJSON
+**Date:** 2026-02-27
+
+**Reason:** The audit claims `AddPatchChangeKind` (line 128) and `DeletePatchChangeKind` (line 136)
+use "anonymous struct literals" for marshaling, and that `UpdatePatchChangeKind` is inconsistent
+by using `map[string]interface{}`. This is factually wrong. All three types use the map pattern:
+`AddPatchChangeKind` uses `map[string]string{"type": "add"}`, `DeletePatchChangeKind` uses
+`map[string]string{"type": "delete"}`, and `UpdatePatchChangeKind` uses `map[string]interface{}`
+(interface{} because it has an optional `move_path` field). There is no intra-file inconsistency.
+The anonymous struct pattern exists in other files (`approval.go`, `config.go`, `review.go`)
+but not in the types the audit references.
+
 ### Close cannot race with handleResponse to double-send on pending channel
 
 **Location:** `stdio.go:197-213` — Close() pending request cleanup loop
@@ -314,6 +328,18 @@ complexity without mitigating any concrete risk.
 ## Intentional Design Decisions
 
 <!-- Findings that describe behavior which is correct by design -->
+
+### UserInput types rely on custom MarshalJSON for type discriminator injection
+
+**Location:** `turn.go:156-246` — TextUserInput, ImageUserInput, LocalImageUserInput, SkillUserInput, MentionUserInput
+**Date:** 2026-02-27
+
+**Reason:** The MarshalJSON methods inject a `"type"` discriminator without storing it as a struct field.
+This is the standard Go pattern for discriminated unions — the type tag is a serialization concern,
+not domain state. The `UnmarshalUserInput` factory function handles deserialization dispatch.
+Embedding these types without their custom marshaler would lose the discriminator, but this applies
+to any Go type with custom marshaling and is not specific to this code. The pattern is used
+consistently across all UserInput variants and matches other union types in the codebase.
 
 ### normalizeID relies on float64 precision for JSON number IDs
 
