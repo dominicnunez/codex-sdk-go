@@ -184,16 +184,17 @@ func (t *StdioTransport) Close() error {
 	// Unblock all pending request waiters with an error response indicating
 	// the transport was closed. We send rather than close because
 	// handleResponse may concurrently hold a reference to the channel.
-	closedResp := Response{
-		JSONRPC: jsonrpcVersion,
-		Error: &Error{
-			Code:    ErrCodeInternalError,
-			Message: "transport closed",
-		},
-	}
 	for id, ch := range t.pendingReqs {
+		resp := Response{
+			JSONRPC: jsonrpcVersion,
+			ID:      RequestID{Value: id},
+			Error: &Error{
+				Code:    ErrCodeInternalError,
+				Message: "transport closed",
+			},
+		}
 		select {
-		case ch <- closedResp:
+		case ch <- resp:
 		default:
 		}
 		delete(t.pendingReqs, id)
