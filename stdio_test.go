@@ -619,6 +619,53 @@ func TestStdioRequestHandlerPanicRecovery(t *testing.T) {
 	}
 }
 
+// TestStdioNotificationHandlerPanicWithoutOnPanic verifies that a panicking
+// notification handler without OnPanic recovers silently instead of crashing.
+func TestStdioNotificationHandlerPanicWithoutOnPanic(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer clientReader.Close()
+	defer serverWriter.Close()
+	defer serverReader.Close()
+	defer clientWriter.Close()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer transport.Close()
+
+	received := make(chan string, 2)
+	callCount := 0
+	// No OnPanic registered — panic must be silently recovered
+	transport.OnNotify(func(ctx context.Context, notif codex.Notification) {
+		callCount++
+		if callCount == 1 {
+			panic("no OnPanic registered")
+		}
+		received <- notif.Method
+	})
+
+	// Send first notification (will panic and recover silently)
+	notif1 := codex.Notification{JSONRPC: "2.0", Method: "first/panic"}
+	n1JSON, _ := json.Marshal(notif1)
+	_, _ = serverWriter.Write(append(n1JSON, '\n'))
+
+	// Brief wait for the panic to be recovered
+	time.Sleep(50 * time.Millisecond)
+
+	// Send second notification (transport should still work)
+	notif2 := codex.Notification{JSONRPC: "2.0", Method: "second/ok"}
+	n2JSON, _ := json.Marshal(notif2)
+	_, _ = serverWriter.Write(append(n2JSON, '\n'))
+
+	select {
+	case method := <-received:
+		if method != "second/ok" {
+			t.Errorf("received method = %s; want second/ok", method)
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout: transport stopped working after unhandled notification panic")
+	}
+}
+
 // TestStdioNotificationHandlerPanicRecovery verifies that a panicking notification
 // handler does not crash the process and the transport continues operating.
 func TestStdioNotificationHandlerPanicRecovery(t *testing.T) {
