@@ -193,8 +193,11 @@ func (c *Client) OnNotification(method string, handler NotificationHandler) {
 func (c *Client) handleNotification(ctx context.Context, notif Notification) {
 	c.listenersMu.RLock()
 	handler := c.notificationListeners[notif.Method]
-	// Snapshot internal listeners so we can release the lock before calling.
-	internals := c.internalListeners[notif.Method]
+	// Deep-copy internal listeners so concurrent unsubscribe can't mutate the
+	// backing array while we iterate outside the lock.
+	src := c.internalListeners[notif.Method]
+	internals := make([]internalListener, len(src))
+	copy(internals, src)
 	c.listenersMu.RUnlock()
 
 	if handler != nil {
