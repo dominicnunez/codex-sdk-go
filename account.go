@@ -43,6 +43,18 @@ type ChatgptAccount struct {
 
 func (c *ChatgptAccount) accountType() string { return "chatgpt" }
 
+// UnknownAccount represents an unrecognized account type from a newer protocol version.
+type UnknownAccount struct {
+	Type string          `json:"type"`
+	Raw  json.RawMessage `json:"-"`
+}
+
+func (u *UnknownAccount) accountType() string { return u.Type }
+
+func (u *UnknownAccount) MarshalJSON() ([]byte, error) {
+	return u.Raw, nil
+}
+
 // PlanType represents the account plan tier
 type PlanType string
 
@@ -86,7 +98,7 @@ func (a *AccountWrapper) UnmarshalJSON(data []byte) error {
 		}
 		a.Value = &chatgpt
 	default:
-		return fmt.Errorf("unknown account type: %s", typeCheck.Type)
+		a.Value = &UnknownAccount{Type: typeCheck.Type, Raw: append(json.RawMessage(nil), data...)}
 	}
 
 	return nil
