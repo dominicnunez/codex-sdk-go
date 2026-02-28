@@ -184,7 +184,7 @@ func (s *SessionSourceWrapper) UnmarshalJSON(data []byte) error {
 		}
 	}
 
-	return fmt.Errorf("unable to unmarshal SessionSource")
+	return fmt.Errorf("unable to unmarshal SessionSource from: %.200s", data)
 }
 
 // unmarshalSubAgentSource dispatches the SubAgentSource discriminated union.
