@@ -18,11 +18,11 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 		"initialize": "Client.Initialize()",
 
 		// Account service (5 methods)
-		"account/read":              "Client.Account.Get()",
-		"account/rateLimits/read":   "Client.Account.GetRateLimits()",
-		"account/login/start":       "Client.Account.Login()",
-		"account/login/cancel":      "Client.Account.CancelLogin()",
-		"account/logout":            "Client.Account.Logout()",
+		"account/read":            "Client.Account.Get()",
+		"account/rateLimits/read": "Client.Account.GetRateLimits()",
+		"account/login/start":     "Client.Account.Login()",
+		"account/login/cancel":    "Client.Account.CancelLogin()",
+		"account/logout":          "Client.Account.Logout()",
 
 		// Apps service (1 method)
 		"app/list": "Client.Apps.List()",
@@ -53,8 +53,8 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 		"fuzzyFileSearch": "APPROVAL_HANDLER",
 
 		// MCP service (2 methods)
-		"mcpServerStatus/list":   "Client.Mcp.ListServerStatus()",
-		"mcpServer/oauth/login":  "Client.Mcp.OauthLogin()",
+		"mcpServerStatus/list":  "Client.Mcp.ListServerStatus()",
+		"mcpServer/oauth/login": "Client.Mcp.OauthLogin()",
 
 		// Model service (1 method)
 		"model/list": "Client.Model.List()",

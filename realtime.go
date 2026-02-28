@@ -35,17 +35,17 @@ type ThreadRealtimeItemAddedNotification struct {
 
 // ThreadRealtimeAudioChunk contains audio data and metadata.
 type ThreadRealtimeAudioChunk struct {
-	Data               string  `json:"data"`                         // Base64-encoded audio bytes
-	NumChannels        uint16  `json:"numChannels"`                  // Number of audio channels
-	SampleRate         uint32  `json:"sampleRate"`                   // Sample rate in Hz
-	SamplesPerChannel  *uint32 `json:"samplesPerChannel,omitempty"`  // Number of samples per channel
+	Data              string  `json:"data"`                        // Base64-encoded audio bytes
+	NumChannels       uint16  `json:"numChannels"`                 // Number of audio channels
+	SampleRate        uint32  `json:"sampleRate"`                  // Sample rate in Hz
+	SamplesPerChannel *uint32 `json:"samplesPerChannel,omitempty"` // Number of samples per channel
 }
 
 // ThreadRealtimeOutputAudioDeltaNotification is sent when audio output is streamed.
 // Method: thread/realtime/outputAudio/delta
 type ThreadRealtimeOutputAudioDeltaNotification struct {
-	ThreadID string                    `json:"threadId"`
-	Audio    ThreadRealtimeAudioChunk  `json:"audio"`
+	ThreadID string                   `json:"threadId"`
+	Audio    ThreadRealtimeAudioChunk `json:"audio"`
 }
 
 // OnThreadRealtimeStarted registers a listener for thread/realtime/started notifications.

@@ -14,34 +14,34 @@ type ConfigReadParams struct {
 
 // ConfigReadResponse represents response from config/read request
 type ConfigReadResponse struct {
-	Config  *Config                       `json:"config"`
-	Layers  *[]ConfigLayer                `json:"layers,omitempty"`
+	Config  *Config                        `json:"config"`
+	Layers  *[]ConfigLayer                 `json:"layers,omitempty"`
 	Origins map[string]ConfigLayerMetadata `json:"origins"`
 }
 
 // Config represents the effective configuration
 type Config struct {
-	Analytics                   *AnalyticsConfig       `json:"analytics,omitempty"`
-	ApprovalPolicy              *AskForApprovalWrapper `json:"approval_policy,omitempty"`
-	CompactPrompt               *string                `json:"compact_prompt,omitempty"`
-	DeveloperInstructions       *string                `json:"developer_instructions,omitempty"`
-	ForcedChatgptWorkspaceID    *string                `json:"forced_chatgpt_workspace_id,omitempty"`
-	ForcedLoginMethod           *ForcedLoginMethod     `json:"forced_login_method,omitempty"`
-	Instructions                *string                `json:"instructions,omitempty"`
-	Model                       *string                `json:"model,omitempty"`
-	ModelAutoCompactTokenLimit  *int64                 `json:"model_auto_compact_token_limit,omitempty"`
-	ModelContextWindow          *int64                 `json:"model_context_window,omitempty"`
-	ModelProvider               *string                `json:"model_provider,omitempty"`
-	ModelReasoningEffort        *ReasoningEffort       `json:"model_reasoning_effort,omitempty"`
-	ModelReasoningSummary       *ReasoningSummaryWrapper `json:"model_reasoning_summary,omitempty"`
-	ModelVerbosity              *Verbosity             `json:"model_verbosity,omitempty"`
-	Profile                     *string                `json:"profile,omitempty"`
-	Profiles                    map[string]ProfileV2   `json:"profiles,omitempty"`
-	ReviewModel                 *string                `json:"review_model,omitempty"`
-	SandboxMode                 *SandboxMode           `json:"sandbox_mode,omitempty"`
-	SandboxWorkspaceWrite       *SandboxWorkspaceWrite `json:"sandbox_workspace_write,omitempty"`
-	Tools                       *ToolsV2               `json:"tools,omitempty"`
-	WebSearch                   *WebSearchMode         `json:"web_search,omitempty"`
+	Analytics                  *AnalyticsConfig         `json:"analytics,omitempty"`
+	ApprovalPolicy             *AskForApprovalWrapper   `json:"approval_policy,omitempty"`
+	CompactPrompt              *string                  `json:"compact_prompt,omitempty"`
+	DeveloperInstructions      *string                  `json:"developer_instructions,omitempty"`
+	ForcedChatgptWorkspaceID   *string                  `json:"forced_chatgpt_workspace_id,omitempty"`
+	ForcedLoginMethod          *ForcedLoginMethod       `json:"forced_login_method,omitempty"`
+	Instructions               *string                  `json:"instructions,omitempty"`
+	Model                      *string                  `json:"model,omitempty"`
+	ModelAutoCompactTokenLimit *int64                   `json:"model_auto_compact_token_limit,omitempty"`
+	ModelContextWindow         *int64                   `json:"model_context_window,omitempty"`
+	ModelProvider              *string                  `json:"model_provider,omitempty"`
+	ModelReasoningEffort       *ReasoningEffort         `json:"model_reasoning_effort,omitempty"`
+	ModelReasoningSummary      *ReasoningSummaryWrapper `json:"model_reasoning_summary,omitempty"`
+	ModelVerbosity             *Verbosity               `json:"model_verbosity,omitempty"`
+	Profile                    *string                  `json:"profile,omitempty"`
+	Profiles                   map[string]ProfileV2     `json:"profiles,omitempty"`
+	ReviewModel                *string                  `json:"review_model,omitempty"`
+	SandboxMode                *SandboxMode             `json:"sandbox_mode,omitempty"`
+	SandboxWorkspaceWrite      *SandboxWorkspaceWrite   `json:"sandbox_workspace_write,omitempty"`
+	Tools                      *ToolsV2                 `json:"tools,omitempty"`
+	WebSearch                  *WebSearchMode           `json:"web_search,omitempty"`
 }
 
 // AnalyticsConfig represents analytics configuration
@@ -80,10 +80,10 @@ func (w ReasoningSummaryWrapper) MarshalJSON() ([]byte, error) {
 
 // SandboxWorkspaceWrite represents workspace write settings
 type SandboxWorkspaceWrite struct {
-	ExcludeSlashTmp      *bool    `json:"exclude_slash_tmp,omitempty"`
-	ExcludeTmpdirEnvVar  *bool    `json:"exclude_tmpdir_env_var,omitempty"`
-	NetworkAccess        *bool    `json:"network_access,omitempty"`
-	WritableRoots        []string `json:"writable_roots,omitempty"`
+	ExcludeSlashTmp     *bool    `json:"exclude_slash_tmp,omitempty"`
+	ExcludeTmpdirEnvVar *bool    `json:"exclude_tmpdir_env_var,omitempty"`
+	NetworkAccess       *bool    `json:"network_access,omitempty"`
+	WritableRoots       []string `json:"writable_roots,omitempty"`
 }
 
 // ToolsV2 represents tools configuration
@@ -94,28 +94,28 @@ type ToolsV2 struct {
 
 // ProfileV2 represents a named configuration profile
 type ProfileV2 struct {
-	ApprovalPolicy       *AskForApprovalWrapper   `json:"approval_policy,omitempty"`
-	ChatgptBaseURL       *string                  `json:"chatgpt_base_url,omitempty"`
-	Model                *string                  `json:"model,omitempty"`
-	ModelProvider        *string                  `json:"model_provider,omitempty"`
-	ModelReasoningEffort *ReasoningEffort          `json:"model_reasoning_effort,omitempty"`
+	ApprovalPolicy        *AskForApprovalWrapper   `json:"approval_policy,omitempty"`
+	ChatgptBaseURL        *string                  `json:"chatgpt_base_url,omitempty"`
+	Model                 *string                  `json:"model,omitempty"`
+	ModelProvider         *string                  `json:"model_provider,omitempty"`
+	ModelReasoningEffort  *ReasoningEffort         `json:"model_reasoning_effort,omitempty"`
 	ModelReasoningSummary *ReasoningSummaryWrapper `json:"model_reasoning_summary,omitempty"`
-	ModelVerbosity       *Verbosity               `json:"model_verbosity,omitempty"`
-	WebSearch            *WebSearchMode           `json:"web_search,omitempty"`
+	ModelVerbosity        *Verbosity               `json:"model_verbosity,omitempty"`
+	WebSearch             *WebSearchMode           `json:"web_search,omitempty"`
 }
 
 // ConfigLayer represents a configuration layer
 type ConfigLayer struct {
-	Config         json.RawMessage         `json:"config"`
-	DisabledReason *string                 `json:"disabledReason,omitempty"`
+	Config         json.RawMessage          `json:"config"`
+	DisabledReason *string                  `json:"disabledReason,omitempty"`
 	Name           ConfigLayerSourceWrapper `json:"name"`
-	Version        string                  `json:"version"`
+	Version        string                   `json:"version"`
 }
 
 // ConfigLayerMetadata represents metadata about a config layer
 type ConfigLayerMetadata struct {
 	Name    ConfigLayerSourceWrapper `json:"name"`
-	Version string                  `json:"version"`
+	Version string                   `json:"version"`
 }
 
 // ConfigLayerSource interface for discriminated union
@@ -340,25 +340,25 @@ type ConfigEdit struct {
 
 // ConfigWriteResponse represents response from config write operations
 type ConfigWriteResponse struct {
-	FilePath           string               `json:"filePath"`
-	Status             WriteStatus          `json:"status"`
-	Version            string               `json:"version"`
-	OverriddenMetadata *OverriddenMetadata  `json:"overriddenMetadata,omitempty"`
+	FilePath           string              `json:"filePath"`
+	Status             WriteStatus         `json:"status"`
+	Version            string              `json:"version"`
+	OverriddenMetadata *OverriddenMetadata `json:"overriddenMetadata,omitempty"`
 }
 
 // OverriddenMetadata represents info when value was overridden by higher layer
 type OverriddenMetadata struct {
-	EffectiveValue   json.RawMessage     `json:"effectiveValue"`
-	Message          string              `json:"message"`
-	OverridingLayer  ConfigLayerMetadata `json:"overridingLayer"`
+	EffectiveValue  json.RawMessage     `json:"effectiveValue"`
+	Message         string              `json:"message"`
+	OverridingLayer ConfigLayerMetadata `json:"overridingLayer"`
 }
 
 // ConfigWarningNotification represents the "configWarning" notification.
 type ConfigWarningNotification struct {
-	Summary string      `json:"summary"`
-	Details *string     `json:"details,omitempty"`
-	Path    *string     `json:"path,omitempty"`
-	Range   *TextRange  `json:"range,omitempty"`
+	Summary string     `json:"summary"`
+	Details *string    `json:"details,omitempty"`
+	Path    *string    `json:"path,omitempty"`
+	Range   *TextRange `json:"range,omitempty"`
 }
 
 // TextRange represents a range in a text file

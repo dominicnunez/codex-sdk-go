@@ -9,7 +9,8 @@ import (
 // to avoid recursive test execution.
 //
 // To verify no data races:
-//   go test -race ./...
+//
+//	go test -race ./...
 //
 // This is critical for concurrent code in transport and dispatch layers.
 func TestRaceDetectorVerification(t *testing.T) {

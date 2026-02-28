@@ -21,18 +21,18 @@ type AppsListResponse struct {
 
 // AppInfo represents metadata for an app/connector.
 type AppInfo struct {
-	ID                  string        `json:"id"`
-	Name                string        `json:"name"`
-	Description         *string       `json:"description,omitempty"`
-	DistributionChannel *string       `json:"distributionChannel,omitempty"`
-	InstallURL          *string       `json:"installUrl,omitempty"`
-	IsAccessible        bool          `json:"isAccessible"`
-	IsEnabled           bool          `json:"isEnabled"`
+	ID                  string            `json:"id"`
+	Name                string            `json:"name"`
+	Description         *string           `json:"description,omitempty"`
+	DistributionChannel *string           `json:"distributionChannel,omitempty"`
+	InstallURL          *string           `json:"installUrl,omitempty"`
+	IsAccessible        bool              `json:"isAccessible"`
+	IsEnabled           bool              `json:"isEnabled"`
 	Labels              map[string]string `json:"labels,omitempty"`
-	LogoURL             *string       `json:"logoUrl,omitempty"`
-	LogoURLDark         *string       `json:"logoUrlDark,omitempty"`
-	Branding            *AppBranding  `json:"branding,omitempty"`
-	AppMetadata         *AppMetadata  `json:"appMetadata,omitempty"`
+	LogoURL             *string           `json:"logoUrl,omitempty"`
+	LogoURLDark         *string           `json:"logoUrlDark,omitempty"`
+	Branding            *AppBranding      `json:"branding,omitempty"`
+	AppMetadata         *AppMetadata      `json:"appMetadata,omitempty"`
 }
 
 // AppBranding contains branding information for an app.
@@ -47,18 +47,18 @@ type AppBranding struct {
 
 // AppMetadata contains extended metadata for an app.
 type AppMetadata struct {
-	Categories                  *[]string        `json:"categories,omitempty"`
-	SubCategories               *[]string        `json:"subCategories,omitempty"`
-	Developer                   *string          `json:"developer,omitempty"`
-	FirstPartyRequiresInstall   *bool            `json:"firstPartyRequiresInstall,omitempty"`
-	FirstPartyType              *string          `json:"firstPartyType,omitempty"`
-	Review                      *AppReview       `json:"review,omitempty"`
-	Screenshots                 *[]AppScreenshot `json:"screenshots,omitempty"`
-	SEODescription              *string          `json:"seoDescription,omitempty"`
-	ShowInComposerWhenUnlinked  *bool            `json:"showInComposerWhenUnlinked,omitempty"`
-	Version                     *string          `json:"version,omitempty"`
-	VersionID                   *string          `json:"versionId,omitempty"`
-	VersionNotes                *string          `json:"versionNotes,omitempty"`
+	Categories                 *[]string        `json:"categories,omitempty"`
+	SubCategories              *[]string        `json:"subCategories,omitempty"`
+	Developer                  *string          `json:"developer,omitempty"`
+	FirstPartyRequiresInstall  *bool            `json:"firstPartyRequiresInstall,omitempty"`
+	FirstPartyType             *string          `json:"firstPartyType,omitempty"`
+	Review                     *AppReview       `json:"review,omitempty"`
+	Screenshots                *[]AppScreenshot `json:"screenshots,omitempty"`
+	SEODescription             *string          `json:"seoDescription,omitempty"`
+	ShowInComposerWhenUnlinked *bool            `json:"showInComposerWhenUnlinked,omitempty"`
+	Version                    *string          `json:"version,omitempty"`
+	VersionID                  *string          `json:"versionId,omitempty"`
+	VersionNotes               *string          `json:"versionNotes,omitempty"`
 }
 
 // AppReview contains review status information.

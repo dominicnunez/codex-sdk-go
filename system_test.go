@@ -365,41 +365,41 @@ func TestErrorNotification(t *testing.T) {
 		{
 			name: "simple string error",
 			params: map[string]interface{}{
-				"threadId": "thread-123",
-				"turnId":   "turn-456",
+				"threadId":  "thread-123",
+				"turnId":    "turn-456",
 				"willRetry": true,
 				"error": map[string]interface{}{
 					"message": "Server error occurred",
 				},
 			},
 			expected: codex.ErrorNotification{
-				ThreadID: "thread-123",
-				TurnID:   "turn-456",
+				ThreadID:  "thread-123",
+				TurnID:    "turn-456",
 				WillRetry: true,
 			},
 		},
 		{
 			name: "with context window exceeded",
 			params: map[string]interface{}{
-				"threadId": "thread-123",
-				"turnId":   "turn-456",
+				"threadId":  "thread-123",
+				"turnId":    "turn-456",
 				"willRetry": false,
 				"error": map[string]interface{}{
-					"message": "Context limit exceeded",
+					"message":        "Context limit exceeded",
 					"codexErrorInfo": "contextWindowExceeded",
 				},
 			},
 			expected: codex.ErrorNotification{
-				ThreadID: "thread-123",
-				TurnID:   "turn-456",
+				ThreadID:  "thread-123",
+				TurnID:    "turn-456",
 				WillRetry: false,
 			},
 		},
 		{
 			name: "with http connection failed",
 			params: map[string]interface{}{
-				"threadId": "thread-123",
-				"turnId":   "turn-456",
+				"threadId":  "thread-123",
+				"turnId":    "turn-456",
 				"willRetry": true,
 				"error": map[string]interface{}{
 					"message": "Connection failed",
@@ -412,8 +412,8 @@ func TestErrorNotification(t *testing.T) {
 				},
 			},
 			expected: codex.ErrorNotification{
-				ThreadID: "thread-123",
-				TurnID:   "turn-456",
+				ThreadID:  "thread-123",
+				TurnID:    "turn-456",
 				WillRetry: true,
 			},
 		},

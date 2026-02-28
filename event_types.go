@@ -18,7 +18,7 @@ type ByteRange struct {
 // TextElement represents a span within text used to render or persist special elements.
 // Used in UserInput to mark UI-defined elements within the text.
 type TextElement struct {
-	ByteRange   ByteRange `json:"byteRange"`        // Byte range in the parent text buffer
+	ByteRange   ByteRange `json:"byteRange"`             // Byte range in the parent text buffer
 	Placeholder *string   `json:"placeholder,omitempty"` // Optional human-readable placeholder for UI
 }
 
@@ -109,9 +109,9 @@ type CollabAgentState struct {
 
 // FileUpdateChange represents a file change with diff and kind.
 type FileUpdateChange struct {
-	Path string                  `json:"path"`
-	Diff string                  `json:"diff"`
-	Kind PatchChangeKindWrapper  `json:"kind"`
+	Path string                 `json:"path"`
+	Diff string                 `json:"diff"`
+	Kind PatchChangeKindWrapper `json:"kind"`
 }
 
 // PatchChangeKind is a discriminated union for patch change types.

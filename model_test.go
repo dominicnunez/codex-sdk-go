@@ -21,16 +21,16 @@ func TestModelList(t *testing.T) {
 			mockResponse: map[string]interface{}{
 				"data": []interface{}{
 					map[string]interface{}{
-						"id":                         "claude-opus-4-6",
-						"model":                      "claude-opus-4-6",
-						"displayName":                "Claude Opus 4.6",
-						"description":                "Most capable Claude model",
-						"hidden":                     false,
-						"isDefault":                  true,
-						"defaultReasoningEffort":     "medium",
-						"supportedReasoningEfforts":  []interface{}{},
-						"inputModalities":            []interface{}{"text", "image"},
-						"supportsPersonality":        false,
+						"id":                        "claude-opus-4-6",
+						"model":                     "claude-opus-4-6",
+						"displayName":               "Claude Opus 4.6",
+						"description":               "Most capable Claude model",
+						"hidden":                    false,
+						"isDefault":                 true,
+						"defaultReasoningEffort":    "medium",
+						"supportedReasoningEfforts": []interface{}{},
+						"inputModalities":           []interface{}{"text", "image"},
+						"supportsPersonality":       false,
 					},
 				},
 			},
@@ -62,13 +62,13 @@ func TestModelList(t *testing.T) {
 			mockResponse: map[string]interface{}{
 				"data": []interface{}{
 					map[string]interface{}{
-						"id":                        "claude-sonnet-4-5",
-						"model":                     "claude-sonnet-4-5",
-						"displayName":               "Claude Sonnet 4.5",
-						"description":               "Balanced performance and speed",
-						"hidden":                    false,
-						"isDefault":                 false,
-						"defaultReasoningEffort":    "low",
+						"id":                     "claude-sonnet-4-5",
+						"model":                  "claude-sonnet-4-5",
+						"displayName":            "Claude Sonnet 4.5",
+						"description":            "Balanced performance and speed",
+						"hidden":                 false,
+						"isDefault":              false,
+						"defaultReasoningEffort": "low",
 						"supportedReasoningEfforts": []interface{}{
 							map[string]interface{}{
 								"reasoningEffort": "none",

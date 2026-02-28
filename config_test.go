@@ -10,16 +10,16 @@ import (
 
 func TestConfigRead(t *testing.T) {
 	tests := []struct {
-		name           string
-		params         codex.ConfigReadParams
-		mockResponse   map[string]interface{}
-		checkResponse  func(t *testing.T, resp codex.ConfigReadResponse)
+		name          string
+		params        codex.ConfigReadParams
+		mockResponse  map[string]interface{}
+		checkResponse func(t *testing.T, resp codex.ConfigReadResponse)
 	}{
 		{
-			name: "minimal read",
+			name:   "minimal read",
 			params: codex.ConfigReadParams{},
 			mockResponse: map[string]interface{}{
-				"config": map[string]interface{}{},
+				"config":  map[string]interface{}{},
 				"origins": map[string]interface{}{},
 			},
 			checkResponse: func(t *testing.T, resp codex.ConfigReadResponse) {
@@ -39,7 +39,7 @@ func TestConfigRead(t *testing.T) {
 			},
 			mockResponse: map[string]interface{}{
 				"config": map[string]interface{}{
-					"model": "claude-4.5",
+					"model":           "claude-4.5",
 					"approval_policy": "on-request",
 				},
 				"layers": []interface{}{
@@ -199,8 +199,8 @@ func TestConfigWrite(t *testing.T) {
 				"status":   "okOverridden",
 				"version":  "v3",
 				"overriddenMetadata": map[string]interface{}{
-					"effectiveValue":   "on-request",
-					"message":          "Value overridden by system policy",
+					"effectiveValue": "on-request",
+					"message":        "Value overridden by system policy",
 					"overridingLayer": map[string]interface{}{
 						"name":    map[string]interface{}{"type": "system", "file": "/etc/claude/config.toml"},
 						"version": "v1",

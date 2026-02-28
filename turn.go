@@ -18,17 +18,17 @@ func newTurnService(client *Client) *TurnService {
 
 // TurnStartParams are the parameters for turn/start
 type TurnStartParams struct {
-	ThreadID       string          `json:"threadId"`
-	Input          []UserInput     `json:"input"`
-	ApprovalPolicy *AskForApproval `json:"approvalPolicy,omitempty"`
-	Cwd            *string         `json:"cwd,omitempty"`
-	Effort         *ReasoningEffort         `json:"effort,omitempty"`
-	Model          *string                  `json:"model,omitempty"`
+	ThreadID       string           `json:"threadId"`
+	Input          []UserInput      `json:"input"`
+	ApprovalPolicy *AskForApproval  `json:"approvalPolicy,omitempty"`
+	Cwd            *string          `json:"cwd,omitempty"`
+	Effort         *ReasoningEffort `json:"effort,omitempty"`
+	Model          *string          `json:"model,omitempty"`
 	// OutputSchema optionally constrains the model's structured output to conform to a JSON Schema.
-	OutputSchema   interface{}              `json:"outputSchema,omitempty"`
-	Personality    *Personality             `json:"personality,omitempty"`
-	SandboxPolicy  *SandboxPolicy           `json:"sandboxPolicy,omitempty"`
-	Summary        *ReasoningSummaryWrapper  `json:"summary,omitempty"`
+	OutputSchema  interface{}              `json:"outputSchema,omitempty"`
+	Personality   *Personality             `json:"personality,omitempty"`
+	SandboxPolicy *SandboxPolicy           `json:"sandboxPolicy,omitempty"`
+	Summary       *ReasoningSummaryWrapper `json:"summary,omitempty"`
 }
 
 // unmarshalUserInputSlice unmarshals a slice of raw JSON messages into UserInput values.

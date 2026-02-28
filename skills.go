@@ -18,10 +18,10 @@ const (
 type HazelnutScope string
 
 const (
-	HazelnutScopeExample          HazelnutScope = "example"
-	HazelnutScopeWorkspaceShared  HazelnutScope = "workspace-shared"
-	HazelnutScopeAllShared        HazelnutScope = "all-shared"
-	HazelnutScopePersonal         HazelnutScope = "personal"
+	HazelnutScopeExample         HazelnutScope = "example"
+	HazelnutScopeWorkspaceShared HazelnutScope = "workspace-shared"
+	HazelnutScopeAllShared       HazelnutScope = "all-shared"
+	HazelnutScopePersonal        HazelnutScope = "personal"
 )
 
 // ProductSurface defines the product surface for remote skills
@@ -85,16 +85,16 @@ type SkillsListExtraRootsForCwd struct {
 
 // SkillsListParams defines parameters for listing skills
 type SkillsListParams struct {
-	Cwds                []string                      `json:"cwds,omitempty"`
-	ForceReload         *bool                         `json:"forceReload,omitempty"`
+	Cwds                 []string                     `json:"cwds,omitempty"`
+	ForceReload          *bool                        `json:"forceReload,omitempty"`
 	PerCwdExtraUserRoots []SkillsListExtraRootsForCwd `json:"perCwdExtraUserRoots,omitempty"`
 }
 
 // SkillsListEntry represents skills and errors for a single cwd
 type SkillsListEntry struct {
-	Cwd    string          `json:"cwd"`
+	Cwd    string           `json:"cwd"`
 	Errors []SkillErrorInfo `json:"errors"`
-	Skills []SkillMetadata `json:"skills"`
+	Skills []SkillMetadata  `json:"skills"`
 }
 
 // SkillsListResponse contains the list of skills grouped by cwd

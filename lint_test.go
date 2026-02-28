@@ -12,8 +12,9 @@ import (
 // This test documents that the codebase has been linted and all issues fixed.
 //
 // To run golangci-lint manually:
-//   go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-//   ~/go/bin/golangci-lint run ./...
+//
+//	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+//	~/go/bin/golangci-lint run ./...
 func TestGolangciLint(t *testing.T) {
 	// Check if golangci-lint is installed
 	lintPath := exec.Command("which", "golangci-lint").Run()
@@ -65,47 +66,47 @@ func TestNotificationListenerCoverage(t *testing.T) {
 
 	// All 41 notification methods from ServerNotification.json:
 	expectedNotifications := []string{
-		"account/login/completed",        // OnAccountLoginCompleted
-		"account/rateLimits/updated",     // OnAccountRateLimitsUpdated
-		"account/updated",                // OnAccountUpdated
-		"app/list/updated",               // OnAppListUpdated
-		"configWarning",                  // OnConfigWarning
-		"deprecationNotice",              // OnDeprecationNotice
-		"error",                          // OnError
-		"fuzzyFileSearch/sessionCompleted", // OnFuzzyFileSearchSessionCompleted
-		"fuzzyFileSearch/sessionUpdated",   // OnFuzzyFileSearchSessionUpdated
-		"item/agentMessage/delta",        // OnAgentMessageDelta
-		"item/commandExecution/outputDelta", // OnCommandExecutionOutputDelta
+		"account/login/completed",                   // OnAccountLoginCompleted
+		"account/rateLimits/updated",                // OnAccountRateLimitsUpdated
+		"account/updated",                           // OnAccountUpdated
+		"app/list/updated",                          // OnAppListUpdated
+		"configWarning",                             // OnConfigWarning
+		"deprecationNotice",                         // OnDeprecationNotice
+		"error",                                     // OnError
+		"fuzzyFileSearch/sessionCompleted",          // OnFuzzyFileSearchSessionCompleted
+		"fuzzyFileSearch/sessionUpdated",            // OnFuzzyFileSearchSessionUpdated
+		"item/agentMessage/delta",                   // OnAgentMessageDelta
+		"item/commandExecution/outputDelta",         // OnCommandExecutionOutputDelta
 		"item/commandExecution/terminalInteraction", // OnTerminalInteraction
-		"item/completed",                 // OnItemCompleted
-		"item/fileChange/outputDelta",    // OnFileChangeOutputDelta
-		"item/mcpToolCall/progress",      // OnMcpToolCallProgress
-		"item/plan/delta",                // OnPlanDelta
-		"item/reasoning/summaryPartAdded", // OnReasoningSummaryPartAdded
-		"item/reasoning/summaryTextDelta", // OnReasoningSummaryTextDelta
-		"item/reasoning/textDelta",       // OnReasoningTextDelta
-		"item/started",                   // OnItemStarted
-		"mcpServer/oauthLogin/completed", // OnMcpServerOauthLoginCompleted
-		"model/rerouted",                 // OnModelRerouted
-		"thread/archived",                // OnThreadArchived
-		"thread/closed",                  // OnThreadClosed
-		"thread/compacted",               // OnContextCompacted
-		"thread/name/updated",            // OnThreadNameUpdated
-		"thread/realtime/closed",         // OnThreadRealtimeClosed
-		"thread/realtime/error",          // OnThreadRealtimeError
-		"thread/realtime/itemAdded",      // OnThreadRealtimeItemAdded
-		"thread/realtime/outputAudio/delta", // OnThreadRealtimeOutputAudioDelta
-		"thread/realtime/started",        // OnThreadRealtimeStarted
-		"thread/started",                 // OnThreadStarted
-		"thread/status/changed",          // OnThreadStatusChanged
-		"thread/tokenUsage/updated",      // OnThreadTokenUsageUpdated
-		"thread/unarchived",              // OnThreadUnarchived
-		"turn/completed",                 // OnTurnCompleted
-		"turn/diff/updated",              // OnTurnDiffUpdated
-		"turn/plan/updated",              // OnTurnPlanUpdated
-		"turn/started",                   // OnTurnStarted
-		"windowsSandbox/setupCompleted",  // OnWindowsSandboxSetupCompleted
-		"windows/worldWritableWarning",   // OnWindowsWorldWritableWarning
+		"item/completed",                            // OnItemCompleted
+		"item/fileChange/outputDelta",               // OnFileChangeOutputDelta
+		"item/mcpToolCall/progress",                 // OnMcpToolCallProgress
+		"item/plan/delta",                           // OnPlanDelta
+		"item/reasoning/summaryPartAdded",           // OnReasoningSummaryPartAdded
+		"item/reasoning/summaryTextDelta",           // OnReasoningSummaryTextDelta
+		"item/reasoning/textDelta",                  // OnReasoningTextDelta
+		"item/started",                              // OnItemStarted
+		"mcpServer/oauthLogin/completed",            // OnMcpServerOauthLoginCompleted
+		"model/rerouted",                            // OnModelRerouted
+		"thread/archived",                           // OnThreadArchived
+		"thread/closed",                             // OnThreadClosed
+		"thread/compacted",                          // OnContextCompacted
+		"thread/name/updated",                       // OnThreadNameUpdated
+		"thread/realtime/closed",                    // OnThreadRealtimeClosed
+		"thread/realtime/error",                     // OnThreadRealtimeError
+		"thread/realtime/itemAdded",                 // OnThreadRealtimeItemAdded
+		"thread/realtime/outputAudio/delta",         // OnThreadRealtimeOutputAudioDelta
+		"thread/realtime/started",                   // OnThreadRealtimeStarted
+		"thread/started",                            // OnThreadStarted
+		"thread/status/changed",                     // OnThreadStatusChanged
+		"thread/tokenUsage/updated",                 // OnThreadTokenUsageUpdated
+		"thread/unarchived",                         // OnThreadUnarchived
+		"turn/completed",                            // OnTurnCompleted
+		"turn/diff/updated",                         // OnTurnDiffUpdated
+		"turn/plan/updated",                         // OnTurnPlanUpdated
+		"turn/started",                              // OnTurnStarted
+		"windowsSandbox/setupCompleted",             // OnWindowsSandboxSetupCompleted
+		"windows/worldWritableWarning",              // OnWindowsWorldWritableWarning
 	}
 
 	// Verification: we expect 41 notifications per specs (40 per PRD + 1 discovered)

@@ -6,11 +6,11 @@ import "context"
 type ExperimentalFeatureStage string
 
 const (
-	ExperimentalFeatureStageBeta              ExperimentalFeatureStage = "beta"
-	ExperimentalFeatureStageUnderDevelopment  ExperimentalFeatureStage = "underDevelopment"
-	ExperimentalFeatureStageStable            ExperimentalFeatureStage = "stable"
-	ExperimentalFeatureStageDeprecated        ExperimentalFeatureStage = "deprecated"
-	ExperimentalFeatureStageRemoved           ExperimentalFeatureStage = "removed"
+	ExperimentalFeatureStageBeta             ExperimentalFeatureStage = "beta"
+	ExperimentalFeatureStageUnderDevelopment ExperimentalFeatureStage = "underDevelopment"
+	ExperimentalFeatureStageStable           ExperimentalFeatureStage = "stable"
+	ExperimentalFeatureStageDeprecated       ExperimentalFeatureStage = "deprecated"
+	ExperimentalFeatureStageRemoved          ExperimentalFeatureStage = "removed"
 )
 
 // ExperimentalFeature represents a single experimental feature flag

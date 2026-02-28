@@ -262,8 +262,8 @@ func (t *StdioTransport) writeMessage(msg interface{}) error {
 func (t *StdioTransport) readLoop() {
 	defer t.once.Do(func() { close(t.readerStopped) })
 
-	const initialBufferSize = 64 * 1024      // 64KB
-	const maxMessageSize = 10 * 1024 * 1024  // 10MB — file diffs and base64 payloads exceed the default
+	const initialBufferSize = 64 * 1024     // 64KB
+	const maxMessageSize = 10 * 1024 * 1024 // 10MB — file diffs and base64 payloads exceed the default
 	scanner := bufio.NewScanner(t.reader)
 	scanner.Buffer(make([]byte, 0, initialBufferSize), maxMessageSize)
 	for scanner.Scan() {

@@ -425,8 +425,8 @@ func TestItemStarted(t *testing.T) {
 	// Test with a simple JSON object representing a ThreadItem
 	// We use json.RawMessage to avoid defining the full ThreadItem union in tests
 	tests := []struct {
-		name string
-		json string
+		name    string
+		json    string
 		checkFn func(*testing.T, codex.ItemStartedNotification)
 	}{
 		{
@@ -487,8 +487,8 @@ func TestItemStarted(t *testing.T) {
 // TestItemCompleted tests the turn/itemCompleted notification
 func TestItemCompleted(t *testing.T) {
 	tests := []struct {
-		name string
-		json string
+		name    string
+		json    string
 		checkFn func(*testing.T, codex.ItemCompletedNotification)
 	}{
 		{
@@ -544,4 +544,3 @@ func TestItemCompleted(t *testing.T) {
 		})
 	}
 }
-

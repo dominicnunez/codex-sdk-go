@@ -172,10 +172,10 @@ func TestAccountLogin(t *testing.T) {
 		{
 			name: "chatgpt_auth_tokens_login",
 			params: &codex.ChatgptAuthTokensLoginAccountParams{
-				Type:              "chatgptAuthTokens",
-				AccessToken:       "token-123",
-				ChatgptAccountId:  "account-456",
-				ChatgptPlanType:   ptr("plus"),
+				Type:             "chatgptAuthTokens",
+				AccessToken:      "token-123",
+				ChatgptAccountId: "account-456",
+				ChatgptPlanType:  ptr("plus"),
 			},
 			response: map[string]interface{}{
 				"type": "chatgptAuthTokens",

@@ -15,9 +15,9 @@ const (
 // ExternalAgentConfigMigrationItem represents a detected or imported migration item.
 // Null or empty Cwd means home-scoped migration; non-empty means repo-scoped migration.
 type ExternalAgentConfigMigrationItem struct {
-	Cwd         *string                                  `json:"cwd,omitempty"`
-	Description string                                   `json:"description"`
-	ItemType    ExternalAgentConfigMigrationItemType     `json:"itemType"`
+	Cwd         *string                              `json:"cwd,omitempty"`
+	Description string                               `json:"description"`
+	ItemType    ExternalAgentConfigMigrationItemType `json:"itemType"`
 }
 
 // ExternalAgentConfigDetectParams contains parameters for detecting external agent configurations.

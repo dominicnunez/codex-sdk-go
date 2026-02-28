@@ -208,4 +208,3 @@ func (c *Client) OnItemCompleted(handler func(ItemCompletedNotification)) {
 		handler(n)
 	})
 }
-
