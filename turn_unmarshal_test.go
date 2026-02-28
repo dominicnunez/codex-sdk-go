@@ -2,15 +2,14 @@ package codex_test
 
 import (
 	"encoding/json"
-	"strings"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go"
 )
 
-// TestUnknownUserInputType verifies that UnmarshalUserInput returns an error for unknown types
+// TestUnknownUserInputType verifies that UnmarshalUserInput preserves unknown types
+// for forward compatibility with newer protocol versions.
 func TestUnknownUserInputType(t *testing.T) {
-	// Create a TurnStartParams with an unknown UserInput type
 	jsonData := []byte(`{
 		"threadId": "thread-123",
 		"input": [
@@ -19,25 +18,39 @@ func TestUnknownUserInputType(t *testing.T) {
 	}`)
 
 	var params codex.TurnStartParams
-	err := json.Unmarshal(jsonData, &params)
-
-	// We expect an error because the type is unknown
-	if err == nil {
-		t.Fatal("expected error for unknown UserInput type, got nil")
+	if err := json.Unmarshal(jsonData, &params); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Verify error message mentions the unknown type
-	if !strings.Contains(err.Error(), "unknown UserInput type") {
-		t.Errorf("error message should mention 'unknown UserInput type', got: %v", err)
+	if len(params.Input) != 1 {
+		t.Fatalf("expected 1 input, got %d", len(params.Input))
 	}
-	if !strings.Contains(err.Error(), "unknownType") {
-		t.Errorf("error message should include the unknown type name, got: %v", err)
+
+	unknown, ok := params.Input[0].(*codex.UnknownUserInput)
+	if !ok {
+		t.Fatalf("expected *UnknownUserInput, got %T", params.Input[0])
+	}
+
+	// Verify roundtrip preserves the raw JSON
+	out, err := json.Marshal(unknown)
+	if err != nil {
+		t.Fatalf("marshal unknown input: %v", err)
+	}
+
+	var rt map[string]interface{}
+	if err := json.Unmarshal(out, &rt); err != nil {
+		t.Fatalf("unmarshal roundtrip: %v", err)
+	}
+	if rt["type"] != "unknownType" {
+		t.Errorf("roundtrip type = %v, want unknownType", rt["type"])
+	}
+	if rt["someField"] != "value" {
+		t.Errorf("roundtrip someField = %v, want value", rt["someField"])
 	}
 }
 
 // TestValidUserInputTypeAfterUnknown verifies that valid types still work correctly
 func TestValidUserInputTypeAfterUnknown(t *testing.T) {
-	// Create a TurnStartParams with a valid UserInput type
 	jsonData := []byte(`{
 		"threadId": "thread-123",
 		"input": [
@@ -46,14 +59,10 @@ func TestValidUserInputTypeAfterUnknown(t *testing.T) {
 	}`)
 
 	var params codex.TurnStartParams
-	err := json.Unmarshal(jsonData, &params)
-
-	// Valid type should not error
-	if err != nil {
+	if err := json.Unmarshal(jsonData, &params); err != nil {
 		t.Fatalf("unexpected error for valid UserInput type: %v", err)
 	}
 
-	// Verify the input was parsed correctly
 	if len(params.Input) != 1 {
 		t.Fatalf("expected 1 input, got %d", len(params.Input))
 	}

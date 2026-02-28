@@ -3,7 +3,6 @@ package codex
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 )
 
 // TurnService handles turn-related operations
@@ -246,6 +245,18 @@ func (m *MentionUserInput) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// UnknownUserInput represents an unrecognized user input type from a newer protocol version.
+type UnknownUserInput struct {
+	Type string          `json:"-"`
+	Raw  json.RawMessage `json:"-"`
+}
+
+func (u *UnknownUserInput) userInput() {}
+
+func (u *UnknownUserInput) MarshalJSON() ([]byte, error) {
+	return u.Raw, nil
+}
+
 // UnmarshalUserInput unmarshals a UserInput from JSON based on the "type" field
 func UnmarshalUserInput(data []byte) (UserInput, error) {
 	var typeField struct {
@@ -287,6 +298,6 @@ func UnmarshalUserInput(data []byte) (UserInput, error) {
 		}
 		return &input, nil
 	default:
-		return nil, fmt.Errorf("unknown UserInput type: %s", typeField.Type)
+		return &UnknownUserInput{Type: typeField.Type, Raw: append(json.RawMessage(nil), data...)}, nil
 	}
 }
