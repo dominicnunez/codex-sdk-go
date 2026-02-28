@@ -52,6 +52,9 @@ type UnknownAccount struct {
 func (u *UnknownAccount) accountType() string { return u.Type }
 
 func (u *UnknownAccount) MarshalJSON() ([]byte, error) {
+	if u.Raw == nil {
+		return []byte("null"), nil
+	}
 	return u.Raw, nil
 }
 
@@ -277,6 +280,9 @@ type UnknownLoginAccountResponse struct {
 func (u *UnknownLoginAccountResponse) loginResponseType() string { return u.Type }
 
 func (u *UnknownLoginAccountResponse) MarshalJSON() ([]byte, error) {
+	if u.Raw == nil {
+		return []byte("null"), nil
+	}
 	return u.Raw, nil
 }
 

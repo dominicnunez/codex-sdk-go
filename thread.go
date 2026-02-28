@@ -145,6 +145,9 @@ type UnknownThreadStatus struct {
 func (UnknownThreadStatus) isThreadStatus() {}
 
 func (u UnknownThreadStatus) MarshalJSON() ([]byte, error) {
+	if u.Raw == nil {
+		return []byte("null"), nil
+	}
 	return u.Raw, nil
 }
 
@@ -332,6 +335,9 @@ type UnknownAskForApproval struct {
 func (UnknownAskForApproval) isAskForApproval() {}
 
 func (u UnknownAskForApproval) MarshalJSON() ([]byte, error) {
+	if u.Raw == nil {
+		return []byte("null"), nil
+	}
 	return u.Raw, nil
 }
 
@@ -434,6 +440,9 @@ type UnknownSandboxPolicy struct {
 func (UnknownSandboxPolicy) isSandboxPolicy() {}
 
 func (u UnknownSandboxPolicy) MarshalJSON() ([]byte, error) {
+	if u.Raw == nil {
+		return []byte("null"), nil
+	}
 	return u.Raw, nil
 }
 
@@ -467,6 +476,9 @@ type UnknownReadOnlyAccess struct {
 func (UnknownReadOnlyAccess) isReadOnlyAccess() {}
 
 func (u UnknownReadOnlyAccess) MarshalJSON() ([]byte, error) {
+	if u.Raw == nil {
+		return []byte("null"), nil
+	}
 	return u.Raw, nil
 }
 

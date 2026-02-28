@@ -226,6 +226,9 @@ type UnknownConfigLayerSource struct {
 func (UnknownConfigLayerSource) isConfigLayerSource() {}
 
 func (u UnknownConfigLayerSource) MarshalJSON() ([]byte, error) {
+	if u.Raw == nil {
+		return []byte("null"), nil
+	}
 	return u.Raw, nil
 }
 

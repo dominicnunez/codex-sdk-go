@@ -85,6 +85,9 @@ type UnknownReviewTarget struct {
 func (*UnknownReviewTarget) reviewTarget() {}
 
 func (u *UnknownReviewTarget) MarshalJSON() ([]byte, error) {
+	if u.Raw == nil {
+		return []byte("null"), nil
+	}
 	return u.Raw, nil
 }
 

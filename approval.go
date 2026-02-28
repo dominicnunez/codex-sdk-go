@@ -58,6 +58,9 @@ type UnknownFileChange struct {
 func (u *UnknownFileChange) fileChange() {}
 
 func (u *UnknownFileChange) MarshalJSON() ([]byte, error) {
+	if u.Raw == nil {
+		return []byte("null"), nil
+	}
 	return u.Raw, nil
 }
 
@@ -759,6 +762,9 @@ type UnknownDynamicToolCallOutputContentItem struct {
 func (u *UnknownDynamicToolCallOutputContentItem) dynamicToolCallOutputContentItem() {}
 
 func (u *UnknownDynamicToolCallOutputContentItem) MarshalJSON() ([]byte, error) {
+	if u.Raw == nil {
+		return []byte("null"), nil
+	}
 	return u.Raw, nil
 }
 

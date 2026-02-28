@@ -255,6 +255,9 @@ type UnknownUserInput struct {
 func (u *UnknownUserInput) userInput() {}
 
 func (u *UnknownUserInput) MarshalJSON() ([]byte, error) {
+	if u.Raw == nil {
+		return []byte("null"), nil
+	}
 	return u.Raw, nil
 }
 

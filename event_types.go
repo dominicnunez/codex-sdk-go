@@ -161,6 +161,9 @@ type UnknownPatchChangeKind struct {
 func (UnknownPatchChangeKind) patchChangeKind() {}
 
 func (u UnknownPatchChangeKind) MarshalJSON() ([]byte, error) {
+	if u.Raw == nil {
+		return []byte("null"), nil
+	}
 	return u.Raw, nil
 }
 
@@ -288,6 +291,9 @@ type UnknownWebSearchAction struct {
 func (UnknownWebSearchAction) webSearchAction() {}
 
 func (u UnknownWebSearchAction) MarshalJSON() ([]byte, error) {
+	if u.Raw == nil {
+		return []byte("null"), nil
+	}
 	return u.Raw, nil
 }
 
