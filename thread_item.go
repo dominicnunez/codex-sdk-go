@@ -484,3 +484,15 @@ func (w *ThreadItemWrapper) UnmarshalJSON(data []byte) error {
 func (w ThreadItemWrapper) MarshalJSON() ([]byte, error) {
 	return json.Marshal(w.Value)
 }
+
+// IsCollabToolCall returns true if the item is a CollabAgentToolCallThreadItem.
+func (w ThreadItemWrapper) IsCollabToolCall() bool {
+	_, ok := w.Value.(*CollabAgentToolCallThreadItem)
+	return ok
+}
+
+// CollabToolCall returns the underlying CollabAgentToolCallThreadItem, or nil.
+func (w ThreadItemWrapper) CollabToolCall() *CollabAgentToolCallThreadItem {
+	c, _ := w.Value.(*CollabAgentToolCallThreadItem)
+	return c
+}
