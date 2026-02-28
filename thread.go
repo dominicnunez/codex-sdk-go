@@ -161,7 +161,12 @@ func (s *SessionSourceWrapper) UnmarshalJSON(data []byte) error {
 	// Try string literal first
 	var literal string
 	if err := json.Unmarshal(data, &literal); err == nil {
-		s.Value = sessionSourceLiteral(literal)
+		switch sessionSourceLiteral(literal) {
+		case SessionSourceCLI, SessionSourceVSCode, SessionSourceExec, SessionSourceAppServer, SessionSourceUnknown:
+			s.Value = sessionSourceLiteral(literal)
+		default:
+			return fmt.Errorf("unknown session source: %s", literal)
+		}
 		return nil
 	}
 
@@ -169,19 +174,55 @@ func (s *SessionSourceWrapper) UnmarshalJSON(data []byte) error {
 	// is actually present, otherwise any JSON object would match
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err == nil {
-		if _, hasKey := raw["subAgent"]; hasKey {
-			var subAgent SessionSourceSubAgent
-			if err := json.Unmarshal(data, &subAgent); err != nil {
+		if subAgentRaw, hasKey := raw["subAgent"]; hasKey {
+			subAgent, err := unmarshalSubAgentSource(subAgentRaw)
+			if err != nil {
 				return fmt.Errorf("unmarshal session source subAgent: %w", err)
 			}
-			s.Value = subAgent
+			s.Value = SessionSourceSubAgent{SubAgent: subAgent}
 			return nil
 		}
 	}
 
-	// Default to unknown
-	s.Value = SessionSourceUnknown
-	return nil
+	return fmt.Errorf("unable to unmarshal SessionSource")
+}
+
+// unmarshalSubAgentSource dispatches the SubAgentSource discriminated union.
+func unmarshalSubAgentSource(data json.RawMessage) (SubAgentSource, error) {
+	// Try string literal first
+	var literal string
+	if err := json.Unmarshal(data, &literal); err == nil {
+		switch subAgentSourceLiteral(literal) {
+		case SubAgentSourceReview, SubAgentSourceCompact, SubAgentSourceMemoryConsolidation:
+			return subAgentSourceLiteral(literal), nil
+		default:
+			return nil, fmt.Errorf("unknown sub-agent source: %s", literal)
+		}
+	}
+
+	// Try object variants
+	var keys map[string]json.RawMessage
+	if err := json.Unmarshal(data, &keys); err != nil {
+		return nil, fmt.Errorf("unable to unmarshal SubAgentSource")
+	}
+
+	if _, ok := keys["thread_spawn"]; ok {
+		var ts SubAgentSourceThreadSpawn
+		if err := json.Unmarshal(data, &ts); err != nil {
+			return nil, fmt.Errorf("unmarshal thread_spawn: %w", err)
+		}
+		return ts, nil
+	}
+
+	if _, ok := keys["other"]; ok {
+		var other SubAgentSourceOther
+		if err := json.Unmarshal(data, &other); err != nil {
+			return nil, fmt.Errorf("unmarshal other: %w", err)
+		}
+		return other, nil
+	}
+
+	return nil, fmt.Errorf("unable to unmarshal SubAgentSource")
 }
 
 // MarshalJSON for SessionSourceWrapper
@@ -285,7 +326,12 @@ func (a *AskForApprovalWrapper) UnmarshalJSON(data []byte) error {
 	// Try string literal first
 	var literal string
 	if err := json.Unmarshal(data, &literal); err == nil {
-		a.Value = approvalPolicyLiteral(literal)
+		switch approvalPolicyLiteral(literal) {
+		case ApprovalPolicyUntrusted, ApprovalPolicyOnFailure, ApprovalPolicyOnRequest, ApprovalPolicyNever:
+			a.Value = approvalPolicyLiteral(literal)
+		default:
+			return fmt.Errorf("unknown approval policy: %s", literal)
+		}
 		return nil
 	}
 
@@ -303,9 +349,7 @@ func (a *AskForApprovalWrapper) UnmarshalJSON(data []byte) error {
 		}
 	}
 
-	// Default to untrusted
-	a.Value = ApprovalPolicyUntrusted
-	return nil
+	return fmt.Errorf("unable to unmarshal AskForApproval")
 }
 
 // MarshalJSON for AskForApprovalWrapper
