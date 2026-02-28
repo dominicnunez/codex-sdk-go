@@ -2,8 +2,6 @@ package codex
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 )
 
 // ClientInfo represents information about the client application.
@@ -37,34 +35,9 @@ type InitializeResponse struct {
 // Initialize sends an initialize request to the server.
 // This is the v1 handshake that must be performed before using v2 protocol methods.
 func (c *Client) Initialize(ctx context.Context, params InitializeParams) (InitializeResponse, error) {
-	// Marshal params to JSON
-	paramsJSON, err := json.Marshal(params)
-	if err != nil {
-		return InitializeResponse{}, fmt.Errorf("marshal request params for initialize: %w", err)
-	}
-
-	// Create request
-	req := Request{
-		JSONRPC: jsonrpcVersion,
-		ID:      RequestID{Value: c.nextRequestID()},
-		Method:  "initialize",
-		Params:  paramsJSON,
-	}
-
-	// Send request
-	resp, err := c.Send(ctx, req)
-	if err != nil {
+	var result InitializeResponse
+	if err := c.sendRequest(ctx, "initialize", params, &result); err != nil {
 		return InitializeResponse{}, err
 	}
-
-	// Parse response
-	if resp.Result == nil {
-		return InitializeResponse{}, fmt.Errorf("initialize: server returned empty result")
-	}
-	var result InitializeResponse
-	if err := json.Unmarshal(resp.Result, &result); err != nil {
-		return InitializeResponse{}, fmt.Errorf("unmarshal response result for initialize: %w", err)
-	}
-
 	return result, nil
 }
