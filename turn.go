@@ -31,6 +31,19 @@ type TurnStartParams struct {
 	Summary        *ReasoningSummaryWrapper  `json:"summary,omitempty"`
 }
 
+// unmarshalUserInputSlice unmarshals a slice of raw JSON messages into UserInput values.
+func unmarshalUserInputSlice(raw []json.RawMessage) ([]UserInput, error) {
+	inputs := make([]UserInput, len(raw))
+	for i, r := range raw {
+		input, err := UnmarshalUserInput(r)
+		if err != nil {
+			return nil, err
+		}
+		inputs[i] = input
+	}
+	return inputs, nil
+}
+
 // UnmarshalJSON implements custom unmarshaling for TurnStartParams
 func (p *TurnStartParams) UnmarshalJSON(data []byte) error {
 	type Alias TurnStartParams
@@ -46,16 +59,12 @@ func (p *TurnStartParams) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	// Unmarshal each input element
-	p.Input = make([]UserInput, len(aux.Input))
-	for i, rawInput := range aux.Input {
-		input, err := UnmarshalUserInput(rawInput)
-		if err != nil {
-			*p = TurnStartParams{}
-			return err
-		}
-		p.Input[i] = input
+	inputs, err := unmarshalUserInputSlice(aux.Input)
+	if err != nil {
+		*p = TurnStartParams{}
+		return err
 	}
+	p.Input = inputs
 
 	return nil
 }
@@ -117,16 +126,12 @@ func (p *TurnSteerParams) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	// Unmarshal each input element
-	p.Input = make([]UserInput, len(aux.Input))
-	for i, rawInput := range aux.Input {
-		input, err := UnmarshalUserInput(rawInput)
-		if err != nil {
-			*p = TurnSteerParams{}
-			return err
-		}
-		p.Input[i] = input
+	inputs, err := unmarshalUserInputSlice(aux.Input)
+	if err != nil {
+		*p = TurnSteerParams{}
+		return err
 	}
+	p.Input = inputs
 
 	return nil
 }
