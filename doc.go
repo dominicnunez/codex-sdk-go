@@ -4,7 +4,7 @@
 // service methods, streaming notification listeners, and approval handler
 // callbacks. The public API maps 1:1 to the Codex protocol schemas.
 //
-// Basic usage:
+// Basic usage with an existing transport:
 //
 //	transport := codex.NewStdioTransport(os.Stdin, os.Stdout)
 //	defer transport.Close()
@@ -21,5 +21,15 @@
 //
 //	thread, err := client.Thread.Start(ctx, codex.ThreadStartParams{
 //		Model: codex.Ptr("gpt-4"),
+//	})
+//
+// Using StartProcess for automatic process management:
+//
+//	proc, err := codex.StartProcess(ctx, nil)
+//	if err != nil { ... }
+//	defer proc.Close()
+//
+//	resp, err := proc.Client.Initialize(ctx, codex.InitializeParams{
+//		ClientInfo: codex.ClientInfo{Name: "my-app", Version: "1.0.0"},
 //	})
 package codex
