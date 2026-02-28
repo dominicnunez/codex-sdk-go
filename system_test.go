@@ -43,9 +43,7 @@ func TestWindowsSandboxSetupStart(t *testing.T) {
 				t.Fatalf("WindowsSandboxSetupStart failed: %v", err)
 			}
 
-			if resp == nil {
-				t.Fatal("Expected non-nil response")
-			}
+			_ = resp
 
 			req := mock.GetSentRequest(0)
 			if req.Method != "windowsSandbox/setupStart" {
