@@ -98,8 +98,8 @@ func TestSpecCoverage(t *testing.T) {
 		if strings.Contains(m, "JSONRPCRequest") || strings.Contains(m, "JSONRPCResponse") ||
 			strings.Contains(m, "JSONRPCNotification") || strings.Contains(m, "JSONRPCMessage") ||
 			strings.Contains(m, "JSONRPCError") || strings.Contains(m, "JSONRPCErrorError") ||
-			strings.Contains(m, "ServerNotification") || strings.Contains(m, "ClientNotification") ||
-			strings.Contains(m, "ServerRequest") || strings.Contains(m, "ClientRequest") ||
+			strings.HasPrefix(m, "ServerNotification (") || strings.HasPrefix(m, "ClientNotification (") ||
+			strings.HasPrefix(m, "ServerRequest (") || strings.HasPrefix(m, "ClientRequest (") ||
 			strings.Contains(m, "RequestId (") ||
 			strings.Contains(m, "codex_app_server_protocol.schemas") ||
 			strings.Contains(m, "RawResponseItemCompletedNotification") {
@@ -169,9 +169,9 @@ func checkTypeExists(t *testing.T, typeName string) bool {
 // TestSpecCoverageDocumentation documents the expected coverage based on PRD.md requirements.
 func TestSpecCoverageDocumentation(t *testing.T) {
 	requirements := map[string]int{
-		"v1 requests (Initialize)":          1,
-		"v2 client→server requests":         37,
-		"v2 server→client notifications":    40,
+		"v1 requests (Initialize)":           1,
+		"v2 client→server requests":          37,
+		"v2 server→client notifications":     40,
 		"v2 server→client approval requests": 9,
 	}
 
