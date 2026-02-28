@@ -30,6 +30,8 @@ func (c *Client) SetApprovalHandlers(handlers ApprovalHandlers) {
 // ========== ApplyPatchApproval (DEPRECATED - Legacy API) ==========
 
 // ApplyPatchApprovalParams represents the parameters for a server→client applyPatchApproval request.
+//
+// Deprecated: Use FileChangeRequestApprovalParams instead.
 type ApplyPatchApprovalParams struct {
 	CallID         string                     `json:"callId"`
 	ConversationID string                     `json:"conversationId"`
@@ -165,6 +167,8 @@ func (w FileChangeWrapper) MarshalJSON() ([]byte, error) {
 }
 
 // ApplyPatchApprovalResponse represents the response to an applyPatchApproval request.
+//
+// Deprecated: Use FileChangeRequestApprovalResponse instead.
 type ApplyPatchApprovalResponse struct {
 	Decision ReviewDecisionWrapper `json:"decision"`
 }
@@ -550,6 +554,8 @@ func (w CommandExecutionApprovalDecisionWrapper) MarshalJSON() ([]byte, error) {
 // ========== ExecCommandApproval (DEPRECATED - Legacy API) ==========
 
 // ExecCommandApprovalParams represents parameters for exec command approval (legacy).
+//
+// Deprecated: Use CommandExecutionRequestApprovalParams instead.
 type ExecCommandApprovalParams struct {
 	CallID         string                 `json:"callId"`
 	Command        []string               `json:"command"`
@@ -701,6 +707,8 @@ func (w ParsedCommandWrapper) MarshalJSON() ([]byte, error) {
 
 // ExecCommandApprovalResponse represents the response to an exec command approval request (legacy).
 // Uses the same ReviewDecision as ApplyPatchApproval.
+//
+// Deprecated: Use CommandExecutionRequestApprovalResponse instead.
 type ExecCommandApprovalResponse struct {
 	Decision ReviewDecisionWrapper `json:"decision"`
 }
