@@ -42,6 +42,7 @@ func (p *TurnStartParams) UnmarshalJSON(data []byte) error {
 	}
 
 	if err := json.Unmarshal(data, &aux); err != nil {
+		*p = TurnStartParams{}
 		return err
 	}
 
@@ -50,6 +51,7 @@ func (p *TurnStartParams) UnmarshalJSON(data []byte) error {
 	for i, rawInput := range aux.Input {
 		input, err := UnmarshalUserInput(rawInput)
 		if err != nil {
+			*p = TurnStartParams{}
 			return err
 		}
 		p.Input[i] = input
@@ -112,6 +114,7 @@ func (p *TurnSteerParams) UnmarshalJSON(data []byte) error {
 	}
 
 	if err := json.Unmarshal(data, &aux); err != nil {
+		*p = TurnSteerParams{}
 		return err
 	}
 
@@ -120,6 +123,7 @@ func (p *TurnSteerParams) UnmarshalJSON(data []byte) error {
 	for i, rawInput := range aux.Input {
 		input, err := UnmarshalUserInput(rawInput)
 		if err != nil {
+			*p = TurnSteerParams{}
 			return err
 		}
 		p.Input[i] = input
