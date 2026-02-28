@@ -180,34 +180,28 @@ func (w *ReviewDecisionWrapper) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	// Try object with approved_execpolicy_amendment
-	var execpolicy struct {
-		ApprovedExecpolicyAmendment struct {
-			ProposedExecpolicyAmendment []string `json:"proposed_execpolicy_amendment"`
-		} `json:"approved_execpolicy_amendment"`
-	}
-	if err := json.Unmarshal(data, &execpolicy); err == nil {
-		if len(execpolicy.ApprovedExecpolicyAmendment.ProposedExecpolicyAmendment) > 0 {
-			w.Value = ApprovedExecpolicyAmendmentDecision{
-				ProposedExecpolicyAmendment: execpolicy.ApprovedExecpolicyAmendment.ProposedExecpolicyAmendment,
-			}
-			return nil
-		}
+	// Dispatch on which key is present in the JSON object
+	var keys map[string]json.RawMessage
+	if err := json.Unmarshal(data, &keys); err != nil {
+		return fmt.Errorf("unable to unmarshal ReviewDecision")
 	}
 
-	// Try object with network_policy_amendment
-	var network struct {
-		NetworkPolicyAmendment struct {
-			NetworkPolicyAmendment NetworkPolicyAmendment `json:"network_policy_amendment"`
-		} `json:"network_policy_amendment"`
-	}
-	if err := json.Unmarshal(data, &network); err == nil {
-		if network.NetworkPolicyAmendment.NetworkPolicyAmendment.Host != "" {
-			w.Value = NetworkPolicyAmendmentDecision{
-				NetworkPolicyAmendment: network.NetworkPolicyAmendment.NetworkPolicyAmendment,
-			}
-			return nil
+	if raw, ok := keys["approved_execpolicy_amendment"]; ok {
+		var inner ApprovedExecpolicyAmendmentDecision
+		if err := json.Unmarshal(raw, &inner); err != nil {
+			return fmt.Errorf("unable to unmarshal approved_execpolicy_amendment: %w", err)
 		}
+		w.Value = inner
+		return nil
+	}
+
+	if raw, ok := keys["network_policy_amendment"]; ok {
+		var inner NetworkPolicyAmendmentDecision
+		if err := json.Unmarshal(raw, &inner); err != nil {
+			return fmt.Errorf("unable to unmarshal network_policy_amendment: %w", err)
+		}
+		w.Value = inner
+		return nil
 	}
 
 	return fmt.Errorf("unable to unmarshal ReviewDecision")
@@ -434,34 +428,30 @@ func (w *CommandExecutionApprovalDecisionWrapper) UnmarshalJSON(data []byte) err
 		return nil
 	}
 
-	// Try object with acceptWithExecpolicyAmendment
-	var execpolicy struct {
-		AcceptWithExecpolicyAmendment struct {
-			ExecpolicyAmendment []string `json:"execpolicy_amendment"`
-		} `json:"acceptWithExecpolicyAmendment"`
-	}
-	if err := json.Unmarshal(data, &execpolicy); err == nil {
-		if len(execpolicy.AcceptWithExecpolicyAmendment.ExecpolicyAmendment) > 0 {
-			w.Value = AcceptWithExecpolicyAmendmentDecision{
-				ExecpolicyAmendment: execpolicy.AcceptWithExecpolicyAmendment.ExecpolicyAmendment,
-			}
-			return nil
-		}
+	// Dispatch on which key is present in the JSON object
+	var keys map[string]json.RawMessage
+	if err := json.Unmarshal(data, &keys); err != nil {
+		return fmt.Errorf("unable to unmarshal CommandExecutionApprovalDecision")
 	}
 
-	// Try object with applyNetworkPolicyAmendment
-	var network struct {
-		ApplyNetworkPolicyAmendment struct {
-			NetworkPolicyAmendment NetworkPolicyAmendment `json:"network_policy_amendment"`
-		} `json:"applyNetworkPolicyAmendment"`
-	}
-	if err := json.Unmarshal(data, &network); err == nil {
-		if network.ApplyNetworkPolicyAmendment.NetworkPolicyAmendment.Host != "" {
-			w.Value = ApplyNetworkPolicyAmendmentDecision{
-				NetworkPolicyAmendment: network.ApplyNetworkPolicyAmendment.NetworkPolicyAmendment,
-			}
-			return nil
+	if raw, ok := keys["acceptWithExecpolicyAmendment"]; ok {
+		var inner AcceptWithExecpolicyAmendmentDecision
+		if err := json.Unmarshal(raw, &inner); err != nil {
+			return fmt.Errorf("unable to unmarshal acceptWithExecpolicyAmendment: %w", err)
 		}
+		w.Value = inner
+		return nil
+	}
+
+	if raw, ok := keys["applyNetworkPolicyAmendment"]; ok {
+		var inner struct {
+			NetworkPolicyAmendment NetworkPolicyAmendment `json:"network_policy_amendment"`
+		}
+		if err := json.Unmarshal(raw, &inner); err != nil {
+			return fmt.Errorf("unable to unmarshal applyNetworkPolicyAmendment: %w", err)
+		}
+		w.Value = ApplyNetworkPolicyAmendmentDecision{NetworkPolicyAmendment: inner.NetworkPolicyAmendment}
+		return nil
 	}
 
 	return fmt.Errorf("unable to unmarshal CommandExecutionApprovalDecision")
