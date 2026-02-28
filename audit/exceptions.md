@@ -90,6 +90,16 @@ These are two different spec schemas with different JSON field names:
 with inner field `"execpolicy_amendment"`. The Go types faithfully mirror the specs. The naming
 difference originates in the protocol definition, not in the Go code.
 
+### go.mod specifies go 1.25 which does not exist
+
+**Location:** `go.mod:3` — go directive version
+**Date:** 2026-02-27
+
+**Reason:** The audit claims "Go 1.25 has not been released" and "As of February 2026, Go 1.24
+is the latest stable release." This is factually incorrect. Go 1.25 was released on August 12,
+2025 — over six months before this audit. The `go 1.25` directive in go.mod is valid and refers
+to an existing, stable Go release.
+
 ## Won't Fix
 
 <!-- Real findings not worth fixing — architectural cost, external constraints, etc. -->
@@ -142,6 +152,17 @@ errors (breaking change). The silent-drop behavior is consistent with JSON-RPC 2
 semantics where the server doesn't expect acknowledgment. Malformed notifications from the server
 indicate a protocol-level bug that would manifest in other ways. The risk of silent data loss is
 low relative to the API churn required to surface these errors.
+
+### readLoop silently skips unparseable JSON lines with no diagnostic
+
+**Location:** `stdio.go:250-253` — readLoop JSON unmarshal failure path
+**Date:** 2026-02-27
+
+**Reason:** Surfacing dropped-line counts requires new public API (e.g. a `DroppedMessages() uint64`
+method on `StdioTransport`). The transport deliberately stays alive on malformed input — a single
+bad line should not kill the connection. Pending requests for dropped responses will time out via
+their context, which is the correct failure mode. Adding a counter is new API surface
+disproportionate to a Low severity debugging-convenience finding.
 
 ### McpToolCallResult.Content and MCP metadata fields use untyped interface{}
 
