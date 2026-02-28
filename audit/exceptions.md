@@ -63,6 +63,21 @@ any external party. There is no logging or debugging path in this code — the e
 `handleApproval` return → `handleRequest` goroutine → generic error response. The internal type
 information never crosses any trust boundary.
 
+### ReviewDecisionWrapper and CommandExecutionApprovalDecisionWrapper field names differ because the specs differ
+
+**Location:** `approval.go:189-195` — ReviewDecisionWrapper.UnmarshalJSON
+**Date:** 2026-02-27
+
+**Reason:** The audit claims the naming difference between `ApprovedExecpolicyAmendmentDecision.ProposedExecpolicyAmendment`
+(in `ReviewDecisionWrapper`) and `AcceptWithExecpolicyAmendmentDecision.ExecpolicyAmendment`
+(in `CommandExecutionApprovalDecisionWrapper`) is a code-level inconsistency. This is incorrect.
+These are two different spec schemas with different JSON field names:
+`ApplyPatchApprovalResponse.json` / `ExecCommandApprovalResponse.json` define outer key
+`"approved_execpolicy_amendment"` with inner field `"proposed_execpolicy_amendment"`, while
+`CommandExecutionRequestApprovalResponse.json` defines outer key `"acceptWithExecpolicyAmendment"`
+with inner field `"execpolicy_amendment"`. The Go types faithfully mirror the specs. The naming
+difference originates in the protocol definition, not in the Go code.
+
 ## Won't Fix
 
 <!-- Real findings not worth fixing — architectural cost, external constraints, etc. -->
