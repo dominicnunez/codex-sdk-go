@@ -412,16 +412,12 @@ func (t *StdioTransport) handleNotification(data []byte) {
 
 	t.mu.Lock()
 	handler := t.notifHandler
+	panicFn := t.panicHandler
 	t.mu.Unlock()
 
 	if handler == nil {
-		// No handler registered - silently ignore notification
 		return
 	}
-
-	t.mu.Lock()
-	panicFn := t.panicHandler
-	t.mu.Unlock()
 
 	// Dispatch to handler in goroutine with transport-scoped context
 	go func() {
