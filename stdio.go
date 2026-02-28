@@ -27,7 +27,7 @@ type StdioTransport struct {
 	mu            sync.Mutex
 	closed        bool
 	writeMu       sync.Mutex // separate mutex for write operations
-	pendingReqs   map[interface{}]pendingReq
+	pendingReqs   map[string]pendingReq
 	reqHandler    RequestHandler
 	notifHandler  NotificationHandler
 	readerStopped chan struct{}
@@ -37,31 +37,23 @@ type StdioTransport struct {
 	cancelCtx     context.CancelFunc
 }
 
-// normalizeID normalizes request IDs for map key matching.
-// JSON unmarshals all numbers as float64, so we normalize non-negative
-// integer-valued floats to uint64 for consistent map lookups.
-// Negative or fractional values are kept in their original type.
-// Unknown types are stringified to guarantee comparable map keys.
-func normalizeID(id interface{}) interface{} {
+// normalizeID normalizes request IDs to a string key for map matching.
+// JSON unmarshals all numbers as float64, so we format non-negative
+// integer-valued floats without decimals for consistent lookups.
+func normalizeID(id interface{}) string {
 	switch v := id.(type) {
 	case float64:
 		u := uint64(v)
 		if v >= 0 && v == float64(u) {
-			return u
+			return fmt.Sprintf("%d", u)
 		}
-		return v
+		return fmt.Sprintf("%v", v)
 	case int64:
-		if v >= 0 {
-			return uint64(v)
-		}
-		return v
+		return fmt.Sprintf("%d", v)
 	case int:
-		if v >= 0 {
-			return uint64(v)
-		}
-		return v
+		return fmt.Sprintf("%d", v)
 	case uint64:
-		return v
+		return fmt.Sprintf("%d", v)
 	case string:
 		return v
 	default:
@@ -77,7 +69,7 @@ func NewStdioTransport(reader io.Reader, writer io.Writer) *StdioTransport {
 	t := &StdioTransport{
 		reader:        reader,
 		writer:        writer,
-		pendingReqs:   make(map[interface{}]pendingReq),
+		pendingReqs:   make(map[string]pendingReq),
 		readerStopped: make(chan struct{}),
 		ctx:           ctx,
 		cancelCtx:     cancel,
