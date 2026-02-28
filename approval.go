@@ -448,9 +448,18 @@ type CommandExecutionRequestApprovalResponse struct {
 }
 
 // CommandExecutionApprovalDecisionWrapper wraps the decision for command execution approval.
+// String values should use the CommandExecutionApprovalDecision* constants.
 type CommandExecutionApprovalDecisionWrapper struct {
 	Value interface{} // string or object
 }
+
+// String constants for CommandExecutionApprovalDecision.
+const (
+	CommandExecutionApprovalDecisionAccept           = "accept"
+	CommandExecutionApprovalDecisionAcceptForSession = "acceptForSession"
+	CommandExecutionApprovalDecisionDecline          = "decline"
+	CommandExecutionApprovalDecisionCancel           = "cancel"
+)
 
 // AcceptWithExecpolicyAmendmentDecision represents acceptance with execpolicy amendment.
 type AcceptWithExecpolicyAmendmentDecision struct {

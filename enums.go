@@ -199,6 +199,7 @@ const (
 	FileChangeApprovalDecisionAccept           FileChangeApprovalDecision = "accept"
 	FileChangeApprovalDecisionAcceptForSession FileChangeApprovalDecision = "acceptForSession"
 	FileChangeApprovalDecisionDecline          FileChangeApprovalDecision = "decline"
+	FileChangeApprovalDecisionCancel           FileChangeApprovalDecision = "cancel"
 )
 
 // AppToolApproval represents the approval mode for an app tool.

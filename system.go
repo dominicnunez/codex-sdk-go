@@ -20,8 +20,10 @@ type WindowsSandboxSetupStartParams struct {
 	Mode WindowsSandboxSetupMode `json:"mode"`
 }
 
-// WindowsSandboxSetupStartResponse is the response from windowsSandbox/setupStart (empty)
-type WindowsSandboxSetupStartResponse struct{}
+// WindowsSandboxSetupStartResponse is the response from windowsSandbox/setupStart
+type WindowsSandboxSetupStartResponse struct {
+	Started bool `json:"started"`
+}
 
 // --- Server→Client Notification Types ---
 
