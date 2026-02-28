@@ -166,12 +166,19 @@ func (t *StdioTransport) Close() error {
 	t.closed = true
 	t.cancelCtx()
 
-	// Unblock all pending request waiters by sending zero-value responses.
-	// We send rather than close because handleResponse may concurrently
-	// hold a reference to the channel and attempt a send after Close.
+	// Unblock all pending request waiters with an error response indicating
+	// the transport was closed. We send rather than close because
+	// handleResponse may concurrently hold a reference to the channel.
+	closedResp := Response{
+		JSONRPC: jsonrpcVersion,
+		Error: &Error{
+			Code:    ErrCodeInternalError,
+			Message: "transport closed",
+		},
+	}
 	for id, ch := range t.pendingReqs {
 		select {
-		case ch <- Response{}:
+		case ch <- closedResp:
 		default:
 		}
 		delete(t.pendingReqs, id)
@@ -258,7 +265,9 @@ func (t *StdioTransport) readLoop() {
 	}
 }
 
-// handleResponse routes an incoming response to the pending request channel
+// handleResponse routes an incoming response to the pending request channel.
+// It claims the channel under the lock by deleting from pendingReqs, preventing
+// Close from racing to send on the same channel.
 func (t *StdioTransport) handleResponse(data []byte) {
 	var resp Response
 	if err := json.Unmarshal(data, &resp); err != nil {
@@ -274,13 +283,13 @@ func (t *StdioTransport) handleResponse(data []byte) {
 		return
 	}
 	respChan, ok := t.pendingReqs[normalizedID]
+	if ok {
+		delete(t.pendingReqs, normalizedID)
+	}
 	t.mu.Unlock()
 
 	if ok {
-		select {
-		case respChan <- resp:
-		default:
-		}
+		respChan <- resp
 	}
 }
 
