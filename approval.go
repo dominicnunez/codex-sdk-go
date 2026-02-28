@@ -204,22 +204,11 @@ func (u UnknownReviewDecision) MarshalJSON() ([]byte, error) {
 	return u.Raw, nil
 }
 
-// Valid string values for ReviewDecision per spec.
-var validReviewDecisions = map[string]bool{
-	"approved":             true,
-	"approved_for_session": true,
-	"denied":               true,
-	"abort":                true,
-}
-
 // UnmarshalJSON implements custom unmarshaling for ReviewDecisionWrapper.
 func (w *ReviewDecisionWrapper) UnmarshalJSON(data []byte) error {
 	// Try string first
 	var str string
 	if err := json.Unmarshal(data, &str); err == nil {
-		if !validReviewDecisions[str] {
-			return fmt.Errorf("unknown review decision: %s", str)
-		}
 		w.Value = str
 		return nil
 	}
@@ -483,22 +472,11 @@ func (u UnknownCommandExecutionApprovalDecision) MarshalJSON() ([]byte, error) {
 	return u.Raw, nil
 }
 
-// Valid string values for CommandExecutionApprovalDecision per spec.
-var validCommandExecutionDecisions = map[string]bool{
-	"accept":           true,
-	"acceptForSession": true,
-	"decline":          true,
-	"cancel":           true,
-}
-
 // UnmarshalJSON implements custom unmarshaling for CommandExecutionApprovalDecisionWrapper.
 func (w *CommandExecutionApprovalDecisionWrapper) UnmarshalJSON(data []byte) error {
 	// Try string first
 	var str string
 	if err := json.Unmarshal(data, &str); err == nil {
-		if !validCommandExecutionDecisions[str] {
-			return fmt.Errorf("unknown command execution approval decision: %s", str)
-		}
 		w.Value = str
 		return nil
 	}
