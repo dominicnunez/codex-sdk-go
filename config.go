@@ -69,7 +69,13 @@ func (w *ReasoningSummaryWrapper) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &str); err != nil {
 		return err
 	}
-	w.Value = ReasoningSummaryMode(str)
+	mode := ReasoningSummaryMode(str)
+	switch mode {
+	case ReasoningSummaryModeAuto, ReasoningSummaryModeConcise, ReasoningSummaryModeDetailed, ReasoningSummaryModeNone:
+		w.Value = mode
+	default:
+		return fmt.Errorf("unknown reasoning summary mode: %s", str)
+	}
 	return nil
 }
 
