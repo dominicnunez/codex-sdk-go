@@ -27,9 +27,9 @@ type UncommittedChangesReviewTarget struct{}
 func (*UncommittedChangesReviewTarget) reviewTarget() {}
 
 func (u *UncommittedChangesReviewTarget) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]interface{}{
-		"type": "uncommittedChanges",
-	})
+	return json.Marshal(struct {
+		Type string `json:"type"`
+	}{Type: "uncommittedChanges"})
 }
 
 // BaseBranchReviewTarget reviews changes between the current branch and the given base branch.
@@ -40,10 +40,10 @@ type BaseBranchReviewTarget struct {
 func (*BaseBranchReviewTarget) reviewTarget() {}
 
 func (b *BaseBranchReviewTarget) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]interface{}{
-		"type":   "baseBranch",
-		"branch": b.Branch,
-	})
+	return json.Marshal(struct {
+		Type   string `json:"type"`
+		Branch string `json:"branch"`
+	}{Type: "baseBranch", Branch: b.Branch})
 }
 
 // CommitReviewTarget reviews the changes introduced by a specific commit.
@@ -55,14 +55,11 @@ type CommitReviewTarget struct {
 func (*CommitReviewTarget) reviewTarget() {}
 
 func (c *CommitReviewTarget) MarshalJSON() ([]byte, error) {
-	data := map[string]interface{}{
-		"type": "commit",
-		"sha":  c.SHA,
-	}
-	if c.Title != nil {
-		data["title"] = *c.Title
-	}
-	return json.Marshal(data)
+	return json.Marshal(struct {
+		Type  string  `json:"type"`
+		SHA   string  `json:"sha"`
+		Title *string `json:"title,omitempty"`
+	}{Type: "commit", SHA: c.SHA, Title: c.Title})
 }
 
 // CustomReviewTarget represents arbitrary instructions, equivalent to the old free-form prompt.
@@ -73,10 +70,22 @@ type CustomReviewTarget struct {
 func (*CustomReviewTarget) reviewTarget() {}
 
 func (c *CustomReviewTarget) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]interface{}{
-		"type":         "custom",
-		"instructions": c.Instructions,
-	})
+	return json.Marshal(struct {
+		Type         string `json:"type"`
+		Instructions string `json:"instructions"`
+	}{Type: "custom", Instructions: c.Instructions})
+}
+
+// UnknownReviewTarget represents an unrecognized review target type from a newer protocol version.
+type UnknownReviewTarget struct {
+	Type string          `json:"type"`
+	Raw  json.RawMessage `json:"-"`
+}
+
+func (*UnknownReviewTarget) reviewTarget() {}
+
+func (u *UnknownReviewTarget) MarshalJSON() ([]byte, error) {
+	return u.Raw, nil
 }
 
 // ReviewTargetWrapper wraps a ReviewTarget for JSON marshaling/unmarshaling.
@@ -123,7 +132,7 @@ func (w *ReviewTargetWrapper) UnmarshalJSON(data []byte) error {
 		}
 		w.Value = &target
 	default:
-		return fmt.Errorf("unknown review target type: %s", typeStr)
+		w.Value = &UnknownReviewTarget{Type: typeStr, Raw: append(json.RawMessage(nil), data...)}
 	}
 
 	return nil
