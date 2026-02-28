@@ -276,12 +276,12 @@ func methodNotFoundResponse(id RequestID) Response {
 func handleApproval[P any, R any](ctx context.Context, req Request, handler func(context.Context, P) (R, error)) (Response, error) {
 	var params P
 	if err := json.Unmarshal(req.Params, &params); err != nil {
-		return Response{}, fmt.Errorf("unmarshal %s params: %w", req.Method, errors.Join(errInvalidParams, err))
+		return Response{}, fmt.Errorf("unmarshal %s params: %w: %w", req.Method, errInvalidParams, err)
 	}
 
 	result, err := handler(ctx, params)
 	if err != nil {
-		return Response{}, fmt.Errorf("approval handler %s: %w", req.Method, errors.Join(errHandlerFailed, err))
+		return Response{}, fmt.Errorf("approval handler %s: %w: %w", req.Method, errHandlerFailed, err)
 	}
 
 	resultJSON, err := marshalForWire(&result)
