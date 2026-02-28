@@ -203,6 +203,8 @@ func (t *StdioTransport) Close() error {
 				Message: "transport closed",
 			},
 		}
+		// Defensive: default branch guards against a handleResponse
+		// send racing between the closed check and this loop iteration.
 		select {
 		case pending.ch <- resp:
 		default:
