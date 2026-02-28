@@ -14,7 +14,6 @@ type ApprovalHandlers struct {
 	OnCommandExecutionRequestApproval func(context.Context, CommandExecutionRequestApprovalParams) (CommandExecutionRequestApprovalResponse, error)
 	OnExecCommandApproval             func(context.Context, ExecCommandApprovalParams) (ExecCommandApprovalResponse, error)
 	OnFileChangeRequestApproval       func(context.Context, FileChangeRequestApprovalParams) (FileChangeRequestApprovalResponse, error)
-	OnSkillRequestApproval            func(context.Context, SkillRequestApprovalParams) (SkillRequestApprovalResponse, error)
 	OnDynamicToolCall                 func(context.Context, DynamicToolCallParams) (DynamicToolCallResponse, error)
 	OnToolRequestUserInput            func(context.Context, ToolRequestUserInputParams) (ToolRequestUserInputResponse, error)
 	OnChatgptAuthTokensRefresh        func(context.Context, ChatgptAuthTokensRefreshParams) (ChatgptAuthTokensRefreshResponse, error)
@@ -727,19 +726,6 @@ type FileChangeRequestApprovalParams struct {
 // FileChangeRequestApprovalResponse represents the response to a file change approval request.
 type FileChangeRequestApprovalResponse struct {
 	Decision FileChangeApprovalDecision `json:"decision"`
-}
-
-// ========== SkillRequestApproval (NEW - turn/start API) ==========
-
-// SkillRequestApprovalParams represents parameters for skill approval.
-type SkillRequestApprovalParams struct {
-	ItemID    string `json:"itemId"`
-	SkillName string `json:"skillName"`
-}
-
-// SkillRequestApprovalResponse represents the response to a skill approval request.
-type SkillRequestApprovalResponse struct {
-	Decision SkillApprovalDecision `json:"decision"`
 }
 
 // ========== DynamicToolCall (NEW - Direct Tool Execution) ==========

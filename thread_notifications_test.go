@@ -277,6 +277,49 @@ func TestThreadTokenUsageUpdatedNotification(t *testing.T) {
 	}
 }
 
+// TestServerRequestResolvedNotification tests ServerRequestResolvedNotification deserialization
+func TestServerRequestResolvedNotification(t *testing.T) {
+	jsonData := `{"requestId": 42, "threadId": "thread-123"}`
+
+	var notification codex.ServerRequestResolvedNotification
+	if err := json.Unmarshal([]byte(jsonData), &notification); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if notification.ThreadID != "thread-123" {
+		t.Errorf("expected threadId 'thread-123', got %q", notification.ThreadID)
+	}
+}
+
+// TestServerRequestResolvedListener tests the OnServerRequestResolved listener
+func TestServerRequestResolvedListener(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+
+	ctx := context.Background()
+
+	called := false
+	var receivedNotification codex.ServerRequestResolvedNotification
+
+	client.OnServerRequestResolved(func(n codex.ServerRequestResolvedNotification) {
+		called = true
+		receivedNotification = n
+	})
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "serverRequest/resolved",
+		Params:  json.RawMessage(`{"requestId": 99, "threadId": "thread-resolved"}`),
+	})
+
+	if !called {
+		t.Error("serverRequest/resolved listener was not called")
+	}
+	if receivedNotification.ThreadID != "thread-resolved" {
+		t.Errorf("expected thread ID 'thread-resolved', got %q", receivedNotification.ThreadID)
+	}
+}
+
 // TestThreadNotificationListenerRegistration tests that notification listeners can be registered and dispatched
 func TestThreadNotificationListenerRegistration(t *testing.T) {
 	mock := NewMockTransport()

@@ -249,7 +249,6 @@ func TestApprovalHandlerDispatch(t *testing.T) {
 	var commandExecCalled bool
 	var execCommandCalled bool
 	var fileChangeCalled bool
-	var skillCalled bool
 	var toolCallCalled bool
 	var userInputCalled bool
 	var authRefreshCalled bool
@@ -279,12 +278,6 @@ func TestApprovalHandlerDispatch(t *testing.T) {
 				Decision: "accept",
 			}, nil
 		},
-		OnSkillRequestApproval: func(ctx context.Context, params codex.SkillRequestApprovalParams) (codex.SkillRequestApprovalResponse, error) {
-			skillCalled = true
-			return codex.SkillRequestApprovalResponse{
-				Decision: "approve",
-			}, nil
-		},
 		OnDynamicToolCall: func(ctx context.Context, params codex.DynamicToolCallParams) (codex.DynamicToolCallResponse, error) {
 			toolCallCalled = true
 			return codex.DynamicToolCallResponse{
@@ -305,9 +298,9 @@ func TestApprovalHandlerDispatch(t *testing.T) {
 		OnChatgptAuthTokensRefresh: func(ctx context.Context, params codex.ChatgptAuthTokensRefreshParams) (codex.ChatgptAuthTokensRefreshResponse, error) {
 			authRefreshCalled = true
 			return codex.ChatgptAuthTokensRefreshResponse{
-				AccessToken:       "new-token",
-				ChatgptAccountID:  "account-123",
-				ChatgptPlanType:   ptr("plus"),
+				AccessToken:      "new-token",
+				ChatgptAccountID: "account-123",
+				ChatgptPlanType:  ptr("plus"),
 			}, nil
 		},
 	}
@@ -349,34 +342,26 @@ func TestApprovalHandlerDispatch(t *testing.T) {
 		Params:  json.RawMessage(`{"itemId":"i1","threadId":"t1","turnId":"tu1"}`),
 	})
 
-	// 5. SkillRequestApproval
+	// 5. DynamicToolCall
 	_, _ = mock.InjectServerRequest(ctx, codex.Request{
 		JSONRPC: "2.0",
 		ID:      codex.RequestID{Value: 5},
-		Method:  "skill/requestApproval",
-		Params:  json.RawMessage(`{"itemId":"i1","skillName":"test-skill"}`),
-	})
-
-	// 6. DynamicToolCall
-	_, _ = mock.InjectServerRequest(ctx, codex.Request{
-		JSONRPC: "2.0",
-		ID:      codex.RequestID{Value: 6},
 		Method:  "item/tool/call",
 		Params:  json.RawMessage(`{"tool":"test","arguments":{},"callId":"c1","threadId":"t1","turnId":"tu1"}`),
 	})
 
-	// 7. ToolRequestUserInput
+	// 6. ToolRequestUserInput
 	_, _ = mock.InjectServerRequest(ctx, codex.Request{
 		JSONRPC: "2.0",
-		ID:      codex.RequestID{Value: 7},
+		ID:      codex.RequestID{Value: 6},
 		Method:  "item/tool/requestUserInput",
 		Params:  json.RawMessage(`{"itemId":"i1","threadId":"t1","turnId":"tu1","questions":[{"id":"q1","header":"H","question":"Q"}]}`),
 	})
 
-	// 8. ChatgptAuthTokensRefresh
+	// 7. ChatgptAuthTokensRefresh
 	_, _ = mock.InjectServerRequest(ctx, codex.Request{
 		JSONRPC: "2.0",
-		ID:      codex.RequestID{Value: 8},
+		ID:      codex.RequestID{Value: 7},
 		Method:  "account/chatgptAuthTokens/refresh",
 		Params:  json.RawMessage(`{"reason":"unauthorized"}`),
 	})
@@ -393,9 +378,6 @@ func TestApprovalHandlerDispatch(t *testing.T) {
 	}
 	if !fileChangeCalled {
 		t.Error("FileChangeRequestApproval handler not called")
-	}
-	if !skillCalled {
-		t.Error("SkillRequestApproval handler not called")
 	}
 	if !toolCallCalled {
 		t.Error("DynamicToolCall handler not called")
@@ -499,35 +481,38 @@ func TestApprovalEndToEnd(t *testing.T) {
 	}
 }
 
-// TestApprovalHandlersCompleteness verifies all 8 server→client request handler fields exist
+// TestApprovalHandlersCompleteness verifies all 7 server→client request handler fields exist
 func TestApprovalHandlersCompleteness(t *testing.T) {
-	// This test ensures ApprovalHandlers struct has all 8 handler fields
+	// This test ensures ApprovalHandlers struct has all 7 handler fields
 	// as specified in ServerRequest.json
 	handlers := codex.ApprovalHandlers{
-		OnApplyPatchApproval:              func(context.Context, codex.ApplyPatchApprovalParams) (codex.ApplyPatchApprovalResponse, error) { return codex.ApplyPatchApprovalResponse{}, nil },
-		OnCommandExecutionRequestApproval: func(context.Context, codex.CommandExecutionRequestApprovalParams) (codex.CommandExecutionRequestApprovalResponse, error) { return codex.CommandExecutionRequestApprovalResponse{}, nil },
-		OnExecCommandApproval:             func(context.Context, codex.ExecCommandApprovalParams) (codex.ExecCommandApprovalResponse, error) { return codex.ExecCommandApprovalResponse{}, nil },
-		OnFileChangeRequestApproval:       func(context.Context, codex.FileChangeRequestApprovalParams) (codex.FileChangeRequestApprovalResponse, error) { return codex.FileChangeRequestApprovalResponse{}, nil },
-		OnSkillRequestApproval:            func(context.Context, codex.SkillRequestApprovalParams) (codex.SkillRequestApprovalResponse, error) { return codex.SkillRequestApprovalResponse{}, nil },
-		OnDynamicToolCall:                 func(context.Context, codex.DynamicToolCallParams) (codex.DynamicToolCallResponse, error) { return codex.DynamicToolCallResponse{}, nil },
-		OnToolRequestUserInput:            func(context.Context, codex.ToolRequestUserInputParams) (codex.ToolRequestUserInputResponse, error) { return codex.ToolRequestUserInputResponse{}, nil },
-		OnChatgptAuthTokensRefresh:        func(context.Context, codex.ChatgptAuthTokensRefreshParams) (codex.ChatgptAuthTokensRefreshResponse, error) { return codex.ChatgptAuthTokensRefreshResponse{}, nil },
+		OnApplyPatchApproval: func(context.Context, codex.ApplyPatchApprovalParams) (codex.ApplyPatchApprovalResponse, error) {
+			return codex.ApplyPatchApprovalResponse{}, nil
+		},
+		OnCommandExecutionRequestApproval: func(context.Context, codex.CommandExecutionRequestApprovalParams) (codex.CommandExecutionRequestApprovalResponse, error) {
+			return codex.CommandExecutionRequestApprovalResponse{}, nil
+		},
+		OnExecCommandApproval: func(context.Context, codex.ExecCommandApprovalParams) (codex.ExecCommandApprovalResponse, error) {
+			return codex.ExecCommandApprovalResponse{}, nil
+		},
+		OnFileChangeRequestApproval: func(context.Context, codex.FileChangeRequestApprovalParams) (codex.FileChangeRequestApprovalResponse, error) {
+			return codex.FileChangeRequestApprovalResponse{}, nil
+		},
+		OnDynamicToolCall: func(context.Context, codex.DynamicToolCallParams) (codex.DynamicToolCallResponse, error) {
+			return codex.DynamicToolCallResponse{}, nil
+		},
+		OnToolRequestUserInput: func(context.Context, codex.ToolRequestUserInputParams) (codex.ToolRequestUserInputResponse, error) {
+			return codex.ToolRequestUserInputResponse{}, nil
+		},
+		OnChatgptAuthTokensRefresh: func(context.Context, codex.ChatgptAuthTokensRefreshParams) (codex.ChatgptAuthTokensRefreshResponse, error) {
+			return codex.ChatgptAuthTokensRefreshResponse{}, nil
+		},
 	}
 
 	// Verify we can set handlers on client
 	mock := NewMockTransport()
 	client := codex.NewClient(mock)
 	client.SetApprovalHandlers(handlers)
-
-	// Count: 8 server→client request types
-	// 1. ApplyPatchApproval
-	// 2. CommandExecutionRequestApproval
-	// 3. ExecCommandApproval
-	// 4. FileChangeRequestApproval
-	// 5. SkillRequestApproval
-	// 6. DynamicToolCall
-	// 7. ToolRequestUserInput
-	// 8. ChatgptAuthTokensRefresh
 
 	// This test will fail to compile if any handler field is missing or has wrong signature
 }

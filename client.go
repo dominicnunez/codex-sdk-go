@@ -54,17 +54,17 @@ type Client struct {
 	requestIDCounter uint64
 
 	// Service accessors
-	Thread        *ThreadService
-	Turn          *TurnService
-	Account       *AccountService
-	Config        *ConfigService
-	Model         *ModelService
-	Skills        *SkillsService
-	Apps          *AppsService
-	Mcp           *McpService
-	Command       *CommandService
-	Review        *ReviewService
-	Feedback      *FeedbackService
+	Thread          *ThreadService
+	Turn            *TurnService
+	Account         *AccountService
+	Config          *ConfigService
+	Model           *ModelService
+	Skills          *SkillsService
+	Apps            *AppsService
+	Mcp             *McpService
+	Command         *CommandService
+	Review          *ReviewService
+	Feedback        *FeedbackService
 	ExternalAgent   *ExternalAgentService
 	Experimental    *ExperimentalService
 	System          *SystemService
@@ -227,12 +227,6 @@ func (c *Client) handleRequest(ctx context.Context, req Request) (Response, erro
 			return methodNotFoundResponse(req.ID), nil
 		}
 		return handleApproval(ctx, req, handlers.OnFileChangeRequestApproval)
-
-	case methodSkillRequestApproval:
-		if handlers.OnSkillRequestApproval == nil {
-			return methodNotFoundResponse(req.ID), nil
-		}
-		return handleApproval(ctx, req, handlers.OnSkillRequestApproval)
 
 	case methodDynamicToolCall:
 		if handlers.OnDynamicToolCall == nil {

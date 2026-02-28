@@ -39,18 +39,18 @@ type ThreadStatusChangedNotification struct {
 
 // TokenUsageBreakdown contains token usage metrics
 type TokenUsageBreakdown struct {
-	CachedInputTokens    int64 `json:"cachedInputTokens"`
-	InputTokens          int64 `json:"inputTokens"`
-	OutputTokens         int64 `json:"outputTokens"`
+	CachedInputTokens     int64 `json:"cachedInputTokens"`
+	InputTokens           int64 `json:"inputTokens"`
+	OutputTokens          int64 `json:"outputTokens"`
 	ReasoningOutputTokens int64 `json:"reasoningOutputTokens"`
-	TotalTokens          int64 `json:"totalTokens"`
+	TotalTokens           int64 `json:"totalTokens"`
 }
 
 // ThreadTokenUsage contains token usage information for a thread
 type ThreadTokenUsage struct {
-	Last                TokenUsageBreakdown `json:"last"`
-	Total               TokenUsageBreakdown `json:"total"`
-	ModelContextWindow  *int64              `json:"modelContextWindow,omitempty"`
+	Last               TokenUsageBreakdown `json:"last"`
+	Total              TokenUsageBreakdown `json:"total"`
+	ModelContextWindow *int64              `json:"modelContextWindow,omitempty"`
 }
 
 // ThreadTokenUsageUpdatedNotification is sent when a thread's token usage is updated
@@ -143,6 +143,27 @@ func (c *Client) OnThreadStatusChanged(handler func(ThreadStatusChangedNotificat
 	}
 	c.OnNotification(notifyThreadStatusChanged, func(ctx context.Context, notif Notification) {
 		var notification ThreadStatusChangedNotification
+		if err := json.Unmarshal(notif.Params, &notification); err != nil {
+			return
+		}
+		handler(notification)
+	})
+}
+
+// ServerRequestResolvedNotification is sent when a server request is resolved
+type ServerRequestResolvedNotification struct {
+	RequestID RequestID `json:"requestId"`
+	ThreadID  string    `json:"threadId"`
+}
+
+// OnServerRequestResolved registers a listener for serverRequest/resolved notifications
+func (c *Client) OnServerRequestResolved(handler func(ServerRequestResolvedNotification)) {
+	if handler == nil {
+		c.OnNotification(notifyServerRequestResolved, nil)
+		return
+	}
+	c.OnNotification(notifyServerRequestResolved, func(ctx context.Context, notif Notification) {
+		var notification ServerRequestResolvedNotification
 		if err := json.Unmarshal(notif.Params, &notification); err != nil {
 			return
 		}

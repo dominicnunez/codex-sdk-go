@@ -327,19 +327,6 @@ func TestKnownApprovalHandlerDispatch(t *testing.T) {
 			expectCalled: true,
 		},
 		{
-			name:   "skill/requestApproval",
-			method: "skill/requestApproval",
-			params: map[string]interface{}{
-				"skill": "test-skill",
-			},
-			handler: func(ah *codex.ApprovalHandlers) {
-				ah.OnSkillRequestApproval = func(ctx context.Context, p codex.SkillRequestApprovalParams) (codex.SkillRequestApprovalResponse, error) {
-					return codex.SkillRequestApprovalResponse{Decision: "approve"}, nil
-				}
-			},
-			expectCalled: true,
-		},
-		{
 			name:   "item/tool/call",
 			method: "item/tool/call",
 			params: map[string]interface{}{

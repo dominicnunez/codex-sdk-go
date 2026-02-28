@@ -48,6 +48,23 @@ type Model struct {
 	SupportsPersonality bool `json:"supportsPersonality"`
 	// Optional model ID to upgrade to.
 	Upgrade *string `json:"upgrade,omitempty"`
+	// Availability nux message for the model.
+	AvailabilityNux *ModelAvailabilityNux `json:"availabilityNux,omitempty"`
+	// Upgrade information for the model.
+	UpgradeInfo *ModelUpgradeInfo `json:"upgradeInfo,omitempty"`
+}
+
+// ModelAvailabilityNux contains an availability nux message for a model.
+type ModelAvailabilityNux struct {
+	Message string `json:"message"`
+}
+
+// ModelUpgradeInfo contains upgrade information for a model.
+type ModelUpgradeInfo struct {
+	Model             string  `json:"model"`
+	MigrationMarkdown *string `json:"migrationMarkdown,omitempty"`
+	ModelLink         *string `json:"modelLink,omitempty"`
+	UpgradeCopy       *string `json:"upgradeCopy,omitempty"`
 }
 
 // ReasoningEffortOption describes a supported reasoning effort level.

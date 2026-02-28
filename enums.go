@@ -17,17 +17,17 @@ const (
 type TurnAbortReason string
 
 const (
-	TurnAbortReasonInterrupted  TurnAbortReason = "interrupted"
-	TurnAbortReasonReplaced     TurnAbortReason = "replaced"
-	TurnAbortReasonReviewEnded  TurnAbortReason = "review_ended"
+	TurnAbortReasonInterrupted TurnAbortReason = "interrupted"
+	TurnAbortReasonReplaced    TurnAbortReason = "replaced"
+	TurnAbortReasonReviewEnded TurnAbortReason = "review_ended"
 )
 
 // Personality represents the assistant personality style.
 type Personality string
 
 const (
-	PersonalityNone     Personality = "none"
-	PersonalityFriendly Personality = "friendly"
+	PersonalityNone      Personality = "none"
+	PersonalityFriendly  Personality = "friendly"
 	PersonalityPragmatic Personality = "pragmatic"
 )
 
@@ -60,9 +60,9 @@ const (
 type SandboxMode string
 
 const (
-	SandboxModeReadOnly          SandboxMode = "read-only"
-	SandboxModeWorkspaceWrite    SandboxMode = "workspace-write"
-	SandboxModeDangerFullAccess  SandboxMode = "danger-full-access"
+	SandboxModeReadOnly         SandboxMode = "read-only"
+	SandboxModeWorkspaceWrite   SandboxMode = "workspace-write"
+	SandboxModeDangerFullAccess SandboxMode = "danger-full-access"
 )
 
 // WebSearchMode represents the web search behavior mode.
@@ -104,10 +104,10 @@ const (
 type ExecCommandSource string
 
 const (
-	ExecCommandSourceAgent                    ExecCommandSource = "agent"
-	ExecCommandSourceUserShell                ExecCommandSource = "user_shell"
-	ExecCommandSourceUnifiedExecStartup       ExecCommandSource = "unified_exec_startup"
-	ExecCommandSourceUnifiedExecInteraction   ExecCommandSource = "unified_exec_interaction"
+	ExecCommandSourceAgent                  ExecCommandSource = "agent"
+	ExecCommandSourceUserShell              ExecCommandSource = "user_shell"
+	ExecCommandSourceUnifiedExecStartup     ExecCommandSource = "unified_exec_startup"
+	ExecCommandSourceUnifiedExecInteraction ExecCommandSource = "unified_exec_interaction"
 )
 
 // ExecCommandStatus represents the status of a legacy exec command.
@@ -190,14 +190,6 @@ type ChatgptAuthTokensRefreshReason string
 
 const (
 	ChatgptAuthTokensRefreshReasonUnauthorized ChatgptAuthTokensRefreshReason = "unauthorized"
-)
-
-// SkillApprovalDecision represents the decision for a skill approval request.
-type SkillApprovalDecision string
-
-const (
-	SkillApprovalDecisionApprove SkillApprovalDecision = "approve"
-	SkillApprovalDecisionDecline SkillApprovalDecision = "decline"
 )
 
 // FileChangeApprovalDecision represents the decision for a file change approval request.

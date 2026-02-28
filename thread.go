@@ -18,21 +18,22 @@ func newThreadService(client *Client) *ThreadService {
 
 // Thread represents a conversation thread with all its metadata
 type Thread struct {
-	ID            string                `json:"id"`
-	CLIVersion    string                `json:"cliVersion"`
-	CreatedAt     int64                 `json:"createdAt"`
-	Cwd           string                `json:"cwd"`
-	ModelProvider string                `json:"modelProvider"`
-	Preview       string                `json:"preview"`
-	Source        SessionSourceWrapper  `json:"source"`
-	Status        ThreadStatusWrapper   `json:"status"`
-	Turns         []Turn                `json:"turns"`
-	UpdatedAt     int64                 `json:"updatedAt"`
-	AgentNickname *string               `json:"agentNickname,omitempty"`
-	AgentRole     *string               `json:"agentRole,omitempty"`
-	GitInfo       *GitInfo              `json:"gitInfo,omitempty"`
-	Name          *string               `json:"name,omitempty"`
-	Path          *string               `json:"path,omitempty"`
+	ID            string               `json:"id"`
+	CLIVersion    string               `json:"cliVersion"`
+	CreatedAt     int64                `json:"createdAt"`
+	Cwd           string               `json:"cwd"`
+	ModelProvider string               `json:"modelProvider"`
+	Preview       string               `json:"preview"`
+	Source        SessionSourceWrapper `json:"source"`
+	Status        ThreadStatusWrapper  `json:"status"`
+	Turns         []Turn               `json:"turns"`
+	UpdatedAt     int64                `json:"updatedAt"`
+	Ephemeral     bool                 `json:"ephemeral"`
+	AgentNickname *string              `json:"agentNickname,omitempty"`
+	AgentRole     *string              `json:"agentRole,omitempty"`
+	GitInfo       *GitInfo             `json:"gitInfo,omitempty"`
+	Name          *string              `json:"name,omitempty"`
+	Path          *string              `json:"path,omitempty"`
 }
 
 // GitInfo contains git repository information
@@ -182,9 +183,9 @@ type Turn struct {
 
 // TurnError represents an error in a turn
 type TurnError struct {
-	Message           string           `json:"message"`
-	CodexErrorInfo    json.RawMessage  `json:"codexErrorInfo,omitempty"`
-	AdditionalDetails *string          `json:"additionalDetails,omitempty"`
+	Message           string          `json:"message"`
+	CodexErrorInfo    json.RawMessage `json:"codexErrorInfo,omitempty"`
+	AdditionalDetails *string         `json:"additionalDetails,omitempty"`
 }
 
 // SessionSourceWrapper wraps SessionSource for JSON marshaling
@@ -705,13 +706,13 @@ func (s *ThreadService) Read(ctx context.Context, params ThreadReadParams) (Thre
 
 // ThreadListParams are parameters for listing threads
 type ThreadListParams struct {
-	Archived       *bool    `json:"archived,omitempty"`
-	Cursor         *string  `json:"cursor,omitempty"`
-	Cwd            *string  `json:"cwd,omitempty"`
-	Limit          *uint32  `json:"limit,omitempty"`
-	ModelProviders []string `json:"modelProviders,omitempty"`
-	SearchTerm     *string  `json:"searchTerm,omitempty"`
-	SortKey        *ThreadSortKey    `json:"sortKey,omitempty"`
+	Archived       *bool              `json:"archived,omitempty"`
+	Cursor         *string            `json:"cursor,omitempty"`
+	Cwd            *string            `json:"cwd,omitempty"`
+	Limit          *uint32            `json:"limit,omitempty"`
+	ModelProviders []string           `json:"modelProviders,omitempty"`
+	SearchTerm     *string            `json:"searchTerm,omitempty"`
+	SortKey        *ThreadSortKey     `json:"sortKey,omitempty"`
 	SourceKinds    []ThreadSourceKind `json:"sourceKinds,omitempty"`
 }
 
