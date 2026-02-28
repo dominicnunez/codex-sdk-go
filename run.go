@@ -27,6 +27,9 @@ type RunOptions struct {
 
 	// ApprovalPolicy optionally sets the approval policy for the thread.
 	ApprovalPolicy *AskForApproval
+
+	// CollaborationMode optionally configures multi-agent collaboration for this turn.
+	CollaborationMode *CollaborationMode
 }
 
 // RunResult contains the output of a completed turn.
@@ -72,6 +75,9 @@ func buildTurnParams(opts RunOptions, threadID string) TurnStartParams {
 	}
 	if opts.Effort != nil {
 		params.Effort = opts.Effort
+	}
+	if opts.CollaborationMode != nil {
+		params.CollaborationMode = opts.CollaborationMode
 	}
 	return params
 }
