@@ -284,3 +284,29 @@ correctly, and the structured variants are rarely used in client-to-server param
 naming to maintain a clear 1:1 mapping. The project's spec compliance rules prohibit renaming
 public types that map to spec schemas. While `ExecPolicy` would be more idiomatic Go, diverging
 from the spec naming creates a maintenance burden and makes cross-referencing harder.
+
+### RPCError.Is matches on error code only, ignoring message and data
+
+**Location:** `errors.go:52-61` — RPCError.Is
+**Date:** 2026-02-27
+
+**Reason:** Code-only matching is the intentional semantic contract for RPCError. JSON-RPC error
+codes define the error category (-32600, -32601, etc.), while messages are human-readable context
+that may vary between server versions. Matching on code allows `errors.Is(err, sentinelRPCError)`
+patterns where the sentinel carries the code but not a specific message. The nil-nil comparison
+path (`e.err == nil && t.err == nil`) is unreachable since `NewRPCError` is never called with nil,
+but the nil guard is a defensive correctness check, not dead logic worth removing.
+
+### Notify may succeed even if the transport reader has just stopped
+
+**Location:** `stdio.go:135-156` — Notify method
+**Date:** 2026-02-27
+
+**Reason:** Same design tradeoff as the existing Send goroutine exception. The write goroutine
+acquires `writeMu` and calls `io.Writer.Write`, which has no context or deadline support.
+Between the `t.closed` check and the goroutine running, the reader could stop — but the
+`select` at the wait phase handles this correctly. If the write completes before `readerStopped`
+fires, `Notify` returns nil even though the transport is dying. This is benign: the notification
+is fire-and-forget by definition, and the next Send call will fail with the transport error.
+Fixing this requires the same `io.WriteCloser` API change discussed in the Send goroutine
+exception, which is disproportionate to the severity.
