@@ -407,12 +407,6 @@ func (w *CommandActionWrapper) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		w.Value = &search
-	case "unknown":
-		var unknown UnknownCommandAction
-		if err := json.Unmarshal(data, &unknown); err != nil {
-			return err
-		}
-		w.Value = &unknown
 	default:
 		var unknown UnknownCommandAction
 		if err := json.Unmarshal(data, &unknown); err != nil {
@@ -674,12 +668,6 @@ func (w *ParsedCommandWrapper) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		w.Value = &search
-	case "unknown":
-		var unknown UnknownParsedCommand
-		if err := json.Unmarshal(data, &unknown); err != nil {
-			return err
-		}
-		w.Value = &unknown
 	default:
 		var unknown UnknownParsedCommand
 		if err := json.Unmarshal(data, &unknown); err != nil {
