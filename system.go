@@ -39,8 +39,8 @@ type WindowsWorldWritableWarningNotification struct {
 	SamplePaths []string `json:"samplePaths"`
 }
 
-// ContextCompactedNotification is sent when context is compacted (DEPRECATED)
-// Use ContextCompaction item type instead
+// Deprecated: Use ContextCompaction item type instead.
+// ContextCompactedNotification is sent when context is compacted.
 type ContextCompactedNotification struct {
 	ThreadID string `json:"threadId"`
 	TurnID   string `json:"turnId"`
@@ -113,7 +113,8 @@ func (c *Client) OnWindowsWorldWritableWarning(handler func(WindowsWorldWritable
 	})
 }
 
-// OnContextCompacted registers a listener for thread/compacted notifications (DEPRECATED)
+// Deprecated: Use ContextCompaction item type instead.
+// OnContextCompacted registers a listener for thread/compacted notifications.
 func (c *Client) OnContextCompacted(handler func(ContextCompactedNotification)) {
 	c.OnNotification("thread/compacted", func(ctx context.Context, notif Notification) {
 		var params ContextCompactedNotification
