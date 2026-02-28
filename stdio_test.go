@@ -719,3 +719,69 @@ func TestStdioNotificationHandlerPanicRecovery(t *testing.T) {
 		t.Fatal("timeout: transport stopped working after notification handler panic")
 	}
 }
+
+// TestStdioHandleResponseUnmarshalError verifies that when a response has a
+// valid ID but fails full unmarshal, the pending caller receives a parse error
+// instead of hanging until timeout.
+func TestStdioHandleResponseUnmarshalError(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer clientReader.Close()
+	defer serverWriter.Close()
+	defer serverReader.Close()
+	defer clientWriter.Close()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer transport.Close()
+
+	// Drain requests from the server side
+	go func() {
+		scanner := bufio.NewScanner(serverReader)
+		for scanner.Scan() {
+		}
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// Send a request in a goroutine
+	errCh := make(chan error, 1)
+	go func() {
+		req := codex.Request{
+			JSONRPC: "2.0",
+			ID:      codex.RequestID{Value: "test-unmarshal-fail"},
+			Method:  "test/method",
+		}
+		resp, err := transport.Send(ctx, req)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		if resp.Error == nil {
+			errCh <- nil
+			return
+		}
+		if resp.Error.Code != codex.ErrCodeParseError {
+			t.Errorf("error code = %d; want %d", resp.Error.Code, codex.ErrCodeParseError)
+		}
+		errCh <- nil
+	}()
+
+	// Wait for the request to be sent
+	time.Sleep(50 * time.Millisecond)
+
+	// Send a malformed response that has a valid ID but invalid structure
+	// for the full Response type. We include a valid "id" but make "error"
+	// an invalid type (string instead of object) so the full unmarshal fails.
+	malformed := `{"jsonrpc":"2.0","id":"test-unmarshal-fail","error":"not-an-object"}` + "\n"
+	_, _ = serverWriter.Write([]byte(malformed))
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout: caller should have received a parse error, not hung")
+	}
+}

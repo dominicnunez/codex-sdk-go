@@ -318,6 +318,35 @@ func (t *StdioTransport) readLoop() {
 func (t *StdioTransport) handleResponse(data []byte) {
 	var resp Response
 	if err := json.Unmarshal(data, &resp); err != nil {
+		// Full unmarshal failed. Try to extract just the ID so the
+		// pending caller gets an immediate error instead of timing out.
+		var idOnly struct {
+			ID RequestID `json:"id"`
+		}
+		if json.Unmarshal(data, &idOnly) != nil {
+			return
+		}
+		normalizedID := normalizeID(idOnly.ID.Value)
+		t.mu.Lock()
+		if t.closed {
+			t.mu.Unlock()
+			return
+		}
+		pending, ok := t.pendingReqs[normalizedID]
+		if ok {
+			delete(t.pendingReqs, normalizedID)
+		}
+		t.mu.Unlock()
+		if ok {
+			pending.ch <- Response{
+				JSONRPC: jsonrpcVersion,
+				ID:      pending.id,
+				Error: &Error{
+					Code:    ErrCodeParseError,
+					Message: "failed to parse response: " + err.Error(),
+				},
+			}
+		}
 		return
 	}
 
