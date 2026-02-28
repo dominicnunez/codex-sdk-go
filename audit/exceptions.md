@@ -135,6 +135,33 @@ correct mapping for `"items": true`. Callers who need specific types can type-as
 
 <!-- Findings that describe behavior which is correct by design -->
 
+### normalizeID relies on float64 precision for JSON number IDs
+
+**Location:** `stdio.go:39-63` — normalizeID function
+**Date:** 2026-02-27
+
+**Reason:** JSON numbers unmarshal as float64 in Go's encoding/json, which
+loses precision for integers above 2^53. Two distinct large IDs could
+collide. However, JSON-RPC servers use small sequential integers or strings
+for request IDs — values above 2^53 are not realistic. Fixing this would
+require raw JSON token parsing to bypass float64, which is disproportionate
+to the near-zero probability. The standard Go JSON number handling is the
+correct default for this protocol.
+
+### ReviewDecisionWrapper and CommandExecutionApprovalDecisionWrapper use untyped interface{} for Value
+
+**Location:** `approval.go:154-156`, `approval.go:419-421` — Value fields
+**Date:** 2026-02-27
+
+**Reason:** These wrappers hold either a string or a specific struct, using
+`interface{}` instead of a typed interface with marker methods. Changing
+this would alter the public API surface of approval response types, which
+is prohibited by the spec compliance rules (types map 1:1 to JSON-RPC
+schemas). The custom UnmarshalJSON/MarshalJSON methods already enforce
+valid values at runtime, and callers use type switches which are idiomatic
+for this pattern. The compile-time safety gain does not justify the
+breaking API change.
+
 ### Notification handler registration silently overwrites previous handlers
 
 **Location:** `client.go:138-142` — OnNotification
