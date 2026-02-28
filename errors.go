@@ -16,6 +16,9 @@ func NewRPCError(err *Error) *RPCError {
 }
 
 // Error implements the error interface.
+// Note: when Data is present, its raw content is included in the string.
+// Data is server-controlled and may contain sensitive information (internal
+// paths, tokens, PII). Callers who log or display this value should be aware.
 func (e *RPCError) Error() string {
 	if e.err == nil {
 		return "rpc error: <nil>"
