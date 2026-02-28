@@ -102,6 +102,34 @@ type SubAgentSourceOther struct {
 
 func (SubAgentSourceOther) isSubAgentSource() {}
 
+// UnknownSubAgentSource represents an unrecognized sub-agent source object from a newer protocol version.
+type UnknownSubAgentSource struct {
+	Raw json.RawMessage `json:"-"`
+}
+
+func (UnknownSubAgentSource) isSubAgentSource() {}
+
+func (u UnknownSubAgentSource) MarshalJSON() ([]byte, error) {
+	if u.Raw == nil {
+		return []byte("null"), nil
+	}
+	return u.Raw, nil
+}
+
+// UnknownSessionSource represents an unrecognized session source from a newer protocol version.
+type UnknownSessionSource struct {
+	Raw json.RawMessage `json:"-"`
+}
+
+func (UnknownSessionSource) isSessionSource() {}
+
+func (u UnknownSessionSource) MarshalJSON() ([]byte, error) {
+	if u.Raw == nil {
+		return []byte("null"), nil
+	}
+	return u.Raw, nil
+}
+
 // ThreadStatus represents the current status of a thread
 type ThreadStatus interface {
 	isThreadStatus()
@@ -180,8 +208,7 @@ func (s *SessionSourceWrapper) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	// Try sub-agent object — validate that the discriminating "subAgent" key
-	// is actually present, otherwise any JSON object would match
+	// Try object
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err == nil {
 		if subAgentRaw, hasKey := raw["subAgent"]; hasKey {
@@ -192,6 +219,9 @@ func (s *SessionSourceWrapper) UnmarshalJSON(data []byte) error {
 			s.Value = SessionSourceSubAgent{SubAgent: subAgent}
 			return nil
 		}
+		// Unknown object variant — preserve for forward compatibility
+		s.Value = UnknownSessionSource{Raw: append(json.RawMessage(nil), data...)}
+		return nil
 	}
 
 	return fmt.Errorf("unable to unmarshal SessionSource from: %.200s", data)
@@ -208,7 +238,7 @@ func unmarshalSubAgentSource(data json.RawMessage) (SubAgentSource, error) {
 	// Try object variants
 	var keys map[string]json.RawMessage
 	if err := json.Unmarshal(data, &keys); err != nil {
-		return nil, fmt.Errorf("unable to unmarshal SubAgentSource")
+		return nil, fmt.Errorf("unable to unmarshal SubAgentSource: %w", err)
 	}
 
 	if _, ok := keys["thread_spawn"]; ok {
@@ -227,7 +257,7 @@ func unmarshalSubAgentSource(data json.RawMessage) (SubAgentSource, error) {
 		return other, nil
 	}
 
-	return nil, fmt.Errorf("unable to unmarshal SubAgentSource")
+	return UnknownSubAgentSource{Raw: append(json.RawMessage(nil), data...)}, nil
 }
 
 // MarshalJSON for SessionSourceWrapper
@@ -240,6 +270,8 @@ func (s SessionSourceWrapper) MarshalJSON() ([]byte, error) {
 		return json.Marshal(string(v))
 	case SessionSourceSubAgent:
 		return json.Marshal(v)
+	case UnknownSessionSource:
+		return v.MarshalJSON()
 	default:
 		return nil, fmt.Errorf("unknown SessionSource type: %T", v)
 	}
