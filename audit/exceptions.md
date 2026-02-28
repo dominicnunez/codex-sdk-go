@@ -190,6 +190,20 @@ Introducing typed content parts (e.g. `[]McpContentPart`) would be speculative �
 leaves these open for forward compatibility. Using `[]interface{}` (or `json.RawMessage`) is the
 correct mapping for `"items": true`. Callers who need specific types can type-assert or re-unmarshal.
 
+### Handler errors in handleApproval are invisible to SDK consumers
+
+**Location:** `client.go:273-274` — handleApproval error return path
+**Date:** 2026-02-27
+
+**Reason:** When a user-supplied approval handler returns an error, it propagates to `handleRequest`
+in `stdio.go` which replaces it with a generic `"internal handler error"` response on the wire.
+The original error is never surfaced to the SDK consumer. Adding observability (e.g. an
+`OnHandlerError` callback on `Client`) requires new public API surface. This is the same pattern
+as the existing "notification handlers silently swallow unmarshal errors" and "writeMessage errors
+silently discarded" exceptions — surfacing internal errors from goroutine-dispatched handlers
+requires API additions disproportionate to the severity. Consumers who need observability can
+wrap their handler functions with their own error logging before passing them to the SDK.
+
 ## Intentional Design Decisions
 
 <!-- Findings that describe behavior which is correct by design -->
