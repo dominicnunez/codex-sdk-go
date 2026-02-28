@@ -338,12 +338,14 @@ func (t *StdioTransport) handleResponse(data []byte) {
 		}
 		t.mu.Unlock()
 		if ok {
+			errDetail, _ := json.Marshal(err.Error())
 			pending.ch <- Response{
 				JSONRPC: jsonrpcVersion,
 				ID:      pending.id,
 				Error: &Error{
 					Code:    ErrCodeParseError,
-					Message: "failed to parse response: " + err.Error(),
+					Message: "failed to parse server response",
+					Data:    json.RawMessage(errDetail),
 				},
 			}
 		}
