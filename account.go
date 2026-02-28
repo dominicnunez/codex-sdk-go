@@ -389,9 +389,8 @@ func (s *AccountService) CancelLogin(ctx context.Context, params CancelLoginAcco
 
 // Logout logs out of the current account
 func (s *AccountService) Logout(ctx context.Context) (LogoutAccountResponse, error) {
-	var resp LogoutAccountResponse
-	if err := s.client.sendRequest(ctx, "account/logout", nil, &resp); err != nil {
+	if err := s.client.sendRequest(ctx, "account/logout", nil, nil); err != nil {
 		return LogoutAccountResponse{}, err
 	}
-	return resp, nil
+	return LogoutAccountResponse{}, nil
 }

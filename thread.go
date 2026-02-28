@@ -784,11 +784,10 @@ type ThreadSetNameResponse struct {
 
 // SetName updates the name of a thread
 func (s *ThreadService) SetName(ctx context.Context, params ThreadSetNameParams) (ThreadSetNameResponse, error) {
-	var response ThreadSetNameResponse
-	if err := s.client.sendRequest(ctx, "thread/name/set", params, &response); err != nil {
+	if err := s.client.sendRequest(ctx, "thread/name/set", params, nil); err != nil {
 		return ThreadSetNameResponse{}, err
 	}
-	return response, nil
+	return ThreadSetNameResponse{}, nil
 }
 
 // ThreadArchiveParams are parameters for archiving a thread
@@ -803,11 +802,10 @@ type ThreadArchiveResponse struct {
 
 // Archive archives a thread
 func (s *ThreadService) Archive(ctx context.Context, params ThreadArchiveParams) (ThreadArchiveResponse, error) {
-	var response ThreadArchiveResponse
-	if err := s.client.sendRequest(ctx, "thread/archive", params, &response); err != nil {
+	if err := s.client.sendRequest(ctx, "thread/archive", params, nil); err != nil {
 		return ThreadArchiveResponse{}, err
 	}
-	return response, nil
+	return ThreadArchiveResponse{}, nil
 }
 
 // ThreadUnarchiveParams are parameters for unarchiving a thread
@@ -860,9 +858,8 @@ type ThreadCompactStartResponse struct {
 
 // CompactStart initiates thread compaction
 func (s *ThreadService) CompactStart(ctx context.Context, params ThreadCompactStartParams) (ThreadCompactStartResponse, error) {
-	var response ThreadCompactStartResponse
-	if err := s.client.sendRequest(ctx, "thread/compact/start", params, &response); err != nil {
+	if err := s.client.sendRequest(ctx, "thread/compact/start", params, nil); err != nil {
 		return ThreadCompactStartResponse{}, err
 	}
-	return response, nil
+	return ThreadCompactStartResponse{}, nil
 }

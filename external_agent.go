@@ -59,9 +59,8 @@ func (s *ExternalAgentService) ConfigDetect(ctx context.Context, params External
 
 // ConfigImport imports detected external agent configurations.
 func (s *ExternalAgentService) ConfigImport(ctx context.Context, params ExternalAgentConfigImportParams) (ExternalAgentConfigImportResponse, error) {
-	var resp ExternalAgentConfigImportResponse
-	if err := s.client.sendRequest(ctx, "externalAgentConfig/import", params, &resp); err != nil {
+	if err := s.client.sendRequest(ctx, "externalAgentConfig/import", params, nil); err != nil {
 		return ExternalAgentConfigImportResponse{}, err
 	}
-	return resp, nil
+	return ExternalAgentConfigImportResponse{}, nil
 }

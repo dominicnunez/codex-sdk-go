@@ -87,11 +87,10 @@ type TurnInterruptResponse struct{}
 
 // Interrupt interrupts an active turn
 func (s *TurnService) Interrupt(ctx context.Context, params TurnInterruptParams) (TurnInterruptResponse, error) {
-	var resp TurnInterruptResponse
-	if err := s.client.sendRequest(ctx, "turn/interrupt", params, &resp); err != nil {
+	if err := s.client.sendRequest(ctx, "turn/interrupt", params, nil); err != nil {
 		return TurnInterruptResponse{}, err
 	}
-	return resp, nil
+	return TurnInterruptResponse{}, nil
 }
 
 // ===== Turn Steer =====
