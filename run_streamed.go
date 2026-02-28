@@ -64,25 +64,35 @@ func (p *Process) RunStreamed(ctx context.Context, opts RunOptions) *Stream {
 	return s
 }
 
-// streamSend performs a non-blocking send on ch. Events are best-effort: if the
-// consumer fell behind or stopped reading, the event is dropped rather than
-// blocking the transport dispatch goroutine.
-func streamSend(ch chan<- eventOrErr, eoe eventOrErr) {
+// streamSendEvent performs a non-blocking send of an event on ch.
+// Events are best-effort: if the consumer fell behind, the event is dropped.
+func streamSendEvent(ch chan<- eventOrErr, event Event) {
 	select {
-	case ch <- eoe:
+	case ch <- eventOrErr{event: event}:
 	default:
 	}
 }
 
+// streamSendErr performs a blocking send of an error on ch.
+// Errors must not be lost — they are terminal and signal the consumer to stop.
+func streamSendErr(ch chan<- eventOrErr, err error) {
+	ch <- eventOrErr{err: err}
+}
+
 // streamListen registers a notification listener that unmarshals the
 // notification params into N, converts it to an Event, and sends it on ch.
-func streamListen[N any](on func(string, NotificationHandler), method string, ch chan<- eventOrErr, convert func(N) Event) {
+// Notifications with a threadId that does not match threadID are ignored.
+func streamListen[N any](on func(string, NotificationHandler), method string, ch chan<- eventOrErr, threadID string, convert func(N) Event) {
 	on(method, func(_ context.Context, notif Notification) {
+		var carrier threadIDCarrier
+		if err := json.Unmarshal(notif.Params, &carrier); err != nil || carrier.ThreadID != threadID {
+			return
+		}
 		var n N
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
 			return
 		}
-		streamSend(ch, eventOrErr{event: convert(n)})
+		streamSendEvent(ch, convert(n))
 	})
 }
 
@@ -91,131 +101,25 @@ func (p *Process) runStreamedLifecycle(ctx context.Context, opts RunOptions, ch 
 	defer close(s.done)
 
 	if opts.Prompt == "" {
-		streamSend(ch, eventOrErr{err: errors.New("prompt is required")})
+		streamSendErr(ch, errors.New("prompt is required"))
 		return
 	}
 
 	if err := p.ensureInit(ctx); err != nil {
-		streamSend(ch, eventOrErr{err: err})
+		streamSendErr(ch, err)
 		return
 	}
 
 	threadResp, err := p.Client.Thread.Start(ctx, buildThreadParams(opts))
 	if err != nil {
-		streamSend(ch, eventOrErr{err: fmt.Errorf("thread/start: %w", err)})
+		streamSendErr(ch, fmt.Errorf("thread/start: %w", err))
 		return
 	}
 
-	// Register internal listeners before starting the turn to avoid missing events.
-	var (
-		items      []ThreadItemWrapper
-		itemsMu    sync.Mutex
-		unsubFuncs []func()
-	)
-	defer func() {
-		for _, unsub := range unsubFuncs {
-			unsub()
-		}
-	}()
-
-	on := func(method string, handler NotificationHandler) {
-		unsub := p.Client.addNotificationListener(method, handler)
-		unsubFuncs = append(unsubFuncs, unsub)
-	}
-
-	turnDone := make(chan TurnCompletedNotification, 1)
-
-	streamListen(on, notifyTurnStarted, ch, func(n TurnStartedNotification) Event {
-		return &TurnStarted{Turn: n.Turn, ThreadID: n.ThreadID}
-	})
-
-	streamListen(on, notifyAgentMessageDelta, ch, func(n AgentMessageDeltaNotification) Event {
-		return &TextDelta{Delta: n.Delta, ItemID: n.ItemID}
-	})
-
-	streamListen(on, notifyReasoningTextDelta, ch, func(n ReasoningTextDeltaNotification) Event {
-		return &ReasoningDelta{Delta: n.Delta, ItemID: n.ItemID, ContentIndex: n.ContentIndex}
-	})
-
-	streamListen(on, notifyReasoningSummaryTextDelta, ch, func(n ReasoningSummaryTextDeltaNotification) Event {
-		return &ReasoningSummaryDelta{Delta: n.Delta, ItemID: n.ItemID, SummaryIndex: n.SummaryIndex}
-	})
-
-	streamListen(on, notifyPlanDelta, ch, func(n PlanDeltaNotification) Event {
-		return &PlanDelta{Delta: n.Delta, ItemID: n.ItemID}
-	})
-
-	streamListen(on, notifyFileChangeOutputDelta, ch, func(n FileChangeOutputDeltaNotification) Event {
-		return &FileChangeDelta{Delta: n.Delta, ItemID: n.ItemID}
-	})
-
-	// item/started: emit collab event before generic event when applicable.
-	on(notifyItemStarted, func(_ context.Context, notif Notification) {
-		var n ItemStartedNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
-			return
-		}
-		if c, ok := n.Item.Value.(*CollabAgentToolCallThreadItem); ok {
-			streamSend(ch, eventOrErr{event: newCollabStarted(c)})
-		}
-		streamSend(ch, eventOrErr{event: &ItemStarted{Item: n.Item}})
-	})
-
-	// item/completed: emit collab event before generic event, and append to collected items.
-	on(notifyItemCompleted, func(_ context.Context, notif Notification) {
-		var n ItemCompletedNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
-			return
-		}
-		itemsMu.Lock()
-		items = append(items, n.Item)
-		itemsMu.Unlock()
-		if c, ok := n.Item.Value.(*CollabAgentToolCallThreadItem); ok {
-			streamSend(ch, eventOrErr{event: newCollabCompleted(c)})
-		}
-		streamSend(ch, eventOrErr{event: &ItemCompleted{Item: n.Item}})
-	})
-
-	// turn/completed is special: signals turnDone and synthesizes on unmarshal failure.
-	on(notifyTurnCompleted, func(_ context.Context, notif Notification) {
-		var n TurnCompletedNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
-			n = TurnCompletedNotification{
-				Turn: Turn{Error: &TurnError{Message: "failed to unmarshal turn/completed: " + err.Error()}},
-			}
-		}
-		select {
-		case turnDone <- n:
-		default:
-		}
-	})
-
-	if _, err := p.Client.Turn.Start(ctx, buildTurnParams(opts, threadResp.Thread.ID)); err != nil {
-		streamSend(ch, eventOrErr{err: fmt.Errorf("turn/start: %w", err)})
-		return
-	}
-
-	// Wait for turn completion or context cancellation.
-	select {
-	case completed := <-turnDone:
-		// Emit TurnCompleted event before checking for errors.
-		streamSend(ch, eventOrErr{event: &TurnCompleted{Turn: completed.Turn}})
-
-		if completed.Turn.Error != nil {
-			streamSend(ch, eventOrErr{err: fmt.Errorf("turn error: %s", completed.Turn.Error.Message)})
-			return
-		}
-
-		itemsMu.Lock()
-		collectedItems := make([]ThreadItemWrapper, len(items))
-		copy(collectedItems, items)
-		itemsMu.Unlock()
-
-		s.mu.Lock()
-		s.result = buildRunResult(threadResp.Thread, completed.Turn, collectedItems)
-		s.mu.Unlock()
-
-	case <-ctx.Done():
-		streamSend(ch, eventOrErr{err: ctx.Err()})
-	}
+	executeStreamedTurn(ctx, turnLifecycleParams{
+		client:     p.Client,
+		turnParams: buildTurnParams(opts, threadResp.Thread.ID),
+		thread:     threadResp.Thread,
+		threadID:   threadResp.Thread.ID,
+	}, ch, s)
 }
