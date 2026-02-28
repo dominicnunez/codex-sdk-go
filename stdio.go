@@ -233,14 +233,19 @@ func (t *StdioTransport) writeMessage(msg interface{}) error {
 	t.writeMu.Lock()
 	defer t.writeMu.Unlock()
 
-	// Write message with newline delimiter, handling short writes
-	data = append(data, '\n')
+	// Write message then newline delimiter, handling short writes.
+	// The newline is written separately to avoid copying the entire
+	// payload just to append one byte.
 	for len(data) > 0 {
 		n, err := t.writer.Write(data)
 		if err != nil {
 			return NewTransportError("write message", err)
 		}
 		data = data[n:]
+	}
+
+	if _, err := t.writer.Write([]byte{'\n'}); err != nil {
+		return NewTransportError("write message", err)
 	}
 
 	return nil
