@@ -79,6 +79,17 @@ referenced in ServerNotification.json" and "is not part of the wire protocol; im
 would be dead code." The test at line 105 explicitly exempts it. The server never emits this
 notification — `ServerNotification.json` does not reference it — so there is nothing to drop.
 
+### ThreadStartParams.ApprovalPolicy bare interface marshaling flagged as new finding but already covered
+
+**Location:** `thread.go:586` — ThreadStartParams.ApprovalPolicy field type
+**Date:** 2026-02-27
+
+**Reason:** The audit re-flagged the bare interface typing of `ApprovalPolicy` on params structs
+as a new Medium-severity bug. The audit itself acknowledges "This finding is already covered by
+the exception and is noted here for completeness — no new action required." The existing exception
+"Params structs use bare interface instead of wrapper type" at `thread.go:538` et al. already
+covers this exact issue. This is a duplicate, not a new finding.
+
 ### AppsListParams.ForceRefetch described as missing omitempty but it has omitempty
 
 **Location:** `apps.go:11` — ForceRefetch field tag
@@ -276,6 +287,18 @@ safety gain.
 it ensures no partial state leaks on error. The note that future modifications must include
 the reset is accurate but not actionable as a code change.
 
+### handleApproval includes server-controlled method name in internal error strings
+
+**Location:** `client.go:274,279,284` — error wrapping in handleApproval
+**Date:** 2026-02-27
+
+**Reason:** The `req.Method` string from the server is included in error messages, but these
+errors never cross a trust boundary. `handleRequest` in `stdio.go` replaces all handler errors
+with a generic `"internal handler error"` before sending the JSON-RPC response. The internal
+error strings are not logged, stored, or exposed. This is a defense-in-depth observation with
+no active vulnerability. Adding truncation/sanitization to internal error formatting adds
+complexity without mitigating any concrete risk.
+
 ## Intentional Design Decisions
 
 <!-- Findings that describe behavior which is correct by design -->
@@ -357,6 +380,39 @@ that may vary between server versions. Matching on code allows `errors.Is(err, s
 patterns where the sentinel carries the code but not a specific message. The nil-nil comparison
 path (`e.err == nil && t.err == nil`) is unreachable since `NewRPCError` is never called with nil,
 but the nil guard is a defensive correctness check, not dead logic worth removing.
+
+### OutputSchema and DynamicToolCallParams.Arguments use bare interface{} instead of json.RawMessage
+
+**Location:** `turn.go:28`, `approval.go:739` — OutputSchema and Arguments fields
+**Date:** 2026-02-27
+
+**Reason:** The spec defines these as open-schema fields. Using `interface{}` is a deliberate
+caller-convenience choice: SDK consumers construct these params and pass Go structs directly
+(e.g. a map or typed struct) which `encoding/json` serializes correctly. Changing to
+`json.RawMessage` would force every caller to pre-marshal their values, adding friction for
+the primary use case. Other open-schema fields that use `json.RawMessage` (e.g. `Turn.Items`)
+are on response types where the SDK receives raw JSON — different direction, different tradeoff.
+
+### SessionSourceWrapper accepts any string without validation
+
+**Location:** `thread.go:176-179` — SessionSourceWrapper.UnmarshalJSON
+**Date:** 2026-02-27
+
+**Reason:** Forward compatibility by design. The server may introduce new session source
+literals in newer protocol versions. Rejecting unknown strings would cause the SDK to break
+on server upgrades. The same pattern is used by other union types in the codebase that accept
+unknown variants (e.g. `UnknownAskForApproval`, `UnknownCommandAction`). Callers who need
+to distinguish known from unknown values can check against the exported constants.
+
+### ReasoningSummaryWrapper accepts any string without validation
+
+**Location:** `config.go:62-69` — ReasoningSummaryWrapper.UnmarshalJSON
+**Date:** 2026-02-27
+
+**Reason:** Same forward-compatibility design as SessionSourceWrapper. The server may add new
+reasoning summary modes. Rejecting unknown strings would break the SDK on server upgrades.
+The type already constrains the value to be a string (rejecting non-string JSON), which is
+the meaningful validation boundary.
 
 ### Notify goroutine can write to writer after context cancellation
 
