@@ -43,6 +43,12 @@ type FileChange interface {
 	fileChange()
 }
 
+const (
+	fileChangeTypeAdd    = "add"
+	fileChangeTypeDelete = "delete"
+	fileChangeTypeUpdate = "update"
+)
+
 // FileChangeWrapper wraps a FileChange for JSON marshaling/unmarshaling.
 type FileChangeWrapper struct {
 	Value FileChange
@@ -60,7 +66,7 @@ func (a *AddFileChange) MarshalJSON() ([]byte, error) {
 		Type    string `json:"type"`
 		Content string `json:"content"`
 	}{
-		Type:    "add",
+		Type:    fileChangeTypeAdd,
 		Content: a.Content,
 	})
 }
@@ -77,7 +83,7 @@ func (d *DeleteFileChange) MarshalJSON() ([]byte, error) {
 		Type    string `json:"type"`
 		Content string `json:"content"`
 	}{
-		Type:    "delete",
+		Type:    fileChangeTypeDelete,
 		Content: d.Content,
 	})
 }
@@ -97,7 +103,7 @@ func (u *UpdateFileChange) MarshalJSON() ([]byte, error) {
 		MovePath    *string `json:"move_path,omitempty"`
 	}
 	return json.Marshal(updateJSON{
-		Type:        "update",
+		Type:        fileChangeTypeUpdate,
 		UnifiedDiff: u.UnifiedDiff,
 		MovePath:    u.MovePath,
 	})
@@ -113,19 +119,19 @@ func (w *FileChangeWrapper) UnmarshalJSON(data []byte) error {
 	}
 
 	switch raw.Type {
-	case "add":
+	case fileChangeTypeAdd:
 		var add AddFileChange
 		if err := json.Unmarshal(data, &add); err != nil {
 			return err
 		}
 		w.Value = &add
-	case "delete":
+	case fileChangeTypeDelete:
 		var del DeleteFileChange
 		if err := json.Unmarshal(data, &del); err != nil {
 			return err
 		}
 		w.Value = &del
-	case "update":
+	case fileChangeTypeUpdate:
 		var upd UpdateFileChange
 		if err := json.Unmarshal(data, &upd); err != nil {
 			return err
