@@ -2,7 +2,7 @@ package codex
 
 // Event is a sealed interface for streaming events yielded by Stream.Events.
 // Concrete types: TurnStarted, TextDelta, ReasoningDelta, ReasoningSummaryDelta,
-// PlanDelta, FileChangeDelta, ItemStarted, ItemCompleted, TurnCompleted.
+// PlanDelta, FileChangeDelta, ItemStarted, ItemCompleted, CollabToolCallEvent, TurnCompleted.
 type Event interface {
 	streamEvent()
 }
@@ -71,9 +71,19 @@ type ItemCompleted struct {
 
 func (*ItemCompleted) streamEvent() {}
 
-// CollabToolCallStarted is emitted when a collab tool call begins (item/started
-// with a collabAgentToolCall item). Emitted before the generic ItemStarted event.
-type CollabToolCallStarted struct {
+// CollabToolCallPhase distinguishes started from completed collab events.
+type CollabToolCallPhase string
+
+const (
+	CollabToolCallStartedPhase   CollabToolCallPhase = "started"
+	CollabToolCallCompletedPhase CollabToolCallPhase = "completed"
+)
+
+// CollabToolCallEvent is emitted when a collab tool call begins or finishes
+// (item/started or item/completed with a collabAgentToolCall item).
+// Emitted before the generic ItemStarted/ItemCompleted event.
+type CollabToolCallEvent struct {
+	Phase             CollabToolCallPhase
 	ID                string
 	Tool              CollabAgentTool
 	Status            CollabAgentToolCallStatus
@@ -83,36 +93,11 @@ type CollabToolCallStarted struct {
 	Prompt            *string
 }
 
-func (*CollabToolCallStarted) streamEvent() {}
+func (*CollabToolCallEvent) streamEvent() {}
 
-// CollabToolCallCompleted is emitted when a collab tool call finishes (item/completed
-// with a collabAgentToolCall item). Emitted before the generic ItemCompleted event.
-type CollabToolCallCompleted struct {
-	ID                string
-	Tool              CollabAgentTool
-	Status            CollabAgentToolCallStatus
-	AgentsStates      map[string]CollabAgentState
-	ReceiverThreadIds []string
-	SenderThreadId    string
-	Prompt            *string
-}
-
-func (*CollabToolCallCompleted) streamEvent() {}
-
-func newCollabStarted(c *CollabAgentToolCallThreadItem) *CollabToolCallStarted {
-	return &CollabToolCallStarted{
-		ID:                c.ID,
-		Tool:              c.Tool,
-		Status:            c.Status,
-		AgentsStates:      c.AgentsStates,
-		ReceiverThreadIds: c.ReceiverThreadIds,
-		SenderThreadId:    c.SenderThreadId,
-		Prompt:            c.Prompt,
-	}
-}
-
-func newCollabCompleted(c *CollabAgentToolCallThreadItem) *CollabToolCallCompleted {
-	return &CollabToolCallCompleted{
+func newCollabEvent(phase CollabToolCallPhase, c *CollabAgentToolCallThreadItem) *CollabToolCallEvent {
+	return &CollabToolCallEvent{
+		Phase:             phase,
 		ID:                c.ID,
 		Tool:              c.Tool,
 		Status:            c.Status,

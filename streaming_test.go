@@ -478,11 +478,12 @@ func TestOnCollabToolCallStartedIgnoresNonCollab(t *testing.T) {
 	}
 }
 
-// TestOnCollabToolCallStartedNilHandler verifies nil handler doesn't panic.
+// TestOnCollabToolCallStartedNilHandler verifies nil handler doesn't panic and returns a no-op unsub.
 func TestOnCollabToolCallStartedNilHandler(t *testing.T) {
 	mock := NewMockTransport()
 	client := codex.NewClient(mock)
-	client.OnCollabToolCallStarted(nil) // should not panic
+	unsub := client.OnCollabToolCallStarted(nil) // should not panic
+	unsub()                                      // no-op unsub should not panic
 }
 
 // TestOnCollabToolCallCompleted tests the collab-specific item/completed listener.
@@ -521,11 +522,12 @@ func TestOnCollabToolCallCompleted(t *testing.T) {
 	}
 }
 
-// TestOnCollabToolCallCompletedNilHandler verifies nil handler doesn't panic.
+// TestOnCollabToolCallCompletedNilHandler verifies nil handler doesn't panic and returns a no-op unsub.
 func TestOnCollabToolCallCompletedNilHandler(t *testing.T) {
 	mock := NewMockTransport()
 	client := codex.NewClient(mock)
-	client.OnCollabToolCallCompleted(nil) // should not panic
+	unsub := client.OnCollabToolCallCompleted(nil) // should not panic
+	unsub()                                        // no-op unsub should not panic
 }
 
 // TestItemStarted tests the turn/itemStarted notification with typed ThreadItem

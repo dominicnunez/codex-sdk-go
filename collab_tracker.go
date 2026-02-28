@@ -27,27 +27,23 @@ func (a *AgentInfo) isTerminal() bool {
 // AgentTracker maintains a live map of agent states by processing collab events.
 // Safe for concurrent reads via RWMutex.
 type AgentTracker struct {
-	mu     sync.RWMutex
-	agents map[string]*AgentInfo
-	cond   *sync.Cond
+	mu      sync.RWMutex
+	agents  map[string]*AgentInfo
+	updated chan struct{} // closed + replaced on every state change
 }
 
 // NewAgentTracker creates an AgentTracker ready to process events.
 func NewAgentTracker() *AgentTracker {
-	t := &AgentTracker{
-		agents: make(map[string]*AgentInfo),
+	return &AgentTracker{
+		agents:  make(map[string]*AgentInfo),
+		updated: make(chan struct{}),
 	}
-	t.cond = sync.NewCond(t.mu.RLocker())
-	return t
 }
 
 // ProcessEvent updates the tracker from a stream event.
 // Call this inside your Events() range loop.
 func (t *AgentTracker) ProcessEvent(event Event) {
-	switch e := event.(type) {
-	case *CollabToolCallStarted:
-		t.processCollab(e.Tool, e.SenderThreadId, e.AgentsStates)
-	case *CollabToolCallCompleted:
+	if e, ok := event.(*CollabToolCallEvent); ok {
 		t.processCollab(e.Tool, e.SenderThreadId, e.AgentsStates)
 	}
 }
@@ -72,7 +68,8 @@ func (t *AgentTracker) processCollab(tool CollabAgentTool, sender string, states
 		}
 	}
 
-	t.cond.Broadcast()
+	close(t.updated)
+	t.updated = make(chan struct{})
 }
 
 // Agents returns a snapshot of all tracked agents.
@@ -116,32 +113,28 @@ func (t *AgentTracker) ActiveCount() int {
 // WaitAllDone blocks until all tracked agents reach a terminal status
 // or the context is cancelled.
 func (t *AgentTracker) WaitAllDone(ctx context.Context) error {
-	done := make(chan struct{})
-	go func() {
+	for {
 		t.mu.RLock()
-		defer t.mu.RUnlock()
-		for !t.allDone() {
-			t.cond.Wait()
+		if t.allDone() {
+			t.mu.RUnlock()
+			return nil
 		}
-		close(done)
-	}()
+		ch := t.updated
+		t.mu.RUnlock()
 
-	select {
-	case <-done:
-		return nil
-	case <-ctx.Done():
-		// Unblock the waiting goroutine.
-		t.cond.Broadcast()
-		return ctx.Err()
+		select {
+		case <-ch:
+			continue
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 }
 
 // allDone returns true if all tracked agents are in a terminal state.
+// Returns true on an empty tracker (vacuously true).
 // Must be called with at least a read lock held.
 func (t *AgentTracker) allDone() bool {
-	if len(t.agents) == 0 {
-		return false
-	}
 	for _, info := range t.agents {
 		if !info.isTerminal() {
 			return false

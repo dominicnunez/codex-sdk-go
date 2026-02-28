@@ -208,11 +208,12 @@ func (c *Client) OnItemCompleted(handler func(ItemCompletedNotification)) {
 // OnCollabToolCallStarted registers an internal listener for item/started notifications
 // that fires only when the item is a CollabAgentToolCallThreadItem. Uses
 // addNotificationListener so it does not clobber existing OnItemStarted handlers.
-func (c *Client) OnCollabToolCallStarted(handler func(ItemStartedNotification, *CollabAgentToolCallThreadItem)) {
+// Returns a function that removes the listener.
+func (c *Client) OnCollabToolCallStarted(handler func(ItemStartedNotification, *CollabAgentToolCallThreadItem)) func() {
 	if handler == nil {
-		return
+		return func() {}
 	}
-	c.addNotificationListener(notifyItemStarted, func(_ context.Context, notif Notification) {
+	return c.addNotificationListener(notifyItemStarted, func(_ context.Context, notif Notification) {
 		var n ItemStartedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
 			return
@@ -226,11 +227,12 @@ func (c *Client) OnCollabToolCallStarted(handler func(ItemStartedNotification, *
 // OnCollabToolCallCompleted registers an internal listener for item/completed notifications
 // that fires only when the item is a CollabAgentToolCallThreadItem. Uses
 // addNotificationListener so it does not clobber existing OnItemCompleted handlers.
-func (c *Client) OnCollabToolCallCompleted(handler func(ItemCompletedNotification, *CollabAgentToolCallThreadItem)) {
+// Returns a function that removes the listener.
+func (c *Client) OnCollabToolCallCompleted(handler func(ItemCompletedNotification, *CollabAgentToolCallThreadItem)) func() {
 	if handler == nil {
-		return
+		return func() {}
 	}
-	c.addNotificationListener(notifyItemCompleted, func(_ context.Context, notif Notification) {
+	return c.addNotificationListener(notifyItemCompleted, func(_ context.Context, notif Notification) {
 		var n ItemCompletedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
 			return

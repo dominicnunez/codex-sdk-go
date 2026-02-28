@@ -94,10 +94,8 @@
 //		if err != nil { log.Fatal(err) }
 //		tracker.ProcessEvent(event)
 //		switch e := event.(type) {
-//		case *codex.CollabToolCallStarted:
-//			fmt.Printf("[collab] %s started (tool=%s)\n", e.ID, e.Tool)
-//		case *codex.CollabToolCallCompleted:
-//			fmt.Printf("[collab] %s completed\n", e.ID)
+//		case *codex.CollabToolCallEvent:
+//			fmt.Printf("[collab] %s %s (tool=%s)\n", e.ID, e.Phase, e.Tool)
 //		case *codex.TextDelta:
 //			fmt.Print(e.Delta)
 //		}

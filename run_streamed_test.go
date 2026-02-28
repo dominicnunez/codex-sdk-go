@@ -608,14 +608,12 @@ func TestRunStreamedCollabEvents(t *testing.T) {
 		events = append(events, event)
 	}
 
-	// Expected order: CollabToolCallStarted, ItemStarted, CollabToolCallCompleted, ItemCompleted, TurnCompleted
+	// Expected order: CollabToolCall(started), ItemStarted, CollabToolCall(completed), ItemCompleted, TurnCompleted
 	typeNames := make([]string, 0, len(events))
 	for _, e := range events {
-		switch e.(type) {
-		case *codex.CollabToolCallStarted:
-			typeNames = append(typeNames, "CollabToolCallStarted")
-		case *codex.CollabToolCallCompleted:
-			typeNames = append(typeNames, "CollabToolCallCompleted")
+		switch ev := e.(type) {
+		case *codex.CollabToolCallEvent:
+			typeNames = append(typeNames, fmt.Sprintf("CollabToolCall(%s)", ev.Phase))
 		case *codex.ItemStarted:
 			typeNames = append(typeNames, "ItemStarted")
 		case *codex.ItemCompleted:
@@ -628,8 +626,8 @@ func TestRunStreamedCollabEvents(t *testing.T) {
 	}
 
 	expected := []string{
-		"CollabToolCallStarted", "ItemStarted",
-		"CollabToolCallCompleted", "ItemCompleted",
+		"CollabToolCall(started)", "ItemStarted",
+		"CollabToolCall(completed)", "ItemCompleted",
 		"TurnCompleted",
 	}
 
@@ -643,7 +641,10 @@ func TestRunStreamedCollabEvents(t *testing.T) {
 	}
 
 	// Verify the collab event data.
-	started := events[0].(*codex.CollabToolCallStarted)
+	started := events[0].(*codex.CollabToolCallEvent)
+	if started.Phase != codex.CollabToolCallStartedPhase {
+		t.Errorf("started.Phase = %q, want started", started.Phase)
+	}
 	if started.Tool != codex.CollabAgentToolSpawnAgent {
 		t.Errorf("started.Tool = %q, want spawnAgent", started.Tool)
 	}
@@ -651,7 +652,10 @@ func TestRunStreamedCollabEvents(t *testing.T) {
 		t.Errorf("started.SenderThreadId = %q, want 'thread-1'", started.SenderThreadId)
 	}
 
-	completed := events[2].(*codex.CollabToolCallCompleted)
+	completed := events[2].(*codex.CollabToolCallEvent)
+	if completed.Phase != codex.CollabToolCallCompletedPhase {
+		t.Errorf("completed.Phase = %q, want completed", completed.Phase)
+	}
 	if completed.Status != codex.CollabAgentToolCallStatusCompleted {
 		t.Errorf("completed.Status = %q, want completed", completed.Status)
 	}

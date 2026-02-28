@@ -12,7 +12,8 @@ func TestAgentTrackerProcessEvent(t *testing.T) {
 	tracker := codex.NewAgentTracker()
 
 	// Simulate a spawnAgent event.
-	tracker.ProcessEvent(&codex.CollabToolCallStarted{
+	tracker.ProcessEvent(&codex.CollabToolCallEvent{
+		Phase:             codex.CollabToolCallStartedPhase,
 		ID:                "tc-1",
 		Tool:              codex.CollabAgentToolSpawnAgent,
 		Status:            codex.CollabAgentToolCallStatusInProgress,
@@ -39,7 +40,8 @@ func TestAgentTrackerProcessEvent(t *testing.T) {
 	}
 
 	// Simulate the spawn completing — agent transitions to running.
-	tracker.ProcessEvent(&codex.CollabToolCallCompleted{
+	tracker.ProcessEvent(&codex.CollabToolCallEvent{
+		Phase:             codex.CollabToolCallCompletedPhase,
 		ID:                "tc-1",
 		Tool:              codex.CollabAgentToolSpawnAgent,
 		Status:            codex.CollabAgentToolCallStatusCompleted,
@@ -59,7 +61,8 @@ func TestAgentTrackerProcessEvent(t *testing.T) {
 	}
 
 	// Simulate closeAgent completing — agent transitions to completed.
-	tracker.ProcessEvent(&codex.CollabToolCallCompleted{
+	tracker.ProcessEvent(&codex.CollabToolCallEvent{
+		Phase:             codex.CollabToolCallCompletedPhase,
 		ID:                "tc-2",
 		Tool:              codex.CollabAgentToolCloseAgent,
 		Status:            codex.CollabAgentToolCallStatusCompleted,
@@ -85,7 +88,8 @@ func TestAgentTrackerProcessEvent(t *testing.T) {
 func TestAgentTrackerAgentsSnapshot(t *testing.T) {
 	tracker := codex.NewAgentTracker()
 
-	tracker.ProcessEvent(&codex.CollabToolCallStarted{
+	tracker.ProcessEvent(&codex.CollabToolCallEvent{
+		Phase:          codex.CollabToolCallStartedPhase,
 		Tool:           codex.CollabAgentToolSpawnAgent,
 		SenderThreadId: "parent",
 		AgentsStates: map[string]codex.CollabAgentState{
@@ -110,7 +114,8 @@ func TestAgentTrackerWaitAllDone(t *testing.T) {
 	tracker := codex.NewAgentTracker()
 
 	// Add a running agent.
-	tracker.ProcessEvent(&codex.CollabToolCallStarted{
+	tracker.ProcessEvent(&codex.CollabToolCallEvent{
+		Phase:          codex.CollabToolCallStartedPhase,
 		Tool:           codex.CollabAgentToolSpawnAgent,
 		SenderThreadId: "parent",
 		AgentsStates: map[string]codex.CollabAgentState{
@@ -124,7 +129,8 @@ func TestAgentTrackerWaitAllDone(t *testing.T) {
 	// Complete the agent in a goroutine.
 	go func() {
 		time.Sleep(50 * time.Millisecond)
-		tracker.ProcessEvent(&codex.CollabToolCallCompleted{
+		tracker.ProcessEvent(&codex.CollabToolCallEvent{
+			Phase:          codex.CollabToolCallCompletedPhase,
 			Tool:           codex.CollabAgentToolCloseAgent,
 			SenderThreadId: "parent",
 			AgentsStates: map[string]codex.CollabAgentState{
@@ -142,7 +148,8 @@ func TestAgentTrackerWaitAllDone(t *testing.T) {
 func TestAgentTrackerWaitAllDoneContextCancel(t *testing.T) {
 	tracker := codex.NewAgentTracker()
 
-	tracker.ProcessEvent(&codex.CollabToolCallStarted{
+	tracker.ProcessEvent(&codex.CollabToolCallEvent{
+		Phase:          codex.CollabToolCallStartedPhase,
 		Tool:           codex.CollabAgentToolSpawnAgent,
 		SenderThreadId: "parent",
 		AgentsStates: map[string]codex.CollabAgentState{
@@ -156,6 +163,19 @@ func TestAgentTrackerWaitAllDoneContextCancel(t *testing.T) {
 	err := tracker.WaitAllDone(ctx)
 	if err == nil {
 		t.Fatal("expected context error")
+	}
+}
+
+func TestAgentTrackerWaitAllDoneEmpty(t *testing.T) {
+	tracker := codex.NewAgentTracker()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	// Empty tracker should return immediately (vacuously true).
+	err := tracker.WaitAllDone(ctx)
+	if err != nil {
+		t.Fatalf("WaitAllDone on empty tracker: %v", err)
 	}
 }
 
@@ -188,7 +208,8 @@ func TestAgentTrackerMultipleAgents(t *testing.T) {
 	tracker := codex.NewAgentTracker()
 
 	// Spawn two agents.
-	tracker.ProcessEvent(&codex.CollabToolCallStarted{
+	tracker.ProcessEvent(&codex.CollabToolCallEvent{
+		Phase:          codex.CollabToolCallStartedPhase,
 		Tool:           codex.CollabAgentToolSpawnAgent,
 		SenderThreadId: "parent",
 		AgentsStates: map[string]codex.CollabAgentState{
@@ -202,7 +223,8 @@ func TestAgentTrackerMultipleAgents(t *testing.T) {
 	}
 
 	// Complete one.
-	tracker.ProcessEvent(&codex.CollabToolCallCompleted{
+	tracker.ProcessEvent(&codex.CollabToolCallEvent{
+		Phase:          codex.CollabToolCallCompletedPhase,
 		Tool:           codex.CollabAgentToolCloseAgent,
 		SenderThreadId: "parent",
 		AgentsStates: map[string]codex.CollabAgentState{
@@ -216,7 +238,8 @@ func TestAgentTrackerMultipleAgents(t *testing.T) {
 	}
 
 	// Complete the other.
-	tracker.ProcessEvent(&codex.CollabToolCallCompleted{
+	tracker.ProcessEvent(&codex.CollabToolCallEvent{
+		Phase:          codex.CollabToolCallCompletedPhase,
 		Tool:           codex.CollabAgentToolCloseAgent,
 		SenderThreadId: "parent",
 		AgentsStates: map[string]codex.CollabAgentState{
