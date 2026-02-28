@@ -12,6 +12,10 @@ import (
 
 var errInvalidParams = errors.New("invalid params")
 
+// ErrEmptyResult indicates the server returned a successful response with a
+// null result where the caller expected a value.
+var ErrEmptyResult = errors.New("server returned empty result")
+
 // wireMarshaler is implemented by types whose MarshalJSON is redacted for safety.
 // marshalForWire uses this to get the unredacted representation for protocol serialization.
 type wireMarshaler interface {
@@ -317,7 +321,7 @@ func (c *Client) sendRequest(ctx context.Context, method string, params interfac
 	// Unmarshal result if caller expects one
 	if result != nil {
 		if resp.Result == nil {
-			return fmt.Errorf("%s: server returned empty result", method)
+			return fmt.Errorf("%s: %w", method, ErrEmptyResult)
 		}
 		if err := json.Unmarshal(resp.Result, result); err != nil {
 			return fmt.Errorf("unmarshal response result for %s: %w", method, err)
