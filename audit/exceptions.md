@@ -155,6 +155,18 @@ to an existing, stable Go release.
 
 <!-- Real findings not worth fixing — architectural cost, external constraints, etc. -->
 
+### Request handler goroutines are untracked and can outlive Close
+
+**Location:** `stdio.go:354` — handleRequest goroutine dispatch
+**Date:** 2026-02-27
+
+**Reason:** Same root cause as the existing Send and Notify goroutine leak exceptions.
+Tracking goroutines with a WaitGroup causes Close() to deadlock when handler goroutines
+are blocked in `io.Writer.Write` (which has no context or deadline support). The only fix
+is changing the writer API to `io.WriteCloser` so the writer can be closed to unblock
+stuck writes — a breaking change disproportionate to the severity. In practice, the writer
+is stdout to a child process and these goroutines terminate when the process exits.
+
 ### StdioTransport.Close does not stop the reader goroutine
 
 **Location:** `stdio.go:140-157` — Close() and readLoop()
@@ -440,6 +452,27 @@ fix it but is prohibited by spec compliance rules (public API types map 1:1 to s
 practice, `TurnStartParams` is constructed by SDK callers and marshaled for sending; the
 unmarshal path is only used when the SDK receives these params in tests or echo scenarios,
 not in normal client operation.
+
+### LoginId field uses spec casing instead of Go acronym convention
+
+**Location:** `account_notifications.go:25` — AccountLoginCompletedNotification.LoginId
+**Date:** 2026-02-27
+
+**Reason:** The spec schema (`AccountLoginCompletedNotification.json`) defines the wire field
+as `"loginId"`. The Go field name `LoginId` mirrors the spec. Renaming to `LoginID` would be
+more idiomatic Go, but the project's spec compliance rules prohibit renaming public fields
+that map to spec schemas. The JSON struct tag preserves wire compatibility regardless.
+
+### AuthorizationUrl field uses spec casing instead of Go acronym convention
+
+**Location:** `mcp.go:83` — McpServerOauthLoginResponse.AuthorizationUrl
+**Date:** 2026-02-27
+
+**Reason:** The spec schema (`McpServerOauthLoginResponse.json`) defines the wire field as
+`"authorizationUrl"`. The Go field name `AuthorizationUrl` mirrors the spec. Renaming to
+`AuthorizationURL` would be more idiomatic Go, but the project's spec compliance rules
+prohibit renaming public fields that map to spec schemas. The JSON struct tag preserves
+wire compatibility regardless.
 
 ### Notify may succeed even if the transport reader has just stopped
 
