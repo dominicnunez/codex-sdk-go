@@ -488,6 +488,13 @@ func TestStdioInvalidJSON(t *testing.T) {
 	transport := codex.NewStdioTransport(clientReader, clientWriter)
 	defer func() { _ = transport.Close() }()
 
+	// Register handler BEFORE writing messages so readLoop can't
+	// process the valid notification before the handler exists.
+	received := make(chan string, 1)
+	transport.OnNotify(func(ctx context.Context, notif codex.Notification) {
+		received <- notif.Method
+	})
+
 	// Send invalid JSON from server
 	invalidLines := []string{
 		`{invalid json}`,
@@ -506,11 +513,6 @@ func TestStdioInvalidJSON(t *testing.T) {
 	}
 	notifJSON, _ := json.Marshal(validNotif)
 	_, _ = serverWriter.Write(append(notifJSON, '\n'))
-
-	received := make(chan string, 1)
-	transport.OnNotify(func(ctx context.Context, notif codex.Notification) {
-		received <- notif.Method
-	})
 
 	// Verify the valid notification is still received
 	select {
