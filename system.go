@@ -60,9 +60,6 @@ type ErrorNotification struct {
 	WillRetry bool      `json:"willRetry"`
 }
 
-// TurnError represents an error that occurred during a turn.
-// Defined in thread.go; ErrorNotification reuses that type.
-
 // TerminalInteractionNotification is sent for terminal stdin interactions
 type TerminalInteractionNotification struct {
 	ItemID    string `json:"itemId"`
