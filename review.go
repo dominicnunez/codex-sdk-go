@@ -3,7 +3,6 @@ package codex
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 )
 
 // ReviewDelivery specifies where to run the review.
@@ -108,12 +107,7 @@ func (w *ReviewTargetWrapper) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	typeStr := raw.Type
-	if typeStr == "" {
-		return fmt.Errorf("review target: missing or empty type key")
-	}
-
-	switch typeStr {
+	switch raw.Type {
 	case "uncommittedChanges":
 		w.Value = &UncommittedChangesReviewTarget{}
 	case "baseBranch":
@@ -135,7 +129,7 @@ func (w *ReviewTargetWrapper) UnmarshalJSON(data []byte) error {
 		}
 		w.Value = &target
 	default:
-		w.Value = &UnknownReviewTarget{Type: typeStr, Raw: append(json.RawMessage(nil), data...)}
+		w.Value = &UnknownReviewTarget{Type: raw.Type, Raw: append(json.RawMessage(nil), data...)}
 	}
 
 	return nil
