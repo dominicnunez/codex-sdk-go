@@ -124,7 +124,7 @@ type AddPatchChangeKind struct{}
 
 func (AddPatchChangeKind) patchChangeKind() {}
 
-func (a AddPatchChangeKind) MarshalJSON() ([]byte, error) {
+func (a *AddPatchChangeKind) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Type string `json:"type"`
 	}{Type: "add"})
@@ -135,7 +135,7 @@ type DeletePatchChangeKind struct{}
 
 func (DeletePatchChangeKind) patchChangeKind() {}
 
-func (d DeletePatchChangeKind) MarshalJSON() ([]byte, error) {
+func (d *DeletePatchChangeKind) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Type string `json:"type"`
 	}{Type: "delete"})
@@ -148,7 +148,7 @@ type UpdatePatchChangeKind struct {
 
 func (UpdatePatchChangeKind) patchChangeKind() {}
 
-func (u UpdatePatchChangeKind) MarshalJSON() ([]byte, error) {
+func (u *UpdatePatchChangeKind) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Type     string  `json:"type"`
 		MovePath *string `json:"move_path,omitempty"`
@@ -163,7 +163,7 @@ type UnknownPatchChangeKind struct {
 
 func (UnknownPatchChangeKind) patchChangeKind() {}
 
-func (u UnknownPatchChangeKind) MarshalJSON() ([]byte, error) {
+func (u *UnknownPatchChangeKind) MarshalJSON() ([]byte, error) {
 	if u.Raw == nil {
 		return []byte("null"), nil
 	}
@@ -231,7 +231,7 @@ type SearchWebSearchAction struct {
 
 func (SearchWebSearchAction) webSearchAction() {}
 
-func (s SearchWebSearchAction) MarshalJSON() ([]byte, error) {
+func (s *SearchWebSearchAction) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Type    string    `json:"type"`
 		Query   *string   `json:"query,omitempty"`
@@ -246,7 +246,7 @@ type OpenPageWebSearchAction struct {
 
 func (OpenPageWebSearchAction) webSearchAction() {}
 
-func (o OpenPageWebSearchAction) MarshalJSON() ([]byte, error) {
+func (o *OpenPageWebSearchAction) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Type string  `json:"type"`
 		URL  *string `json:"url,omitempty"`
@@ -261,7 +261,7 @@ type FindInPageWebSearchAction struct {
 
 func (FindInPageWebSearchAction) webSearchAction() {}
 
-func (f FindInPageWebSearchAction) MarshalJSON() ([]byte, error) {
+func (f *FindInPageWebSearchAction) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Type    string  `json:"type"`
 		URL     *string `json:"url,omitempty"`
@@ -274,7 +274,7 @@ type OtherWebSearchAction struct{}
 
 func (OtherWebSearchAction) webSearchAction() {}
 
-func (o OtherWebSearchAction) MarshalJSON() ([]byte, error) {
+func (o *OtherWebSearchAction) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Type string `json:"type"`
 	}{Type: "other"})
@@ -288,7 +288,7 @@ type UnknownWebSearchAction struct {
 
 func (UnknownWebSearchAction) webSearchAction() {}
 
-func (u UnknownWebSearchAction) MarshalJSON() ([]byte, error) {
+func (u *UnknownWebSearchAction) MarshalJSON() ([]byte, error) {
 	if u.Raw == nil {
 		return []byte("null"), nil
 	}
