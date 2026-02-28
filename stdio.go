@@ -243,6 +243,9 @@ func (t *StdioTransport) writeMessage(msg interface{}) error {
 		if err != nil {
 			return NewTransportError("write message", err)
 		}
+		if n == 0 {
+			return NewTransportError("write message", errors.New("writer returned zero bytes written without error"))
+		}
 		data = data[n:]
 	}
 
