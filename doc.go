@@ -66,4 +66,41 @@
 //		}
 //	}
 //	result = stream.Result()
+//
+// Using Conversation for multi-turn sessions:
+//
+//	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{
+//		Instructions: codex.Ptr("You are a helpful assistant"),
+//	})
+//	if err != nil { log.Fatal(err) }
+//
+//	r1, err := conv.Turn(ctx, codex.TurnOptions{Prompt: "What files are in this project?"})
+//	fmt.Println(r1.Response)
+//
+//	r2, err := conv.Turn(ctx, codex.TurnOptions{Prompt: "Summarize the main one"})
+//	fmt.Println(r2.Response)
+//
+// Using multi-agent collaboration with streaming and the AgentTracker:
+//
+//	tracker := codex.NewAgentTracker()
+//	stream := proc.RunStreamed(ctx, codex.RunOptions{
+//		Prompt: "Refactor the auth module",
+//		CollaborationMode: &codex.CollaborationMode{
+//			Mode:     codex.ModeKindDefault,
+//			Settings: codex.CollaborationModeSettings{Model: "o3"},
+//		},
+//	})
+//	for event, err := range stream.Events() {
+//		if err != nil { log.Fatal(err) }
+//		tracker.ProcessEvent(event)
+//		switch e := event.(type) {
+//		case *codex.CollabToolCallStarted:
+//			fmt.Printf("[collab] %s started (tool=%s)\n", e.ID, e.Tool)
+//		case *codex.CollabToolCallCompleted:
+//			fmt.Printf("[collab] %s completed\n", e.ID)
+//		case *codex.TextDelta:
+//			fmt.Print(e.Delta)
+//		}
+//	}
+//	fmt.Printf("Active agents: %d\n", tracker.ActiveCount())
 package codex
