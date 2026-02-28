@@ -44,9 +44,11 @@ type StdioTransport struct {
 func normalizeID(id interface{}) string {
 	switch v := id.(type) {
 	case float64:
-		u := uint64(v)
-		if v >= 0 && v == float64(u) {
-			return fmt.Sprintf("%d", u)
+		if v >= 0 {
+			u := uint64(v)
+			if v == float64(u) {
+				return fmt.Sprintf("%d", u)
+			}
 		}
 		return fmt.Sprintf("%v", v)
 	case int64:
