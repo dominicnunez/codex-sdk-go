@@ -165,10 +165,15 @@ func (c *Client) Send(ctx context.Context, req Request) (Response, error) {
 // OnNotification registers a listener for incoming notifications with the given method.
 // When a notification with this method arrives from the server, the handler will be called.
 // Only one handler can be registered per method; subsequent calls replace the previous handler.
+// Passing nil removes the handler for the given method.
 func (c *Client) OnNotification(method string, handler NotificationHandler) {
 	c.listenersMu.Lock()
 	defer c.listenersMu.Unlock()
-	c.notificationListeners[method] = handler
+	if handler == nil {
+		delete(c.notificationListeners, method)
+	} else {
+		c.notificationListeners[method] = handler
+	}
 }
 
 // handleNotification is the internal handler registered with the transport.
