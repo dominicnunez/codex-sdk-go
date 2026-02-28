@@ -2,6 +2,7 @@ package codex
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -83,31 +84,37 @@ func (p *Process) Run(ctx context.Context, opts RunOptions) (*RunResult, error) 
 		return nil, fmt.Errorf("thread/start: %w", err)
 	}
 
-	// Collect items and wait for turn completion.
+	// Collect items and wait for turn completion via internal listeners,
+	// which don't clobber user-registered handlers.
 	var (
 		items []ThreadItemWrapper
 		mu    sync.Mutex
 		done  = make(chan TurnCompletedNotification, 1)
 	)
 
-	p.Client.OnItemCompleted(func(n ItemCompletedNotification) {
+	unsubItem := p.Client.addNotificationListener(notifyItemCompleted, func(_ context.Context, notif Notification) {
+		var n ItemCompletedNotification
+		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			return
+		}
 		mu.Lock()
 		items = append(items, n.Item)
 		mu.Unlock()
 	})
 
-	p.Client.OnTurnCompleted(func(n TurnCompletedNotification) {
+	unsubTurn := p.Client.addNotificationListener(notifyTurnCompleted, func(_ context.Context, notif Notification) {
+		var n TurnCompletedNotification
+		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			return
+		}
 		select {
 		case done <- n:
 		default:
 		}
 	})
 
-	// Clean up listeners when we return.
-	defer func() {
-		p.Client.OnItemCompleted(nil)
-		p.Client.OnTurnCompleted(nil)
-	}()
+	defer unsubItem()
+	defer unsubTurn()
 
 	// Start the turn.
 	turnParams := TurnStartParams{
