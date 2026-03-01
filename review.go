@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 )
 
 // ReviewDelivery specifies where to run the review.
@@ -105,6 +106,10 @@ func (w *ReviewTargetWrapper) UnmarshalJSON(data []byte) error {
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
+	}
+
+	if raw.Type == "" {
+		return fmt.Errorf("review target: missing or empty type field")
 	}
 
 	switch raw.Type {
