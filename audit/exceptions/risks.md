@@ -178,3 +178,16 @@ with a generic `"internal handler error"` before sending the JSON-RPC response. 
 error strings are not logged, stored, or exposed. This is a defense-in-depth observation with
 no active vulnerability. Adding truncation/sanitization to internal error formatting adds
 complexity without mitigating any concrete risk.
+
+### Process.Close discards signal and kill errors during graceful shutdown
+
+**Location:** `process.go:153-164` — Signal and Kill error handling in Close
+**Date:** 2026-02-28
+
+**Reason:** `Close()` discards errors from `Signal(os.Interrupt)` and `Process.Kill()` with `_ =`.
+The transport close error takes priority (returned to caller). Signal errors are typically
+`os.ErrProcessDone` (process already exited) which is not an error condition. Kill errors after
+a grace period timeout are rare and non-actionable — the process is being force-terminated.
+Surfacing these would require a structured multi-error return or a callback, which is
+disproportionate to the severity. The caller cares whether cleanup succeeded (transport closed),
+not about the intermediate signaling steps.

@@ -245,3 +245,29 @@ only to discard every field. If the spec adds fields to these types, the struct 
 will gain fields and the unmarshal call must be added — but that's a spec change that
 requires code updates regardless. The current code is correct for the current spec and
 avoids unnecessary work.
+
+### RunResult.Thread reflects thread metadata at turn start, not post-turn live state
+
+**Location:** `turn_lifecycle.go:87` — buildRunResult receives thread snapshot from turnLifecycleParams
+**Date:** 2026-02-28
+
+**Reason:** `RunResult.Thread` provides the thread metadata context (ID, config, cwd, model, etc.)
+captured when the conversation was started or last completed. The `RunResult.Turn` field carries
+the actual turn data from the server's `turn/completed` notification, which is always current.
+Updating `RunResult.Thread` from the server response would require the `turn/completed`
+notification to carry the full `Thread` object — which it doesn't (it only carries the `Turn`).
+The current behavior is consistent: the Thread field is stable metadata, the Turn field is live
+per-turn data. Callers who need post-turn thread state use `Conversation.Thread()`.
+
+### AgentTracker signals on every collab event including empty state updates
+
+**Location:** `collab_tracker.go:71-72` — unconditional close(t.updated) signal
+**Date:** 2026-02-28
+
+**Reason:** The `close(t.updated)` signal fires even when `states` is empty, causing a spurious
+wakeup in `WaitAllDone`. This is standard Go condition-variable semantics — waiters must recheck
+their condition after every wakeup. `WaitAllDone` already does this correctly by calling
+`t.allDone()` after every channel receive. Guarding the signal with `len(states) > 0` would
+be a minor optimization but changes the notification contract — callers who depend on any
+collab event (not just state changes) would miss updates. The current behavior is safe and
+consistent with the documented wakeup-recheck pattern.
