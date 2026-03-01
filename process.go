@@ -79,7 +79,10 @@ var errEndOfOptionsInExecArgs = errors.New(`ExecArgs must not contain "--" (end-
 
 var errTypedFlagInExecArgs = errors.New("ExecArgs must not contain typed safety flags")
 
-var rejectedFlagPrefixes = []string{"--model", "--sandbox", "--approval-mode", "--config"}
+// rejectedFlagNames are the bare names of typed safety flags (without dash
+// prefixes). buildArgs rejects both --name and -name variants to prevent
+// bypass via single-dash long flags accepted by some CLI parsers.
+var rejectedFlagNames = []string{"model", "sandbox", "approval-mode", "config"}
 
 // buildArgs constructs the CLI argument list from typed fields and ExecArgs.
 // ExecArgs are prepended before typed flags so that typed fields (Model,
@@ -90,9 +93,12 @@ func (opts *ProcessOptions) buildArgs() ([]string, error) {
 		if arg == "--" {
 			return nil, errEndOfOptionsInExecArgs
 		}
-		for _, prefix := range rejectedFlagPrefixes {
-			if arg == prefix || strings.HasPrefix(arg, prefix+"=") {
-				return nil, fmt.Errorf("%w: %s", errTypedFlagInExecArgs, prefix)
+		for _, name := range rejectedFlagNames {
+			doubleDash := "--" + name
+			singleDash := "-" + name
+			if arg == doubleDash || strings.HasPrefix(arg, doubleDash+"=") ||
+				arg == singleDash || strings.HasPrefix(arg, singleDash+"=") {
+				return nil, fmt.Errorf("%w: %s", errTypedFlagInExecArgs, doubleDash)
 			}
 		}
 	}

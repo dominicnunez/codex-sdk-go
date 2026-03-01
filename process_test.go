@@ -238,6 +238,42 @@ func TestStartProcessExecArgsWithTypedFlagsCombinedForm(t *testing.T) {
 	}
 }
 
+// TestStartProcessExecArgsWithSingleDashTypedFlags verifies that single-dash
+// variants of typed safety flags are also rejected.
+func TestStartProcessExecArgsWithSingleDashTypedFlags(t *testing.T) {
+	rejectedFlags := []string{"-model", "-sandbox", "-approval-mode", "-config"}
+
+	for _, flag := range rejectedFlags {
+		t.Run(flag, func(t *testing.T) {
+			ctx := context.Background()
+			_, err := codex.StartProcess(ctx, &codex.ProcessOptions{
+				BinaryPath: "/nonexistent/binary",
+				ExecArgs:   []string{flag, "value"},
+			})
+			if err == nil {
+				t.Fatalf("expected error when ExecArgs contains %q", flag)
+			}
+			if !strings.Contains(err.Error(), "typed safety flags") {
+				t.Errorf("error should mention typed safety flags, got: %v", err)
+			}
+		})
+
+		t.Run(flag+"=value", func(t *testing.T) {
+			ctx := context.Background()
+			_, err := codex.StartProcess(ctx, &codex.ProcessOptions{
+				BinaryPath: "/nonexistent/binary",
+				ExecArgs:   []string{flag + "=evil-value"},
+			})
+			if err == nil {
+				t.Fatalf("expected error when ExecArgs contains %q", flag+"=evil-value")
+			}
+			if !strings.Contains(err.Error(), "typed safety flags") {
+				t.Errorf("error should mention typed safety flags, got: %v", err)
+			}
+		})
+	}
+}
+
 // TestStartProcessExecArgsAllowsNonSafetyFlags verifies that non-safety
 // flags with = values are allowed through.
 func TestStartProcessExecArgsAllowsNonSafetyFlags(t *testing.T) {
