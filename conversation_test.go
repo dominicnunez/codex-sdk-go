@@ -3,6 +3,7 @@ package codex_test
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -469,6 +470,37 @@ func TestConversationWithCollaborationMode(t *testing.T) {
 
 	if err := <-ch; err != nil {
 		t.Fatalf("Turn error: %v", err)
+	}
+}
+
+func TestStartConversationThreadStartFailure(t *testing.T) {
+	mock := NewMockTransport()
+
+	_ = mock.SetResponseData("initialize", map[string]interface{}{
+		"userAgent": "codex-test/1.0",
+	})
+
+	// thread/start returns an RPC error.
+	mock.SetResponse("thread/start", codex.Response{
+		JSONRPC: "2.0",
+		Error: &codex.Error{
+			Code:    -32600,
+			Message: "invalid configuration",
+		},
+	})
+
+	client := codex.NewClient(mock, codex.WithRequestTimeout(2*time.Second))
+	proc := codex.NewProcessFromClient(client)
+
+	ctx := context.Background()
+	_, err := proc.StartConversation(ctx, codex.ConversationOptions{
+		Instructions: codex.Ptr("Be helpful"),
+	})
+	if err == nil {
+		t.Fatal("expected error from thread/start failure")
+	}
+	if !strings.Contains(err.Error(), "thread/start") {
+		t.Errorf("error = %q, want it to mention 'thread/start'", err)
 	}
 }
 

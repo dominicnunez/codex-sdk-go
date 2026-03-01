@@ -888,6 +888,64 @@ func TestStdioHandleResponseUnmarshalError(t *testing.T) {
 	}
 }
 
+// TestStdioSpuriousResponseUnknownID verifies that a response with an ID that has
+// no pending caller is silently discarded without panic, error, or goroutine leak.
+func TestStdioSpuriousResponseUnknownID(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	// Drain requests from the server side.
+	go func() {
+		scanner := bufio.NewScanner(serverReader)
+		for scanner.Scan() {
+		}
+	}()
+
+	// Inject a response with an ID that no caller is waiting for.
+	spurious := `{"jsonrpc":"2.0","id":"no-such-request","result":{"ok":true}}` + "\n"
+	_, _ = serverWriter.Write([]byte(spurious))
+
+	// Verify the transport still works by doing a real request-response cycle.
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	respCh := make(chan codex.Response, 1)
+	go func() {
+		req := codex.Request{
+			JSONRPC: "2.0",
+			ID:      codex.RequestID{Value: "real-request"},
+			Method:  "test/method",
+		}
+		resp, err := transport.Send(ctx, req)
+		if err != nil {
+			return
+		}
+		respCh <- resp
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Send the real response.
+	realResp := `{"jsonrpc":"2.0","id":"real-request","result":{"status":"ok"}}` + "\n"
+	_, _ = serverWriter.Write([]byte(realResp))
+
+	select {
+	case resp := <-respCh:
+		if string(resp.Result) != `{"status":"ok"}` {
+			t.Errorf("response result = %s; want {\"status\":\"ok\"}", resp.Result)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout: transport broken after spurious response")
+	}
+}
+
 // TestStdioConcurrentSendAndClose verifies that concurrent Send and Close calls
 // do not race or panic. Every Send must either succeed or return an error.
 func TestStdioConcurrentSendAndClose(t *testing.T) {
