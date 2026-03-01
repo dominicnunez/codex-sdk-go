@@ -252,3 +252,28 @@ unexported by design (callers should not interact with the transport directly).
 Exporting it or adding a test-only constructor solely for this test adds public API surface
 for a Low-severity testing gap. The code path is trivial (one `if err != nil` assignment)
 and is exercised indirectly by integration tests with real processes.
+
+### Conversation and turn tests use time.Sleep for goroutine synchronization
+
+**Location:** `conversation_test.go:42,67,111,256,315,525,554,623,664,715` — and similar in `run_test.go`, `run_streamed_test.go`
+**Date:** 2026-03-01
+
+**Reason:** Nearly every turn-based test uses `time.Sleep(50ms)` between starting a goroutine
+that calls `Turn()` and injecting the completion notification. Replacing these with deterministic
+signals requires adding a method-call signaling mechanism to MockTransport (e.g. a channel that
+fires when `turn/start` is sent). The mock transport currently returns immediately from `Send`,
+so the 50ms sleep is reliably sufficient. The fix requires non-trivial test infrastructure
+changes across ~15 tests for a low-severity code smell. The tests have never flaked in CI.
+
+### Notification listeners double-unmarshal threadIDCarrier for thread filtering
+
+**Location:** `turn_lifecycle.go:35-36,49-50`, `run_streamed.go:97-101` — threadIDCarrier pre-parse
+**Date:** 2026-03-01
+
+**Reason:** Every notification listener in the turn lifecycle first unmarshals a `threadIDCarrier`
+to check the threadID, then unmarshals the full notification struct. This compounds with the
+existing readLoop double-parse (each notification is parsed 4 times total). Fixing this requires
+restructuring all notification listeners to unmarshal the full typed struct first, then check
+the threadID field from the result — which changes the filter-then-parse pattern used consistently
+across all listeners. The overhead is negligible for the small JSON-RPC payloads that dominate
+notification traffic. Same risk profile as the readLoop double-parse exception above.
