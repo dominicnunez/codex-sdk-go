@@ -155,17 +155,6 @@ func TestTurnSteer(t *testing.T) {
 	}
 }
 
-// TestTurnServiceMethodSignatures verifies TurnService has all required methods
-func TestTurnServiceMethodSignatures(t *testing.T) {
-	mockTransport := NewMockTransport()
-	client := codex.NewClient(mockTransport)
-
-	// Compile-time check that methods exist with correct signatures
-	var _ = client.Turn.Start
-	var _ = client.Turn.Interrupt
-	var _ = client.Turn.Steer
-}
-
 // TestTurnStartedNotification tests TurnStartedNotification dispatch
 func TestTurnStartedNotification(t *testing.T) {
 	mockTransport := NewMockTransport()

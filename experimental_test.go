@@ -129,16 +129,6 @@ func TestExperimentalFeatureList(t *testing.T) {
 	}
 }
 
-func TestExperimentalServiceMethodSignatures(t *testing.T) {
-	mock := NewMockTransport()
-	client := codex.NewClient(mock)
-
-	// Compile-time verification that ExperimentalService has all required methods
-	var _ interface {
-		FeatureList(context.Context, codex.ExperimentalFeatureListParams) (codex.ExperimentalFeatureListResponse, error)
-	} = client.Experimental
-}
-
 func TestExperimentalFeatureList_RPCError_ReturnsRPCError(t *testing.T) {
 	mock := NewMockTransport()
 	client := codex.NewClient(mock)

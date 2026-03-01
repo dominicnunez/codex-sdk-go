@@ -148,20 +148,6 @@ func TestExternalAgentConfigImport(t *testing.T) {
 	}
 }
 
-func TestExternalAgentServiceMethodSignatures(t *testing.T) {
-	mock := NewMockTransport()
-	client := codex.NewClient(mock)
-
-	// Compile-time verification that all methods exist with correct signatures
-	_ = func(ctx context.Context, params codex.ExternalAgentConfigDetectParams) (codex.ExternalAgentConfigDetectResponse, error) {
-		return client.ExternalAgent.ConfigDetect(ctx, params)
-	}
-
-	_ = func(ctx context.Context, params codex.ExternalAgentConfigImportParams) (codex.ExternalAgentConfigImportResponse, error) {
-		return client.ExternalAgent.ConfigImport(ctx, params)
-	}
-}
-
 func TestExternalAgentConfigDetect_RPCError_ReturnsRPCError(t *testing.T) {
 	mock := NewMockTransport()
 	client := codex.NewClient(mock)

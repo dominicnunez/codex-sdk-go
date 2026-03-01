@@ -294,16 +294,6 @@ func TestMcpToolCallProgressNotification(t *testing.T) {
 	}
 }
 
-func TestMcpServiceMethodSignatures(t *testing.T) {
-	mock := NewMockTransport()
-	client := codex.NewClient(mock)
-
-	// Compile-time verification that all methods exist with correct signatures
-	var _ = client.Mcp.ListServerStatus
-	var _ = client.Mcp.OauthLogin
-	var _ = client.Mcp.Refresh
-}
-
 func TestMcpListServerStatus_RPCError_ReturnsRPCError(t *testing.T) {
 	mock := NewMockTransport()
 	client := codex.NewClient(mock)

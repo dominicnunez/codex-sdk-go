@@ -536,26 +536,6 @@ func TestTerminalInteractionNotification(t *testing.T) {
 	}
 }
 
-// TestSystemServiceMethodSignatures verifies all SystemService methods exist with correct signatures
-func TestSystemServiceMethodSignatures(t *testing.T) {
-	mock := NewMockTransport()
-	client := codex.NewClient(mock)
-
-	// Verify SystemService exists
-	if client.System == nil {
-		t.Fatal("Expected client.System to be non-nil")
-	}
-
-	// Test WindowsSandboxSetupStart method signature
-	_ = mock.SetResponseData("windowsSandbox/setupStart", map[string]interface{}{"started": true})
-	_, err := client.System.WindowsSandboxSetupStart(context.Background(), codex.WindowsSandboxSetupStartParams{
-		Mode: codex.WindowsSandboxSetupModeElevated,
-	})
-	if err != nil {
-		t.Errorf("WindowsSandboxSetupStart failed: %v", err)
-	}
-}
-
 func TestWindowsSandboxSetupStart_RPCError_ReturnsRPCError(t *testing.T) {
 	mock := NewMockTransport()
 	client := codex.NewClient(mock)

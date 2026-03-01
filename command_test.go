@@ -170,14 +170,6 @@ func TestCommandExecutionOutputDeltaNotification(t *testing.T) {
 	}
 }
 
-func TestCommandServiceMethodSignatures(t *testing.T) {
-	mock := NewMockTransport()
-	client := codex.NewClient(mock)
-
-	// Compile-time verification that all methods exist
-	var _ = client.Command.Exec
-}
-
 func TestCommandExec_RPCError_ReturnsRPCError(t *testing.T) {
 	mock := NewMockTransport()
 	client := codex.NewClient(mock)

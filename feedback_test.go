@@ -86,16 +86,6 @@ func TestFeedbackUpload(t *testing.T) {
 	}
 }
 
-func TestFeedbackServiceMethodSignatures(t *testing.T) {
-	// Compile-time verification that FeedbackService has the expected methods
-	mock := NewMockTransport()
-	client := codex.NewClient(mock)
-
-	var _ interface {
-		Upload(context.Context, codex.FeedbackUploadParams) (codex.FeedbackUploadResponse, error)
-	} = client.Feedback
-}
-
 func TestFeedbackUpload_RPCError_ReturnsRPCError(t *testing.T) {
 	mock := NewMockTransport()
 	client := codex.NewClient(mock)

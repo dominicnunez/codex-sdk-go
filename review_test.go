@@ -143,14 +143,6 @@ func TestReviewStart(t *testing.T) {
 	}
 }
 
-func TestReviewServiceMethodSignatures(t *testing.T) {
-	mock := NewMockTransport()
-	client := codex.NewClient(mock)
-
-	// Verify ReviewService exists and has Start method
-	_ = client.Review.Start
-}
-
 func TestReviewStart_RPCError_ReturnsRPCError(t *testing.T) {
 	mock := NewMockTransport()
 	client := codex.NewClient(mock)

@@ -217,13 +217,3 @@ func TestModelReroutedNotification(t *testing.T) {
 		t.Errorf("expected Reason = highRiskCyberActivity, got %s", receivedNotif.Reason)
 	}
 }
-
-func TestModelServiceMethodSignatures(t *testing.T) {
-	// Compile-time verification that ModelService has all required methods
-	mock := NewMockTransport()
-	client := codex.NewClient(mock)
-
-	var _ interface {
-		List(context.Context, codex.ModelListParams) (codex.ModelListResponse, error)
-	} = client.Model
-}
