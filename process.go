@@ -2,9 +2,11 @@ package codex
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+	"sort"
 	"sync"
 	"time"
 )
@@ -78,8 +80,13 @@ func (opts *ProcessOptions) buildArgs() []string {
 	if opts.ApprovalMode != "" {
 		args = append(args, "--approval-mode", opts.ApprovalMode)
 	}
-	for k, v := range opts.Config {
-		args = append(args, "--config", k+"="+v)
+	keys := make([]string, 0, len(opts.Config))
+	for k := range opts.Config {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		args = append(args, "--config", k+"="+opts.Config[k])
 	}
 
 	args = append(args, opts.ExecArgs...)
@@ -168,6 +175,12 @@ func (p *Process) Close() error {
 				_ = p.cmd.Process.Kill()
 				<-p.waitDone
 			}
+
+			// Surface the process exit error unless it was caused by
+			// our own interrupt/kill signal (expected during shutdown).
+			if p.waitErr != nil && !isSignalError(p.waitErr) {
+				closeErr = errors.Join(closeErr, p.waitErr)
+			}
 		}
 	})
 	return closeErr
@@ -198,6 +211,17 @@ func (p *Process) doWait() {
 		p.waitErr = p.cmd.Wait()
 		close(p.waitDone)
 	})
+}
+
+// isSignalError returns true if the error is an exec.ExitError caused by a signal
+// (as opposed to a non-zero exit code). Signal-caused exits are expected during
+// Process.Close shutdown and should not be surfaced as errors.
+func isSignalError(err error) bool {
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		return false
+	}
+	return exitErr.ProcessState != nil && !exitErr.Exited()
 }
 
 // Wait waits for the child process to exit and returns the exit error.
