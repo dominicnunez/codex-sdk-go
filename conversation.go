@@ -43,17 +43,26 @@ func (c *Conversation) ThreadID() string {
 	return c.threadID
 }
 
-// Thread returns a snapshot of the latest thread state.
-// The returned slices (Turns, Items) are deep-copied so append/reorder/delete
-// operations do not affect the Conversation. However, pointer fields on the
-// Thread struct (GitInfo, Name, AgentNickname, AgentRole) and the
-// ThreadItemWrapper values within Items share underlying pointers with the
-// original — field-level mutations through these pointers will be visible to
-// both the snapshot and the Conversation.
+// Thread returns a deep-copy snapshot of the latest thread state.
+// The returned Thread is fully isolated from the Conversation's internal
+// state — mutations to the snapshot (including pointer fields) do not
+// affect the Conversation. The ThreadItemWrapper.Value interface pointers
+// within Items still share underlying memory with the original.
 func (c *Conversation) Thread() Thread {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	t := c.thread
+	t.Name = cloneStringPtr(c.thread.Name)
+	t.AgentNickname = cloneStringPtr(c.thread.AgentNickname)
+	t.AgentRole = cloneStringPtr(c.thread.AgentRole)
+	t.Path = cloneStringPtr(c.thread.Path)
+	if c.thread.GitInfo != nil {
+		g := *c.thread.GitInfo
+		g.Branch = cloneStringPtr(g.Branch)
+		g.OriginURL = cloneStringPtr(g.OriginURL)
+		g.SHA = cloneStringPtr(g.SHA)
+		t.GitInfo = &g
+	}
 	t.Turns = make([]Turn, len(c.thread.Turns))
 	copy(t.Turns, c.thread.Turns)
 	for i, turn := range t.Turns {
@@ -65,6 +74,14 @@ func (c *Conversation) Thread() Thread {
 		}
 	}
 	return t
+}
+
+func cloneStringPtr(s *string) *string {
+	if s == nil {
+		return nil
+	}
+	v := *s
+	return &v
 }
 
 // StartConversation creates a thread and returns a Conversation handle.
