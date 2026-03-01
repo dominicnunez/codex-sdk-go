@@ -550,7 +550,9 @@ func TestThreadUnsubscribe(t *testing.T) {
 
 	client := codex.NewClient(transport)
 
-	_ = transport.SetResponseData("thread/unsubscribe", map[string]interface{}{})
+	_ = transport.SetResponseData("thread/unsubscribe", map[string]interface{}{
+		"status": "unsubscribed",
+	})
 
 	params := codex.ThreadUnsubscribeParams{
 		ThreadID: "thread-unsub",
@@ -564,8 +566,9 @@ func TestThreadUnsubscribe(t *testing.T) {
 		t.Fatalf("Thread.Unsubscribe failed: %v", err)
 	}
 
-	// ThreadUnsubscribeResponse should be an empty struct
-	_ = response
+	if response.Status != codex.ThreadUnsubscribeStatusUnsubscribed {
+		t.Errorf("expected status %q, got %q", codex.ThreadUnsubscribeStatusUnsubscribed, response.Status)
+	}
 
 	req := transport.GetSentRequest(0)
 	if req.Method != "thread/unsubscribe" {
