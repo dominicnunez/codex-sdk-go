@@ -366,7 +366,7 @@ func (t *StdioTransport) readLoop() {
 func (t *StdioTransport) handleResponse(data []byte) {
 	var resp Response
 	if err := json.Unmarshal(data, &resp); err != nil {
-		t.handleMalformedResponse(data, err)
+		t.handleMalformedResponse(data)
 		return
 	}
 
@@ -394,7 +394,7 @@ func (t *StdioTransport) handleResponse(data []byte) {
 
 // handleMalformedResponse attempts to extract the ID from a response that
 // failed full unmarshal, and sends a parse error to the pending caller.
-func (t *StdioTransport) handleMalformedResponse(data []byte, unmarshalErr error) {
+func (t *StdioTransport) handleMalformedResponse(data []byte) {
 	var idOnly struct {
 		ID RequestID `json:"id"`
 	}
@@ -418,14 +418,12 @@ func (t *StdioTransport) handleMalformedResponse(data []byte, unmarshalErr error
 	t.mu.Unlock()
 
 	if ok {
-		errDetail, _ := json.Marshal(unmarshalErr.Error()) //nolint:errchkjson // marshalling a string cannot fail
 		pending.ch <- Response{
 			JSONRPC: jsonrpcVersion,
 			ID:      pending.id,
 			Error: &Error{
 				Code:    ErrCodeParseError,
 				Message: "failed to parse server response",
-				Data:    json.RawMessage(errDetail),
 			},
 		}
 	}
@@ -435,7 +433,7 @@ func (t *StdioTransport) handleMalformedResponse(data []byte, unmarshalErr error
 func (t *StdioTransport) handleRequest(data []byte) {
 	var req Request
 	if err := json.Unmarshal(data, &req); err != nil {
-		t.handleMalformedRequest(data, err)
+		t.handleMalformedRequest(data)
 		return
 	}
 
@@ -509,7 +507,7 @@ func (t *StdioTransport) handleRequest(data []byte) {
 // handleMalformedRequest attempts to extract the ID from a request that
 // failed full unmarshal, and sends back a parse error response so the
 // server knows the request failed instead of hanging indefinitely.
-func (t *StdioTransport) handleMalformedRequest(data []byte, unmarshalErr error) {
+func (t *StdioTransport) handleMalformedRequest(data []byte) {
 	var idOnly struct {
 		ID RequestID `json:"id"`
 	}
@@ -517,14 +515,12 @@ func (t *StdioTransport) handleMalformedRequest(data []byte, unmarshalErr error)
 		return
 	}
 
-	errDetail, _ := json.Marshal(unmarshalErr.Error()) //nolint:errchkjson // marshalling a string cannot fail
 	errorResp := Response{
 		JSONRPC: jsonrpcVersion,
 		ID:      idOnly.ID,
 		Error: &Error{
 			Code:    ErrCodeParseError,
 			Message: "failed to parse server request",
-			Data:    json.RawMessage(errDetail),
 		},
 	}
 	_ = t.writeMessage(errorResp)

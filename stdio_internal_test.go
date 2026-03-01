@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"io"
 	"strings"
 	"sync"
 	"testing"
@@ -30,7 +29,7 @@ func TestHandleMalformedRequestSendsParseError(t *testing.T) {
 
 	// Call handleMalformedRequest with data containing a valid ID
 	data := []byte(`{"id":"malformed-req","method":"test"}`)
-	transport.handleMalformedRequest(data, io.ErrUnexpectedEOF)
+	transport.handleMalformedRequest(data)
 
 	// Verify the response written to the writer
 	output := buf.String()
@@ -51,6 +50,9 @@ func TestHandleMalformedRequestSendsParseError(t *testing.T) {
 	}
 	if resp.ID.Value != "malformed-req" {
 		t.Errorf("response ID = %v; want malformed-req", resp.ID.Value)
+	}
+	if resp.Error.Data != nil {
+		t.Errorf("error Data should be nil to avoid leaking internal details, got %s", resp.Error.Data)
 	}
 }
 
