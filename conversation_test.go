@@ -923,3 +923,104 @@ func TestConversationStreamedThreadSnapshotDuringTurnCompletion(t *testing.T) {
 	}
 	<-snapshotDone
 }
+
+func TestConversationThreadDeepCopyIsolation_ZeroTurnsPointerFields(t *testing.T) {
+	mock := NewMockTransport()
+
+	_ = mock.SetResponseData("initialize", map[string]interface{}{
+		"userAgent": "codex-test/1.0",
+	})
+
+	_ = mock.SetResponseData("thread/start", map[string]interface{}{
+		"approvalPolicy": "never",
+		"cwd":            "/tmp",
+		"model":          "o3",
+		"modelProvider":  "openai",
+		"sandbox":        map[string]interface{}{"type": "readOnly"},
+		"thread": map[string]interface{}{
+			"id":            "thread-1",
+			"cliVersion":    "1.0.0",
+			"createdAt":     1700000000,
+			"cwd":           "/tmp",
+			"modelProvider": "openai",
+			"preview":       "",
+			"source":        "exec",
+			"status":        map[string]interface{}{"type": "idle"},
+			"turns":         []interface{}{},
+			"updatedAt":     1700000000,
+			"ephemeral":     false,
+			"name":          "original-name",
+			"agentNickname": "original-nickname",
+			"agentRole":     "original-role",
+			"path":          "/original/path",
+			"gitInfo": map[string]interface{}{
+				"branch":    "main",
+				"originUrl": "https://example.com/repo.git",
+				"sha":       "abc123",
+			},
+		},
+	})
+
+	_ = mock.SetResponseData("turn/start", map[string]interface{}{
+		"turn": map[string]interface{}{
+			"id":    "turn-1",
+			"items": []interface{}{},
+		},
+	})
+
+	client := codex.NewClient(mock, codex.WithRequestTimeout(2*time.Second))
+	proc := codex.NewProcessFromClient(client)
+
+	ctx := context.Background()
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+
+	// Snapshot with zero turns but populated pointer fields.
+	snap := conv.Thread()
+	if len(snap.Turns) != 0 {
+		t.Fatalf("expected 0 turns, got %d", len(snap.Turns))
+	}
+
+	// Mutate snapshot string pointer fields.
+	*snap.Name = "mutated-name"
+	*snap.AgentNickname = "mutated-nickname"
+	*snap.AgentRole = "mutated-role"
+	*snap.Path = "/mutated/path"
+
+	// Mutate snapshot GitInfo fields.
+	*snap.GitInfo.Branch = "feature-branch"
+	*snap.GitInfo.OriginURL = "https://mutated.com/repo.git"
+	*snap.GitInfo.SHA = "deadbeef"
+
+	// A second snapshot should still see original values.
+	snap2 := conv.Thread()
+
+	if *snap2.Name != "original-name" {
+		t.Errorf("Name mutation leaked: got %q, want %q", *snap2.Name, "original-name")
+	}
+	if *snap2.AgentNickname != "original-nickname" {
+		t.Errorf("AgentNickname mutation leaked: got %q, want %q", *snap2.AgentNickname, "original-nickname")
+	}
+	if *snap2.AgentRole != "original-role" {
+		t.Errorf("AgentRole mutation leaked: got %q, want %q", *snap2.AgentRole, "original-role")
+	}
+	if *snap2.Path != "/original/path" {
+		t.Errorf("Path mutation leaked: got %q, want %q", *snap2.Path, "/original/path")
+	}
+	if *snap2.GitInfo.Branch != "main" {
+		t.Errorf("GitInfo.Branch mutation leaked: got %q, want %q", *snap2.GitInfo.Branch, "main")
+	}
+	if *snap2.GitInfo.OriginURL != "https://example.com/repo.git" {
+		t.Errorf("GitInfo.OriginURL mutation leaked: got %q, want %q", *snap2.GitInfo.OriginURL, "https://example.com/repo.git")
+	}
+	if *snap2.GitInfo.SHA != "abc123" {
+		t.Errorf("GitInfo.SHA mutation leaked: got %q, want %q", *snap2.GitInfo.SHA, "abc123")
+	}
+
+	// Also verify GitInfo pointer identity is distinct.
+	if snap.GitInfo == snap2.GitInfo {
+		t.Error("GitInfo pointer is shared between snapshots")
+	}
+}
