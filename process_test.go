@@ -2,12 +2,15 @@ package codex_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -275,7 +278,7 @@ func TestStartProcessExecArgsWithSingleDashTypedFlags(t *testing.T) {
 }
 
 // TestStartProcessExecArgsAllowsNonSafetyFlags verifies that non-safety
-// flags with = values are allowed through.
+// flags with = values are allowed through validation (failing only at exec).
 func TestStartProcessExecArgsAllowsNonSafetyFlags(t *testing.T) {
 	ctx := context.Background()
 	// StartProcess will fail because the binary doesn't exist, but it
@@ -287,8 +290,13 @@ func TestStartProcessExecArgsAllowsNonSafetyFlags(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error (binary not found), got nil")
 	}
+	// Verify we reached the exec stage (not rejected by flag validation).
 	if strings.Contains(err.Error(), "typed safety flags") {
 		t.Errorf("non-safety flags should not be rejected, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "codex") && !strings.Contains(err.Error(), "nonexistent") &&
+		!strings.Contains(err.Error(), "no such file") && !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected exec-stage error (binary not found), got: %v", err)
 	}
 }
 
@@ -556,5 +564,105 @@ exit 0
 	}
 	if len(data) == 0 {
 		t.Error("stderr file is empty, expected error output")
+	}
+}
+
+// delayedCountingTransport delays initialize responses and counts how many
+// times each method is called. Used to test that ensureInit serializes
+// concurrent callers so only one initialize request is sent.
+type delayedCountingTransport struct {
+	delay      time.Duration
+	callCounts sync.Map // method → *atomic.Int32
+	reqHandler codex.RequestHandler
+	mu         sync.Mutex
+}
+
+func (d *delayedCountingTransport) Send(ctx context.Context, req codex.Request) (codex.Response, error) {
+	counter, _ := d.callCounts.LoadOrStore(req.Method, &atomic.Int32{})
+	counter.(*atomic.Int32).Add(1)
+
+	if req.Method == "initialize" {
+		select {
+		case <-time.After(d.delay):
+		case <-ctx.Done():
+			return codex.Response{}, ctx.Err()
+		}
+	}
+
+	return codex.Response{
+		JSONRPC: "2.0",
+		ID:      req.ID,
+		Result:  json.RawMessage(`{"userAgent":"test"}`),
+	}, nil
+}
+
+func (d *delayedCountingTransport) Notify(_ context.Context, _ codex.Notification) error { return nil }
+func (d *delayedCountingTransport) OnRequest(h codex.RequestHandler) {
+	d.mu.Lock()
+	d.reqHandler = h
+	d.mu.Unlock()
+}
+func (d *delayedCountingTransport) OnNotify(_ codex.NotificationHandler) {}
+func (d *delayedCountingTransport) Close() error                         { return nil }
+
+func (d *delayedCountingTransport) methodCount(method string) int32 {
+	counter, ok := d.callCounts.Load(method)
+	if !ok {
+		return 0
+	}
+	return counter.(*atomic.Int32).Load()
+}
+
+// TestEnsureInitConcurrentCallers verifies that two goroutines calling
+// StartConversation concurrently on a fresh Process result in exactly one
+// initialize request (ensureInit serializes callers via initMu).
+func TestEnsureInitConcurrentCallers(t *testing.T) {
+	transport := &delayedCountingTransport{delay: 50 * time.Millisecond}
+
+	// Set up a thread/start response so StartConversation succeeds.
+	transport.callCounts.LoadOrStore("thread/start", &atomic.Int32{})
+
+	client := codex.NewClient(transport, codex.WithRequestTimeout(5*time.Second))
+	proc := codex.NewProcessFromClient(client)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	const concurrency = 5
+	errs := make(chan error, concurrency)
+
+	// Override the thread/start response to return valid data.
+	origSend := transport.Send
+	_ = origSend // used via the transport interface
+
+	var startBarrier sync.WaitGroup
+	startBarrier.Add(concurrency)
+
+	for i := 0; i < concurrency; i++ {
+		go func() {
+			startBarrier.Done()
+			startBarrier.Wait() // all goroutines start ~simultaneously
+			_, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+			errs <- err
+		}()
+	}
+
+	// Collect results — we expect thread/start to fail because our transport
+	// returns a minimal JSON result, but ensureInit should succeed.
+	var initFailed bool
+	for i := 0; i < concurrency; i++ {
+		err := <-errs
+		if err != nil && strings.Contains(err.Error(), "initialize") {
+			initFailed = true
+		}
+	}
+
+	if initFailed {
+		t.Fatal("initialize failed unexpectedly")
+	}
+
+	initCount := transport.methodCount("initialize")
+	if initCount != 1 {
+		t.Errorf("expected exactly 1 initialize call, got %d", initCount)
 	}
 }
