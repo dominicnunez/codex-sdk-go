@@ -112,10 +112,14 @@ func (c *Conversation) Turn(ctx context.Context, opts TurnOptions) (*RunResult, 
 		return nil, err
 	}
 
+	c.mu.Lock()
+	thread := c.thread
+	c.mu.Unlock()
+
 	return executeTurn(ctx, turnLifecycleParams{
 		client:     c.process.Client,
 		turnParams: c.buildTurnParams(opts),
-		thread:     c.thread,
+		thread:     thread,
 		threadID:   c.threadID,
 		onComplete: func(turn Turn) {
 			c.mu.Lock()
@@ -159,10 +163,14 @@ func (c *Conversation) turnStreamedLifecycle(ctx context.Context, opts TurnOptio
 		return
 	}
 
+	c.mu.Lock()
+	thread := c.thread
+	c.mu.Unlock()
+
 	executeStreamedTurn(ctx, turnLifecycleParams{
 		client:     c.process.Client,
 		turnParams: c.buildTurnParams(opts),
-		thread:     c.thread,
+		thread:     thread,
 		threadID:   c.threadID,
 		onComplete: func(turn Turn) {
 			c.mu.Lock()
