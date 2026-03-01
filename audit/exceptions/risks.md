@@ -9,18 +9,6 @@
 > **Date:** YYYY-MM-DD
 > **Reason:** Explanation (can be multiple lines)
 
-### Request handler goroutines are untracked and can outlive Close
-
-**Location:** `stdio.go:354` — handleRequest goroutine dispatch
-**Date:** 2026-02-27
-
-**Reason:** Same root cause as the existing Send and Notify goroutine leak exceptions.
-Tracking goroutines with a WaitGroup causes Close() to deadlock when handler goroutines
-are blocked in `io.Writer.Write` (which has no context or deadline support). The only fix
-is changing the writer API to `io.WriteCloser` so the writer can be closed to unblock
-stuck writes — a breaking change disproportionate to the severity. In practice, the writer
-is stdout to a child process and these goroutines terminate when the process exits.
-
 ### StdioTransport.Close does not stop the reader goroutine
 
 **Location:** `stdio.go:140-157` — Close() and readLoop()
@@ -227,3 +215,14 @@ writers, a registered handler that returns an errInvalidParams-wrapped error, an
 of the JSON-RPC response error code. This is integration-level testing that requires substantially
 more setup than unit tests. The branching logic is simple (one errors.Is check) and the risk of
 incorrect error codes is low — both branches produce valid JSON-RPC error responses.
+
+### Internal listener sequence counter can theoretically wrap around and collide
+
+**Location:** `client.go:217` — internalListenerSeq uint64 increment
+**Date:** 2026-02-28
+
+**Reason:** `internalListenerSeq` is incremented without overflow checking. After 2^64
+increments it wraps to 0 and subsequent IDs could collide with still-registered listeners.
+However, 2^64 operations is unreachable in any realistic runtime — at 1 billion increments
+per second it would take ~584 years. Adding overflow detection or a different ID scheme
+is disproportionate to the near-zero probability of occurrence.

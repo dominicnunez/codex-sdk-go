@@ -9,20 +9,6 @@
 > **Date:** YYYY-MM-DD
 > **Reason:** Explanation (can be multiple lines)
 
-### UpdatePatchChangeKind MarshalJSON inconsistency with AddPatchChangeKind and DeletePatchChangeKind
-
-**Location:** `event_types.go:147-153` — UpdatePatchChangeKind.MarshalJSON
-**Date:** 2026-02-27
-
-**Reason:** The audit claims `AddPatchChangeKind` (line 128) and `DeletePatchChangeKind` (line 136)
-use "anonymous struct literals" for marshaling, and that `UpdatePatchChangeKind` is inconsistent
-by using `map[string]interface{}`. This is factually wrong. All three types use the map pattern:
-`AddPatchChangeKind` uses `map[string]string{"type": "add"}`, `DeletePatchChangeKind` uses
-`map[string]string{"type": "delete"}`, and `UpdatePatchChangeKind` uses `map[string]interface{}`
-(interface{} because it has an optional `move_path` field). There is no intra-file inconsistency.
-The anonymous struct pattern exists in other files (`approval.go`, `config.go`, `review.go`)
-but not in the types the audit references.
-
 ### Close cannot race with handleResponse to double-send on pending channel
 
 **Location:** `stdio.go:197-213` — Close() pending request cleanup loop
@@ -229,3 +215,38 @@ race + the existing design exception.
 This is factually wrong. `TestAgentTrackerIgnoresNonCollabEvents` (collab_tracker_test.go:182-193)
 passes `*TextDelta`, `*TurnCompleted`, and `*ItemStarted` events to `ProcessEvent` and asserts
 that `tracker.Agents()` remains empty. The exact test the finding requests already exists.
+
+### TurnStartParams SandboxPolicy marshal finding is a duplicate of existing design exception
+
+**Location:** `turn.go:22-33` — TurnStartParams.SandboxPolicy field
+**Date:** 2026-02-28
+
+**Reason:** The audit flags that `TurnStartParams.SandboxPolicy` (bare interface `*SandboxPolicy`)
+does not inject the `"type"` discriminator for struct variants like `SandboxPolicyWorkspaceWrite`.
+The audit itself acknowledges "Already covered by the design exception 'Params structs use bare
+interface instead of wrapper type.'" This is the exact same issue documented at
+`audit/exceptions/design.md:63-77`, which covers all bare-interface policy fields on params
+structs including `TurnStartParams.SandboxPolicy` at `turn.go:30`. Duplicate finding.
+
+### handleApproval marshalForWire pointer-to-result described as a potential bug but works correctly
+
+**Location:** `client.go:324` — marshalForWire(&result) call
+**Date:** 2026-02-28
+
+**Reason:** The audit describes a theoretical scenario where `marshalForWire(&result)` could fail
+to satisfy the `wireMarshaler` interface check for future types. The audit itself concludes
+"The current code is correct for all existing types" and "No change needed for current types.
+This is noted for awareness." A finding that describes correct behavior and requires no change
+is not an actionable finding — it is a speculative concern about hypothetical future types.
+
+### turn/completed unmarshal failure path in executeStreamedTurn claimed to lack test coverage
+
+**Location:** `turn_lifecycle.go:181-184` — turn/completed unmarshal failure synthesis
+**Date:** 2026-02-28
+
+**Reason:** The audit claims "This path is not tested." This is factually wrong.
+`TestRunStreamedMalformedTurnCompleted` (run_streamed_test.go:763-786) injects a `turn/completed`
+notification with a valid `threadId` but a malformed turn body, then verifies the stream emits
+an error containing "unmarshal turn/completed." The blocking path is also tested by
+`TestRunMalformedTurnCompleted` (run_test.go:571-602). Both tests exercise the exact synthesized
+`TurnCompletedNotification` with `TurnError` path described in the finding.
