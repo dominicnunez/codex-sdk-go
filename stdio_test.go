@@ -686,13 +686,12 @@ func TestStdioNotificationHandlerPanicRecovery(t *testing.T) {
 
 	received := make(chan string, 2)
 	panicCaught := make(chan any, 1)
-	callCount := 0
+	var callCount atomic.Int32
 	transport.OnPanic(func(v any) {
 		panicCaught <- v
 	})
 	transport.OnNotify(func(ctx context.Context, notif codex.Notification) {
-		callCount++
-		if callCount == 1 {
+		if callCount.Add(1) == 1 {
 			panic("notification handler blew up")
 		}
 		received <- notif.Method
