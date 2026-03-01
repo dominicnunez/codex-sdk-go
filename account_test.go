@@ -512,3 +512,75 @@ func TestAccountRateLimitsUpdatedNotification(t *testing.T) {
 		t.Errorf("usedPercent = %d, want 75", receivedRateLimits.Primary.UsedPercent)
 	}
 }
+
+func TestAccountMarshalJSONInjectsTypeDiscriminator(t *testing.T) {
+	tests := []struct {
+		name    string
+		account codex.Account
+		want    string
+	}{
+		{
+			name:    "ApiKeyAccount",
+			account: &codex.ApiKeyAccount{},
+			want:    `{"type":"apiKey"}`,
+		},
+		{
+			name:    "ChatgptAccount_with_fields",
+			account: &codex.ChatgptAccount{Email: "a@b.com", PlanType: codex.PlanTypePlus},
+			want:    `{"type":"chatgpt","email":"a@b.com","planType":"plus"}`,
+		},
+		{
+			name:    "ChatgptAccount_zero_value",
+			account: &codex.ChatgptAccount{},
+			want:    `{"type":"chatgpt","email":"","planType":""}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := json.Marshal(tt.account)
+			if err != nil {
+				t.Fatalf("Marshal() error = %v", err)
+			}
+			if string(got) != tt.want {
+				t.Errorf("Marshal() = %s, want %s", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAccountWrapperRoundTrip(t *testing.T) {
+	tests := []struct {
+		name    string
+		wrapper *codex.AccountWrapper
+		want    string
+	}{
+		{
+			name:    "apiKey",
+			wrapper: &codex.AccountWrapper{Value: &codex.ApiKeyAccount{}},
+			want:    `{"type":"apiKey"}`,
+		},
+		{
+			name:    "chatgpt",
+			wrapper: &codex.AccountWrapper{Value: &codex.ChatgptAccount{Email: "a@b.com", PlanType: codex.PlanTypePro}},
+			want:    `{"type":"chatgpt","email":"a@b.com","planType":"pro"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := json.Marshal(tt.wrapper)
+			if err != nil {
+				t.Fatalf("Marshal() error = %v", err)
+			}
+			if string(got) != tt.want {
+				t.Errorf("Marshal() = %s, want %s", got, tt.want)
+			}
+
+			var roundTripped codex.AccountWrapper
+			if err := json.Unmarshal(got, &roundTripped); err != nil {
+				t.Fatalf("Unmarshal() error = %v", err)
+			}
+		})
+	}
+}

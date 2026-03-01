@@ -34,6 +34,14 @@ type ApiKeyAccount struct {
 
 func (*ApiKeyAccount) isAccount() {}
 
+// MarshalJSON injects the type discriminator, matching the pattern used by all
+// other discriminated union variants in the codebase.
+func (a *ApiKeyAccount) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Type string `json:"type"`
+	}{Type: "apiKey"})
+}
+
 // ChatgptAccount represents a ChatGPT account
 type ChatgptAccount struct {
 	Type     string   `json:"type"`
@@ -42,6 +50,16 @@ type ChatgptAccount struct {
 }
 
 func (*ChatgptAccount) isAccount() {}
+
+// MarshalJSON injects the type discriminator, matching the pattern used by all
+// other discriminated union variants in the codebase.
+func (c *ChatgptAccount) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Type     string   `json:"type"`
+		Email    string   `json:"email"`
+		PlanType PlanType `json:"planType"`
+	}{Type: "chatgpt", Email: c.Email, PlanType: c.PlanType})
+}
 
 // UnknownAccount represents an unrecognized account type from a newer protocol version.
 type UnknownAccount struct {
