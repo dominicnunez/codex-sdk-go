@@ -2,6 +2,8 @@ package codex_test
 
 import (
 	"context"
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -255,5 +257,107 @@ func TestAgentTrackerMultipleAgents(t *testing.T) {
 	info, _ := tracker.Agent("b")
 	if info.Message != "failed" {
 		t.Errorf("Message = %q, want 'failed'", info.Message)
+	}
+}
+
+func TestAgentTrackerConcurrentAccess(t *testing.T) {
+	const numAgents = 20
+	const numReaders = 10
+
+	tracker := codex.NewAgentTracker()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var wg sync.WaitGroup
+
+	// Goroutines that spawn agents via ProcessEvent.
+	for i := range numAgents {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			threadID := fmt.Sprintf("agent-%d", i)
+			tracker.ProcessEvent(&codex.CollabToolCallEvent{
+				Phase:          codex.CollabToolCallStartedPhase,
+				Tool:           codex.CollabAgentToolSpawnAgent,
+				SenderThreadId: "parent",
+				AgentsStates: map[string]codex.CollabAgentState{
+					threadID: {Status: codex.CollabAgentStatusRunning},
+				},
+			})
+		}()
+	}
+
+	// Goroutines that repeatedly read Agents() and ActiveCount().
+	for range numReaders {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 50; j++ {
+				_ = tracker.Agents()
+				_ = tracker.ActiveCount()
+			}
+		}()
+	}
+
+	// Wait for all spawns and reads to finish before completing agents.
+	wg.Wait()
+
+	// Verify all agents were tracked.
+	agents := tracker.Agents()
+	if len(agents) != numAgents {
+		t.Fatalf("len(Agents()) = %d, want %d", len(agents), numAgents)
+	}
+
+	// Launch WaitAllDone in a goroutine — it should block until all complete.
+	waitDone := make(chan error, 1)
+	go func() {
+		waitDone <- tracker.WaitAllDone(ctx)
+	}()
+
+	// Concurrently complete all agents while readers keep hitting the tracker.
+	var wg2 sync.WaitGroup
+
+	for i := range numAgents {
+		wg2.Add(1)
+		go func() {
+			defer wg2.Done()
+			threadID := fmt.Sprintf("agent-%d", i)
+			tracker.ProcessEvent(&codex.CollabToolCallEvent{
+				Phase:          codex.CollabToolCallCompletedPhase,
+				Tool:           codex.CollabAgentToolCloseAgent,
+				SenderThreadId: "parent",
+				AgentsStates: map[string]codex.CollabAgentState{
+					threadID: {Status: codex.CollabAgentStatusCompleted},
+				},
+			})
+		}()
+	}
+
+	for range numReaders {
+		wg2.Add(1)
+		go func() {
+			defer wg2.Done()
+			for j := 0; j < 50; j++ {
+				_ = tracker.Agents()
+				_ = tracker.ActiveCount()
+			}
+		}()
+	}
+
+	wg2.Wait()
+
+	// WaitAllDone should have unblocked.
+	select {
+	case err := <-waitDone:
+		if err != nil {
+			t.Fatalf("WaitAllDone returned error: %v", err)
+		}
+	case <-ctx.Done():
+		t.Fatal("WaitAllDone did not return after all agents completed")
+	}
+
+	if tracker.ActiveCount() != 0 {
+		t.Errorf("ActiveCount() = %d, want 0", tracker.ActiveCount())
 	}
 }
