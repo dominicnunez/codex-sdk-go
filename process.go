@@ -12,6 +12,10 @@ import (
 const (
 	defaultBinaryName  = "codex"
 	processGracePeriod = 3 * time.Second
+
+	// sdkVersion is sent to the server during initialization.
+	// Update this value when cutting a new release.
+	sdkVersion = "0.1.0"
 )
 
 // ProcessOptions configures how the Codex CLI process is spawned.
@@ -179,7 +183,7 @@ func (p *Process) ensureInit(ctx context.Context) error {
 		return nil
 	}
 	_, err := p.Client.Initialize(ctx, InitializeParams{
-		ClientInfo: ClientInfo{Name: "codex-sdk-go", Version: "0.1.0"},
+		ClientInfo: ClientInfo{Name: "codex-sdk-go", Version: sdkVersion},
 	})
 	if err != nil {
 		return fmt.Errorf("initialize: %w", err)
