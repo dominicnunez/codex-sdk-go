@@ -80,17 +80,20 @@ func (c *Conversation) Thread() Thread {
 }
 
 // cloneThreadItemWrapper deep-copies a ThreadItemWrapper via JSON round-trip.
+// Panics on marshal/unmarshal failure — these indicate a bug in a type's JSON
+// methods and must not be silently swallowed (returning the original would
+// break the deep-copy isolation guarantee).
 func cloneThreadItemWrapper(w ThreadItemWrapper) ThreadItemWrapper {
 	if w.Value == nil {
 		return w
 	}
 	b, err := json.Marshal(w)
 	if err != nil {
-		return w
+		panic(fmt.Sprintf("cloneThreadItemWrapper: marshal failed: %v", err))
 	}
 	var clone ThreadItemWrapper
 	if err := json.Unmarshal(b, &clone); err != nil {
-		return w
+		panic(fmt.Sprintf("cloneThreadItemWrapper: unmarshal failed: %v", err))
 	}
 	return clone
 }
