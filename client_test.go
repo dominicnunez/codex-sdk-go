@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -95,9 +96,9 @@ func TestClientUnknownNotification(t *testing.T) {
 	client := codex.NewClient(mock)
 
 	// Register a listener for a specific method
-	called := false
+	var called atomic.Bool
 	client.OnNotification("test.known", func(ctx context.Context, notif codex.Notification) {
-		called = true
+		called.Store(true)
 	})
 
 	// Inject an unknown notification method
@@ -114,7 +115,7 @@ func TestClientUnknownNotification(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// Verify the listener was NOT called (unknown method should be ignored)
-	if called {
+	if called.Load() {
 		t.Error("listener was called for unknown notification method")
 	}
 
