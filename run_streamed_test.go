@@ -125,6 +125,29 @@ func TestRunStreamedEmptyPrompt(t *testing.T) {
 	}
 }
 
+func TestRunStreamedEmptyPromptConsumedGuard(t *testing.T) {
+	proc, _ := mockProcess(t)
+	ctx := context.Background()
+
+	stream := proc.RunStreamed(ctx, codex.RunOptions{})
+
+	// First call — drain the error stream.
+	for range stream.Events() {
+	}
+
+	// Second call should yield ErrStreamConsumed.
+	var gotErr error
+	for _, err := range stream.Events() {
+		if err != nil {
+			gotErr = err
+			break
+		}
+	}
+	if gotErr != codex.ErrStreamConsumed {
+		t.Errorf("second Events() error = %v, want ErrStreamConsumed", gotErr)
+	}
+}
+
 func TestRunStreamedTurnError(t *testing.T) {
 	proc, mock := mockProcess(t)
 
