@@ -283,38 +283,22 @@ func TestClientRPCError(t *testing.T) {
 	}
 }
 
-// Helper function to check if error is a timeout error
+// isTimeoutError checks if err is or wraps a TimeoutError or DeadlineExceeded.
 func isTimeoutError(err error) bool {
-	if err == nil {
-		return false
-	}
-	// Check for context.DeadlineExceeded or TimeoutError
-	if err == context.DeadlineExceeded {
+	if errors.Is(err, context.DeadlineExceeded) {
 		return true
 	}
 	var timeoutErr *codex.TimeoutError
-	return isRPCError(err, &timeoutErr)
+	return errors.As(err, &timeoutErr)
 }
 
-// Helper function to check if error is an RPCError (using type assertion since we can't import errors)
+// isRPCError checks if err is or wraps an RPCError.
 func isRPCError(err error, target interface{}) bool {
-	if err == nil {
-		return false
-	}
-
-	// Try direct type assertion
 	switch v := target.(type) {
 	case **codex.RPCError:
-		if rpcErr, ok := err.(*codex.RPCError); ok {
-			*v = rpcErr
-			return true
-		}
+		return errors.As(err, v)
 	case **codex.TimeoutError:
-		if timeoutErr, ok := err.(*codex.TimeoutError); ok {
-			*v = timeoutErr
-			return true
-		}
+		return errors.As(err, v)
 	}
-
 	return false
 }
