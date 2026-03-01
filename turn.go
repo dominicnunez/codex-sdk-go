@@ -16,7 +16,10 @@ func newTurnService(client *Client) *TurnService {
 
 // ===== Turn Start =====
 
-// TurnStartParams are the parameters for turn/start
+// TurnStartParams are the parameters for turn/start.
+// Marshal note: each UserInput implementation must provide its own MarshalJSON
+// to inject the "type" discriminator. No custom MarshalJSON is needed here
+// because the default encoder delegates to each element's MarshalJSON.
 type TurnStartParams struct {
 	ThreadID       string           `json:"threadId"`
 	Input          []UserInput      `json:"input"`
