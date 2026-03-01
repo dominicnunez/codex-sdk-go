@@ -26,8 +26,9 @@ type ProcessOptions struct {
 	// Path to the codex binary. If empty, "codex" is resolved from PATH.
 	BinaryPath string
 
-	// Extra arguments appended after all typed flags.
+	// Extra arguments prepended before typed flags (so typed flags win via last-wins).
 	// Use for forward-compat with new CLI flags not yet covered by typed fields.
+	// Must not contain "--" (end-of-options marker), which would bypass typed flag safety.
 	ExecArgs []string
 
 	// Environment variables for the child process. Nil inherits the parent environment.
@@ -68,11 +69,21 @@ type Process struct {
 	initDone  bool
 }
 
+// errEndOfOptionsInExecArgs is returned when ExecArgs contains "--", which
+// would cause typed safety flags to be treated as positional arguments.
+var errEndOfOptionsInExecArgs = errors.New(`ExecArgs must not contain "--" (end-of-options marker)`)
+
 // buildArgs constructs the CLI argument list from typed fields and ExecArgs.
 // ExecArgs are prepended before typed flags so that typed fields (Model,
 // Sandbox, ApprovalMode, Config) always win via last-wins CLI parsing.
 // This prevents untrusted ExecArgs from overriding safety-critical flags.
-func (opts *ProcessOptions) buildArgs() []string {
+func (opts *ProcessOptions) buildArgs() ([]string, error) {
+	for _, arg := range opts.ExecArgs {
+		if arg == "--" {
+			return nil, errEndOfOptionsInExecArgs
+		}
+	}
+
 	args := []string{"exec", "--experimental-json"}
 
 	args = append(args, opts.ExecArgs...)
@@ -95,7 +106,7 @@ func (opts *ProcessOptions) buildArgs() []string {
 		args = append(args, "--config", k+"="+opts.Config[k])
 	}
 
-	return args
+	return args, nil
 }
 
 // NewProcessFromClient wraps an existing Client in a Process. This is useful
@@ -120,7 +131,10 @@ func StartProcess(ctx context.Context, opts *ProcessOptions) (*Process, error) {
 		binary = defaultBinaryName
 	}
 
-	args := opts.buildArgs()
+	args, err := opts.buildArgs()
+	if err != nil {
+		return nil, err
+	}
 
 	cmd := exec.CommandContext(ctx, binary, args...)
 	cmd.Env = opts.Env

@@ -178,6 +178,22 @@ func TestStartProcessBadBinary(t *testing.T) {
 	}
 }
 
+// TestStartProcessExecArgsWithEndOfOptions verifies that StartProcess rejects
+// ExecArgs containing "--" (end-of-options marker), which would bypass typed flag safety.
+func TestStartProcessExecArgsWithEndOfOptions(t *testing.T) {
+	ctx := context.Background()
+	_, err := codex.StartProcess(ctx, &codex.ProcessOptions{
+		BinaryPath: "/nonexistent/binary",
+		ExecArgs:   []string{"--foo", "--", "--bar"},
+	})
+	if err == nil {
+		t.Fatal("expected error when ExecArgs contains '--'")
+	}
+	if !strings.Contains(err.Error(), "--") && !strings.Contains(err.Error(), "end-of-options") {
+		t.Errorf("error message should mention '--' or end-of-options, got: %v", err)
+	}
+}
+
 // TestStartProcessContextCancellation verifies that canceling the context
 // causes the process to terminate.
 func TestStartProcessContextCancellation(t *testing.T) {
