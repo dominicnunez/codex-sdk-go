@@ -1,6 +1,9 @@
 package codex
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func TestNormalizeID(t *testing.T) {
 	tests := []struct {
@@ -34,7 +37,10 @@ func TestNormalizeID(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := normalizeID(tt.in)
+			got, err := normalizeID(tt.in)
+			if err != nil {
+				t.Fatalf("normalizeID(%v) returned unexpected error: %v", tt.in, err)
+			}
 			if got != tt.want {
 				t.Errorf("normalizeID(%v) = %q; want %q", tt.in, got, tt.want)
 			}
@@ -42,7 +48,7 @@ func TestNormalizeID(t *testing.T) {
 	}
 }
 
-func TestNormalizeIDPanicsOnUnexpectedType(t *testing.T) {
+func TestNormalizeIDReturnsErrorOnUnexpectedType(t *testing.T) {
 	cases := []struct {
 		name string
 		in   interface{}
@@ -53,12 +59,13 @@ func TestNormalizeIDPanicsOnUnexpectedType(t *testing.T) {
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			defer func() {
-				if r := recover(); r == nil {
-					t.Errorf("normalizeID(%v) did not panic for unexpected type", tt.in)
-				}
-			}()
-			normalizeID(tt.in)
+			_, err := normalizeID(tt.in)
+			if err == nil {
+				t.Errorf("normalizeID(%v) returned nil error for unexpected type", tt.in)
+			}
+			if !errors.Is(err, errUnexpectedIDType) {
+				t.Errorf("normalizeID(%v) error = %v; want errUnexpectedIDType", tt.in, err)
+			}
 		})
 	}
 }

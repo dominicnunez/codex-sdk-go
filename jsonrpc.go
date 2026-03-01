@@ -85,13 +85,17 @@ func (r RequestID) Equal(other RequestID) bool {
 func isNumericID(v interface{}) (string, bool) {
 	switch v := v.(type) {
 	case float64:
-		return normalizeID(v), true
+		s, _ := normalizeID(v) // err is unreachable: float64 is always handled
+		return s, true
 	case int64:
-		return normalizeID(v), true
+		s, _ := normalizeID(v)
+		return s, true
 	case int:
-		return normalizeID(v), true
+		s, _ := normalizeID(v)
+		return s, true
 	case uint64:
-		return normalizeID(v), true
+		s, _ := normalizeID(v)
+		return s, true
 	default:
 		return "", false
 	}

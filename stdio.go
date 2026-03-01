@@ -38,34 +38,38 @@ type StdioTransport struct {
 	cancelCtx     context.CancelFunc
 }
 
+// errUnexpectedIDType is returned when normalizeID encounters an ID value
+// that is not a supported JSON-RPC ID type (string, number).
+var errUnexpectedIDType = errors.New("unexpected ID type")
+
 // normalizeID normalizes request IDs to a string key for map matching.
 // JSON unmarshals all numbers as float64, so we format integer-valued
 // floats without decimals for consistent lookups.
-func normalizeID(id interface{}) string {
+func normalizeID(id interface{}) (string, error) {
 	switch v := id.(type) {
 	case float64:
 		if v >= 0 {
 			u := uint64(v)
 			if v == float64(u) {
-				return fmt.Sprintf("%d", u)
+				return fmt.Sprintf("%d", u), nil
 			}
 		} else {
 			i := int64(v)
 			if v == float64(i) {
-				return fmt.Sprintf("%d", i)
+				return fmt.Sprintf("%d", i), nil
 			}
 		}
-		return fmt.Sprintf("%v", v)
+		return fmt.Sprintf("%v", v), nil
 	case int64:
-		return fmt.Sprintf("%d", v)
+		return fmt.Sprintf("%d", v), nil
 	case int:
-		return fmt.Sprintf("%d", v)
+		return fmt.Sprintf("%d", v), nil
 	case uint64:
-		return fmt.Sprintf("%d", v)
+		return fmt.Sprintf("%d", v), nil
 	case string:
-		return v
+		return v, nil
 	default:
-		panic(fmt.Sprintf("normalizeID: unexpected ID type %T", id))
+		return "", fmt.Errorf("%w: %T", errUnexpectedIDType, id)
 	}
 }
 
@@ -96,7 +100,11 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 	}
 
 	// Create response channel and store with normalized ID for matching
-	normalizedID := normalizeID(req.ID.Value)
+	normalizedID, err := normalizeID(req.ID.Value)
+	if err != nil {
+		t.mu.Unlock()
+		return Response{}, NewTransportError("send failed", err)
+	}
 	if _, exists := t.pendingReqs[normalizedID]; exists {
 		t.mu.Unlock()
 		return Response{}, NewTransportError("send failed", fmt.Errorf("duplicate request ID: %v", req.ID.Value))
@@ -331,42 +339,15 @@ func (t *StdioTransport) readLoop() {
 func (t *StdioTransport) handleResponse(data []byte) {
 	var resp Response
 	if err := json.Unmarshal(data, &resp); err != nil {
-		// Full unmarshal failed. Try to extract just the ID so the
-		// pending caller gets an immediate error instead of timing out.
-		var idOnly struct {
-			ID RequestID `json:"id"`
-		}
-		if json.Unmarshal(data, &idOnly) != nil {
-			return
-		}
-		normalizedID := normalizeID(idOnly.ID.Value)
-		t.mu.Lock()
-		if t.closed {
-			t.mu.Unlock()
-			return
-		}
-		pending, ok := t.pendingReqs[normalizedID]
-		if ok {
-			delete(t.pendingReqs, normalizedID)
-		}
-		t.mu.Unlock()
-		if ok {
-			errDetail, _ := json.Marshal(err.Error()) //nolint:errchkjson // marshalling a string cannot fail
-			pending.ch <- Response{
-				JSONRPC: jsonrpcVersion,
-				ID:      pending.id,
-				Error: &Error{
-					Code:    ErrCodeParseError,
-					Message: "failed to parse server response",
-					Data:    json.RawMessage(errDetail),
-				},
-			}
-		}
+		t.handleMalformedResponse(data, err)
 		return
 	}
 
 	// Normalize ID for matching
-	normalizedID := normalizeID(resp.ID.Value)
+	normalizedID, err := normalizeID(resp.ID.Value)
+	if err != nil {
+		return
+	}
 
 	t.mu.Lock()
 	if t.closed {
@@ -381,6 +362,45 @@ func (t *StdioTransport) handleResponse(data []byte) {
 
 	if ok {
 		pending.ch <- resp // safe: buffer 1, only one sender claims via delete
+	}
+}
+
+// handleMalformedResponse attempts to extract the ID from a response that
+// failed full unmarshal, and sends a parse error to the pending caller.
+func (t *StdioTransport) handleMalformedResponse(data []byte, unmarshalErr error) {
+	var idOnly struct {
+		ID RequestID `json:"id"`
+	}
+	if json.Unmarshal(data, &idOnly) != nil {
+		return
+	}
+	normalizedID, err := normalizeID(idOnly.ID.Value)
+	if err != nil {
+		return
+	}
+
+	t.mu.Lock()
+	if t.closed {
+		t.mu.Unlock()
+		return
+	}
+	pending, ok := t.pendingReqs[normalizedID]
+	if ok {
+		delete(t.pendingReqs, normalizedID)
+	}
+	t.mu.Unlock()
+
+	if ok {
+		errDetail, _ := json.Marshal(unmarshalErr.Error()) //nolint:errchkjson // marshalling a string cannot fail
+		pending.ch <- Response{
+			JSONRPC: jsonrpcVersion,
+			ID:      pending.id,
+			Error: &Error{
+				Code:    ErrCodeParseError,
+				Message: "failed to parse server response",
+				Data:    json.RawMessage(errDetail),
+			},
+		}
 	}
 }
 
