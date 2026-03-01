@@ -10,6 +10,11 @@ import (
 	"sync/atomic"
 )
 
+// streamChannelBuffer is the capacity of the event channel between the
+// lifecycle goroutine and the Events() iterator. 64 is large enough to
+// absorb bursts of rapid notifications (e.g. streaming text deltas)
+// without blocking the notification dispatcher, while small enough to
+// keep per-stream memory overhead negligible.
 const streamChannelBuffer = 64
 
 // ErrStreamConsumed is returned when Events() is called on a Stream whose

@@ -13,7 +13,10 @@ import (
 )
 
 const (
-	defaultBinaryName  = "codex"
+	defaultBinaryName = "codex"
+	// processGracePeriod is how long Close waits after SIGINT before
+	// sending SIGKILL. 3 seconds balances fast shutdown against giving
+	// the CLI time to flush pending writes and release resources.
 	processGracePeriod = 3 * time.Second
 
 	// sdkVersion is sent to the server during initialization.
