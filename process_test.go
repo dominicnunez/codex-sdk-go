@@ -2,6 +2,7 @@ package codex_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -262,6 +263,63 @@ func TestStartProcessNilOptions(t *testing.T) {
 		t.Log("StartProcess with nil options succeeded (codex binary found in PATH)")
 	}
 	// Either error or success is acceptable — we just verify no panic.
+}
+
+// TestEnsureInitRetryAfterFailure verifies that ensureInit retries the
+// initialize handshake after a transient failure instead of latching the error.
+func TestEnsureInitRetryAfterFailure(t *testing.T) {
+	mock := NewMockTransport()
+	mock.SetSendError(fmt.Errorf("transient network error"))
+
+	client := codex.NewClient(mock, codex.WithRequestTimeout(2*time.Second))
+	proc := codex.NewProcessFromClient(client)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// First call should fail because Send returns an error for "initialize".
+	_, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err == nil {
+		t.Fatal("expected StartConversation to fail on transient init error")
+	}
+
+	// Clear the error and set up proper responses for initialize and thread/start.
+	mock.SetSendError(nil)
+
+	_ = mock.SetResponseData("initialize", map[string]interface{}{
+		"userAgent": "codex-test/1.0",
+	})
+
+	_ = mock.SetResponseData("thread/start", map[string]interface{}{
+		"approvalPolicy": "never",
+		"cwd":            "/tmp",
+		"model":          "o3",
+		"modelProvider":  "openai",
+		"sandbox":        map[string]interface{}{"type": "readOnly"},
+		"thread": map[string]interface{}{
+			"id":            "thread-1",
+			"cliVersion":    "1.0.0",
+			"createdAt":     1700000000,
+			"cwd":           "/tmp",
+			"modelProvider": "openai",
+			"preview":       "",
+			"source":        "exec",
+			"status":        map[string]interface{}{"type": "idle"},
+			"turns":         []interface{}{},
+			"updatedAt":     1700000000,
+			"ephemeral":     true,
+		},
+	})
+
+	// Second call should succeed, proving ensureInit retried.
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("expected StartConversation to succeed after clearing error: %v", err)
+	}
+
+	if conv.ThreadID() != "thread-1" {
+		t.Errorf("ThreadID() = %q, want %q", conv.ThreadID(), "thread-1")
+	}
 }
 
 // TestProcessCloseIdempotent verifies Close can be called multiple times.
