@@ -1142,3 +1142,38 @@ intentional. They verify that SECURITY.md exists and contains required sections 
 security scope, dependency policy). Actual security behavior (credential redaction, wire protocol
 safety) is tested in `credential_redact_test.go` and transport tests. The documentation tests ensure
 the security policy file stays complete as the project evolves.
+
+### Thread() deep-copy does not have a gap in Turn field cloning
+
+**Location:** `conversation.go:68-81` — Thread() clone logic
+**Date:** 2026-03-01
+
+**Reason:** The audit claims the clone logic is "scattered" and risks missing fields, but the `Turn`
+struct has exactly four fields: `ID` (string, value-copied), `Status` (TurnStatus string, value-copied),
+`Items` (deep-copied item-by-item via `cloneThreadItemWrapper`), and `Error` (deep-copied with
+`CodexErrorInfo` and `AdditionalDetails` handled explicitly). Every field is correctly cloned.
+The finding itself admits "the current code is correct" — the concern is purely speculative about
+hypothetical future fields, which is not an actionable finding.
+
+### handleApproval passing pointer to result for marshalForWire is standard Go behavior
+
+**Location:** `client.go:397` — marshalForWire(&result) call
+**Date:** 2026-03-01
+
+**Reason:** The audit notes that `marshalForWire(&result)` checks `wireMarshaler` on `*R` instead of `R`,
+then admits "the current code is correct for all existing types." The suggested fix is to add a comment
+explaining how Go method sets work. This is standard Go behavior (a pointer to a value satisfies
+interfaces with both value and pointer receivers), not a bug or code quality issue. The finding
+describes no actual or potential incorrect behavior.
+
+### newErrorStream does not bypass the consumed guard
+
+**Location:** `run_streamed.go:151-160` — newErrorStream constructor
+**Date:** 2026-03-01
+
+**Reason:** The audit claims `newErrorStream` "bypasses consumed guard, allowing double iteration."
+This is wrong. `newErrorStream` creates a `Stream` with `consumed` at its zero value (`false`).
+The `Events()` method uses `consumed.CompareAndSwap(false, true)` — the first call succeeds and
+returns the events iterator; the second call fails the CAS and returns `ErrStreamConsumed`. The
+`consumed` guard works identically for `newErrorStream` and `newStream`. The `events` field is
+unexported, so callers cannot access the iterator except through `Events()`.
