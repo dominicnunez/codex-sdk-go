@@ -666,3 +666,52 @@ func TestEnsureInitConcurrentCallers(t *testing.T) {
 		t.Errorf("expected exactly 1 initialize call, got %d", initCount)
 	}
 }
+
+// TestRunAfterTransportClose verifies that calling Run on a Process whose
+// transport has been closed produces a clear error.
+func TestRunAfterTransportClose(t *testing.T) {
+	mock := NewMockTransport()
+
+	_ = mock.SetResponseData("initialize", map[string]interface{}{
+		"userAgent": "codex-test/1.0",
+	})
+	_ = mock.SetResponseData("thread/start", map[string]interface{}{
+		"approvalPolicy": "never",
+		"cwd":            "/tmp",
+		"model":          "o3",
+		"modelProvider":  "openai",
+		"sandbox":        map[string]interface{}{"type": "readOnly"},
+		"thread": map[string]interface{}{
+			"id":            "thread-1",
+			"cliVersion":    "1.0.0",
+			"createdAt":     1700000000,
+			"cwd":           "/tmp",
+			"modelProvider": "openai",
+			"preview":       "",
+			"source":        "exec",
+			"status":        map[string]interface{}{"type": "idle"},
+			"turns":         []interface{}{},
+			"updatedAt":     1700000000,
+		},
+	})
+
+	client := codex.NewClient(mock, codex.WithRequestTimeout(2*time.Second))
+	proc := codex.NewProcessFromClient(client)
+
+	ctx := context.Background()
+
+	// StartConversation initializes and creates a thread (no turn wait).
+	_, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+
+	// Close the transport to simulate process shutdown.
+	_ = mock.Close()
+
+	// Run should fail because the transport is closed.
+	_, err = proc.Run(ctx, codex.RunOptions{Prompt: "after close"})
+	if err == nil {
+		t.Fatal("expected error from Run after transport close, got nil")
+	}
+}
