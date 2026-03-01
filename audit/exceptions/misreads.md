@@ -577,3 +577,52 @@ request — it appears in `specs/ClientRequest.json` and is implemented as
 absent from the server→client approval dispatch in `handleRequest`. The `request_coverage_test.go`
 comment at line 189 ("server→client request (approval flow)") is misleading, but the code is
 correct — `fuzzyFileSearch` is tested in `fuzzy_search_test.go` as a normal client→server method.
+
+### Config key=value concatenation allows parsing ambiguity
+
+**Location:** `process.go:94` — buildArgs config flag construction
+**Date:** 2026-03-01
+
+**Reason:** Duplicate of existing exception "Config flag values containing '=' are ambiguous on the
+CLI" at `process.go:87`. Both describe the same issue: `--config k=v` concatenation is ambiguous
+when keys or values contain `=`. The existing exception already documents why this is a CLI-side
+parsing concern and not an SDK defect. The additional suggestion to validate keys is a feature
+request, not a bug.
+
+### cloneThreadItemWrapper panics on marshal/unmarshal failure
+
+**Location:** `conversation.go:89-102` — cloneThreadItemWrapper panic behavior
+**Date:** 2026-03-01
+
+**Reason:** Covered by existing exception "cloneThreadItemWrapper uses JSON round-trip for deep copy"
+which explicitly states: "The error path now panics (instead of silently returning the original),
+ensuring the deep-copy guarantee is never silently broken." The panic is a deliberate design choice
+already analyzed and accepted. The alternative (returning an error from `Thread()`) would change the
+public API signature — a breaking change disproportionate to the risk, since marshal/unmarshal failure
+on types with tested JSON methods indicates a logic bug, not a runtime condition to handle gracefully.
+
+### Duplicate approval dispatch tests across two files
+
+**Location:** `approval_test.go`, `dispatch_test.go` — approval handler tests
+**Date:** 2026-03-01
+
+**Reason:** The audit claims these tests are "identical" and "redundant." They test different
+aspects. `TestApprovalHandlerDispatch` (approval_test.go) registers all 7 handlers and verifies
+each handler **was called** (checking invocation). `TestKnownApprovalHandlerDispatch` (dispatch_test.go)
+is table-driven, registers one handler per case, and verifies the **response has no error** (checking
+dispatch correctness). `TestMissingApprovalHandler` tests with zero handlers set;
+`TestMissingApprovalHandlerReturnsMethodNotFound` tests with a specific handler missing while others
+are registered. These are complementary, not duplicative.
+
+### ChatgptAuthTokensRefreshParams described as carrying auth tokens that need redaction tests
+
+**Location:** `credential_redact_test.go` — missing test claim
+**Date:** 2026-03-01
+
+**Reason:** The audit claims `ChatgptAuthTokensRefreshParams` is "the request type that carries auth
+tokens" and needs redaction tests. This is factually wrong. `ChatgptAuthTokensRefreshParams` contains
+only `Reason` (a string enum) and `PreviousAccountID` (optional string) — neither is a credential.
+The type carries the *reason* for a token refresh request (e.g. "expired"), not the actual tokens.
+The *response* type (`ChatgptAuthTokensRefreshResponse`) carries the new `AccessToken` and already
+has `MarshalJSON` redaction with full test coverage in `credential_redact_test.go`. There is nothing
+to redact on the params type.
