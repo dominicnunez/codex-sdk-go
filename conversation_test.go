@@ -921,3 +921,48 @@ func TestConversationThreadSnapshotDuringTurnCompletion(t *testing.T) {
 	}
 	<-snapshotDone
 }
+
+func TestConversationStreamedThreadSnapshotDuringTurnCompletion(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+
+	stream := conv.TurnStreamed(ctx, codex.TurnOptions{Prompt: "race"})
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Concurrently call Thread() while iterating streamed events.
+	// Run with -race to verify no data race on the shared thread state.
+	snapshotDone := make(chan struct{})
+	go func() {
+		defer close(snapshotDone)
+		for i := 0; i < 100; i++ {
+			snap := conv.Thread()
+			_ = snap.Turns
+		}
+	}()
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-1","text":"Hi"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	for _, err := range stream.Events() {
+		if err != nil {
+			t.Fatalf("unexpected stream error: %v", err)
+		}
+	}
+	<-snapshotDone
+}
