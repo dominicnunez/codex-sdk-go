@@ -45,10 +45,11 @@ func (c *Conversation) ThreadID() string {
 
 // Thread returns a snapshot of the latest thread state.
 // The returned slices (Turns, Items) are deep-copied so append/reorder/delete
-// operations do not affect the Conversation. However, the ThreadItemWrapper
-// values within Items share underlying pointers with the original — field-level
-// mutations of individual items will be visible to both the snapshot and the
-// Conversation.
+// operations do not affect the Conversation. However, pointer fields on the
+// Thread struct (GitInfo, Name, AgentNickname, AgentRole) and the
+// ThreadItemWrapper values within Items share underlying pointers with the
+// original — field-level mutations through these pointers will be visible to
+// both the snapshot and the Conversation.
 func (c *Conversation) Thread() Thread {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -182,19 +183,19 @@ func (c *Conversation) turnStreamedLifecycle(ctx context.Context, opts TurnOptio
 	defer close(s.done)
 
 	if opts.Prompt == "" {
-		streamSendErr(ch, errors.New("prompt is required"))
+		streamSendErr(ctx, ch, errors.New("prompt is required"))
 		return
 	}
 
 	if err := c.process.ensureInit(ctx); err != nil {
-		streamSendErr(ch, err)
+		streamSendErr(ctx, ch, err)
 		return
 	}
 
 	c.mu.Lock()
 	if c.activeTurn {
 		c.mu.Unlock()
-		streamSendErr(ch, errTurnInProgress)
+		streamSendErr(ctx, ch, errTurnInProgress)
 		return
 	}
 	c.activeTurn = true

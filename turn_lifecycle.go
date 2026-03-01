@@ -190,7 +190,7 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, ch chan<- e
 	})
 
 	if _, err := p.client.Turn.Start(ctx, p.turnParams); err != nil {
-		streamSendErr(ch, fmt.Errorf("turn/start: %w", err))
+		streamSendErr(ctx, ch, fmt.Errorf("turn/start: %w", err))
 		return
 	}
 
@@ -200,7 +200,7 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, ch chan<- e
 		streamSendEvent(ctx, ch, &TurnCompleted{Turn: completed.Turn})
 
 		if completed.Turn.Error != nil {
-			streamSendErr(ch, fmt.Errorf("turn error: %w", completed.Turn.Error))
+			streamSendErr(ctx, ch, fmt.Errorf("turn error: %w", completed.Turn.Error))
 			return
 		}
 
@@ -218,6 +218,6 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, ch chan<- e
 		s.mu.Unlock()
 
 	case <-ctx.Done():
-		streamSendErr(ch, ctx.Err())
+		streamSendErr(ctx, ch, ctx.Err())
 	}
 }

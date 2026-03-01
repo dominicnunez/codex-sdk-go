@@ -28,6 +28,8 @@ type Stream struct {
 
 // Events yields (Event, error) pairs. Iterate with a range-over-func loop.
 // Iteration ends when the turn completes, an error occurs, or the context is cancelled.
+// The iterator is single-use: subsequent iterations yield zero events because the
+// underlying channel is already drained and closed.
 func (s *Stream) Events() iter.Seq2[Event, error] {
 	return s.events
 }
@@ -74,10 +76,18 @@ func streamSendEvent(ctx context.Context, ch chan<- eventOrErr, event Event) {
 	}
 }
 
-// streamSendErr performs a blocking send of an error on ch.
-// Errors must not be lost — they are terminal and signal the consumer to stop.
-func streamSendErr(ch chan<- eventOrErr, err error) {
-	ch <- eventOrErr{err: err}
+// streamSendErr sends a terminal error on ch. It attempts a non-blocking send
+// first (sufficient when buffer space remains), then falls back to a blocking
+// send guarded by ctx to prevent goroutine leaks when the consumer stops reading.
+func streamSendErr(ctx context.Context, ch chan<- eventOrErr, err error) {
+	select {
+	case ch <- eventOrErr{err: err}:
+	default:
+		select {
+		case ch <- eventOrErr{err: err}:
+		case <-ctx.Done():
+		}
+	}
 }
 
 // streamListen registers a notification listener that unmarshals the
@@ -102,18 +112,18 @@ func (p *Process) runStreamedLifecycle(ctx context.Context, opts RunOptions, ch 
 	defer close(s.done)
 
 	if opts.Prompt == "" {
-		streamSendErr(ch, errors.New("prompt is required"))
+		streamSendErr(ctx, ch, errors.New("prompt is required"))
 		return
 	}
 
 	if err := p.ensureInit(ctx); err != nil {
-		streamSendErr(ch, err)
+		streamSendErr(ctx, ch, err)
 		return
 	}
 
 	threadResp, err := p.Client.Thread.Start(ctx, buildThreadParams(opts))
 	if err != nil {
-		streamSendErr(ch, fmt.Errorf("thread/start: %w", err))
+		streamSendErr(ctx, ch, fmt.Errorf("thread/start: %w", err))
 		return
 	}
 
