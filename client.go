@@ -62,6 +62,9 @@ type Client struct {
 	// Request ID counter for generating unique request IDs
 	requestIDCounter atomic.Uint64
 
+	// Handler error callback (optional, set once during construction)
+	handlerErrorCallback func(method string, err error)
+
 	// Service accessors
 	Thread          *ThreadService
 	Turn            *TurnService
@@ -88,6 +91,16 @@ type ClientOption func(*Client)
 func WithRequestTimeout(timeout time.Duration) ClientOption {
 	return func(c *Client) {
 		c.requestTimeout = timeout
+	}
+}
+
+// WithHandlerErrorCallback sets a callback that is invoked when a notification
+// handler or approval handler panics or returns an error. The callback receives
+// the JSON-RPC method name and the error. If the callback itself panics, the
+// panic is silently recovered.
+func WithHandlerErrorCallback(cb func(method string, err error)) ClientOption {
+	return func(c *Client) {
+		c.handlerErrorCallback = cb
 	}
 }
 
@@ -186,9 +199,45 @@ func (c *Client) OnNotification(method string, handler NotificationHandler) {
 	}
 }
 
+// panicToError converts a recovered panic value to an error.
+func panicToError(v any) error {
+	switch e := v.(type) {
+	case error:
+		return e
+	case string:
+		return errors.New(e)
+	default:
+		return fmt.Errorf("panic: %v", e)
+	}
+}
+
+// reportHandlerError invokes the handler error callback if set.
+// Recovers from callback panics to prevent double-fault crashes.
+func (c *Client) reportHandlerError(method string, err error) {
+	cb := c.handlerErrorCallback
+	if cb == nil {
+		return
+	}
+	defer func() { recover() }() //nolint:errcheck // callback panic is intentionally swallowed
+	cb(method, err)
+}
+
+// safeCallNotificationHandler calls fn, recovering any panic and reporting it
+// via reportHandlerError.
+func (c *Client) safeCallNotificationHandler(method string, fn func()) {
+	defer func() {
+		if r := recover(); r != nil {
+			c.reportHandlerError(method, panicToError(r))
+		}
+	}()
+	fn()
+}
+
 // handleNotification is the internal handler registered with the transport.
 // It routes incoming notifications to the appropriate registered listener,
 // then dispatches to all internal listeners for the same method.
+// Each handler is called in isolation so a panic in one does not prevent others
+// from executing.
 func (c *Client) handleNotification(ctx context.Context, notif Notification) {
 	c.listenersMu.RLock()
 	handler := c.notificationListeners[notif.Method]
@@ -200,11 +249,15 @@ func (c *Client) handleNotification(ctx context.Context, notif Notification) {
 	c.listenersMu.RUnlock()
 
 	if handler != nil {
-		handler(ctx, notif)
+		c.safeCallNotificationHandler(notif.Method, func() {
+			handler(ctx, notif)
+		})
 	}
 
 	for _, il := range internals {
-		il.handler(ctx, notif)
+		c.safeCallNotificationHandler(notif.Method, func() {
+			il.handler(ctx, notif)
+		})
 	}
 }
 
@@ -236,7 +289,28 @@ func (c *Client) addNotificationListener(method string, handler NotificationHand
 
 // handleRequest is the internal handler for server→client requests (approval flows).
 // It routes incoming requests to the appropriate approval handler.
-func (c *Client) handleRequest(ctx context.Context, req Request) (Response, error) {
+// Panics in approval handlers are recovered and reported via the handler error
+// callback. Errors returned by approval handlers are also reported.
+func (c *Client) handleRequest(ctx context.Context, req Request) (resp Response, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			pErr := panicToError(r)
+			c.reportHandlerError(req.Method, pErr)
+			resp = Response{}
+			err = pErr
+		}
+	}()
+
+	resp, err = c.dispatchApproval(ctx, req)
+	if err != nil {
+		c.reportHandlerError(req.Method, err)
+	}
+	return resp, err
+}
+
+// dispatchApproval routes an incoming server→client request to the appropriate
+// approval handler based on method name.
+func (c *Client) dispatchApproval(ctx context.Context, req Request) (Response, error) {
 	// Snapshot handlers under read lock, then release before calling
 	c.approvalMu.RLock()
 	handlers := c.approvalHandlers
