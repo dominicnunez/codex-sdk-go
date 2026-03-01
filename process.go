@@ -28,6 +28,7 @@ const (
 // ProcessOptions configures how the Codex CLI process is spawned.
 type ProcessOptions struct {
 	// Path to the codex binary. If empty, "codex" is resolved from PATH.
+	// Must be a trusted value — passed directly to exec.CommandContext.
 	BinaryPath string
 
 	// Extra arguments prepended before typed flags (so typed flags win via last-wins).
