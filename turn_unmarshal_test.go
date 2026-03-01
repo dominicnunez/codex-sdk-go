@@ -49,8 +49,8 @@ func TestUnknownUserInputType(t *testing.T) {
 	}
 }
 
-// TestValidUserInputTypeAfterUnknown verifies that valid types still work correctly
-func TestValidUserInputTypeAfterUnknown(t *testing.T) {
+// TestValidUserInputTextUnmarshal verifies that a standard text input unmarshals correctly.
+func TestValidUserInputTextUnmarshal(t *testing.T) {
 	jsonData := []byte(`{
 		"threadId": "thread-123",
 		"input": [
