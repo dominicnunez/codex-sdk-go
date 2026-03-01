@@ -251,8 +251,16 @@ func (t *StdioTransport) writeMessage(msg interface{}) error {
 		data = data[n:]
 	}
 
-	if _, err := t.writer.Write([]byte{'\n'}); err != nil {
-		return NewTransportError("write message", err)
+	delim := []byte{'\n'}
+	for len(delim) > 0 {
+		n, err := t.writer.Write(delim)
+		if err != nil {
+			return NewTransportError("write message", err)
+		}
+		if n == 0 {
+			return NewTransportError("write message", errors.New("writer returned zero bytes written without error"))
+		}
+		delim = delim[n:]
 	}
 
 	return nil
