@@ -822,3 +822,102 @@ func TestConversationThreadDeepCopyIsolation(t *testing.T) {
 		t.Errorf("Thread mutation leaked: got %d turns, want %d", len(snapshot2.Turns), originalLen)
 	}
 }
+
+func TestConversationThreadDeepCopyItemValueIsolation(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+
+	// Execute a turn that produces an agentMessage item.
+	turnDone := make(chan error, 1)
+	go func() {
+		_, err := conv.Turn(ctx, codex.TurnOptions{Prompt: "hello"})
+		turnDone <- err
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-1","text":"original"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[{"type":"agentMessage","id":"item-1","text":"original"}]}}`),
+	})
+
+	if err := <-turnDone; err != nil {
+		t.Fatalf("Turn error: %v", err)
+	}
+
+	// Get a snapshot and mutate the item value through the interface pointer.
+	snap1 := conv.Thread()
+	if len(snap1.Turns) == 0 || len(snap1.Turns[0].Items) == 0 {
+		t.Fatal("expected at least one turn with one item")
+	}
+	msg, ok := snap1.Turns[0].Items[0].Value.(*codex.AgentMessageThreadItem)
+	if !ok {
+		t.Fatal("expected AgentMessageThreadItem")
+	}
+	msg.Text = "mutated"
+
+	// A second snapshot should still see the original text.
+	snap2 := conv.Thread()
+	msg2, ok := snap2.Turns[0].Items[0].Value.(*codex.AgentMessageThreadItem)
+	if !ok {
+		t.Fatal("expected AgentMessageThreadItem")
+	}
+	if msg2.Text != "original" {
+		t.Errorf("item value mutation leaked: got %q, want %q", msg2.Text, "original")
+	}
+}
+
+func TestConversationThreadSnapshotDuringTurnCompletion(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+
+	turnDone := make(chan error, 1)
+	go func() {
+		_, err := conv.Turn(ctx, codex.TurnOptions{Prompt: "race"})
+		turnDone <- err
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Concurrently call Thread() while completing the turn.
+	// Run with -race to verify no data race.
+	snapshotDone := make(chan struct{})
+	go func() {
+		defer close(snapshotDone)
+		for i := 0; i < 100; i++ {
+			snap := conv.Thread()
+			_ = snap.Turns
+		}
+	}()
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	if err := <-turnDone; err != nil {
+		t.Fatalf("Turn error: %v", err)
+	}
+	<-snapshotDone
+}
