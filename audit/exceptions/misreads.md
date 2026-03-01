@@ -206,3 +206,26 @@ by `TestRunStreamedTurnError` (run_streamed_test.go:128-173) and `TestConversati
 `TestRunStreamedContextCancellation` (run_streamed_test.go:88-107) and
 `TestConversationTurnStreamedContextCancel` (conversation_test.go:392-416). Only the `turn/completed`
 unmarshal failure path genuinely lacks a test, but the blanket claim "none are exercised" is false.
+
+### TurnStreamed captures stale thread snapshot for RunResult
+
+**Location:** `conversation.go:162-165` — turnStreamedLifecycle thread capture
+**Date:** 2026-02-28
+
+**Reason:** This finding claims to be "a separate semantic issue" from the mutex race (finding 2),
+stating that "even with the lock fix, the snapshot semantics are ambiguous." The race condition
+is already captured by the mutex finding (which remains in the report). The "ambiguous semantics"
+claim is incorrect — the design exception at `audit/exceptions/design.md:249-260` already documents
+that `RunResult.Thread` deliberately reflects thread metadata at turn-start time, not post-turn state.
+The semantics are defined and accepted, not ambiguous. This finding is a duplicate of the mutex
+race + the existing design exception.
+
+### AgentTracker.ProcessEvent ignores non-CollabToolCallEvent events silently
+
+**Location:** `collab_tracker.go:46-49` — ProcessEvent type switch
+**Date:** 2026-02-28
+
+**Reason:** The finding claims "no test verifies that passing non-collab events is a no-op."
+This is factually wrong. `TestAgentTrackerIgnoresNonCollabEvents` (collab_tracker_test.go:182-193)
+passes `*TextDelta`, `*TurnCompleted`, and `*ItemStarted` events to `ProcessEvent` and asserts
+that `tracker.Agents()` remains empty. The exact test the finding requests already exists.
