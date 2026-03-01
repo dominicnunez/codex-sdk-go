@@ -36,38 +36,33 @@ func newGuardedChan(size int) *guardedChan {
 }
 
 // send writes an event/error pair to the channel, blocking until the send
-// succeeds or ctx is cancelled. Returns false if the channel is already closed.
-func (g *guardedChan) send(ctx context.Context, eoe eventOrErr) bool {
+// succeeds, ctx is cancelled, or the channel is already closed.
+func (g *guardedChan) send(ctx context.Context, eoe eventOrErr) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	if g.closed {
-		return false
+		return
 	}
 	select {
 	case g.ch <- eoe:
-		return true
 	case <-ctx.Done():
-		return false
 	}
 }
 
 // trySend attempts a non-blocking send, falling back to a blocking send
-// guarded by ctx. Returns false if the channel is closed or ctx cancelled.
-func (g *guardedChan) trySend(ctx context.Context, eoe eventOrErr) bool {
+// guarded by ctx. No-ops if the channel is closed or ctx cancelled.
+func (g *guardedChan) trySend(ctx context.Context, eoe eventOrErr) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	if g.closed {
-		return false
+		return
 	}
 	select {
 	case g.ch <- eoe:
-		return true
 	default:
 		select {
 		case g.ch <- eoe:
-			return true
 		case <-ctx.Done():
-			return false
 		}
 	}
 }
