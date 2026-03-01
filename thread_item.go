@@ -19,16 +19,6 @@ type UserMessageThreadItem struct {
 func (UserMessageThreadItem) threadItem() {}
 
 func (u *UserMessageThreadItem) MarshalJSON() ([]byte, error) {
-	type Alias UserMessageThreadItem
-	aux := &struct {
-		Type    string          `json:"type"`
-		Content json.RawMessage `json:"content"`
-		*Alias
-	}{
-		Type:  "userMessage",
-		Alias: (*Alias)(u),
-	}
-	// Marshal each UserInput via its own MarshalJSON.
 	items := make([]json.RawMessage, len(u.Content))
 	for i, input := range u.Content {
 		b, err := json.Marshal(input)
@@ -41,8 +31,6 @@ func (u *UserMessageThreadItem) MarshalJSON() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	aux.Content = contentBytes
-	// Use a flat struct so "content" is the marshaled slice, not the Alias version.
 	return json.Marshal(struct {
 		Type    string          `json:"type"`
 		ID      string          `json:"id"`
