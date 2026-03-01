@@ -1042,6 +1042,50 @@ func TestStdioSpuriousResponseUnknownID(t *testing.T) {
 	}
 }
 
+// TestStdioNoHandlerReturnsMethodNotFound verifies that a server→client request
+// with no registered handler gets a method-not-found error response instead of
+// being silently dropped.
+func TestStdioNoHandlerReturnsMethodNotFound(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	// Read responses from the transport
+	responseChan := make(chan codex.Response, 1)
+	go func() {
+		scanner := bufio.NewScanner(serverReader)
+		for scanner.Scan() {
+			var resp codex.Response
+			if err := json.Unmarshal(scanner.Bytes(), &resp); err == nil && resp.Error != nil {
+				responseChan <- resp
+				return
+			}
+		}
+	}()
+
+	// No OnRequest handler registered — should get method-not-found
+	req := `{"jsonrpc":"2.0","id":"no-handler","method":"unknown/method","params":{}}` + "\n"
+	_, _ = serverWriter.Write([]byte(req))
+
+	select {
+	case resp := <-responseChan:
+		if resp.Error.Code != codex.ErrCodeMethodNotFound {
+			t.Errorf("error code = %d; want %d (ErrCodeMethodNotFound)", resp.Error.Code, codex.ErrCodeMethodNotFound)
+		}
+		if resp.ID.Value != "no-handler" {
+			t.Errorf("response ID = %v; want no-handler", resp.ID.Value)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout: expected method-not-found response")
+	}
+}
+
 // TestStdioConcurrentSendAndClose verifies that concurrent Send and Close calls
 // do not race or panic. Every Send must either succeed or return an error.
 func TestStdioConcurrentSendAndClose(t *testing.T) {

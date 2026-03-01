@@ -415,6 +415,7 @@ func (t *StdioTransport) handleMalformedResponse(data []byte, unmarshalErr error
 func (t *StdioTransport) handleRequest(data []byte) {
 	var req Request
 	if err := json.Unmarshal(data, &req); err != nil {
+		t.handleMalformedRequest(data, err)
 		return
 	}
 
@@ -483,6 +484,30 @@ func (t *StdioTransport) handleRequest(data []byte) {
 		resp.ID = req.ID
 		_ = t.writeMessage(resp) // Error writing response - nothing more we can do (already in goroutine)
 	}()
+}
+
+// handleMalformedRequest attempts to extract the ID from a request that
+// failed full unmarshal, and sends back a parse error response so the
+// server knows the request failed instead of hanging indefinitely.
+func (t *StdioTransport) handleMalformedRequest(data []byte, unmarshalErr error) {
+	var idOnly struct {
+		ID RequestID `json:"id"`
+	}
+	if json.Unmarshal(data, &idOnly) != nil {
+		return
+	}
+
+	errDetail, _ := json.Marshal(unmarshalErr.Error()) //nolint:errchkjson // marshalling a string cannot fail
+	errorResp := Response{
+		JSONRPC: jsonrpcVersion,
+		ID:      idOnly.ID,
+		Error: &Error{
+			Code:    ErrCodeParseError,
+			Message: "failed to parse server request",
+			Data:    json.RawMessage(errDetail),
+		},
+	}
+	_ = t.writeMessage(errorResp)
 }
 
 // handleNotification dispatches an incoming server→client notification to the handler
