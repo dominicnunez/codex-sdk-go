@@ -723,6 +723,104 @@ func TestStdioNotificationHandlerPanicRecovery(t *testing.T) {
 	}
 }
 
+// TestStdioScannerBufferOverflow verifies that a message exceeding maxMessageSize
+// causes the reader to stop and ScanErr to return the buffer overflow error.
+func TestStdioScannerBufferOverflow(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	_, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	// Write a single line exceeding the 10MB max message size.
+	const oversize = 11 * 1024 * 1024
+	oversizeLine := make([]byte, oversize)
+	for i := range oversizeLine {
+		oversizeLine[i] = 'x'
+	}
+	oversizeLine[len(oversizeLine)-1] = '\n'
+
+	go func() {
+		_, _ = serverWriter.Write(oversizeLine)
+		_ = serverWriter.Close()
+	}()
+
+	// Poll ScanErr until the reader processes the oversized line and stops.
+	deadline := time.After(5 * time.Second)
+	for {
+		if err := transport.ScanErr(); err != nil {
+			if !strings.Contains(err.Error(), "token too long") {
+				t.Errorf("unexpected ScanErr: %v", err)
+			}
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatal("timeout waiting for ScanErr to be set")
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+}
+
+// TestStdioWriteMessageShortWrite verifies that writeMessage handles writers
+// that return partial writes (less than the full buffer) without error.
+func TestStdioWriteMessageShortWrite(t *testing.T) {
+	// Use a shortWriter that writes one byte at a time.
+	sw := &shortWriter{buf: make([]byte, 0, 1024)}
+	clientReader, serverWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, sw)
+	defer func() { _ = transport.Close() }()
+
+	// Notify writes a message through writeMessage.
+	ctx := context.Background()
+	notif := codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "test/short",
+	}
+	if err := transport.Notify(ctx, notif); err != nil {
+		t.Fatalf("Notify failed: %v", err)
+	}
+
+	// Verify the full message was assembled correctly.
+	got := string(sw.Bytes())
+	if !strings.Contains(got, `"method":"test/short"`) {
+		t.Errorf("short-write message corrupted: %s", got)
+	}
+	if !strings.HasSuffix(got, "\n") {
+		t.Error("message missing trailing newline")
+	}
+}
+
+// shortWriter writes at most one byte per Write call.
+type shortWriter struct {
+	mu  sync.Mutex
+	buf []byte
+}
+
+func (w *shortWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if len(p) == 0 {
+		return 0, nil
+	}
+	w.buf = append(w.buf, p[0])
+	return 1, nil
+}
+
+func (w *shortWriter) Bytes() []byte {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	out := make([]byte, len(w.buf))
+	copy(out, w.buf)
+	return out
+}
+
 // TestStdioHandleResponseUnmarshalError verifies that when a response has a
 // valid ID but fails full unmarshal, the pending caller receives a parse error
 // instead of hanging until timeout.

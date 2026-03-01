@@ -471,3 +471,45 @@ func TestConversationWithCollaborationMode(t *testing.T) {
 		t.Fatalf("Turn error: %v", err)
 	}
 }
+
+func TestConversationThreadDeepCopyIsolation(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+
+	// Execute one turn to populate thread state.
+	turnDone := make(chan error, 1)
+	go func() {
+		_, err := conv.Turn(ctx, codex.TurnOptions{Prompt: "Hello"})
+		turnDone <- err
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	if err := <-turnDone; err != nil {
+		t.Fatalf("Turn error: %v", err)
+	}
+
+	// Get a snapshot and mutate it.
+	snapshot1 := conv.Thread()
+	originalLen := len(snapshot1.Turns)
+	snapshot1.Turns = append(snapshot1.Turns, codex.Turn{ID: "injected"})
+
+	// Get another snapshot and verify the mutation did not affect internal state.
+	snapshot2 := conv.Thread()
+	if len(snapshot2.Turns) != originalLen {
+		t.Errorf("Thread mutation leaked: got %d turns, want %d", len(snapshot2.Turns), originalLen)
+	}
+}
