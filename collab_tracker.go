@@ -111,7 +111,9 @@ func (t *AgentTracker) ActiveCount() int {
 }
 
 // WaitAllDone blocks until all tracked agents reach a terminal status
-// or the context is cancelled.
+// or the context is cancelled. Returns immediately if no agents have been
+// tracked yet. Callers should ensure at least one ProcessEvent call has
+// occurred before waiting, or use external synchronization.
 func (t *AgentTracker) WaitAllDone(ctx context.Context) error {
 	for {
 		t.mu.RLock()
