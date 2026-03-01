@@ -51,6 +51,10 @@ func (c *Conversation) Thread() Thread {
 	for i, turn := range t.Turns {
 		t.Turns[i].Items = make([]ThreadItemWrapper, len(turn.Items))
 		copy(t.Turns[i].Items, turn.Items)
+		if turn.Error != nil {
+			e := *turn.Error
+			t.Turns[i].Error = &e
+		}
 	}
 	return t
 }
