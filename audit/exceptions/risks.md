@@ -277,3 +277,32 @@ restructuring all notification listeners to unmarshal the full typed struct firs
 the threadID field from the result — which changes the filter-then-parse pattern used consistently
 across all listeners. The overhead is negligible for the small JSON-RPC payloads that dominate
 notification traffic. Same risk profile as the readLoop double-parse exception above.
+
+### Unbounded goroutine spawning for incoming messages
+
+**Location:** `stdio.go:414,478` — handleRequest and handleNotification dispatch
+**Date:** 2026-03-01
+
+**Reason:** Every incoming server request and notification spawns a new goroutine via `go func()`.
+Adding a bounded worker pool or semaphore requires architectural changes to the transport layer:
+introducing a configurable concurrency limit, deciding on backpressure semantics (drop vs block),
+and handling the interaction between the semaphore and the transport's shutdown sequence. The SDK
+communicates with a single local process over stdio — the message rate is bounded by the server's
+output speed, which is itself bounded by LLM inference latency. Unbounded goroutine creation is
+only a concern if the server is malicious or buggy, neither of which is a realistic threat model
+for a local subprocess. The fix requires disproportionate complexity for a scenario outside the
+SDK's threat model.
+
+### Unbounded agent map growth in AgentTracker
+
+**Location:** `collab_tracker.go:51-73` — agents map never prunes terminal entries
+**Date:** 2026-03-01
+
+**Reason:** `AgentTracker.agents` grows without bound as agents reach terminal states. Adding
+automatic pruning requires choosing a retention policy (time-based? count-based? immediate on
+terminal?), which changes the observable behavior of `Agents()` — callers currently see the full
+history of all agents. A `Prune()` method would be the least disruptive option but adds public
+API surface. In practice, sub-agent counts per session are small (tens, occasionally hundreds).
+The memory held per `AgentInfo` is ~100 bytes. Even 10,000 agents would consume ~1MB, which is
+negligible relative to the process memory. The growth is linear in the number of unique agents
+spawned, not in the number of events processed.
