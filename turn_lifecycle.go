@@ -38,7 +38,10 @@ func executeTurn(ctx context.Context, p turnLifecycleParams) (*RunResult, error)
 		}
 		var n ItemCompletedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
-			return
+			n.Item = ThreadItemWrapper{Value: &UnknownThreadItem{
+				Type: "unmarshal_error",
+				Raw:  append(json.RawMessage(nil), notif.Params...),
+			}}
 		}
 		mu.Lock()
 		items = append(items, n.Item)
@@ -160,7 +163,10 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, ch chan<- e
 		}
 		var n ItemCompletedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
-			return
+			n.Item = ThreadItemWrapper{Value: &UnknownThreadItem{
+				Type: "unmarshal_error",
+				Raw:  append(json.RawMessage(nil), notif.Params...),
+			}}
 		}
 		itemsMu.Lock()
 		items = append(items, n.Item)
