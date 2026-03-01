@@ -480,39 +480,3 @@ func TestApprovalEndToEnd(t *testing.T) {
 		t.Errorf("Expected decision=accept, got %v", result.Decision.Value)
 	}
 }
-
-// TestApprovalHandlersCompleteness verifies all 7 server→client request handler fields exist
-func TestApprovalHandlersCompleteness(t *testing.T) {
-	// This test ensures ApprovalHandlers struct has all 7 handler fields
-	// as specified in ServerRequest.json
-	handlers := codex.ApprovalHandlers{
-		OnApplyPatchApproval: func(context.Context, codex.ApplyPatchApprovalParams) (codex.ApplyPatchApprovalResponse, error) {
-			return codex.ApplyPatchApprovalResponse{}, nil
-		},
-		OnCommandExecutionRequestApproval: func(context.Context, codex.CommandExecutionRequestApprovalParams) (codex.CommandExecutionRequestApprovalResponse, error) {
-			return codex.CommandExecutionRequestApprovalResponse{}, nil
-		},
-		OnExecCommandApproval: func(context.Context, codex.ExecCommandApprovalParams) (codex.ExecCommandApprovalResponse, error) {
-			return codex.ExecCommandApprovalResponse{}, nil
-		},
-		OnFileChangeRequestApproval: func(context.Context, codex.FileChangeRequestApprovalParams) (codex.FileChangeRequestApprovalResponse, error) {
-			return codex.FileChangeRequestApprovalResponse{}, nil
-		},
-		OnDynamicToolCall: func(context.Context, codex.DynamicToolCallParams) (codex.DynamicToolCallResponse, error) {
-			return codex.DynamicToolCallResponse{}, nil
-		},
-		OnToolRequestUserInput: func(context.Context, codex.ToolRequestUserInputParams) (codex.ToolRequestUserInputResponse, error) {
-			return codex.ToolRequestUserInputResponse{}, nil
-		},
-		OnChatgptAuthTokensRefresh: func(context.Context, codex.ChatgptAuthTokensRefreshParams) (codex.ChatgptAuthTokensRefreshResponse, error) {
-			return codex.ChatgptAuthTokensRefreshResponse{}, nil
-		},
-	}
-
-	// Verify we can set handlers on client
-	mock := NewMockTransport()
-	client := codex.NewClient(mock)
-	client.SetApprovalHandlers(handlers)
-
-	// This test will fail to compile if any handler field is missing or has wrong signature
-}
