@@ -1,0 +1,80 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    # Bug detection
+    - bodyclose
+    - durationcheck
+    - errchkjson
+    - errorlint
+    - copyloopvar
+    - nilerr
+    - nilnil
+    - sqlclosecheck
+
+    # Style & clarity
+    - asciicheck
+    - bidichk
+    - dupword
+    - errname
+    - fatcontext
+    - misspell
+    - noctx
+    - predeclared
+    - reassign
+    - unconvert
+    - unparam
+    - wastedassign
+
+    # Complexity & structure
+    - gocognit
+    - nestif
+    - prealloc
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment # noisy, marginal benefit for an SDK
+        - shadow          # too noisy for idiomatic err re-declarations
+    staticcheck:
+      checks:
+        - all
+        - -ST1003 # public type/field names map 1:1 to JSON-RPC spec schemas
+        - -ST1021 # doc comment form conflicts with deprecation notices
+    gocognit:
+      min-complexity: 35
+    nestif:
+      min-complexity: 5
+
+  exclusions:
+    presets:
+      - std-error-handling
+    rules:
+      # Tests can be more relaxed.
+      - path: _test\.go$
+        linters:
+          - errcheck
+          - errchkjson
+          - errorlint
+          - unparam
+          - gocognit
+          - nestif
+          - fatcontext
+          - bodyclose
+          - noctx
+          - copyloopvar
+          - prealloc
+          - wastedassign
+          - govet
+      # Notification/enum registration files are repetitive by design.
+      - path: "(enums|notifications)\\.go$"
+        linters:
+          - dupl
+
+formatters:
+  enable:
+    - gofmt

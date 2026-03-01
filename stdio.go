@@ -338,7 +338,7 @@ func (t *StdioTransport) handleResponse(data []byte) {
 		}
 		t.mu.Unlock()
 		if ok {
-			errDetail, _ := json.Marshal(err.Error())
+			errDetail, _ := json.Marshal(err.Error()) //nolint:errchkjson // marshalling a string cannot fail
 			pending.ch <- Response{
 				JSONRPC: jsonrpcVersion,
 				ID:      pending.id,
