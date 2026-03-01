@@ -54,7 +54,6 @@ func TestNormalizeIDReturnsErrorOnUnexpectedType(t *testing.T) {
 		in   interface{}
 	}{
 		{"bool", true},
-		{"nil", nil},
 		{"struct", struct{}{}},
 	}
 	for _, tt := range cases {
@@ -67,5 +66,15 @@ func TestNormalizeIDReturnsErrorOnUnexpectedType(t *testing.T) {
 				t.Errorf("normalizeID(%v) error = %v; want errUnexpectedIDType", tt.in, err)
 			}
 		})
+	}
+}
+
+func TestNormalizeIDReturnsErrorOnNilID(t *testing.T) {
+	_, err := normalizeID(nil)
+	if err == nil {
+		t.Fatal("normalizeID(nil) returned nil error")
+	}
+	if !errors.Is(err, errNullID) {
+		t.Errorf("normalizeID(nil) error = %v; want errNullID", err)
 	}
 }

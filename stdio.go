@@ -42,11 +42,18 @@ type StdioTransport struct {
 // that is not a supported JSON-RPC ID type (string, number).
 var errUnexpectedIDType = errors.New("unexpected ID type")
 
+// errNullID is returned when normalizeID encounters a nil (JSON null) ID.
+// JSON-RPC 2.0 responses with "id": null indicate the server could not
+// parse the request ID.
+var errNullID = errors.New("null request ID")
+
 // normalizeID normalizes request IDs to a string key for map matching.
 // JSON unmarshals all numbers as float64, so we format integer-valued
 // floats without decimals for consistent lookups.
 func normalizeID(id interface{}) (string, error) {
 	switch v := id.(type) {
+	case nil:
+		return "", errNullID
 	case float64:
 		if v >= 0 {
 			u := uint64(v)
