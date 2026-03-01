@@ -905,7 +905,7 @@ type ChatgptAuthTokensRefreshResponse struct {
 // MarshalJSON redacts the access token to prevent accidental credential leaks
 // via structured logging, debug serializers, or error payloads.
 // Use marshalWire for intentional wire-protocol serialization.
-func (r *ChatgptAuthTokensRefreshResponse) MarshalJSON() ([]byte, error) {
+func (r ChatgptAuthTokensRefreshResponse) MarshalJSON() ([]byte, error) {
 	type redacted struct {
 		AccessToken      string  `json:"accessToken"`
 		ChatgptAccountID string  `json:"chatgptAccountId"`
@@ -918,20 +918,21 @@ func (r *ChatgptAuthTokensRefreshResponse) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func (r *ChatgptAuthTokensRefreshResponse) marshalWire() ([]byte, error) {
+func (r ChatgptAuthTokensRefreshResponse) marshalWire() ([]byte, error) {
 	type wire ChatgptAuthTokensRefreshResponse
-	return json.Marshal((*wire)(r))
+	w := wire(r)
+	return json.Marshal(w)
 }
 
 // String redacts the access token to prevent accidental credential leaks in logs.
-func (r *ChatgptAuthTokensRefreshResponse) String() string {
+func (r ChatgptAuthTokensRefreshResponse) String() string {
 	return fmt.Sprintf("ChatgptAuthTokensRefreshResponse{AccessToken:[REDACTED], ChatgptAccountID:%s}", r.ChatgptAccountID)
 }
 
 // GoString implements fmt.GoStringer to redact credentials from %#v.
-func (r *ChatgptAuthTokensRefreshResponse) GoString() string { return r.String() }
+func (r ChatgptAuthTokensRefreshResponse) GoString() string { return r.String() }
 
 // Format implements fmt.Formatter to redact credentials from all format verbs.
-func (r *ChatgptAuthTokensRefreshResponse) Format(f fmt.State, verb rune) {
+func (r ChatgptAuthTokensRefreshResponse) Format(f fmt.State, verb rune) {
 	_, _ = fmt.Fprint(f, r.String())
 }
