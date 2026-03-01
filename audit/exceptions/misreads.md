@@ -712,3 +712,13 @@ The CLI's parsing of its own arguments is outside the SDK's responsibility. The 
 **Reason:** Already in known exceptions. `TestConversationMultiTurn` (conversation_test.go:13-96)
 executes two turns on the same Conversation, then asserts `len(thread.Turns) == 2` at line 93-94.
 The multi-turn accumulation path is tested.
+
+### Notification handler ordering described as new finding but already accepted as known risk
+
+**Location:** `stdio.go:504-514` — handleNotification goroutine dispatch
+**Date:** 2026-03-01
+
+**Reason:** The finding itself states "Already documented in `audit/exceptions/risks.md` as accepted risk"
+and "No change needed — already accepted." This is a duplicate of the known exception "Notification
+handlers dispatched concurrently without ordering guarantees." The suggested fix (adding godoc) is a
+documentation enhancement, not a code defect.
