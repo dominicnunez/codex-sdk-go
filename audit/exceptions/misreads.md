@@ -459,3 +459,85 @@ concurrently — designed to be run with `-race`.
 **Reason:** The audit claims there are no concurrent tests for Send racing with Close. This is
 factually wrong. `stdio_test.go:1047` contains `TestStdioConcurrentSendAndClose` which launches
 10 concurrent senders racing against a Close call, verifying no panics or races occur.
+
+### Send write goroutine leak described as a new finding but covered by existing exception
+
+**Location:** `stdio.go:117-119` — Send write goroutine
+**Date:** 2026-03-01
+
+**Reason:** The audit describes the Send write goroutine leaking on context cancellation as a new
+Medium-severity bug. This is the exact same issue as the known exception "Write goroutine in Send
+can leak on context cancellation" at `stdio.go:86-102`. The finding references different line numbers
+but describes identical behavior — the write goroutine may outlive the cancelled context because
+`io.Writer.Write` has no context support. The additional claim about "partial writes corrupting the
+stream" is incorrect — `writeMessage` acquires `writeMu` and writes atomically (full JSON + newline),
+so a concurrent write cannot interleave mid-message. Duplicate of existing exception.
+
+### Notify TOCTOU race described as a new finding but covered by existing exceptions
+
+**Location:** `stdio.go:146-151` — Notify closed check and write race
+**Date:** 2026-03-01
+
+**Reason:** The audit describes a TOCTOU race between the `t.closed` check and the subsequent write
+goroutine in `Notify`. This is already covered by two known exceptions: "Notify goroutine can write
+to writer after context cancellation" and "Notify may succeed even if the transport reader has just
+stopped." Both describe the same window where `Close()` can set `closed = true` between the check
+and the write. The behavior is benign — notifications are fire-and-forget by definition, and writing
+to a closed pipe returns an error that propagates correctly. Duplicate of existing exceptions.
+
+### McpToolCallResult.Content untyped slices described as a new finding but covered by existing exception
+
+**Location:** `event_types.go:212` — McpToolCallResult.Content
+**Date:** 2026-03-01
+
+**Reason:** The audit describes `McpToolCallResult.Content` being `[]interface{}` as a code quality
+issue. This is the exact same issue as the known exception "McpToolCallResult.Content and MCP metadata
+fields use untyped interface{}" which explains the upstream spec defines these as open-schema fields
+(`"items": true, "type": "array"`). Using `[]interface{}` is the correct mapping for a spec that
+deliberately leaves the type open. Duplicate of existing exception.
+
+### Resource and Tool untyped interface{} fields described as a new finding but covered by existing exception
+
+**Location:** `mcp.go:26-51` — Resource and Tool type fields
+**Date:** 2026-03-01
+
+**Reason:** The audit describes multiple `interface{}` fields on Resource and Tool types as a code
+quality issue. These fields (`Icons`, `Meta`, `Annotations`, `InputSchema`, `OutputSchema`) are all
+covered by the known exception "McpToolCallResult.Content and MCP metadata fields use untyped
+interface{}" which explicitly mentions `mcp.go` Resource/Tool metadata fields. The upstream spec
+uses open schemas (`true`) for these fields. Duplicate of existing exception.
+
+### DynamicToolCallParams.Arguments untyped interface{} described as a new finding but covered by existing exception
+
+**Location:** `approval.go:753` — DynamicToolCallParams.Arguments
+**Date:** 2026-03-01
+
+**Reason:** The audit describes `DynamicToolCallParams.Arguments` being `interface{}` as a code
+quality issue. This is the exact same issue as the known exception "OutputSchema and
+DynamicToolCallParams.Arguments use bare interface{} instead of json.RawMessage" which explains
+the deliberate caller-convenience tradeoff. Duplicate of existing exception.
+
+### readLoop error paths claimed to have no test coverage
+
+**Location:** `stdio.go:275-325` — readLoop error handling
+**Date:** 2026-03-01
+
+**Reason:** The audit claims the readLoop error conditions have "no direct test coverage." This is
+factually wrong. `stdio_test.go` contains: `TestStdioInvalidJSON` which injects malformed JSON lines
+and verifies the transport stays alive and subsequent valid requests succeed; `TestStdioScannerBufferOverflow`
+which sends a message exceeding `maxMessageSize` and verifies `ScanErr()` returns the buffer overflow
+error; and `TestStdioHandleResponseUnmarshalError` which injects a response with a valid ID but
+malformed body and verifies the pending caller receives a parse error response instead of timing out.
+All three error paths the audit claims are untested have dedicated tests.
+
+### Concurrent turn rejection claimed to be untested
+
+**Location:** `conversation.go:173-178` — activeTurn exclusion logic
+**Date:** 2026-03-01
+
+**Reason:** The audit claims the `errTurnInProgress` concurrent-exclusion logic has no test.
+This is factually wrong. `conversation_test.go` contains four dedicated concurrent turn rejection tests:
+`TestConversationConcurrentTurnRejected` (line 507), `TestConversationConcurrentTurnStreamedRejected`
+(line 651), `TestConversationConcurrentTurnVsTurnStreamedRejected` (line 697), and
+`TestConversationConcurrentTurnStreamedVsTurnRejected` (line 746). These test all four combinations
+of Turn vs TurnStreamed racing and assert the second call returns an error.
