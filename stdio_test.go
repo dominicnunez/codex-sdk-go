@@ -232,20 +232,28 @@ func TestStdioResponseRequestIDMatching(t *testing.T) {
 		}
 	}
 
+	// Build a map from marshaled request ID → unique result payload
+	// so we can verify each caller gets the response meant for its ID.
+	expectedByID := make(map[string]string)
+	for i, req := range requests {
+		idJSON, _ := json.Marshal(req.ID)
+		expectedByID[string(idJSON)] = fmt.Sprintf(`{"match":"resp-%d"}`, i)
+	}
+
 	// Send responses in reverse order to verify ID matching
 	for i := len(requests) - 1; i >= 0; i-- {
 		req := requests[i]
+		idJSON, _ := json.Marshal(req.ID)
 		resp := codex.Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
-			Result:  json.RawMessage(`{"index":` + string(rune('0'+i)) + `}`),
+			Result:  json.RawMessage(expectedByID[string(idJSON)]),
 		}
 		respJSON, _ := json.Marshal(resp)
 		_, _ = serverWriter.Write(append(respJSON, '\n'))
 	}
 
-	// Verify each request got its correct response
-	receivedResults := make(map[string]string)
+	// Verify each request got the response that was sent for its specific ID
 	for i := 0; i < 3; i++ {
 		select {
 		case res := <-results:
@@ -253,25 +261,18 @@ func TestStdioResponseRequestIDMatching(t *testing.T) {
 				t.Errorf("request with id %v returned error: %v", res.id, res.err)
 				continue
 			}
-			var idStr string
-			switch v := res.id.(type) {
-			case string:
-				idStr = v
-			case int64:
-				idStr = "123"
-			case float64:
-				idStr = "456"
+			idJSON, _ := json.Marshal(codex.RequestID{Value: res.id})
+			want, ok := expectedByID[string(idJSON)]
+			if !ok {
+				t.Errorf("unexpected request id %v", res.id)
+				continue
 			}
-			receivedResults[idStr] = string(res.result)
+			if string(res.result) != want {
+				t.Errorf("request id %v: got result %s; want %s", res.id, res.result, want)
+			}
 		case <-time.After(200 * time.Millisecond):
 			t.Fatal("timeout waiting for responses")
 		}
-	}
-
-	// We can't reliably match exact responses because they were sent in reverse order
-	// but we can verify that we got 3 distinct responses
-	if len(receivedResults) != 3 {
-		t.Errorf("got %d unique responses; want 3", len(receivedResults))
 	}
 }
 
@@ -721,6 +722,102 @@ func TestStdioNotificationHandlerPanicRecovery(t *testing.T) {
 		}
 	case <-time.After(500 * time.Millisecond):
 		t.Fatal("timeout: transport stopped working after notification handler panic")
+	}
+}
+
+// TestStdioApprovalInvalidParamsReturnsErrorCode verifies that sending malformed
+// JSON params to a registered approval handler produces a -32602 error response.
+func TestStdioApprovalInvalidParamsReturnsErrorCode(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	client := codex.NewClient(transport)
+
+	client.SetApprovalHandlers(codex.ApprovalHandlers{
+		OnApplyPatchApproval: func(ctx context.Context, p codex.ApplyPatchApprovalParams) (codex.ApplyPatchApprovalResponse, error) {
+			return codex.ApplyPatchApprovalResponse{
+				Decision: codex.ReviewDecisionWrapper{Value: "approved"},
+			}, nil
+		},
+	})
+
+	responseChan := make(chan codex.Response, 1)
+	go func() {
+		scanner := bufio.NewScanner(serverReader)
+		for scanner.Scan() {
+			var resp codex.Response
+			if err := json.Unmarshal(scanner.Bytes(), &resp); err == nil && resp.Error != nil {
+				responseChan <- resp
+				return
+			}
+		}
+	}()
+
+	// Send a request with invalid JSON params (not valid for ApplyPatchApprovalParams)
+	req := `{"jsonrpc":"2.0","id":"bad-params","method":"applyPatchApproval","params":"not-an-object"}` + "\n"
+	_, _ = serverWriter.Write([]byte(req))
+
+	select {
+	case resp := <-responseChan:
+		if resp.Error.Code != codex.ErrCodeInvalidParams {
+			t.Errorf("error code = %d; want %d (ErrCodeInvalidParams)", resp.Error.Code, codex.ErrCodeInvalidParams)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for error response")
+	}
+}
+
+// TestStdioApprovalHandlerErrorReturnsErrorCode verifies that when an approval
+// handler returns a non-nil error, the wire response has code -32603.
+func TestStdioApprovalHandlerErrorReturnsErrorCode(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	client := codex.NewClient(transport)
+
+	client.SetApprovalHandlers(codex.ApprovalHandlers{
+		OnApplyPatchApproval: func(ctx context.Context, p codex.ApplyPatchApprovalParams) (codex.ApplyPatchApprovalResponse, error) {
+			return codex.ApplyPatchApprovalResponse{}, fmt.Errorf("handler refused")
+		},
+	})
+
+	responseChan := make(chan codex.Response, 1)
+	go func() {
+		scanner := bufio.NewScanner(serverReader)
+		for scanner.Scan() {
+			var resp codex.Response
+			if err := json.Unmarshal(scanner.Bytes(), &resp); err == nil && resp.Error != nil {
+				responseChan <- resp
+				return
+			}
+		}
+	}()
+
+	// Send a valid request with proper params
+	req := `{"jsonrpc":"2.0","id":"handler-err","method":"applyPatchApproval","params":{"callId":"c1","conversationId":"t1","fileChanges":{}}}` + "\n"
+	_, _ = serverWriter.Write([]byte(req))
+
+	select {
+	case resp := <-responseChan:
+		if resp.Error.Code != codex.ErrCodeInternalError {
+			t.Errorf("error code = %d; want %d (ErrCodeInternalError)", resp.Error.Code, codex.ErrCodeInternalError)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for error response")
 	}
 }
 
