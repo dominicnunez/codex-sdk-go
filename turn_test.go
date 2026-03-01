@@ -75,6 +75,76 @@ func TestTurnStart(t *testing.T) {
 	}
 }
 
+// TestTurnStartWireInputFormat verifies that the marshaled input array
+// contains correctly typed and structured user input elements.
+func TestTurnStartWireInputFormat(t *testing.T) {
+	mockTransport := NewMockTransport()
+	_ = mockTransport.SetResponseData("turn/start", map[string]interface{}{
+		"turn": map[string]interface{}{
+			"id":     "turn-456",
+			"status": "inProgress",
+			"items":  []interface{}{},
+		},
+	})
+	client := codex.NewClient(mockTransport)
+
+	params := codex.TurnStartParams{
+		ThreadID: "thread-123",
+		Input: []codex.UserInput{
+			&codex.TextUserInput{Text: "Hello"},
+			&codex.ImageUserInput{URL: "https://example.com/img.png"},
+		},
+	}
+
+	_, err := client.Turn.Start(context.Background(), params)
+	if err != nil {
+		t.Fatalf("Turn.Start() error = %v", err)
+	}
+
+	req := mockTransport.GetSentRequest(0)
+	if req == nil {
+		t.Fatal("no request sent")
+	}
+
+	var wireParams struct {
+		Input []json.RawMessage `json:"input"`
+	}
+	if err := json.Unmarshal(req.Params, &wireParams); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if len(wireParams.Input) != 2 {
+		t.Fatalf("expected 2 input elements, got %d", len(wireParams.Input))
+	}
+
+	var textElem struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	}
+	if err := json.Unmarshal(wireParams.Input[0], &textElem); err != nil {
+		t.Fatalf("unmarshal text input: %v", err)
+	}
+	if textElem.Type != "text" {
+		t.Errorf("input[0].type = %q, want %q", textElem.Type, "text")
+	}
+	if textElem.Text != "Hello" {
+		t.Errorf("input[0].text = %q, want %q", textElem.Text, "Hello")
+	}
+
+	var imgElem struct {
+		Type string `json:"type"`
+		URL  string `json:"url"`
+	}
+	if err := json.Unmarshal(wireParams.Input[1], &imgElem); err != nil {
+		t.Fatalf("unmarshal image input: %v", err)
+	}
+	if imgElem.Type != "image" {
+		t.Errorf("input[1].type = %q, want %q", imgElem.Type, "image")
+	}
+	if imgElem.URL != "https://example.com/img.png" {
+		t.Errorf("input[1].url = %q, want %q", imgElem.URL, "https://example.com/img.png")
+	}
+}
+
 // TestTurnInterrupt tests turn/interrupt method
 func TestTurnInterrupt(t *testing.T) {
 	mockTransport := NewMockTransport()
