@@ -1,69 +1,48 @@
 package codex_test
 
 import (
+	"os"
 	"os/exec"
-	"strings"
+	"path/filepath"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go"
 )
 
 // TestGolangciLint verifies that golangci-lint passes with no issues.
-// This test documents that the codebase has been linted and all issues fixed.
 //
 // To run golangci-lint manually:
 //
 //	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-//	~/go/bin/golangci-lint run ./...
+//	golangci-lint run ./...
 func TestGolangciLint(t *testing.T) {
-	// Check if golangci-lint is installed
-	lintPath := exec.Command("which", "golangci-lint").Run()
-	if lintPath != nil {
-		// Try ~/go/bin/golangci-lint
-		if _, err := exec.LookPath("/home/kai/go/bin/golangci-lint"); err != nil {
+	lintBin := "golangci-lint"
+	if _, err := exec.LookPath(lintBin); err != nil {
+		// Fall back to GOPATH/bin or ~/go/bin
+		gopath := os.Getenv("GOPATH")
+		if gopath == "" {
+			gopath = filepath.Join(os.Getenv("HOME"), "go")
+		}
+		candidate := filepath.Join(gopath, "bin", "golangci-lint")
+		if _, err := exec.LookPath(candidate); err != nil {
 			t.Skip("golangci-lint not found - install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest")
 		}
+		lintBin = candidate
 	}
 
-	// Run golangci-lint
-	cmd := exec.Command("sh", "-c", "golangci-lint run ./... 2>&1 || ~/go/bin/golangci-lint run ./... 2>&1")
+	cmd := exec.Command(lintBin, "run", "./...")
 	output, err := cmd.CombinedOutput()
-
 	if err != nil {
 		t.Fatalf("golangci-lint failed:\n%s", string(output))
-	}
-
-	// Check for any linting issues in the output
-	outputStr := string(output)
-	if strings.Contains(outputStr, "Error return value") ||
-		strings.Contains(outputStr, "errcheck") ||
-		strings.Contains(outputStr, "level=error") {
-		t.Fatalf("golangci-lint found issues:\n%s", outputStr)
 	}
 
 	t.Logf("golangci-lint passed successfully")
 }
 
-// TestErrorCheckCompliance documents that all error return values are properly checked.
-// This is the primary issue that was fixed during lint verification.
-func TestErrorCheckCompliance(t *testing.T) {
-	// All unchecked error return values have been fixed with one of:
-	// 1. _ = funcCall()  // Explicitly ignore error where appropriate (tests, mock setup)
-	// 2. _, _ = funcCall() // For functions returning (value, error)
-	// 3. Check and handle the error properly (production code)
-
-	// Production code (stdio.go) uses explicit blank assignment with comments
-	// Test code uses blank assignment since errors during test setup are less critical
-
-	t.Logf("All error return values are properly handled")
-}
-
 // TestNotificationListenerCoverage verifies all notification methods have listener registration.
-// This test validates Phase 15 Task 8: "Verify all 40 notification types have listener registration methods on Client"
+// The compile-time listener registrations below are the real check: if any On*
+// method or notification type is removed, this test fails to compile.
 func TestNotificationListenerCoverage(t *testing.T) {
-	// According to specs/ServerNotification.json, there are 41 notification methods
-	// (PRD estimated 40, but specs show 41)
-
 	// All 41 notification methods from ServerNotification.json:
 	expectedNotifications := []string{
 		"account/login/completed",                   // OnAccountLoginCompleted
@@ -109,15 +88,8 @@ func TestNotificationListenerCoverage(t *testing.T) {
 		"windows/worldWritableWarning",              // OnWindowsWorldWritableWarning
 	}
 
-	// Verification: we expect 41 notifications per specs (40 per PRD + 1 discovered)
-	if len(expectedNotifications) != 41 {
-		t.Errorf("Expected 41 notification methods, got %d", len(expectedNotifications))
-	}
+	_ = expectedNotifications // used for documentation; the compile-time block below is the real check
 
-	t.Logf("Verified %d notification methods from specs", len(expectedNotifications))
-
-	// Step 2: Verify each notification method has a corresponding listener on Client
-	// This is a compile-time check - if any method is missing, this won't compile
 	client := codex.NewClient(NewMockTransport())
 
 	// Register all 41 notification listeners
