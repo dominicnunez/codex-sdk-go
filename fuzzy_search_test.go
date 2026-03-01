@@ -211,3 +211,118 @@ func TestFuzzyFileSearchSessionUpdatedNotification(t *testing.T) {
 		}
 	}
 }
+
+// TestFuzzyFileSearchServiceSearch tests that FuzzyFileSearchService.Search sends the correct
+// request method and deserializes the response.
+func TestFuzzyFileSearchServiceSearch(t *testing.T) {
+	tests := []struct {
+		name     string
+		params   codex.FuzzyFileSearchParams
+		response map[string]interface{}
+		wantLen  int
+	}{
+		{
+			name: "single result",
+			params: codex.FuzzyFileSearchParams{
+				Query: "main.go",
+				Roots: []string{"/home/user/project"},
+			},
+			response: map[string]interface{}{
+				"files": []interface{}{
+					map[string]interface{}{
+						"path":      "/home/user/project/main.go",
+						"file_name": "main.go",
+						"root":      "/home/user/project",
+						"score":     float64(100),
+					},
+				},
+			},
+			wantLen: 1,
+		},
+		{
+			name: "multiple results with indices",
+			params: codex.FuzzyFileSearchParams{
+				Query:             "test",
+				Roots:             []string{"/project"},
+				CancellationToken: ptr("cancel-tok-1"),
+			},
+			response: map[string]interface{}{
+				"files": []interface{}{
+					map[string]interface{}{
+						"path":      "/project/test_a.go",
+						"file_name": "test_a.go",
+						"root":      "/project",
+						"score":     float64(95),
+						"indices":   []interface{}{float64(0), float64(1), float64(2), float64(3)},
+					},
+					map[string]interface{}{
+						"path":      "/project/test_b.go",
+						"file_name": "test_b.go",
+						"root":      "/project",
+						"score":     float64(80),
+					},
+				},
+			},
+			wantLen: 2,
+		},
+		{
+			name: "empty results",
+			params: codex.FuzzyFileSearchParams{
+				Query: "nonexistent",
+				Roots: []string{"/project"},
+			},
+			response: map[string]interface{}{
+				"files": []interface{}{},
+			},
+			wantLen: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := NewMockTransport()
+			client := codex.NewClient(mock)
+			ctx := context.Background()
+
+			_ = mock.SetResponseData("fuzzyFileSearch", tt.response)
+
+			resp, err := client.FuzzyFileSearch.Search(ctx, tt.params)
+			if err != nil {
+				t.Fatalf("FuzzyFileSearch.Search returned error: %v", err)
+			}
+
+			if len(resp.Files) != tt.wantLen {
+				t.Fatalf("Files length = %d, want %d", len(resp.Files), tt.wantLen)
+			}
+
+			// Verify response content for non-empty results
+			if tt.wantLen > 0 {
+				filesSlice := tt.response["files"].([]interface{})
+				firstFile := filesSlice[0].(map[string]interface{})
+
+				if resp.Files[0].Path != firstFile["path"].(string) {
+					t.Errorf("Files[0].Path = %q, want %q", resp.Files[0].Path, firstFile["path"])
+				}
+				if resp.Files[0].FileName != firstFile["file_name"].(string) {
+					t.Errorf("Files[0].FileName = %q, want %q", resp.Files[0].FileName, firstFile["file_name"])
+				}
+				if resp.Files[0].Root != firstFile["root"].(string) {
+					t.Errorf("Files[0].Root = %q, want %q", resp.Files[0].Root, firstFile["root"])
+				}
+				if resp.Files[0].Score != uint32(firstFile["score"].(float64)) {
+					t.Errorf("Files[0].Score = %d, want %d", resp.Files[0].Score, uint32(firstFile["score"].(float64)))
+				}
+			}
+
+			// Verify the sent request method
+			req := mock.GetSentRequest(0)
+			if req == nil {
+				t.Fatal("No request was sent")
+			}
+
+			if req.Method != "fuzzyFileSearch" {
+				t.Errorf("Method = %q, want %q", req.Method, "fuzzyFileSearch")
+			}
+		})
+	}
+}
