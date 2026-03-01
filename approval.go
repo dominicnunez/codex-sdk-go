@@ -208,6 +208,11 @@ func (u UnknownReviewDecision) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON implements custom unmarshaling for ReviewDecisionWrapper.
+// The network_policy_amendment variant uses double-nested JSON to match the spec:
+//
+//	{"network_policy_amendment": {"network_policy_amendment": {...}}}
+//
+// See specs/ApplyPatchApprovalResponse.json and ExecCommandApprovalResponse.json.
 func (w *ReviewDecisionWrapper) UnmarshalJSON(data []byte) error {
 	// Try string first
 	var str string
