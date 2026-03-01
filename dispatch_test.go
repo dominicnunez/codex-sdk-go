@@ -594,3 +594,41 @@ func TestMissingApprovalHandlerReturnsMethodNotFound(t *testing.T) {
 		t.Errorf("expected error code %d (method not found), got %d", codex.ErrCodeMethodNotFound, resp.Error.Code)
 	}
 }
+
+// TestSetApprovalHandlersConcurrentWithRequests verifies that calling
+// SetApprovalHandlers concurrently with incoming server requests does
+// not race (run with -race).
+func TestSetApprovalHandlersConcurrentWithRequests(t *testing.T) {
+	ctx := context.Background()
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+
+	const iterations = 100
+
+	// Continuously swap approval handlers while injecting requests.
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < iterations; i++ {
+			client.SetApprovalHandlers(codex.ApprovalHandlers{
+				OnApplyPatchApproval: func(_ context.Context, _ codex.ApplyPatchApprovalParams) (codex.ApplyPatchApprovalResponse, error) {
+					return codex.ApplyPatchApprovalResponse{
+						Decision: codex.ReviewDecisionWrapper{Value: "approved"},
+					}, nil
+				},
+			})
+		}
+	}()
+
+	for i := 0; i < iterations; i++ {
+		req := codex.Request{
+			JSONRPC: "2.0",
+			Method:  "applyPatchApproval",
+			ID:      codex.RequestID{Value: float64(i)},
+			Params:  json.RawMessage(`{"diff":"test"}`),
+		}
+		_, _ = mock.InjectServerRequest(ctx, req)
+	}
+
+	<-done
+}
