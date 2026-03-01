@@ -849,8 +849,11 @@ func TestStdioScannerBufferOverflow(t *testing.T) {
 	deadline := time.After(5 * time.Second)
 	for {
 		if err := transport.ScanErr(); err != nil {
+			if !strings.Contains(err.Error(), "byte limit") {
+				t.Errorf("ScanErr should mention byte limit, got: %v", err)
+			}
 			if !strings.Contains(err.Error(), "token too long") {
-				t.Errorf("unexpected ScanErr: %v", err)
+				t.Errorf("ScanErr should wrap original error, got: %v", err)
 			}
 			break
 		}

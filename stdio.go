@@ -350,6 +350,9 @@ func (t *StdioTransport) readLoop() {
 	}
 
 	if err := scanner.Err(); err != nil {
+		if errors.Is(err, bufio.ErrTooLong) {
+			err = fmt.Errorf("message exceeded %d byte limit: %w", maxMessageSize, err)
+		}
 		t.mu.Lock()
 		t.scanErr = err
 		t.mu.Unlock()
