@@ -194,6 +194,28 @@ func TestStartProcessExecArgsWithEndOfOptions(t *testing.T) {
 	}
 }
 
+// TestStartProcessExecArgsWithTypedFlags verifies that StartProcess rejects
+// ExecArgs containing typed safety flags that could override critical settings.
+func TestStartProcessExecArgsWithTypedFlags(t *testing.T) {
+	rejectedFlags := []string{"--model", "--sandbox", "--approval-mode", "--config"}
+
+	for _, flag := range rejectedFlags {
+		t.Run(flag, func(t *testing.T) {
+			ctx := context.Background()
+			_, err := codex.StartProcess(ctx, &codex.ProcessOptions{
+				BinaryPath: "/nonexistent/binary",
+				ExecArgs:   []string{"--safe-flag", flag, "value"},
+			})
+			if err == nil {
+				t.Fatalf("expected error when ExecArgs contains %q", flag)
+			}
+			if !strings.Contains(err.Error(), flag) {
+				t.Errorf("error message should mention %q, got: %v", flag, err)
+			}
+		})
+	}
+}
+
 // TestStartProcessContextCancellation verifies that canceling the context
 // causes the process to terminate.
 func TestStartProcessContextCancellation(t *testing.T) {

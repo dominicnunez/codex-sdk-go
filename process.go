@@ -76,6 +76,10 @@ type Process struct {
 // would cause typed safety flags to be treated as positional arguments.
 var errEndOfOptionsInExecArgs = errors.New(`ExecArgs must not contain "--" (end-of-options marker)`)
 
+var errTypedFlagInExecArgs = errors.New("ExecArgs must not contain typed safety flags")
+
+var rejectedFlagPrefixes = []string{"--model", "--sandbox", "--approval-mode", "--config"}
+
 // buildArgs constructs the CLI argument list from typed fields and ExecArgs.
 // ExecArgs are prepended before typed flags so that typed fields (Model,
 // Sandbox, ApprovalMode, Config) always win via last-wins CLI parsing.
@@ -84,6 +88,11 @@ func (opts *ProcessOptions) buildArgs() ([]string, error) {
 	for _, arg := range opts.ExecArgs {
 		if arg == "--" {
 			return nil, errEndOfOptionsInExecArgs
+		}
+		for _, flag := range rejectedFlagPrefixes {
+			if arg == flag {
+				return nil, fmt.Errorf("%w: %s", errTypedFlagInExecArgs, flag)
+			}
 		}
 	}
 
