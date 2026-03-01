@@ -355,6 +355,48 @@ exit 0
 	_ = proc.Close()
 }
 
+// TestProcessCloseForceKill verifies that Close force-kills a process that
+// ignores SIGINT after the grace period expires.
+func TestProcessCloseForceKill(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("process test requires unix signal semantics")
+	}
+
+	dir := t.TempDir()
+	fakeBinary := filepath.Join(dir, "fake-codex")
+
+	// Script that traps SIGINT and ignores it, forcing the force-kill path.
+	script := `#!/bin/sh
+trap '' INT
+while true; do sleep 1; done
+`
+	if err := os.WriteFile(fakeBinary, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake binary: %v", err)
+	}
+
+	ctx := context.Background()
+	proc, err := codex.StartProcess(ctx, &codex.ProcessOptions{
+		BinaryPath: fakeBinary,
+	})
+	if err != nil {
+		t.Fatalf("StartProcess: %v", err)
+	}
+
+	// Close should complete within a reasonable time even though the
+	// process ignores SIGINT — the force-kill fires after the grace period.
+	done := make(chan error, 1)
+	go func() {
+		done <- proc.Close()
+	}()
+
+	select {
+	case <-done:
+		// Close completed (error or nil is fine — the process was killed)
+	case <-time.After(10 * time.Second):
+		t.Fatal("Close did not complete within 10s — force-kill path may be broken")
+	}
+}
+
 // TestStartProcessCustomStderr verifies stderr redirection.
 func TestStartProcessCustomStderr(t *testing.T) {
 	if runtime.GOOS == "windows" {
