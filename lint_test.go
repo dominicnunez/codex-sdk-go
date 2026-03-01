@@ -39,54 +39,106 @@ func TestGolangciLint(t *testing.T) {
 	t.Logf("golangci-lint passed successfully")
 }
 
-// TestNotificationListenerCoverage verifies all notification methods have listener registration.
-// The compile-time listener registrations below are the real check: if any On*
-// method or notification type is removed, this test fails to compile.
+// TestNotificationListenerCoverage verifies all typed notification methods
+// have listener registration. Compile-time: if any On* method or notification
+// type is removed, this test fails to compile. Runtime: the count assertion
+// catches new methods that were added but not registered here.
 func TestNotificationListenerCoverage(t *testing.T) {
 	client := codex.NewClient(NewMockTransport())
 
-	// Register all 41 notification listeners
-	client.OnAccountLoginCompleted(func(codex.AccountLoginCompletedNotification) {})
-	client.OnAccountRateLimitsUpdated(func(codex.AccountRateLimitsUpdatedNotification) {})
-	client.OnAccountUpdated(func(codex.AccountUpdatedNotification) {})
-	client.OnAppListUpdated(func(codex.AppListUpdatedNotification) {})
-	client.OnConfigWarning(func(codex.ConfigWarningNotification) {})
-	client.OnDeprecationNotice(func(codex.DeprecationNoticeNotification) {})
-	client.OnError(func(codex.ErrorNotification) {})
-	client.OnFuzzyFileSearchSessionCompleted(func(codex.FuzzyFileSearchSessionCompletedNotification) {})
-	client.OnFuzzyFileSearchSessionUpdated(func(codex.FuzzyFileSearchSessionUpdatedNotification) {})
-	client.OnAgentMessageDelta(func(codex.AgentMessageDeltaNotification) {})
-	client.OnCommandExecutionOutputDelta(func(codex.CommandExecutionOutputDeltaNotification) {})
-	client.OnTerminalInteraction(func(codex.TerminalInteractionNotification) {})
-	client.OnItemCompleted(func(codex.ItemCompletedNotification) {})
-	client.OnFileChangeOutputDelta(func(codex.FileChangeOutputDeltaNotification) {})
-	client.OnMcpToolCallProgress(func(codex.McpToolCallProgressNotification) {})
-	client.OnPlanDelta(func(codex.PlanDeltaNotification) {})
-	client.OnReasoningSummaryPartAdded(func(codex.ReasoningSummaryPartAddedNotification) {})
-	client.OnReasoningSummaryTextDelta(func(codex.ReasoningSummaryTextDeltaNotification) {})
-	client.OnReasoningTextDelta(func(codex.ReasoningTextDeltaNotification) {})
-	client.OnItemStarted(func(codex.ItemStartedNotification) {})
-	client.OnMcpServerOauthLoginCompleted(func(codex.McpServerOauthLoginCompletedNotification) {})
-	client.OnModelRerouted(func(codex.ModelReroutedNotification) {})
-	client.OnThreadArchived(func(codex.ThreadArchivedNotification) {})
-	client.OnThreadClosed(func(codex.ThreadClosedNotification) {})
-	client.OnContextCompacted(func(codex.ContextCompactedNotification) {})
-	client.OnThreadNameUpdated(func(codex.ThreadNameUpdatedNotification) {})
-	client.OnThreadRealtimeClosed(func(codex.ThreadRealtimeClosedNotification) {})
-	client.OnThreadRealtimeError(func(codex.ThreadRealtimeErrorNotification) {})
-	client.OnThreadRealtimeItemAdded(func(codex.ThreadRealtimeItemAddedNotification) {})
-	client.OnThreadRealtimeOutputAudioDelta(func(codex.ThreadRealtimeOutputAudioDeltaNotification) {})
-	client.OnThreadRealtimeStarted(func(codex.ThreadRealtimeStartedNotification) {})
-	client.OnThreadStarted(func(codex.ThreadStartedNotification) {})
-	client.OnThreadStatusChanged(func(codex.ThreadStatusChangedNotification) {})
-	client.OnThreadTokenUsageUpdated(func(codex.ThreadTokenUsageUpdatedNotification) {})
-	client.OnThreadUnarchived(func(codex.ThreadUnarchivedNotification) {})
-	client.OnTurnCompleted(func(codex.TurnCompletedNotification) {})
-	client.OnTurnDiffUpdated(func(codex.TurnDiffUpdatedNotification) {})
-	client.OnTurnPlanUpdated(func(codex.TurnPlanUpdatedNotification) {})
-	client.OnTurnStarted(func(codex.TurnStartedNotification) {})
-	client.OnWindowsSandboxSetupCompleted(func(codex.WindowsSandboxSetupCompletedNotification) {})
-	client.OnWindowsWorldWritableWarning(func(codex.WindowsWorldWritableWarningNotification) {})
+	// expectedListeners must match the number of typed On* notification methods
+	// on Client (excluding OnNotification and OnCollabToolCall* helpers).
+	// Update this constant when adding or removing On* methods.
+	const expectedListeners = 42
 
-	t.Logf("All 41 notification listener registration methods verified on Client")
+	registered := 0
+
+	client.OnAccountLoginCompleted(func(codex.AccountLoginCompletedNotification) {})
+	registered++
+	client.OnAccountRateLimitsUpdated(func(codex.AccountRateLimitsUpdatedNotification) {})
+	registered++
+	client.OnAccountUpdated(func(codex.AccountUpdatedNotification) {})
+	registered++
+	client.OnAppListUpdated(func(codex.AppListUpdatedNotification) {})
+	registered++
+	client.OnConfigWarning(func(codex.ConfigWarningNotification) {})
+	registered++
+	client.OnDeprecationNotice(func(codex.DeprecationNoticeNotification) {})
+	registered++
+	client.OnError(func(codex.ErrorNotification) {})
+	registered++
+	client.OnFuzzyFileSearchSessionCompleted(func(codex.FuzzyFileSearchSessionCompletedNotification) {})
+	registered++
+	client.OnFuzzyFileSearchSessionUpdated(func(codex.FuzzyFileSearchSessionUpdatedNotification) {})
+	registered++
+	client.OnAgentMessageDelta(func(codex.AgentMessageDeltaNotification) {})
+	registered++
+	client.OnCommandExecutionOutputDelta(func(codex.CommandExecutionOutputDeltaNotification) {})
+	registered++
+	client.OnTerminalInteraction(func(codex.TerminalInteractionNotification) {})
+	registered++
+	client.OnItemCompleted(func(codex.ItemCompletedNotification) {})
+	registered++
+	client.OnFileChangeOutputDelta(func(codex.FileChangeOutputDeltaNotification) {})
+	registered++
+	client.OnMcpToolCallProgress(func(codex.McpToolCallProgressNotification) {})
+	registered++
+	client.OnPlanDelta(func(codex.PlanDeltaNotification) {})
+	registered++
+	client.OnReasoningSummaryPartAdded(func(codex.ReasoningSummaryPartAddedNotification) {})
+	registered++
+	client.OnReasoningSummaryTextDelta(func(codex.ReasoningSummaryTextDeltaNotification) {})
+	registered++
+	client.OnReasoningTextDelta(func(codex.ReasoningTextDeltaNotification) {})
+	registered++
+	client.OnItemStarted(func(codex.ItemStartedNotification) {})
+	registered++
+	client.OnMcpServerOauthLoginCompleted(func(codex.McpServerOauthLoginCompletedNotification) {})
+	registered++
+	client.OnModelRerouted(func(codex.ModelReroutedNotification) {})
+	registered++
+	client.OnServerRequestResolved(func(codex.ServerRequestResolvedNotification) {})
+	registered++
+	client.OnThreadArchived(func(codex.ThreadArchivedNotification) {})
+	registered++
+	client.OnThreadClosed(func(codex.ThreadClosedNotification) {})
+	registered++
+	client.OnContextCompacted(func(codex.ContextCompactedNotification) {})
+	registered++
+	client.OnThreadNameUpdated(func(codex.ThreadNameUpdatedNotification) {})
+	registered++
+	client.OnThreadRealtimeClosed(func(codex.ThreadRealtimeClosedNotification) {})
+	registered++
+	client.OnThreadRealtimeError(func(codex.ThreadRealtimeErrorNotification) {})
+	registered++
+	client.OnThreadRealtimeItemAdded(func(codex.ThreadRealtimeItemAddedNotification) {})
+	registered++
+	client.OnThreadRealtimeOutputAudioDelta(func(codex.ThreadRealtimeOutputAudioDeltaNotification) {})
+	registered++
+	client.OnThreadRealtimeStarted(func(codex.ThreadRealtimeStartedNotification) {})
+	registered++
+	client.OnThreadStarted(func(codex.ThreadStartedNotification) {})
+	registered++
+	client.OnThreadStatusChanged(func(codex.ThreadStatusChangedNotification) {})
+	registered++
+	client.OnThreadTokenUsageUpdated(func(codex.ThreadTokenUsageUpdatedNotification) {})
+	registered++
+	client.OnThreadUnarchived(func(codex.ThreadUnarchivedNotification) {})
+	registered++
+	client.OnTurnCompleted(func(codex.TurnCompletedNotification) {})
+	registered++
+	client.OnTurnDiffUpdated(func(codex.TurnDiffUpdatedNotification) {})
+	registered++
+	client.OnTurnPlanUpdated(func(codex.TurnPlanUpdatedNotification) {})
+	registered++
+	client.OnTurnStarted(func(codex.TurnStartedNotification) {})
+	registered++
+	client.OnWindowsSandboxSetupCompleted(func(codex.WindowsSandboxSetupCompletedNotification) {})
+	registered++
+	client.OnWindowsWorldWritableWarning(func(codex.WindowsWorldWritableWarningNotification) {})
+	registered++
+
+	if registered != expectedListeners {
+		t.Errorf("registered %d listeners, expected %d — update this test when adding/removing On* methods", registered, expectedListeners)
+	}
 }
