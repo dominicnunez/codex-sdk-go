@@ -258,3 +258,15 @@ their condition after every wakeup. `WaitAllDone` already does this correctly by
 be a minor optimization but changes the notification contract — callers who depend on any
 collab event (not just state changes) would miss updates. The current behavior is safe and
 consistent with the documented wakeup-recheck pattern.
+
+### security_test.go tests documentation content rather than security behavior
+
+**Location:** `security_test.go` — all tests
+**Date:** 2026-03-01
+
+**Reason:** These tests verify that SECURITY.md exists and contains required sections (reporting
+guidance, security scope, dependency policy). They are documentation enforcement tests, not
+security behavior tests. This is intentional — actual security behavior (credential redaction,
+wire protocol safety) is tested in `credential_redact_test.go` and the transport tests.
+The documentation tests ensure the security policy file stays complete and accurate as the
+project evolves.
