@@ -43,53 +43,6 @@ func TestGolangciLint(t *testing.T) {
 // The compile-time listener registrations below are the real check: if any On*
 // method or notification type is removed, this test fails to compile.
 func TestNotificationListenerCoverage(t *testing.T) {
-	// All 41 notification methods from ServerNotification.json:
-	expectedNotifications := []string{
-		"account/login/completed",                   // OnAccountLoginCompleted
-		"account/rateLimits/updated",                // OnAccountRateLimitsUpdated
-		"account/updated",                           // OnAccountUpdated
-		"app/list/updated",                          // OnAppListUpdated
-		"configWarning",                             // OnConfigWarning
-		"deprecationNotice",                         // OnDeprecationNotice
-		"error",                                     // OnError
-		"fuzzyFileSearch/sessionCompleted",          // OnFuzzyFileSearchSessionCompleted
-		"fuzzyFileSearch/sessionUpdated",            // OnFuzzyFileSearchSessionUpdated
-		"item/agentMessage/delta",                   // OnAgentMessageDelta
-		"item/commandExecution/outputDelta",         // OnCommandExecutionOutputDelta
-		"item/commandExecution/terminalInteraction", // OnTerminalInteraction
-		"item/completed",                            // OnItemCompleted
-		"item/fileChange/outputDelta",               // OnFileChangeOutputDelta
-		"item/mcpToolCall/progress",                 // OnMcpToolCallProgress
-		"item/plan/delta",                           // OnPlanDelta
-		"item/reasoning/summaryPartAdded",           // OnReasoningSummaryPartAdded
-		"item/reasoning/summaryTextDelta",           // OnReasoningSummaryTextDelta
-		"item/reasoning/textDelta",                  // OnReasoningTextDelta
-		"item/started",                              // OnItemStarted
-		"mcpServer/oauthLogin/completed",            // OnMcpServerOauthLoginCompleted
-		"model/rerouted",                            // OnModelRerouted
-		"thread/archived",                           // OnThreadArchived
-		"thread/closed",                             // OnThreadClosed
-		"thread/compacted",                          // OnContextCompacted
-		"thread/name/updated",                       // OnThreadNameUpdated
-		"thread/realtime/closed",                    // OnThreadRealtimeClosed
-		"thread/realtime/error",                     // OnThreadRealtimeError
-		"thread/realtime/itemAdded",                 // OnThreadRealtimeItemAdded
-		"thread/realtime/outputAudio/delta",         // OnThreadRealtimeOutputAudioDelta
-		"thread/realtime/started",                   // OnThreadRealtimeStarted
-		"thread/started",                            // OnThreadStarted
-		"thread/status/changed",                     // OnThreadStatusChanged
-		"thread/tokenUsage/updated",                 // OnThreadTokenUsageUpdated
-		"thread/unarchived",                         // OnThreadUnarchived
-		"turn/completed",                            // OnTurnCompleted
-		"turn/diff/updated",                         // OnTurnDiffUpdated
-		"turn/plan/updated",                         // OnTurnPlanUpdated
-		"turn/started",                              // OnTurnStarted
-		"windowsSandbox/setupCompleted",             // OnWindowsSandboxSetupCompleted
-		"windows/worldWritableWarning",              // OnWindowsWorldWritableWarning
-	}
-
-	_ = expectedNotifications // used for documentation; the compile-time block below is the real check
-
 	client := codex.NewClient(NewMockTransport())
 
 	// Register all 41 notification listeners

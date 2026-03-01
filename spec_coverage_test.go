@@ -174,23 +174,3 @@ func checkTypeExists(t *testing.T, typeName string) bool {
 
 	return found
 }
-
-// TestSpecCoverageDocumentation documents the expected coverage based on PRD.md requirements.
-func TestSpecCoverageDocumentation(t *testing.T) {
-	requirements := map[string]int{
-		"v1 requests (Initialize)":           1,
-		"v2 client→server requests":          37,
-		"v2 server→client notifications":     40,
-		"v2 server→client approval requests": 9,
-	}
-
-	t.Log("Expected coverage per PRD.md Phase 15:")
-	total := 0
-	for category, count := range requirements {
-		t.Logf("  - %s: %d", category, count)
-		total += count
-	}
-	t.Logf("Total: %d types expected", total)
-	t.Log("Note: Some spec files are shared definitions (EventMsg.json) or embedded types")
-	t.Log("The 150 JSON schemas include both top-level types and nested definitions")
-}
