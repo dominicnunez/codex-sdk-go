@@ -447,24 +447,29 @@ func TestCollabAgentState(t *testing.T) {
 // TestWebSearchAction tests WebSearchAction discriminated union
 func TestWebSearchAction(t *testing.T) {
 	tests := []struct {
-		name string
-		data string
+		name     string
+		data     string
+		wantType string
 	}{
 		{
-			name: "search action",
-			data: `{"type":"search","query":"test query"}`,
+			name:     "search action",
+			data:     `{"type":"search","query":"test query"}`,
+			wantType: "*codex.SearchWebSearchAction",
 		},
 		{
-			name: "open page action",
-			data: `{"type":"openPage","url":"https://example.com"}`,
+			name:     "open page action",
+			data:     `{"type":"openPage","url":"https://example.com"}`,
+			wantType: "*codex.OpenPageWebSearchAction",
 		},
 		{
-			name: "find in page action",
-			data: `{"type":"findInPage","url":"https://example.com","pattern":"test"}`,
+			name:     "find in page action",
+			data:     `{"type":"findInPage","url":"https://example.com","pattern":"test"}`,
+			wantType: "*codex.FindInPageWebSearchAction",
 		},
 		{
-			name: "other action",
-			data: `{"type":"other"}`,
+			name:     "other action",
+			data:     `{"type":"other"}`,
+			wantType: "*codex.OtherWebSearchAction",
 		},
 	}
 
@@ -478,6 +483,11 @@ func TestWebSearchAction(t *testing.T) {
 				t.Fatal("wrapper.Value is nil")
 			}
 
+			gotType := fmt.Sprintf("%T", wrapper.Value)
+			if gotType != tt.wantType {
+				t.Errorf("variant type = %s, want %s", gotType, tt.wantType)
+			}
+
 			// Test marshal round-trip
 			data, err := json.Marshal(wrapper)
 			if err != nil {
@@ -486,6 +496,11 @@ func TestWebSearchAction(t *testing.T) {
 			var roundtrip codex.WebSearchActionWrapper
 			if err := json.Unmarshal(data, &roundtrip); err != nil {
 				t.Fatalf("roundtrip unmarshal error: %v", err)
+			}
+
+			rtType := fmt.Sprintf("%T", roundtrip.Value)
+			if rtType != tt.wantType {
+				t.Errorf("roundtrip variant type = %s, want %s", rtType, tt.wantType)
 			}
 		})
 	}
