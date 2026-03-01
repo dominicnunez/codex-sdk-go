@@ -314,6 +314,11 @@ func (c *ContextCompactionThreadItem) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// UnmarshalErrorItemType is the Type value assigned to synthetic UnknownThreadItem
+// entries created when a notification payload fails to unmarshal. Callers can check
+// this value to detect items that represent parse failures rather than real thread items.
+const UnmarshalErrorItemType = "unmarshal_error"
+
 // UnknownThreadItem represents an unrecognized thread item type from a newer protocol version.
 type UnknownThreadItem struct {
 	Type string          `json:"type"`
