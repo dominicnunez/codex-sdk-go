@@ -344,3 +344,27 @@ comparison path is unreachable since `NewRPCError` is never called with nil, but
 a defensive correctness check, not dead logic worth removing." Defensive nil checks in `Is()`
 implementations are standard Go practice — they prevent panics if the type is ever constructed
 outside the canonical constructor.
+
+### Send pending request context cancellation described as fragile but audit concludes no bug
+
+**Location:** `stdio.go:91-142` — Send() pending request lifecycle
+**Date:** 2026-03-01
+
+**Reason:** The audit's own analysis concludes "No actual bug" and "No code change required. This
+is a documentation-level observation." The deferred `delete` is idempotent — if `handleResponse`
+already claimed and deleted the entry, the defer is a no-op (deleting a key that no longer exists
+in the map). The audit acknowledges the pattern is safe and only speculates about fragility "if
+`handleResponse` ever changes to not delete." A finding that explicitly states no bug exists and
+proposes no code change is not an actionable finding.
+
+### Approval flow mid-turn claimed to have no test coverage
+
+**Location:** `run.go:106-126`, `run_streamed.go:110-136` — Run/RunStreamed approval path
+**Date:** 2026-03-01
+
+**Reason:** The audit claims "No test exercises the full path where a `Run()` call triggers an
+approval request mid-turn." This is factually wrong. `run_test.go:632-679` contains a test that
+calls `proc.Run()`, injects a server→client approval request via `mock.InjectServerRequest` at
+line 646 mid-turn, verifies the handler was called, then completes the turn with notifications.
+`run_streamed_test.go:805-839` does the same for `RunStreamed`. Both tests exercise the full
+path through `executeTurn` with approval flow.
