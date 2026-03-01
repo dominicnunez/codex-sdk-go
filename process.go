@@ -97,7 +97,9 @@ func (opts *ProcessOptions) buildArgs() []string {
 // for testing or when managing the Codex CLI process lifecycle externally.
 // Close on the returned Process is a no-op since there is no child process.
 func NewProcessFromClient(client *Client) *Process {
-	return &Process{Client: client}
+	done := make(chan struct{})
+	close(done)
+	return &Process{Client: client, waitDone: done}
 }
 
 // StartProcess spawns "codex exec --experimental-json" as a child process,
