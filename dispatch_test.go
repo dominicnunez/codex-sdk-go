@@ -632,3 +632,145 @@ func TestSetApprovalHandlersConcurrentWithRequests(t *testing.T) {
 
 	<-done
 }
+
+// TestNilHandlerDeregistration verifies that passing nil to an On* notification
+// method removes the previously registered handler so it no longer fires.
+func TestNilHandlerDeregistration(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name       string
+		method     string
+		register   func(client *codex.Client, called *bool)
+		deregister func(client *codex.Client)
+		params     string
+	}{
+		{
+			name:   "OnThreadStarted",
+			method: "thread/started",
+			register: func(client *codex.Client, called *bool) {
+				client.OnThreadStarted(func(n codex.ThreadStartedNotification) {
+					*called = true
+				})
+			},
+			deregister: func(client *codex.Client) {
+				client.OnThreadStarted(nil)
+			},
+			params: `{
+				"thread": {
+					"id": "thread-123",
+					"cliVersion": "1.0.0",
+					"createdAt": 1234567890,
+					"cwd": "/home/user/project",
+					"modelProvider": "openai",
+					"preview": "Test",
+					"source": "cli",
+					"status": {"type": "idle"},
+					"turns": [],
+					"updatedAt": 1234567890
+				}
+			}`,
+		},
+		{
+			name:   "OnThreadClosed",
+			method: "thread/closed",
+			register: func(client *codex.Client, called *bool) {
+				client.OnThreadClosed(func(n codex.ThreadClosedNotification) {
+					*called = true
+				})
+			},
+			deregister: func(client *codex.Client) {
+				client.OnThreadClosed(nil)
+			},
+			params: `{"threadId": "thread-123"}`,
+		},
+		{
+			name:   "OnThreadArchived",
+			method: "thread/archived",
+			register: func(client *codex.Client, called *bool) {
+				client.OnThreadArchived(func(n codex.ThreadArchivedNotification) {
+					*called = true
+				})
+			},
+			deregister: func(client *codex.Client) {
+				client.OnThreadArchived(nil)
+			},
+			params: `{"threadId": "thread-123"}`,
+		},
+		{
+			name:   "OnThreadUnarchived",
+			method: "thread/unarchived",
+			register: func(client *codex.Client, called *bool) {
+				client.OnThreadUnarchived(func(n codex.ThreadUnarchivedNotification) {
+					*called = true
+				})
+			},
+			deregister: func(client *codex.Client) {
+				client.OnThreadUnarchived(nil)
+			},
+			params: `{"threadId": "thread-123"}`,
+		},
+		{
+			name:   "OnThreadStatusChanged",
+			method: "thread/status/changed",
+			register: func(client *codex.Client, called *bool) {
+				client.OnThreadStatusChanged(func(n codex.ThreadStatusChangedNotification) {
+					*called = true
+				})
+			},
+			deregister: func(client *codex.Client) {
+				client.OnThreadStatusChanged(nil)
+			},
+			params: `{"threadId": "thread-123", "status": {"type": "idle"}}`,
+		},
+		{
+			name:   "OnError",
+			method: "error",
+			register: func(client *codex.Client, called *bool) {
+				client.OnError(func(n codex.ErrorNotification) {
+					*called = true
+				})
+			},
+			deregister: func(client *codex.Client) {
+				client.OnError(nil)
+			},
+			params: `{"error": {"message": "test error"}, "threadId": "thread-123", "turnId": "turn-1"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := NewMockTransport()
+			client := codex.NewClient(mock)
+
+			called := false
+			tt.register(client, &called)
+
+			// Fire notification: handler should be called.
+			mock.InjectServerNotification(ctx, codex.Notification{
+				JSONRPC: "2.0",
+				Method:  tt.method,
+				Params:  json.RawMessage(tt.params),
+			})
+
+			if !called {
+				t.Fatalf("handler was not called before deregistration")
+			}
+
+			// Deregister by passing nil.
+			tt.deregister(client)
+
+			// Reset flag and fire again: handler should NOT be called.
+			called = false
+			mock.InjectServerNotification(ctx, codex.Notification{
+				JSONRPC: "2.0",
+				Method:  tt.method,
+				Params:  json.RawMessage(tt.params),
+			})
+
+			if called {
+				t.Errorf("handler was called after nil deregistration")
+			}
+		})
+	}
+}
