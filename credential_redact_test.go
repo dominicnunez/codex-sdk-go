@@ -113,3 +113,77 @@ func TestCredentialTypesRedactWithAllFormatVerbs(t *testing.T) {
 		}
 	}
 }
+
+func TestLoginWireSerialization_ApiKey_SendsUnredactedCredentials(t *testing.T) {
+	transport := NewMockTransport()
+	client := codex.NewClient(transport)
+
+	apiKey := "sk-live-actual-key"
+	_ = transport.SetResponseData("account/login/start", map[string]interface{}{
+		"type": "apiKey",
+	})
+
+	ctx := context.Background()
+	_, err := client.Account.Login(ctx, &codex.ApiKeyLoginAccountParams{
+		Type:   "apiKey",
+		ApiKey: apiKey,
+	})
+	if err != nil {
+		t.Fatalf("Login() error: %v", err)
+	}
+
+	req := transport.GetSentRequest(0)
+	if req == nil {
+		t.Fatal("no request was sent")
+	}
+	if req.Method != "account/login/start" {
+		t.Fatalf("method = %q, want account/login/start", req.Method)
+	}
+
+	wireJSON := string(req.Params)
+	if !strings.Contains(wireJSON, apiKey) {
+		t.Errorf("wire request must contain unredacted apiKey, got: %s", wireJSON)
+	}
+	if strings.Contains(wireJSON, "[REDACTED]") {
+		t.Errorf("wire request must not contain [REDACTED], got: %s", wireJSON)
+	}
+}
+
+func TestLoginWireSerialization_ChatgptAuthTokens_SendsUnredactedCredentials(t *testing.T) {
+	transport := NewMockTransport()
+	client := codex.NewClient(transport)
+
+	accessToken := "access-token-123"
+	_ = transport.SetResponseData("account/login/start", map[string]interface{}{
+		"type": "chatgptAuthTokens",
+	})
+
+	ctx := context.Background()
+	_, err := client.Account.Login(ctx, &codex.ChatgptAuthTokensLoginAccountParams{
+		Type:             "chatgptAuthTokens",
+		AccessToken:      accessToken,
+		ChatgptAccountId: "acct-1",
+	})
+	if err != nil {
+		t.Fatalf("Login() error: %v", err)
+	}
+
+	req := transport.GetSentRequest(0)
+	if req == nil {
+		t.Fatal("no request was sent")
+	}
+	if req.Method != "account/login/start" {
+		t.Fatalf("method = %q, want account/login/start", req.Method)
+	}
+
+	wireJSON := string(req.Params)
+	if !strings.Contains(wireJSON, accessToken) {
+		t.Errorf("wire request must contain unredacted accessToken, got: %s", wireJSON)
+	}
+	if strings.Contains(wireJSON, "[REDACTED]") {
+		t.Errorf("wire request must not contain [REDACTED], got: %s", wireJSON)
+	}
+	if !strings.Contains(wireJSON, "acct-1") {
+		t.Errorf("wire request must contain chatgptAccountId, got: %s", wireJSON)
+	}
+}

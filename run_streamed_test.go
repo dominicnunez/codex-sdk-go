@@ -1022,6 +1022,95 @@ func TestStreamEventsConsumedOnSecondCall(t *testing.T) {
 	}
 }
 
+func TestRunStreamedBackpressure_SlowConsumerReceivesAllEvents(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "burst"})
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Inject more events than the channel buffer (64) to force backpressure.
+	// Injection must happen in a separate goroutine because once the buffer
+	// fills, streamSendEvent blocks until the consumer reads.
+	const totalDeltas = 100
+	go func() {
+		for i := 0; i < totalDeltas; i++ {
+			mock.InjectServerNotification(ctx, codex.Notification{
+				JSONRPC: "2.0",
+				Method:  "item/agentMessage/delta",
+				Params:  json.RawMessage(fmt.Sprintf(`{"delta":"chunk-%d","itemId":"item-1","threadId":"thread-1","turnId":"turn-1"}`, i)),
+			})
+		}
+
+		// Complete the turn.
+		mock.InjectServerNotification(ctx, codex.Notification{
+			JSONRPC: "2.0",
+			Method:  "turn/completed",
+			Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+		})
+	}()
+
+	// Consume slowly to exercise backpressure.
+	var received int
+	for event, err := range stream.Events() {
+		if err != nil {
+			t.Fatalf("unexpected error after %d events: %v", received, err)
+		}
+		if _, ok := event.(*codex.TextDelta); ok {
+			received++
+			time.Sleep(1 * time.Millisecond)
+		}
+	}
+
+	if received != totalDeltas {
+		t.Errorf("received %d deltas, want %d", received, totalDeltas)
+	}
+}
+
+func TestRunStreamedBackpressure_ContextCancellationUnblocksSender(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "cancel me"})
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Inject notifications from a goroutine to fill the buffer. Once the
+	// buffer is full, streamSendEvent blocks. Cancelling the context must
+	// unblock it, preventing goroutine leaks.
+	go func() {
+		for i := 0; i < 200; i++ {
+			mock.InjectServerNotification(ctx, codex.Notification{
+				JSONRPC: "2.0",
+				Method:  "item/agentMessage/delta",
+				Params:  json.RawMessage(`{"delta":"x","itemId":"item-1","threadId":"thread-1","turnId":"turn-1"}`),
+			})
+		}
+	}()
+
+	// Let some notifications queue up, then cancel without consuming.
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+
+	// The lifecycle goroutine must not hang. Result() should return promptly.
+	done := make(chan struct{})
+	go func() {
+		stream.Result()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("lifecycle goroutine hung after context cancellation with full buffer")
+	}
+}
+
 func TestStreamEventsConcurrentConsumption(t *testing.T) {
 	proc, mock := mockProcess(t)
 
