@@ -23,12 +23,19 @@ type TurnOptions struct {
 	CollaborationMode *CollaborationMode
 }
 
+// errTurnInProgress is returned when a Turn or TurnStreamed call is made
+// while another turn is already executing on the same Conversation.
+var errTurnInProgress = errors.New("a turn is already in progress on this conversation")
+
 // Conversation manages a persistent thread across multiple turns.
+// Concurrent Turn or TurnStreamed calls on the same Conversation are
+// not supported — the second call returns errTurnInProgress.
 type Conversation struct {
-	process  *Process
-	threadID string
-	thread   Thread
-	mu       sync.Mutex
+	process    *Process
+	threadID   string
+	thread     Thread
+	mu         sync.Mutex
+	activeTurn bool
 }
 
 // ThreadID returns the underlying thread ID.
@@ -111,6 +118,8 @@ func (c *Conversation) buildTurnParams(opts TurnOptions) TurnStartParams {
 }
 
 // Turn executes a blocking turn on the existing thread, like Run() but multi-turn.
+// Concurrent calls to Turn or TurnStreamed on the same Conversation are not
+// supported and return an error.
 func (c *Conversation) Turn(ctx context.Context, opts TurnOptions) (*RunResult, error) {
 	if opts.Prompt == "" {
 		return nil, errors.New("prompt is required")
@@ -121,8 +130,19 @@ func (c *Conversation) Turn(ctx context.Context, opts TurnOptions) (*RunResult, 
 	}
 
 	c.mu.Lock()
+	if c.activeTurn {
+		c.mu.Unlock()
+		return nil, errTurnInProgress
+	}
+	c.activeTurn = true
 	thread := c.thread
 	c.mu.Unlock()
+
+	defer func() {
+		c.mu.Lock()
+		c.activeTurn = false
+		c.mu.Unlock()
+	}()
 
 	return executeTurn(ctx, turnLifecycleParams{
 		client:     c.process.Client,
@@ -172,8 +192,20 @@ func (c *Conversation) turnStreamedLifecycle(ctx context.Context, opts TurnOptio
 	}
 
 	c.mu.Lock()
+	if c.activeTurn {
+		c.mu.Unlock()
+		streamSendErr(ch, errTurnInProgress)
+		return
+	}
+	c.activeTurn = true
 	thread := c.thread
 	c.mu.Unlock()
+
+	defer func() {
+		c.mu.Lock()
+		c.activeTurn = false
+		c.mu.Unlock()
+	}()
 
 	executeStreamedTurn(ctx, turnLifecycleParams{
 		client:     c.process.Client,

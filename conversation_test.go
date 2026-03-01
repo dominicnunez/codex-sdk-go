@@ -472,6 +472,66 @@ func TestConversationWithCollaborationMode(t *testing.T) {
 	}
 }
 
+func TestConversationConcurrentTurnRejected(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+
+	// Start first turn in background.
+	firstDone := make(chan error, 1)
+	go func() {
+		_, err := conv.Turn(ctx, codex.TurnOptions{Prompt: "first"})
+		firstDone <- err
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Second turn should be rejected while the first is in progress.
+	_, err = conv.Turn(ctx, codex.TurnOptions{Prompt: "second"})
+	if err == nil {
+		t.Fatal("expected error from concurrent turn")
+	}
+	if err.Error() != "a turn is already in progress on this conversation" {
+		t.Errorf("error = %q, want turn-in-progress error", err)
+	}
+
+	// Complete the first turn.
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	if err := <-firstDone; err != nil {
+		t.Fatalf("first turn error: %v", err)
+	}
+
+	// After the first completes, a new turn should work.
+	thirdDone := make(chan error, 1)
+	go func() {
+		_, err := conv.Turn(ctx, codex.TurnOptions{Prompt: "third"})
+		thirdDone <- err
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-2","status":"completed","items":[]}}`),
+	})
+
+	if err := <-thirdDone; err != nil {
+		t.Fatalf("third turn error: %v", err)
+	}
+}
+
 func TestConversationThreadDeepCopyTurnError(t *testing.T) {
 	proc, mock := mockProcess(t)
 
