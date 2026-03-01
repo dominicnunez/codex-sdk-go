@@ -124,6 +124,10 @@ func (s *Stream) Result() *RunResult {
 // through an iterator instead of blocking until completion. Returns immediately;
 // the lifecycle runs in a background goroutine.
 func (p *Process) RunStreamed(ctx context.Context, opts RunOptions) *Stream {
+	if opts.Prompt == "" {
+		return newErrorStream(errors.New("prompt is required"))
+	}
+
 	g := newGuardedChan(streamChannelBuffer)
 	s := &Stream{
 		done: make(chan struct{}),
@@ -140,6 +144,19 @@ func (p *Process) RunStreamed(ctx context.Context, opts RunOptions) *Stream {
 	go p.runStreamedLifecycle(ctx, opts, g, s)
 
 	return s
+}
+
+// newErrorStream returns a Stream that yields a single error and completes
+// immediately. Used for synchronous validation failures in RunStreamed.
+func newErrorStream(err error) *Stream {
+	done := make(chan struct{})
+	close(done)
+	return &Stream{
+		done: done,
+		events: func(yield func(Event, error) bool) {
+			yield(nil, err)
+		},
+	}
 }
 
 // streamSendEvent sends an event on g, blocking until the send succeeds,
@@ -176,11 +193,6 @@ func streamListen[N any](ctx context.Context, on func(string, NotificationHandle
 func (p *Process) runStreamedLifecycle(ctx context.Context, opts RunOptions, g *guardedChan, s *Stream) {
 	defer g.closeOnce()
 	defer close(s.done)
-
-	if opts.Prompt == "" {
-		streamSendErr(ctx, g, errors.New("prompt is required"))
-		return
-	}
 
 	if err := p.ensureInit(ctx); err != nil {
 		streamSendErr(ctx, g, err)
