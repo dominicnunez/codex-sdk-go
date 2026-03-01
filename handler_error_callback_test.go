@@ -142,7 +142,9 @@ func TestHandlerErrorCallback_NotSet(t *testing.T) {
 	mock := NewMockTransport()
 	client := codex.NewClient(mock) // no callback
 
+	var handlerEntered atomic.Bool
 	client.OnNotification("test.panic", func(_ context.Context, _ codex.Notification) {
+		handlerEntered.Store(true)
 		panic("should be silently recovered")
 	})
 
@@ -152,15 +154,24 @@ func TestHandlerErrorCallback_NotSet(t *testing.T) {
 		Method:  "test.panic",
 		Params:  json.RawMessage(`{}`),
 	})
+
+	if !handlerEntered.Load() {
+		t.Error("notification handler was never called")
+	}
 }
 
 func TestHandlerErrorCallback_CallbackPanics(t *testing.T) {
 	mock := NewMockTransport()
+
+	var callbackEntered atomic.Bool
 	client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(_ string, _ error) {
+		callbackEntered.Store(true)
 		panic("callback itself panics")
 	}))
 
+	var handlerEntered atomic.Bool
 	client.OnNotification("test.panic", func(_ context.Context, _ codex.Notification) {
+		handlerEntered.Store(true)
 		panic("trigger")
 	})
 
@@ -170,6 +181,13 @@ func TestHandlerErrorCallback_CallbackPanics(t *testing.T) {
 		Method:  "test.panic",
 		Params:  json.RawMessage(`{}`),
 	})
+
+	if !handlerEntered.Load() {
+		t.Error("notification handler was never called")
+	}
+	if !callbackEntered.Load() {
+		t.Error("error callback was never called")
+	}
 }
 
 func TestHandlerErrorCallback_InternalListenerPanic(t *testing.T) {
