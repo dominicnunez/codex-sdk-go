@@ -541,3 +541,39 @@ This is factually wrong. `conversation_test.go` contains four dedicated concurre
 (line 651), `TestConversationConcurrentTurnVsTurnStreamedRejected` (line 697), and
 `TestConversationConcurrentTurnStreamedVsTurnRejected` (line 746). These test all four combinations
 of Turn vs TurnStreamed racing and assert the second call returns an error.
+
+### Result() described as blocking forever on cancelled context
+
+**Location:** `run_streamed.go:51-56` — Stream.Result() blocking semantics
+**Date:** 2026-03-01
+
+**Reason:** The audit itself acknowledges "it does close `s.done` (via `defer close(s.done)`), so
+this actually works." The lifecycle goroutine at `run_streamed.go:121-123` always closes `s.done`
+via defer, including on context cancellation — so `Result()` never blocks forever. The remaining
+concern ("nil means the turn did not complete successfully" has no error return) is documented API
+behavior at line 49-50: "Returns nil if the turn errored (the error was already surfaced through
+the Events iterator)." This is an API design preference, not a bug.
+
+### ReviewDecisionWrapper and CommandExecutionApprovalDecisionWrapper use interface{} instead of sealed interface
+
+**Location:** `approval.go:179`, `approval.go:463` — Value fields
+**Date:** 2026-03-01
+
+**Reason:** This is already covered by the known exception "ReviewDecisionWrapper and
+CommandExecutionApprovalDecisionWrapper use untyped interface{} for Value" which explains that
+changing these to sealed interfaces would alter the public API surface, violating the spec
+compliance rules. The custom UnmarshalJSON/MarshalJSON methods already enforce valid values
+at runtime. Duplicate of existing exception.
+
+### FuzzyFileSearch claimed to be missing from approval handler dispatch
+
+**Location:** `client.go:248-294` — handleRequest approval dispatch
+**Date:** 2026-03-01
+
+**Reason:** The audit claims `fuzzyFileSearch` should be routed through `handleRequest` as a
+server→client approval request. This is incorrect. `fuzzyFileSearch` is a **client→server**
+request — it appears in `specs/ClientRequest.json` and is implemented as
+`FuzzyFileSearchService.Search()` which calls `sendRequest` (fuzzy_search.go:53). It is correctly
+absent from the server→client approval dispatch in `handleRequest`. The `request_coverage_test.go`
+comment at line 189 ("server→client request (approval flow)") is misleading, but the code is
+correct — `fuzzyFileSearch` is tested in `fuzzy_search_test.go` as a normal client→server method.

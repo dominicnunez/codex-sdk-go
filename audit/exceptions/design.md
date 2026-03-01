@@ -306,3 +306,19 @@ Clone() method would need to match every variant (and be updated for every new o
 maintenance burden and potential for subtle bugs. The JSON round-trip is O(n) in serialized size
 but automatically correct for all variants. The error path now panics (instead of silently returning
 the original), ensuring the deep-copy guarantee is never silently broken.
+
+### Stream background goroutine blocks if consumer stops iterating without cancelling context
+
+**Location:** `run_streamed.go:67-88` — streamSendEvent and Stream.Events iterator
+**Date:** 2026-03-01
+
+**Reason:** If a consumer calls `Events()`, starts iterating, then breaks out of the loop without
+cancelling the context, the background goroutine in `streamSendEvent` blocks on `ch <- ...` once
+the 64-element buffer fills. The `select` in `streamSendEvent` correctly unblocks on context
+cancellation, so the goroutine is collected when the caller cancels — but if they discard the
+Stream and forget the context, it leaks. This is standard Go context discipline: callers who
+create a context are responsible for cancelling it. Adding a `done` channel closed on iteration
+stop would complicate the iterator contract (callers who fully consume the stream should not need
+to close anything) and would not cover all discard scenarios (e.g. never calling `Events()` at
+all). The current design matches `context.WithCancel` semantics used throughout the standard
+library.
