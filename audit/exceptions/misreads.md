@@ -722,3 +722,58 @@ The multi-turn accumulation path is tested.
 and "No change needed — already accepted." This is a duplicate of the known exception "Notification
 handlers dispatched concurrently without ordering guarantees." The suggested fix (adding godoc) is a
 documentation enhancement, not a code defect.
+
+### Close does not wait for readLoop goroutine to exit described as a new bug
+
+**Location:** `stdio.go:207-240` — Close() and readLoop interaction
+**Date:** 2026-03-01
+
+**Reason:** This is a duplicate of the known exception "StdioTransport.Close does not stop the
+reader goroutine." The suggested fix (wait for `<-t.readerStopped` with a timeout) would deadlock
+because the readLoop is blocked on `scanner.Scan()` which cannot be interrupted without closing the
+underlying reader. The known exception documents that fixing this requires changing the public API
+from `io.Reader` to `io.ReadCloser` — the same root cause and the same disproportionate fix.
+
+### writeMessage goroutines can leak on context cancellation described as a new bug
+
+**Location:** `stdio.go:130-146, stdio.go:160-181` — Send and Notify write goroutines
+**Date:** 2026-03-01
+
+**Reason:** This is a duplicate of the known exception "Write goroutine in Send can leak on context
+cancellation" at `stdio.go:86-102`. The finding covers both `Send` and `Notify`, but both have the
+same root cause: `io.Writer.Write` has no context or deadline support, so there is no way to
+interrupt a blocked write without closing the underlying writer. The known exception documents that
+fixing this requires changing the public API to accept `io.WriteCloser`.
+
+### writeMessage errors silently discarded in request/notification handlers described as a new finding
+
+**Location:** `stdio.go:436, stdio.go:452, stdio.go:477, stdio.go:484` — writeMessage error discards
+**Date:** 2026-03-01
+
+**Reason:** This is a duplicate of the known exception "writeMessage errors silently discarded in
+handleRequest goroutine" at `stdio.go:334, 356, 363`. The line numbers differ due to code changes
+but the issue is identical: `_ = t.writeMessage(...)` calls in goroutines spawned by `handleRequest`
+where there is no caller to return an error to. The known exception documents that surfacing these
+errors requires new public API surface disproportionate to the severity.
+
+### Transport silently drops unparseable JSON lines described as a new finding
+
+**Location:** `stdio.go:307-309` — readLoop JSON unmarshal failure
+**Date:** 2026-03-01
+
+**Reason:** This is a duplicate of the known exception "readLoop silently skips unparseable JSON
+lines with no diagnostic" at `stdio.go:250-253`. Both describe the same behavior: when readLoop
+receives a line that fails JSON unmarshal, it silently continues. The known exception documents that
+surfacing dropped-line counts requires new public API surface disproportionate to a Low severity
+debugging-convenience finding.
+
+### Clone functions panic on marshal failure described as a code quality issue
+
+**Location:** `conversation.go:89-102, conversation.go:106-119, conversation.go:122-136` — clone panic behavior
+**Date:** 2026-03-01
+
+**Reason:** This is a duplicate of the known exception "cloneThreadItemWrapper uses JSON round-trip
+for deep copy" which explicitly states: "The error path now panics (instead of silently returning
+the original), ensuring the deep-copy guarantee is never silently broken." The panic is a deliberate
+design choice already analyzed and accepted. The alternative (returning an error from `Thread()`)
+would change the public API signature.

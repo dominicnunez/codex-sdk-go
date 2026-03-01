@@ -321,3 +321,17 @@ API surface. In practice, sub-agent counts per session are small (tens, occasion
 The memory held per `AgentInfo` is ~100 bytes. Even 10,000 agents would consume ~1MB, which is
 negligible relative to the process memory. The growth is linear in the number of unique agents
 spawned, not in the number of events processed.
+
+### No test for transport readLoop shutdown-during-dispatch behavior
+
+**Location:** `stdio.go` — readLoop/handleNotification/handleRequest
+**Date:** 2026-03-01
+
+**Reason:** Testing that `Close()` during active handler dispatch completes gracefully without
+goroutine leaks requires registering slow handlers, injecting messages, calling `Close()`, and
+verifying goroutine counts (e.g. via `goleak`). The existing `TestStdioConcurrentSendAndClose`
+exercises concurrent close but does not verify in-flight handler completion. Building this test
+requires either adding `goleak` as a test dependency or using `runtime.NumGoroutine` snapshots
+with timing-sensitive assertions. The handlers already recover from panics and the transport's
+context cancellation unblocks context-aware handlers. The risk of a goroutine leak on close is
+low given the process-scoped lifecycle of StdioTransport.
