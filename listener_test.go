@@ -2,6 +2,7 @@ package codex
 
 import (
 	"context"
+	"sync"
 	"testing"
 )
 
@@ -27,6 +28,38 @@ func TestAddNotificationListenerUnsubscribeIdempotent(t *testing.T) {
 	if called != 0 {
 		t.Errorf("listener called %d times after double unsubscribe, want 0", called)
 	}
+}
+
+// TestConcurrentInternalListeners exercises addNotificationListener,
+// handleNotification dispatch, and unsubscribe concurrently under -race.
+func TestConcurrentInternalListeners(t *testing.T) {
+	transport := &mockInternalTransport{}
+	c := NewClient(transport)
+
+	const goroutines = 10
+	const iterations = 50
+
+	var wg sync.WaitGroup
+	ctx := context.Background()
+
+	for i := 0; i < goroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < iterations; j++ {
+				unsub := c.addNotificationListener("test/concurrent", func(_ context.Context, _ Notification) {})
+
+				c.handleNotification(ctx, Notification{
+					JSONRPC: "2.0",
+					Method:  "test/concurrent",
+				})
+
+				unsub()
+			}
+		}()
+	}
+
+	wg.Wait()
 }
 
 // mockInternalTransport satisfies the Transport interface for internal tests.
