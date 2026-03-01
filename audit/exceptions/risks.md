@@ -191,3 +191,39 @@ a grace period timeout are rare and non-actionable — the process is being forc
 Surfacing these would require a structured multi-error return or a callback, which is
 disproportionate to the severity. The caller cares whether cleanup succeeded (transport closed),
 not about the intermediate signaling steps.
+
+### Config flag values containing "=" are ambiguous on the CLI
+
+**Location:** `process.go:87` — buildArgs config flag construction
+**Date:** 2026-02-28
+
+**Reason:** Config flags are constructed as `--config k=v`. If the value itself contains `=`,
+the CLI may split on the first `=` and misinterpret the value. This is a CLI-side parsing
+concern — the SDK faithfully passes what the caller provides. The CLI's `--config` flag parser
+determines how `key=a=b` is interpreted, and the standard convention (split on first `=`) handles
+this correctly. Adding quoting or escaping in the SDK without knowing the CLI's parser would be
+speculative and could introduce new ambiguity.
+
+### Thread ID filtering in notification listeners lacks a cross-thread contamination test
+
+**Location:** `turn_lifecycle.go:34-38`, `run_streamed.go:87-91` — threadID filter
+**Date:** 2026-02-28
+
+**Reason:** Testing cross-thread contamination requires running two concurrent turns on different
+threads through the full turn lifecycle, which needs mock infrastructure for concurrent thread/turn
+start responses with different thread IDs and interleaved notifications. The current mock transport
+supports one response per method, making this test require significant test infrastructure changes.
+The filter logic itself is trivial (`carrier.ThreadID != p.threadID`) and exercised in every
+existing turn test — only the negative path (mismatched IDs) lacks coverage.
+
+### handleRequest error-code dispatch through StdioTransport lacks integration test
+
+**Location:** `stdio.go:422-441` — errInvalidParams branching in handleRequest
+**Date:** 2026-02-28
+
+**Reason:** All approval handler tests use MockTransport which bypasses the real handleRequest
+error classification. Testing this code path requires a real StdioTransport with piped readers/
+writers, a registered handler that returns an errInvalidParams-wrapped error, and verification
+of the JSON-RPC response error code. This is integration-level testing that requires substantially
+more setup than unit tests. The branching logic is simple (one errors.Is check) and the risk of
+incorrect error codes is low — both branches produce valid JSON-RPC error responses.
