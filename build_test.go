@@ -2,7 +2,9 @@ package codex_test
 
 import (
 	"bytes"
+	"fmt"
 	"os/exec"
+	"runtime"
 	"testing"
 )
 
@@ -24,19 +26,19 @@ func TestGoBuild(t *testing.T) {
 	}
 }
 
-// TestGoVersion verifies Go version is 1.22 or higher
+// TestGoVersion verifies the runtime Go version meets the module's minimum (go 1.25).
 func TestGoVersion(t *testing.T) {
-	cmd := exec.Command("go", "version")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("go version failed: %v", err)
+	const minMajor, minMinor = 1, 25
+
+	var major, minor int
+	// runtime.Version() returns e.g. "go1.25.1"
+	if _, err := fmt.Sscanf(runtime.Version(), "go%d.%d", &major, &minor); err != nil {
+		t.Fatalf("failed to parse Go version %q: %v", runtime.Version(), err)
 	}
 
-	// Output format: "go version go1.22.2 linux/amd64"
-	versionStr := string(output)
-	if len(versionStr) == 0 {
-		t.Fatal("go version returned empty output")
+	if major < minMajor || (major == minMajor && minor < minMinor) {
+		t.Fatalf("Go %d.%d required, running %d.%d", minMajor, minMinor, major, minor)
 	}
 
-	t.Logf("Go version: %s", versionStr)
+	t.Logf("Go version: %s", runtime.Version())
 }
