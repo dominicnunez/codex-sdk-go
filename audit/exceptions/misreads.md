@@ -659,3 +659,56 @@ multiple tests for this: lines 890-901 call `Events()` twice and assert the seco
 `ErrStreamConsumed`; lines 1007-1023 do the same in a different test scenario; and
 `TestStreamEventsConcurrentConsumption` (line 1025) tests concurrent access with 10 goroutines
 racing to consume, asserting exactly 1 winner and N-1 `ErrStreamConsumed` results.
+
+### handleApproval pointer-to-result wireMarshaler dispatch described as fragile but works correctly
+
+**Location:** `client.go:397` — marshalForWire(&result) call
+**Date:** 2026-03-01
+
+**Reason:** This is a duplicate of the existing exception "handleApproval marshalForWire pointer-to-result
+described as a potential bug but works correctly." The audit itself concludes the code works correctly
+today and "No immediate change needed." All existing approval response types implement `marshalWire`
+on value receivers, which are callable on pointer receivers in Go. The concern about a future change
+to pointer receivers is speculative — not an actionable finding.
+
+### Conversation.Thread() deep-copy panics on failure described as a code quality issue
+
+**Location:** `conversation.go:89-136` — cloneThreadItemWrapper, cloneSessionSourceWrapper, cloneThreadStatusWrapper
+**Date:** 2026-03-01
+
+**Reason:** Covered by existing exception "cloneThreadItemWrapper uses JSON round-trip for deep copy"
+which explicitly states: "The error path now panics (instead of silently returning the original),
+ensuring the deep-copy guarantee is never silently broken." The panic is a deliberate design choice
+already analyzed and accepted.
+
+### Conversation.Thread() claimed to not deep-copy TokenUsage or other top-level fields
+
+**Location:** `conversation.go:51-83` — Thread() deep-copy
+**Date:** 2026-03-01
+
+**Reason:** The finding claims Thread() "does not deep-copy TokenUsage or other potential top-level fields."
+`TokenUsage` does not exist on the `Thread` struct (thread.go:20-37). Every pointer and slice field on
+Thread is deep-copied: `Name`, `AgentNickname`, `AgentRole`, `Path` (all `*string` — cloned via
+`cloneStringPtr`), `GitInfo` (`*GitInfo` — field-by-field deep copy), `Source` (`SessionSourceWrapper` —
+JSON round-trip clone), `Status` (`ThreadStatusWrapper` — JSON round-trip clone), `Turns` (`[]Turn` —
+slice copy with per-item deep copy of Items and Error). The concern about "future fields" is speculative.
+
+### ExecArgs values described as needing shell metacharacter validation
+
+**Location:** `process.go:84-113` — buildArgs ExecArgs handling
+**Date:** 2026-03-01
+
+**Reason:** The finding itself acknowledges "`exec.Command` does not use a shell" and "This is safe."
+The concern about the Codex CLI interpreting `--config "key=$(cmd)"` is speculative — `exec.Command`
+passes each argument as a discrete `argv` element, so `$(cmd)` is a literal string, not a shell expansion.
+The CLI's parsing of its own arguments is outside the SDK's responsibility. The finding concludes with
+"The current `exec.Command` usage is safe against shell injection" — confirming no vulnerability exists.
+
+### Multi-turn state accumulation claimed to be untested
+
+**Location:** `conversation.go`, `conversation_test.go` — multi-turn testing
+**Date:** 2026-03-01
+
+**Reason:** Already in known exceptions. `TestConversationMultiTurn` (conversation_test.go:13-96)
+executes two turns on the same Conversation, then asserts `len(thread.Turns) == 2` at line 93-94.
+The multi-turn accumulation path is tested.
