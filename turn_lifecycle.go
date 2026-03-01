@@ -72,7 +72,7 @@ func executeTurn(ctx context.Context, p turnLifecycleParams) (*RunResult, error)
 	select {
 	case completed := <-done:
 		if completed.Turn.Error != nil {
-			return nil, fmt.Errorf("turn error: %s", completed.Turn.Error.Message)
+			return nil, fmt.Errorf("turn error: %w", completed.Turn.Error)
 		}
 
 		mu.Lock()
@@ -112,27 +112,27 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, ch chan<- e
 
 	turnDone := make(chan TurnCompletedNotification, 1)
 
-	streamListen(on, notifyTurnStarted, ch, p.threadID, func(n TurnStartedNotification) Event {
+	streamListen(ctx, on, notifyTurnStarted, ch, p.threadID, func(n TurnStartedNotification) Event {
 		return &TurnStarted{Turn: n.Turn, ThreadID: n.ThreadID}
 	})
 
-	streamListen(on, notifyAgentMessageDelta, ch, p.threadID, func(n AgentMessageDeltaNotification) Event {
+	streamListen(ctx, on, notifyAgentMessageDelta, ch, p.threadID, func(n AgentMessageDeltaNotification) Event {
 		return &TextDelta{Delta: n.Delta, ItemID: n.ItemID}
 	})
 
-	streamListen(on, notifyReasoningTextDelta, ch, p.threadID, func(n ReasoningTextDeltaNotification) Event {
+	streamListen(ctx, on, notifyReasoningTextDelta, ch, p.threadID, func(n ReasoningTextDeltaNotification) Event {
 		return &ReasoningDelta{Delta: n.Delta, ItemID: n.ItemID, ContentIndex: n.ContentIndex}
 	})
 
-	streamListen(on, notifyReasoningSummaryTextDelta, ch, p.threadID, func(n ReasoningSummaryTextDeltaNotification) Event {
+	streamListen(ctx, on, notifyReasoningSummaryTextDelta, ch, p.threadID, func(n ReasoningSummaryTextDeltaNotification) Event {
 		return &ReasoningSummaryDelta{Delta: n.Delta, ItemID: n.ItemID, SummaryIndex: n.SummaryIndex}
 	})
 
-	streamListen(on, notifyPlanDelta, ch, p.threadID, func(n PlanDeltaNotification) Event {
+	streamListen(ctx, on, notifyPlanDelta, ch, p.threadID, func(n PlanDeltaNotification) Event {
 		return &PlanDelta{Delta: n.Delta, ItemID: n.ItemID}
 	})
 
-	streamListen(on, notifyFileChangeOutputDelta, ch, p.threadID, func(n FileChangeOutputDeltaNotification) Event {
+	streamListen(ctx, on, notifyFileChangeOutputDelta, ch, p.threadID, func(n FileChangeOutputDeltaNotification) Event {
 		return &FileChangeDelta{Delta: n.Delta, ItemID: n.ItemID}
 	})
 
@@ -147,9 +147,9 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, ch chan<- e
 			return
 		}
 		if c, ok := n.Item.Value.(*CollabAgentToolCallThreadItem); ok {
-			streamSendEvent(ch, newCollabEvent(CollabToolCallStartedPhase, c))
+			streamSendEvent(ctx, ch, newCollabEvent(CollabToolCallStartedPhase, c))
 		}
-		streamSendEvent(ch, &ItemStarted{Item: n.Item})
+		streamSendEvent(ctx, ch, &ItemStarted{Item: n.Item})
 	})
 
 	// item/completed: emit collab event before generic event, and append to collected items.
@@ -166,9 +166,9 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, ch chan<- e
 		items = append(items, n.Item)
 		itemsMu.Unlock()
 		if c, ok := n.Item.Value.(*CollabAgentToolCallThreadItem); ok {
-			streamSendEvent(ch, newCollabEvent(CollabToolCallCompletedPhase, c))
+			streamSendEvent(ctx, ch, newCollabEvent(CollabToolCallCompletedPhase, c))
 		}
-		streamSendEvent(ch, &ItemCompleted{Item: n.Item})
+		streamSendEvent(ctx, ch, &ItemCompleted{Item: n.Item})
 	})
 
 	// turn/completed signals turnDone; synthesizes on unmarshal failure.
@@ -197,10 +197,10 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, ch chan<- e
 	// Wait for turn completion or context cancellation.
 	select {
 	case completed := <-turnDone:
-		streamSendEvent(ch, &TurnCompleted{Turn: completed.Turn})
+		streamSendEvent(ctx, ch, &TurnCompleted{Turn: completed.Turn})
 
 		if completed.Turn.Error != nil {
-			streamSendErr(ch, fmt.Errorf("turn error: %s", completed.Turn.Error.Message))
+			streamSendErr(ch, fmt.Errorf("turn error: %w", completed.Turn.Error))
 			return
 		}
 

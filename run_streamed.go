@@ -64,12 +64,13 @@ func (p *Process) RunStreamed(ctx context.Context, opts RunOptions) *Stream {
 	return s
 }
 
-// streamSendEvent performs a non-blocking send of an event on ch.
-// Events are best-effort: if the consumer fell behind, the event is dropped.
-func streamSendEvent(ch chan<- eventOrErr, event Event) {
+// streamSendEvent sends an event on ch, blocking until the send succeeds or
+// ctx is cancelled. This respects backpressure from the consumer instead of
+// silently dropping events.
+func streamSendEvent(ctx context.Context, ch chan<- eventOrErr, event Event) {
 	select {
 	case ch <- eventOrErr{event: event}:
-	default:
+	case <-ctx.Done():
 	}
 }
 
@@ -82,7 +83,7 @@ func streamSendErr(ch chan<- eventOrErr, err error) {
 // streamListen registers a notification listener that unmarshals the
 // notification params into N, converts it to an Event, and sends it on ch.
 // Notifications with a threadId that does not match threadID are ignored.
-func streamListen[N any](on func(string, NotificationHandler), method string, ch chan<- eventOrErr, threadID string, convert func(N) Event) {
+func streamListen[N any](ctx context.Context, on func(string, NotificationHandler), method string, ch chan<- eventOrErr, threadID string, convert func(N) Event) {
 	on(method, func(_ context.Context, notif Notification) {
 		var carrier threadIDCarrier
 		if err := json.Unmarshal(notif.Params, &carrier); err != nil || carrier.ThreadID != threadID {
@@ -92,7 +93,7 @@ func streamListen[N any](on func(string, NotificationHandler), method string, ch
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
 			return
 		}
-		streamSendEvent(ch, convert(n))
+		streamSendEvent(ctx, ch, convert(n))
 	})
 }
 
