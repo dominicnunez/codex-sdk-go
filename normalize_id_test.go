@@ -11,8 +11,10 @@ func TestNormalizeID(t *testing.T) {
 		// float64 (JSON default for numbers)
 		{"positive float64 integer", float64(42), "42"},
 		{"zero float64", float64(0), "0"},
-		{"negative float64", float64(-1), "-1"},
+		{"negative float64 integer", float64(-1), "-1"},
+		{"negative float64 large", float64(-42), "-42"},
 		{"fractional float64", float64(3.14), "3.14"},
+		{"negative fractional float64", float64(-3.14), "-3.14"},
 
 		// int64
 		{"positive int64", int64(99), "99"},
