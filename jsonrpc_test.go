@@ -337,3 +337,68 @@ func toInt64(v interface{}) (int64, bool) {
 		return 0, false
 	}
 }
+
+func TestRequestIDEqual(t *testing.T) {
+	tests := []struct {
+		name string
+		a, b codex.RequestID
+		want bool
+	}{
+		{
+			name: "uint64 vs float64 same value",
+			a:    codex.RequestID{Value: uint64(99)},
+			b:    codex.RequestID{Value: float64(99)},
+			want: true,
+		},
+		{
+			name: "int64 vs float64 same value",
+			a:    codex.RequestID{Value: int64(42)},
+			b:    codex.RequestID{Value: float64(42)},
+			want: true,
+		},
+		{
+			name: "string vs string equal",
+			a:    codex.RequestID{Value: "req-1"},
+			b:    codex.RequestID{Value: "req-1"},
+			want: true,
+		},
+		{
+			name: "string vs string differ",
+			a:    codex.RequestID{Value: "req-1"},
+			b:    codex.RequestID{Value: "req-2"},
+			want: false,
+		},
+		{
+			name: "uint64 vs float64 differ",
+			a:    codex.RequestID{Value: uint64(1)},
+			b:    codex.RequestID{Value: float64(2)},
+			want: false,
+		},
+		{
+			name: "nil vs nil",
+			a:    codex.RequestID{Value: nil},
+			b:    codex.RequestID{Value: nil},
+			want: true,
+		},
+		{
+			name: "nil vs non-nil",
+			a:    codex.RequestID{Value: nil},
+			b:    codex.RequestID{Value: uint64(1)},
+			want: false,
+		},
+		{
+			name: "string vs int",
+			a:    codex.RequestID{Value: "42"},
+			b:    codex.RequestID{Value: uint64(42)},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.a.Equal(tt.b); got != tt.want {
+				t.Errorf("RequestID(%v).Equal(%v) = %v, want %v", tt.a.Value, tt.b.Value, got, tt.want)
+			}
+		})
+	}
+}

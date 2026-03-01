@@ -46,8 +46,55 @@ type Error struct {
 
 // RequestID is a union type that can be a string, int64, or null.
 // JSON-RPC 2.0 spec allows id to be string | number | null.
+//
+// Because Go's encoding/json decodes JSON numbers as float64, the concrete
+// type of Value may differ depending on whether the ID was constructed
+// locally (uint64 from nextRequestID) or decoded from the wire (float64).
+// Use [RequestID.Equal] instead of == to compare IDs across type boundaries.
 type RequestID struct {
 	Value interface{} // string | int64 | float64 | nil
+}
+
+// Equal reports whether r and other represent the same logical request ID,
+// normalizing across numeric types. For example, uint64(1) and float64(1)
+// are considered equal. String IDs and numeric IDs are never equal, even
+// if they have the same textual representation.
+func (r RequestID) Equal(other RequestID) bool {
+	if r.Value == nil && other.Value == nil {
+		return true
+	}
+	if r.Value == nil || other.Value == nil {
+		return false
+	}
+	rNum, rIsNum := isNumericID(r.Value)
+	oNum, oIsNum := isNumericID(other.Value)
+	if rIsNum && oIsNum {
+		return rNum == oNum
+	}
+	// Both must be strings (same type family) to match.
+	rStr, rIsStr := r.Value.(string)
+	oStr, oIsStr := other.Value.(string)
+	if rIsStr && oIsStr {
+		return rStr == oStr
+	}
+	return false
+}
+
+// isNumericID normalizes a numeric ID value to a comparable string.
+// Returns the normalized form and true if the value is numeric, or ("", false) otherwise.
+func isNumericID(v interface{}) (string, bool) {
+	switch v := v.(type) {
+	case float64:
+		return normalizeID(v), true
+	case int64:
+		return normalizeID(v), true
+	case int:
+		return normalizeID(v), true
+	case uint64:
+		return normalizeID(v), true
+	default:
+		return "", false
+	}
 }
 
 // MarshalJSON implements json.Marshaler for RequestID.
