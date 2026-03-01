@@ -368,3 +368,94 @@ calls `proc.Run()`, injects a server→client approval request via `mock.InjectS
 line 646 mid-turn, verifies the handler was called, then completes the turn with notifications.
 `run_streamed_test.go:805-839` does the same for `RunStreamed`. Both tests exercise the full
 path through `executeTurn` with approval flow.
+
+### Config values passed to CLI args without sanitization described as security risk
+
+**Location:** `process.go:89` — buildArgs config flag construction
+**Date:** 2026-03-01
+
+**Reason:** The audit claims config values concatenated into CLI args could allow shell metacharacter
+injection or flag misinterpretation. This is incorrect. `exec.Command` does not invoke a shell — each
+argument is passed as a discrete `argv` element, so shell metacharacters have no effect. The `--config`
+flag and `k=v` value are passed as two separate arguments (not one), so the value cannot be
+misinterpreted as a flag. The `=` ambiguity concern is already covered by the known exception
+"Config flag values containing '=' are ambiguous on the CLI." The security framing is misleading
+because `exec.Command` eliminates the actual attack vector.
+
+### Close does not wait for readLoop to finish described as a separate bug
+
+**Location:** `stdio.go:192-225` — Close() and readLoop interaction
+**Date:** 2026-03-01
+
+**Reason:** The audit suggests waiting for `<-t.readerStopped` at the end of `Close()`. This would
+deadlock because the readLoop is blocked on `scanner.Scan()` which cannot be interrupted without
+closing the underlying reader. This is the same root cause as the known exception "StdioTransport.Close
+does not stop the reader goroutine" — you can't usefully wait for something you can't stop. The
+suggested fix would make `Close()` hang indefinitely on a stuck reader.
+
+### Write goroutine leak on context cancellation described as a new finding
+
+**Location:** `stdio.go:117-119` — Send write goroutine
+**Date:** 2026-03-01
+
+**Reason:** This is the exact same issue as the known exception "Write goroutine in Send can leak
+on context cancellation" at `stdio.go:86-102`. The finding references different line numbers but
+describes identical behavior — the write goroutine may outlive the cancelled context because
+`io.Writer.Write` has no context support. Duplicate of existing exception.
+
+### handleApproval error swallowed into generic message described as a new finding
+
+**Location:** `stdio.go:432-451` — handleRequest error translation
+**Date:** 2026-03-01
+
+**Reason:** This is the exact same issue as the known exception "Handler errors in handleApproval
+are invisible to SDK consumers" at `client.go:273-274`. Both describe the same behavior — handler
+errors are replaced with a generic "internal handler error" response on the wire. Duplicate of
+existing exception.
+
+### McpToolCallResult uses untyped interface{} slices described as a code quality issue
+
+**Location:** `event_types.go:212-213` — McpToolCallResult.Content and StructuredContent
+**Date:** 2026-03-01
+
+**Reason:** This is the exact same issue as the known exception "McpToolCallResult.Content and MCP
+metadata fields use untyped interface{}" which explains that the upstream spec defines these as
+open-schema fields (`"items": true, "type": "array"`). Using `[]interface{}` is the correct mapping
+for a spec that deliberately leaves the type open. Duplicate of existing exception.
+
+### DynamicToolCallParams.Arguments uses untyped interface{} described as a code quality issue
+
+**Location:** `approval.go:754` — DynamicToolCallParams.Arguments
+**Date:** 2026-03-01
+
+**Reason:** This is the exact same issue as the known exception "OutputSchema and
+DynamicToolCallParams.Arguments use bare interface{} instead of json.RawMessage" which explains
+the deliberate caller-convenience tradeoff. Duplicate of existing exception.
+
+### TurnStartParams.OutputSchema uses untyped interface{} described as a code quality issue
+
+**Location:** `turn.go:28` — TurnStartParams.OutputSchema
+**Date:** 2026-03-01
+
+**Reason:** This is the exact same issue as the known exception "OutputSchema and
+DynamicToolCallParams.Arguments use bare interface{} instead of json.RawMessage" which covers
+this field explicitly. Duplicate of existing exception.
+
+### Concurrent notification listener subscribe/unsubscribe claimed to be untested
+
+**Location:** `client.go:214-235` — addNotificationListener concurrent safety
+**Date:** 2026-03-01
+
+**Reason:** The audit claims there are no concurrent tests for subscribe/unsubscribe racing with
+dispatch. This is factually wrong. `listener_test.go:33-63` contains `TestConcurrentInternalListeners`
+which runs 10 goroutines each performing 50 iterations of subscribe, dispatch, and unsubscribe
+concurrently — designed to be run with `-race`.
+
+### Concurrent Send + Close claimed to be untested
+
+**Location:** `stdio.go:91-142, 192-225` — Send and Close race testing
+**Date:** 2026-03-01
+
+**Reason:** The audit claims there are no concurrent tests for Send racing with Close. This is
+factually wrong. `stdio_test.go:1047` contains `TestStdioConcurrentSendAndClose` which launches
+10 concurrent senders racing against a Close call, verifying no panics or races occur.
