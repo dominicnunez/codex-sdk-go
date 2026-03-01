@@ -61,9 +61,11 @@ func (t *AgentTracker) processCollab(tool CollabAgentTool, sender string, states
 		info.Status = state.Status
 		if state.Message != nil {
 			info.Message = *state.Message
+		} else {
+			info.Message = ""
 		}
 		info.Tool = tool
-		if tool == CollabAgentToolSpawnAgent && !exists {
+		if tool == CollabAgentToolSpawnAgent && info.SpawnedBy == "" {
 			info.SpawnedBy = sender
 		}
 	}
