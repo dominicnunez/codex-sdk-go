@@ -245,6 +245,10 @@ func (w *ReviewDecisionWrapper) UnmarshalJSON(data []byte) error {
 }
 
 // MarshalJSON implements custom marshaling for ReviewDecisionWrapper.
+// The double-nested anonymous structs match the spec schema structure:
+//   - ApplyPatchApprovalResponse.json / ExecCommandApprovalResponse.json define
+//     {"approved_execpolicy_amendment": {"proposed_execpolicy_amendment": [...]}}
+//   - Both specs define {"network_policy_amendment": {"network_policy_amendment": {...}}}
 func (w ReviewDecisionWrapper) MarshalJSON() ([]byte, error) {
 	switch v := w.Value.(type) {
 	case string:

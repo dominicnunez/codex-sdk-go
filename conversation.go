@@ -37,7 +37,11 @@ func (c *Conversation) ThreadID() string {
 }
 
 // Thread returns a snapshot of the latest thread state.
-// The returned value is a deep copy; mutations do not affect the Conversation.
+// The returned slices (Turns, Items) are deep-copied so append/reorder/delete
+// operations do not affect the Conversation. However, the ThreadItemWrapper
+// values within Items share underlying pointers with the original — field-level
+// mutations of individual items will be visible to both the snapshot and the
+// Conversation.
 func (c *Conversation) Thread() Thread {
 	c.mu.Lock()
 	defer c.mu.Unlock()
