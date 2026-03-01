@@ -250,3 +250,64 @@ notification with a valid `threadId` but a malformed turn body, then verifies th
 an error containing "unmarshal turn/completed." The blocking path is also tested by
 `TestRunMalformedTurnCompleted` (run_test.go:571-602). Both tests exercise the exact synthesized
 `TurnCompletedNotification` with `TurnError` path described in the finding.
+
+### normalizeID already has a precision guard for large float64 values
+
+**Location:** `stdio.go:48-51` — normalizeID float64-to-uint64 cast
+**Date:** 2026-03-01
+
+**Reason:** The audit claims `normalizeID` casts `float64` to `uint64` "without checking whether
+the conversion loses precision for integers above 2^53." This is factually wrong. The code at
+lines 48-51 does: `u := uint64(v)` then `if v == float64(u)` — this round-trip check is exactly
+the precision guard the audit suggests adding. For values above 2^53 where the float64 cannot
+represent the integer exactly, `v == float64(u)` will be false, and the code falls through to
+`fmt.Sprintf("%v", v)`. The suggested fix ("only use the integer fast-path when
+`v == float64(uint64(v))` is exact") is already implemented.
+
+### Close and handleResponse race claimed but audit concludes code is safe
+
+**Location:** `stdio.go:201-216, stdio.go:371-378` — Close() and handleResponse() interaction
+**Date:** 2026-03-01
+
+**Reason:** The audit's own analysis concludes "This is actually safe" and the suggested fix is
+"Add a comment explaining why the `select/default` is safe." A finding that concludes the code
+is correct and only needs a comment is not a code defect. The invariants are already documented
+in the code: the comment at line 378 states "safe: buffer 1, only one sender claims via delete"
+and the Close() comments at lines 198-200 and 210-211 explain the defensive pattern.
+
+### internalListenerSeq described as inconsistent but acknowledged as correct
+
+**Location:** `client.go:56` — internalListenerSeq counter
+**Date:** 2026-03-01
+
+**Reason:** The audit's own conclusion states "No actual bug" and "No change needed — the mutex
+protection is sufficient and the pattern is deliberate since the listener map also needs the lock."
+A finding that explicitly states no bug exists and no change is needed is not actionable.
+`internalListenerSeq` is always accessed under `listenersMu.Lock()` because the listener map
+operations require the same lock — using a separate atomic would be unnecessary.
+
+### StdioTransport claimed to have no pipe-based integration tests
+
+**Location:** `stdio.go` — StdioTransport test coverage
+**Date:** 2026-03-01
+
+**Reason:** The audit claims "There are no tests that exercise the actual readLoop, handleResponse,
+handleRequest, and handleNotification codepaths with real pipe-based I/O." This is factually wrong.
+`stdio_test.go` contains extensive pipe-based integration tests using `io.Pipe()` → `NewStdioTransport`:
+`TestStdioNewlineDelimitedJSON` (pipe I/O with Send/response), `TestStdioConcurrentRequestDispatch`
+(server→client requests via pipe), `TestStdioResponseRequestIDMatching` (concurrent sends with pipe),
+`TestStdioNotificationDispatch` (server→client notifications via pipe), `TestStdioMixedMessageTypes`
+(concurrent requests/responses/notifications), `TestStdioInvalidJSON` (malformed JSON recovery),
+`TestStdioContextCancellation`, `TestStdioRequestHandlerPanicRecovery`, `TestStdioScannerBufferOverflow`
+(10MB+ message), `TestStdioHandleResponseUnmarshalError`, and `TestStdioConcurrentSendAndClose`.
+
+### Conversation.Thread() deep-copy semantics claimed to be untested
+
+**Location:** `conversation.go:45-56` — Thread() deep-copy
+**Date:** 2026-03-01
+
+**Reason:** The audit claims "This invariant (append-safe but mutation-visible) is not tested."
+This is factually wrong. `conversation_test.go:505-515` contains a test that calls `conv.Thread()`,
+appends a Turn to the returned snapshot, then calls `conv.Thread()` again and asserts the length
+is unchanged — verifying that the Conversation's internal state is unaffected by mutations to
+the snapshot.
