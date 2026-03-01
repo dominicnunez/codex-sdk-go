@@ -393,6 +393,7 @@ func (t *StdioTransport) handleRequest(data []byte) {
 
 	t.mu.Lock()
 	handler := t.reqHandler
+	panicFn := t.panicHandler
 	t.mu.Unlock()
 
 	if handler == nil {
@@ -411,10 +412,6 @@ func (t *StdioTransport) handleRequest(data []byte) {
 
 	// Dispatch to handler in goroutine with transport-scoped context
 	go func() {
-		t.mu.Lock()
-		panicFn := t.panicHandler
-		t.mu.Unlock()
-
 		defer func() {
 			if r := recover(); r != nil {
 				errorResp := Response{
