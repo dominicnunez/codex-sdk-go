@@ -84,10 +84,11 @@ func newSystemService(client *Client) *SystemService {
 
 // WindowsSandboxSetupStart initiates Windows sandbox setup
 func (s *SystemService) WindowsSandboxSetupStart(ctx context.Context, params WindowsSandboxSetupStartParams) (WindowsSandboxSetupStartResponse, error) {
-	if err := s.client.sendRequest(ctx, methodWindowsSandboxSetupStart, params, nil); err != nil {
+	var resp WindowsSandboxSetupStartResponse
+	if err := s.client.sendRequest(ctx, methodWindowsSandboxSetupStart, params, &resp); err != nil {
 		return WindowsSandboxSetupStartResponse{}, err
 	}
-	return WindowsSandboxSetupStartResponse{}, nil
+	return resp, nil
 }
 
 // --- Client Notification Listeners ---

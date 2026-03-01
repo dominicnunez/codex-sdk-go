@@ -11,23 +11,26 @@ import (
 // TestWindowsSandboxSetupStart tests the client→server WindowsSandboxSetupStart request
 func TestWindowsSandboxSetupStart(t *testing.T) {
 	tests := []struct {
-		name     string
-		params   codex.WindowsSandboxSetupStartParams
-		response map[string]interface{}
+		name            string
+		params          codex.WindowsSandboxSetupStartParams
+		response        map[string]interface{}
+		expectedStarted bool
 	}{
 		{
-			name: "elevated mode",
+			name: "elevated mode started",
 			params: codex.WindowsSandboxSetupStartParams{
 				Mode: codex.WindowsSandboxSetupModeElevated,
 			},
-			response: map[string]interface{}{},
+			response:        map[string]interface{}{"started": true},
+			expectedStarted: true,
 		},
 		{
-			name: "unelevated mode",
+			name: "unelevated mode not started",
 			params: codex.WindowsSandboxSetupStartParams{
 				Mode: codex.WindowsSandboxSetupModeUnelevated,
 			},
-			response: map[string]interface{}{},
+			response:        map[string]interface{}{"started": false},
+			expectedStarted: false,
 		},
 	}
 
@@ -43,7 +46,9 @@ func TestWindowsSandboxSetupStart(t *testing.T) {
 				t.Fatalf("WindowsSandboxSetupStart failed: %v", err)
 			}
 
-			_ = resp
+			if resp.Started != tt.expectedStarted {
+				t.Errorf("Expected Started=%v, got %v", tt.expectedStarted, resp.Started)
+			}
 
 			req := mock.GetSentRequest(0)
 			if req.Method != "windowsSandbox/setupStart" {
@@ -541,7 +546,7 @@ func TestSystemServiceMethodSignatures(t *testing.T) {
 	}
 
 	// Test WindowsSandboxSetupStart method signature
-	_ = mock.SetResponseData("windowsSandbox/setupStart", map[string]interface{}{})
+	_ = mock.SetResponseData("windowsSandbox/setupStart", map[string]interface{}{"started": true})
 	_, err := client.System.WindowsSandboxSetupStart(context.Background(), codex.WindowsSandboxSetupStartParams{
 		Mode: codex.WindowsSandboxSetupModeElevated,
 	})
