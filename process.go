@@ -83,7 +83,7 @@ var errTypedFlagInExecArgs = errors.New("ExecArgs must not contain typed safety 
 // rejectedFlagNames are the bare names of typed safety flags (without dash
 // prefixes). buildArgs rejects both --name and -name variants to prevent
 // bypass via single-dash long flags accepted by some CLI parsers.
-var rejectedFlagNames = []string{"model", "sandbox", "approval-mode", "config"}
+var rejectedFlagNames = []string{"model", "sandbox", "approval-mode", "config", "experimental-json"}
 
 // buildArgs constructs the CLI argument list from typed fields and ExecArgs.
 // ExecArgs are prepended before typed flags so that typed fields (Model,

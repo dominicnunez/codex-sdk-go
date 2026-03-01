@@ -197,7 +197,7 @@ func TestStartProcessExecArgsWithEndOfOptions(t *testing.T) {
 // TestStartProcessExecArgsWithTypedFlags verifies that StartProcess rejects
 // ExecArgs containing typed safety flags that could override critical settings.
 func TestStartProcessExecArgsWithTypedFlags(t *testing.T) {
-	rejectedFlags := []string{"--model", "--sandbox", "--approval-mode", "--config"}
+	rejectedFlags := []string{"--model", "--sandbox", "--approval-mode", "--config", "--experimental-json"}
 
 	for _, flag := range rejectedFlags {
 		t.Run(flag, func(t *testing.T) {
@@ -219,7 +219,7 @@ func TestStartProcessExecArgsWithTypedFlags(t *testing.T) {
 // TestStartProcessExecArgsWithTypedFlagsCombinedForm verifies that
 // --flag=value combined forms are also rejected.
 func TestStartProcessExecArgsWithTypedFlagsCombinedForm(t *testing.T) {
-	rejectedFlags := []string{"--model", "--sandbox", "--approval-mode", "--config"}
+	rejectedFlags := []string{"--model", "--sandbox", "--approval-mode", "--config", "--experimental-json"}
 
 	for _, flag := range rejectedFlags {
 		t.Run(flag+"=value", func(t *testing.T) {
@@ -241,7 +241,7 @@ func TestStartProcessExecArgsWithTypedFlagsCombinedForm(t *testing.T) {
 // TestStartProcessExecArgsWithSingleDashTypedFlags verifies that single-dash
 // variants of typed safety flags are also rejected.
 func TestStartProcessExecArgsWithSingleDashTypedFlags(t *testing.T) {
-	rejectedFlags := []string{"-model", "-sandbox", "-approval-mode", "-config"}
+	rejectedFlags := []string{"-model", "-sandbox", "-approval-mode", "-config", "-experimental-json"}
 
 	for _, flag := range rejectedFlags {
 		t.Run(flag, func(t *testing.T) {
@@ -367,16 +367,18 @@ exit 0
 	}
 }
 
-// TestStartProcessNilOptions verifies that nil options use defaults.
+// TestStartProcessNilOptions verifies that nil options defaults to the "codex"
+// binary name. When "codex" is not in PATH, the error should reference it.
 func TestStartProcessNilOptions(t *testing.T) {
-	// This will fail because "codex" isn't in PATH in CI, but it should
-	// fail with a start error, not a panic.
 	ctx := context.Background()
 	_, err := codex.StartProcess(ctx, nil)
 	if err == nil {
-		t.Log("StartProcess with nil options succeeded (codex binary found in PATH)")
+		t.Skip("codex binary found in PATH; cannot verify default binary name from error")
 	}
-	// Either error or success is acceptable — we just verify no panic.
+	// The error should mention "codex" — the default binary name.
+	if !strings.Contains(err.Error(), "codex") {
+		t.Errorf("expected error to mention default binary name %q, got: %v", "codex", err)
+	}
 }
 
 // TestEnsureInitRetryAfterFailure verifies that ensureInit retries the
