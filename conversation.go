@@ -44,6 +44,10 @@ func (c *Conversation) Thread() Thread {
 	t := c.thread
 	t.Turns = make([]Turn, len(c.thread.Turns))
 	copy(t.Turns, c.thread.Turns)
+	for i, turn := range t.Turns {
+		t.Turns[i].Items = make([]ThreadItemWrapper, len(turn.Items))
+		copy(t.Turns[i].Items, turn.Items)
+	}
 	return t
 }
 
