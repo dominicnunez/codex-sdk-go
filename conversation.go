@@ -2,6 +2,7 @@ package codex
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -70,6 +71,7 @@ func (c *Conversation) Thread() Thread {
 		copy(t.Turns[i].Items, turn.Items)
 		if turn.Error != nil {
 			e := *turn.Error
+			e.CodexErrorInfo = append(json.RawMessage(nil), turn.Error.CodexErrorInfo...)
 			t.Turns[i].Error = &e
 		}
 	}
