@@ -2,6 +2,7 @@ package codex_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go"
@@ -239,39 +240,35 @@ func TestDynamicToolCallStatus(t *testing.T) {
 	}
 }
 
-// TestFileUpdateChange tests FileUpdateChange structure
+// TestFileUpdateChange tests FileUpdateChange structure including Kind discriminator
 func TestFileUpdateChange(t *testing.T) {
 	tests := []struct {
-		name string
-		data string
-		want codex.FileUpdateChange
+		name     string
+		data     string
+		wantPath string
+		wantDiff string
+		wantKind interface{} // expected concrete type for Kind.Value
 	}{
 		{
-			name: "add file",
-			data: `{"path":"/path/to/file","diff":"+ new content","kind":{"type":"add"}}`,
-			want: codex.FileUpdateChange{
-				Path: "/path/to/file",
-				Diff: "+ new content",
-				Kind: codex.PatchChangeKindWrapper{Value: &codex.AddPatchChangeKind{}},
-			},
+			name:     "add file",
+			data:     `{"path":"/path/to/file","diff":"+ new content","kind":{"type":"add"}}`,
+			wantPath: "/path/to/file",
+			wantDiff: "+ new content",
+			wantKind: &codex.AddPatchChangeKind{},
 		},
 		{
-			name: "update file",
-			data: `{"path":"/path/to/file","diff":"@@ -1 +1 @@","kind":{"type":"update","move_path":"/new/path"}}`,
-			want: codex.FileUpdateChange{
-				Path: "/path/to/file",
-				Diff: "@@ -1 +1 @@",
-				Kind: codex.PatchChangeKindWrapper{Value: &codex.UpdatePatchChangeKind{MovePath: ptr("/new/path")}},
-			},
+			name:     "update file",
+			data:     `{"path":"/path/to/file","diff":"@@ -1 +1 @@","kind":{"type":"update","move_path":"/new/path"}}`,
+			wantPath: "/path/to/file",
+			wantDiff: "@@ -1 +1 @@",
+			wantKind: &codex.UpdatePatchChangeKind{MovePath: ptr("/new/path")},
 		},
 		{
-			name: "delete file",
-			data: `{"path":"/path/to/file","diff":"- old content","kind":{"type":"delete"}}`,
-			want: codex.FileUpdateChange{
-				Path: "/path/to/file",
-				Diff: "- old content",
-				Kind: codex.PatchChangeKindWrapper{Value: &codex.DeletePatchChangeKind{}},
-			},
+			name:     "delete file",
+			data:     `{"path":"/path/to/file","diff":"- old content","kind":{"type":"delete"}}`,
+			wantPath: "/path/to/file",
+			wantDiff: "- old content",
+			wantKind: &codex.DeletePatchChangeKind{},
 		},
 	}
 
@@ -281,13 +278,20 @@ func TestFileUpdateChange(t *testing.T) {
 			if err := json.Unmarshal([]byte(tt.data), &got); err != nil {
 				t.Fatalf("unmarshal error: %v", err)
 			}
-			if got.Path != tt.want.Path {
-				t.Errorf("path: got %q, want %q", got.Path, tt.want.Path)
+			if got.Path != tt.wantPath {
+				t.Errorf("path: got %q, want %q", got.Path, tt.wantPath)
 			}
-			if got.Diff != tt.want.Diff {
-				t.Errorf("diff: got %q, want %q", got.Diff, tt.want.Diff)
+			if got.Diff != tt.wantDiff {
+				t.Errorf("diff: got %q, want %q", got.Diff, tt.wantDiff)
 			}
-			// Kind comparison requires type checking the concrete type
+			if got.Kind.Value == nil {
+				t.Fatal("kind: got nil, want non-nil")
+			}
+			gotType := fmt.Sprintf("%T", got.Kind.Value)
+			wantType := fmt.Sprintf("%T", tt.wantKind)
+			if gotType != wantType {
+				t.Errorf("kind type: got %s, want %s", gotType, wantType)
+			}
 		})
 	}
 }
