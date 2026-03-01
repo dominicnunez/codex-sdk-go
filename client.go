@@ -61,7 +61,7 @@ type Client struct {
 	approvalMu       sync.RWMutex
 
 	// Request ID counter for generating unique request IDs
-	requestIDCounter uint64
+	requestIDCounter atomic.Uint64
 
 	// Service accessors
 	Thread          *ThreadService
@@ -340,7 +340,7 @@ func (c *Client) Close() error {
 
 // nextRequestID generates a unique request ID for outgoing requests.
 func (c *Client) nextRequestID() uint64 {
-	return atomic.AddUint64(&c.requestIDCounter, 1)
+	return c.requestIDCounter.Add(1)
 }
 
 // sendRequest is a helper that sends a typed request and unmarshals the response.
