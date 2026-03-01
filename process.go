@@ -21,7 +21,7 @@ const (
 
 	// sdkVersion is sent to the server during initialization.
 	// Update this value when cutting a new release.
-	sdkVersion = "0.1.0"
+	sdkVersion = "0.2.0"
 )
 
 // ProcessOptions configures how the Codex CLI process is spawned.
