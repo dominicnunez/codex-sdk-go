@@ -626,3 +626,36 @@ The type carries the *reason* for a token refresh request (e.g. "expired"), not 
 The *response* type (`ChatgptAuthTokensRefreshResponse`) carries the new `AccessToken` and already
 has `MarshalJSON` redaction with full test coverage in `credential_redact_test.go`. There is nothing
 to redact on the params type.
+
+### Duplicate request ID check described as non-atomic but audit acknowledges no action needed
+
+**Location:** `stdio.go:108-113` — duplicate ID check and registration
+**Date:** 2026-03-01
+
+**Reason:** The audit describes a theoretical window between unlock and write where a response
+could match a different request with the same normalized ID. The audit itself concludes "No action
+needed — the current design is correct for the expected usage pattern with sequential uint64 IDs."
+A finding that states no action is needed and acknowledges correctness is not actionable. The
+duplicate check and registration are both under `t.mu.Lock()`, and IDs are monotonically incrementing.
+
+### Concurrent notification listener subscribe/unsubscribe claimed to be untested
+
+**Location:** `client.go:214-235` — addNotificationListener concurrent safety
+**Date:** 2026-03-01
+
+**Reason:** The audit claims there are no concurrent tests for subscribe/unsubscribe racing with
+dispatch. This is factually wrong. `listener_test.go:33-63` contains `TestConcurrentInternalListeners`
+which runs 10 goroutines each performing 50 iterations of subscribe, dispatch, and unsubscribe
+concurrently — designed to be run with `-race`.
+
+### Stream.Events() single-use enforcement claimed to be untested
+
+**Location:** `run_streamed.go:39-46` — Events() CompareAndSwap enforcement
+**Date:** 2026-03-01
+
+**Reason:** The audit claims there is no test verifying that calling `Events()` twice yields
+`ErrStreamConsumed` on the second call. This is factually wrong. `run_streamed_test.go` contains
+multiple tests for this: lines 890-901 call `Events()` twice and assert the second iterator yields
+`ErrStreamConsumed`; lines 1007-1023 do the same in a different test scenario; and
+`TestStreamEventsConcurrentConsumption` (line 1025) tests concurrent access with 10 goroutines
+racing to consume, asserting exactly 1 winner and N-1 `ErrStreamConsumed` results.
