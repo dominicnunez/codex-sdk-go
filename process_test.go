@@ -117,11 +117,11 @@ exit 0
 		}
 	}
 
-	// Verify --extra flag comes after typed flags (user overrides last)
+	// Verify typed flags come after ExecArgs (typed fields win via last-wins)
 	modelIdx := strings.Index(args, "--model")
 	extraIdx := strings.Index(args, "--extra")
-	if extraIdx < modelIdx {
-		t.Errorf("ExecArgs should come after typed flags: model at %d, extra at %d", modelIdx, extraIdx)
+	if modelIdx < extraIdx {
+		t.Errorf("typed flags should come after ExecArgs: model at %d, extra at %d", modelIdx, extraIdx)
 	}
 }
 

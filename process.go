@@ -68,8 +68,13 @@ type Process struct {
 }
 
 // buildArgs constructs the CLI argument list from typed fields and ExecArgs.
+// ExecArgs are prepended before typed flags so that typed fields (Model,
+// Sandbox, ApprovalMode, Config) always win via last-wins CLI parsing.
+// This prevents untrusted ExecArgs from overriding safety-critical flags.
 func (opts *ProcessOptions) buildArgs() []string {
 	args := []string{"exec", "--experimental-json"}
+
+	args = append(args, opts.ExecArgs...)
 
 	if opts.Model != "" {
 		args = append(args, "--model", opts.Model)
@@ -89,7 +94,6 @@ func (opts *ProcessOptions) buildArgs() []string {
 		args = append(args, "--config", k+"="+opts.Config[k])
 	}
 
-	args = append(args, opts.ExecArgs...)
 	return args
 }
 
