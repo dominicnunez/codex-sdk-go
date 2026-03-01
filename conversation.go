@@ -63,6 +63,8 @@ func (c *Conversation) Thread() Thread {
 		g.SHA = cloneStringPtr(g.SHA)
 		t.GitInfo = &g
 	}
+	t.Source = cloneSessionSourceWrapper(c.thread.Source)
+	t.Status = cloneThreadStatusWrapper(c.thread.Status)
 	t.Turns = make([]Turn, len(c.thread.Turns))
 	copy(t.Turns, c.thread.Turns)
 	for i, turn := range t.Turns {
@@ -95,6 +97,40 @@ func cloneThreadItemWrapper(w ThreadItemWrapper) ThreadItemWrapper {
 	var clone ThreadItemWrapper
 	if err := json.Unmarshal(b, &clone); err != nil {
 		panic(fmt.Sprintf("cloneThreadItemWrapper: unmarshal failed: %v", err))
+	}
+	return clone
+}
+
+// cloneSessionSourceWrapper deep-copies a SessionSourceWrapper via JSON round-trip.
+// Same strategy as cloneThreadItemWrapper — panics on marshal/unmarshal failure.
+func cloneSessionSourceWrapper(w SessionSourceWrapper) SessionSourceWrapper {
+	if w.Value == nil {
+		return w
+	}
+	b, err := json.Marshal(w)
+	if err != nil {
+		panic(fmt.Sprintf("cloneSessionSourceWrapper: marshal failed: %v", err))
+	}
+	var clone SessionSourceWrapper
+	if err := json.Unmarshal(b, &clone); err != nil {
+		panic(fmt.Sprintf("cloneSessionSourceWrapper: unmarshal failed: %v", err))
+	}
+	return clone
+}
+
+// cloneThreadStatusWrapper deep-copies a ThreadStatusWrapper via JSON round-trip.
+// Same strategy as cloneThreadItemWrapper — panics on marshal/unmarshal failure.
+func cloneThreadStatusWrapper(w ThreadStatusWrapper) ThreadStatusWrapper {
+	if w.Value == nil {
+		return w
+	}
+	b, err := json.Marshal(w)
+	if err != nil {
+		panic(fmt.Sprintf("cloneThreadStatusWrapper: marshal failed: %v", err))
+	}
+	var clone ThreadStatusWrapper
+	if err := json.Unmarshal(b, &clone); err != nil {
+		panic(fmt.Sprintf("cloneThreadStatusWrapper: unmarshal failed: %v", err))
 	}
 	return clone
 }
