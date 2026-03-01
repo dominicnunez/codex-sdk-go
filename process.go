@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"sort"
@@ -36,7 +37,7 @@ type ProcessOptions struct {
 	Dir string
 
 	// Stderr writer for the child process. Nil defaults to os.Stderr.
-	Stderr *os.File
+	Stderr io.Writer
 
 	// Client options forwarded to NewClient.
 	ClientOptions []ClientOption
