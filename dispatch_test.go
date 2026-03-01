@@ -512,6 +512,40 @@ func TestMultipleListenersForSameNotification(t *testing.T) {
 	}
 }
 
+// TestApprovalHandlerMarshalFailureReturnsError verifies that when an
+// approval handler returns a response that fails to marshal, the client's
+// handleRequest propagates the error to the transport layer.
+func TestApprovalHandlerMarshalFailureReturnsError(t *testing.T) {
+	ctx := context.Background()
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+
+	// Register handler that returns a response with an unmarshalable value.
+	// ReviewDecisionWrapper.MarshalJSON returns an error for unknown types.
+	client.SetApprovalHandlers(codex.ApprovalHandlers{
+		OnApplyPatchApproval: func(ctx context.Context, p codex.ApplyPatchApprovalParams) (codex.ApplyPatchApprovalResponse, error) {
+			return codex.ApplyPatchApprovalResponse{
+				Decision: codex.ReviewDecisionWrapper{Value: 42}, // int triggers default error branch
+			}, nil
+		},
+	})
+
+	req := codex.Request{
+		JSONRPC: "2.0",
+		Method:  "applyPatchApproval",
+		ID:      codex.RequestID{Value: float64(1)},
+		Params:  json.RawMessage(`{"diff":"test"}`),
+	}
+
+	// The mock transport calls Client.handleRequest directly, which returns
+	// the marshal error. In production, StdioTransport.handleRequest converts
+	// this into an ErrCodeInternalError JSON-RPC response.
+	_, err := mock.InjectServerRequest(ctx, req)
+	if err == nil {
+		t.Fatal("expected marshal error from handleRequest, got nil")
+	}
+}
+
 // TestMissingApprovalHandlerReturnsMethodNotFound verifies that when an
 // approval handler is not set, a method-not-found error is returned.
 func TestMissingApprovalHandlerReturnsMethodNotFound(t *testing.T) {
