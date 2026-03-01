@@ -3,6 +3,7 @@ package codex_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go"
@@ -301,6 +302,58 @@ func TestConfigBatchWrite(t *testing.T) {
 				t.Errorf("expected method config/batchWrite, got %v", req)
 			}
 		})
+	}
+}
+
+func TestConfigWrite_RPCError_ReturnsRPCError(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+
+	mock.SetResponse("config/value/write", codex.Response{
+		JSONRPC: "2.0",
+		Error: &codex.Error{
+			Code:    codex.ErrCodeInternalError,
+			Message: "write failed",
+		},
+	})
+
+	_, err := client.Config.Write(context.Background(), codex.ConfigValueWriteParams{KeyPath: "k", MergeStrategy: "replace", Value: json.RawMessage(`"v"`)})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	var rpcErr *codex.RPCError
+	if !errors.As(err, &rpcErr) {
+		t.Fatalf("expected error to unwrap to *RPCError, got %T", err)
+	}
+	if rpcErr.RPCError().Code != codex.ErrCodeInternalError {
+		t.Errorf("expected error code %d, got %d", codex.ErrCodeInternalError, rpcErr.RPCError().Code)
+	}
+}
+
+func TestConfigBatchWrite_RPCError_ReturnsRPCError(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+
+	mock.SetResponse("config/batchWrite", codex.Response{
+		JSONRPC: "2.0",
+		Error: &codex.Error{
+			Code:    codex.ErrCodeInternalError,
+			Message: "batch write failed",
+		},
+	})
+
+	_, err := client.Config.BatchWrite(context.Background(), codex.ConfigBatchWriteParams{Edits: []codex.ConfigEdit{{KeyPath: "k", MergeStrategy: "replace", Value: json.RawMessage(`"v"`)}}})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	var rpcErr *codex.RPCError
+	if !errors.As(err, &rpcErr) {
+		t.Fatalf("expected error to unwrap to *RPCError, got %T", err)
+	}
+	if rpcErr.RPCError().Code != codex.ErrCodeInternalError {
+		t.Errorf("expected error code %d, got %d", codex.ErrCodeInternalError, rpcErr.RPCError().Code)
 	}
 }
 
