@@ -283,3 +283,26 @@ silently dropping events. Internal listeners (e.g. `streamSendEvent`) use contex
 unblock on cancellation, preventing indefinite head-of-line blocking. Making listeners async would
 lose ordering guarantees and complicate error propagation. The sequential dispatch matches the
 single-goroutine-per-notification model that the transport layer establishes.
+
+### TestErrorCodeConstants verifies constants against their literal definitions
+
+**Location:** `jsonrpc_test.go:230-250` — table-driven test comparing ErrCode* constants to integer values
+**Date:** 2026-03-01
+
+**Reason:** The test compares `ErrCodeParseError` against `-32700`, etc. These values are defined
+as constants, so the test is tautological — it can only fail if someone changes the constant but not
+the test. This is intentional documentation-as-test: the test serves as executable documentation that
+the constants match the JSON-RPC 2.0 spec values. The alternative (deleting the test) loses the
+documentation value with no practical benefit.
+
+### cloneThreadItemWrapper uses JSON round-trip for deep copy
+
+**Location:** `conversation.go:82-96` — JSON marshal/unmarshal clone
+**Date:** 2026-03-01
+
+**Reason:** The JSON round-trip is a correctness-first design choice. ThreadItemWrapper contains
+a discriminated union of many concrete types, each with custom MarshalJSON/UnmarshalJSON. A manual
+Clone() method would need to match every variant (and be updated for every new one), creating a
+maintenance burden and potential for subtle bugs. The JSON round-trip is O(n) in serialized size
+but automatically correct for all variants. The error path now panics (instead of silently returning
+the original), ensuring the deep-copy guarantee is never silently broken.
