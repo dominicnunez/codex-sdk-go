@@ -856,3 +856,43 @@ func TestRunStreamedApprovalFlowDuringTurn(t *testing.T) {
 		t.Errorf("Response = %q, want 'Done'", result.Response)
 	}
 }
+
+func TestRunStreamedEventsSingleUse(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "hello"})
+
+	time.Sleep(50 * time.Millisecond)
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-1","text":"Hi"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	// First iteration should yield events.
+	var firstCount int
+	for range stream.Events() {
+		firstCount++
+	}
+	if firstCount == 0 {
+		t.Fatal("first iteration yielded zero events")
+	}
+
+	// Second iteration should yield zero events (channel already drained and closed).
+	var secondCount int
+	for range stream.Events() {
+		secondCount++
+	}
+	if secondCount != 0 {
+		t.Errorf("second iteration yielded %d events, want 0", secondCount)
+	}
+}
