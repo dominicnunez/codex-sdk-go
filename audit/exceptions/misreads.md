@@ -864,3 +864,242 @@ struct tag (thread.go:89-95). Default `json.Marshal` produces `{"subAgent":{"thr
 which matches the format expected by `UnmarshalJSON` (line 213 checks for key `"subAgent"`, line 243
 checks for key `"thread_spawn"`). The round-trip is correct. This is also a duplicate of the known
 exception "SessionSourceSubAgent relies on implicit marshaling for SubAgentSource variants."
+
+### security_test.go described as testing documentation content instead of security behavior
+
+**Location:** `security_test.go` — all tests
+**Date:** 2026-03-01
+
+**Reason:** These tests verify that SECURITY.md exists and contains required sections (reporting
+guidance, security scope, dependency policy). They are documentation enforcement tests, not
+security behavior tests. This is intentional — actual security behavior (credential redaction,
+wire protocol safety) is tested in `credential_redact_test.go` and the transport tests.
+The documentation tests ensure the security policy file stays complete and accurate as the
+project evolves.
+
+### readLoop silently drops malformed JSON lines described as a new finding
+
+**Location:** `stdio.go:307` — readLoop JSON unmarshal failure path
+**Date:** 2026-03-01
+
+**Reason:** This is a duplicate of the known exception "readLoop silently skips unparseable JSON
+lines with no diagnostic" at `stdio.go:250-253`. Both describe the same behavior: readLoop
+silently continues on JSON parse failure with no observability. The suggested fix (adding an
+`OnParseError` callback) is the same new-API-surface approach already discussed and rejected
+as disproportionate in the existing exception.
+
+### handleRequest goroutines use transport context described as a design concern
+
+**Location:** `stdio.go:460` — handleRequest handler context
+**Date:** 2026-03-01
+
+**Reason:** The audit itself concludes "This is acceptable design but worth documenting" and
+suggests no code change beyond documentation. `Close()` cancels `t.ctx` (line 216), so
+context-aware handlers see the cancellation immediately. The concern about handlers that don't
+respect context cancellation is a general Go programming concern, not specific to this code.
+A finding whose own analysis concludes "acceptable design" is not a code defect.
+
+### writeMessage errors silently discarded in handleRequest described as a new finding
+
+**Location:** `stdio.go:437, 453, 478, 485` — writeMessage error discards in handleRequest
+**Date:** 2026-03-01
+
+**Reason:** This is a duplicate of the known exception "writeMessage errors silently discarded in
+handleRequest goroutine" at `stdio.go:334, 356, 363`. The line numbers differ due to code changes
+but the issue is identical: `_ = t.writeMessage(...)` calls in goroutines spawned by `handleRequest`
+where there is no caller to return an error to. The suggested fix (routing through panicHandler or
+error callback) is the same new-API-surface approach already discussed and rejected in the existing
+exception.
+
+### Stream.Events iterator doesn't drain on early break described as a new finding
+
+**Location:** `run_streamed.go:136-142` — Events iterator early-break behavior
+**Date:** 2026-03-01
+
+**Reason:** This is a duplicate of the known exception "Stream background goroutine blocks if
+consumer stops iterating without cancelling context" which describes the identical behavior —
+the lifecycle goroutine blocks on send when the consumer stops reading and the buffer fills.
+The existing exception documents that context cancellation is the correct cleanup mechanism
+and that adding a `done` channel would complicate the iterator contract.
+
+### TurnStartParams.ApprovalPolicy uses interface type described as code quality issue
+
+**Location:** `turn.go:26` — TurnStartParams.ApprovalPolicy field type
+**Date:** 2026-03-01
+
+**Reason:** This is a duplicate of the known exception "Params structs use bare interface instead
+of wrapper type for approval and sandbox policy fields" which covers all bare-interface policy
+fields on params structs, including `TurnStartParams.ApprovalPolicy` at `turn.go:24`. The
+exception explains that changing the field types to wrapper types would break callers who
+construct params with the current signatures, and that the common case (string literal policies)
+marshals correctly.
+
+### ThreadStartParams.ApprovalPolicy uses interface type described as code quality issue
+
+**Location:** `thread.go:659` — ThreadStartParams.ApprovalPolicy field type
+**Date:** 2026-03-01
+
+**Reason:** Same duplicate as above. The known exception "Params structs use bare interface instead
+of wrapper type" at `thread.go:538` et al. covers this field. `ThreadStartParams.ApprovalPolicy`
+is explicitly listed in the exception's location set.
+
+### normalizeID loses precision for large float64 IDs described as a new finding
+
+**Location:** `stdio.go:57-69` — normalizeID float64 precision
+**Date:** 2026-03-01
+
+**Reason:** Duplicate of the known exception "normalizeID relies on float64 precision for JSON
+number IDs." Additionally, the finding describes the `float64(u) != v` fallthrough as a problem,
+but this IS the precision guard — the code at lines 59-62 does `u := uint64(v)` then checks
+`v == float64(u)`, falling through to `fmt.Sprintf("%v", v)` when precision is lost. The code
+correctly handles the edge case the finding describes. The exception documents that values above
+2^53 are not realistic for JSON-RPC IDs.
+
+### Conversation.TurnStreamed concurrent call rejection claimed to be untested
+
+**Location:** `conversation.go:238` — TurnStreamed activeTurn check
+**Date:** 2026-03-01
+
+**Reason:** Factually wrong. `conversation_test.go` contains four dedicated concurrent turn
+rejection tests: `TestConversationConcurrentTurnRejected` (line 507),
+`TestConversationConcurrentTurnStreamedRejected` (line 651),
+`TestConversationConcurrentTurnVsTurnStreamedRejected` (line 697), and
+`TestConversationConcurrentTurnStreamedVsTurnRejected` (line 746). These test all four
+combinations of Turn vs TurnStreamed racing and assert `errTurnInProgress` is returned.
+
+### Stream early-break cleanup behavior claimed to be untested
+
+**Location:** `run_streamed.go:126` — lifecycle goroutine cleanup on early break
+**Date:** 2026-03-01
+
+**Reason:** Factually wrong. `run_streamed_test.go:507` contains `TestRunStreamedEarlyBreak`
+which starts `RunStreamed`, reads 1 event, breaks out of the `Events()` loop, then verifies
+`Result()` returns within 3 seconds (not hanging). This tests exactly the scenario the finding
+describes — early break from the iterator followed by lifecycle goroutine cleanup.
+
+### Approval handler error path claimed to only be tested for ChatGPT token refresh
+
+**Location:** `approval.go:386` — handleApproval error paths
+**Date:** 2026-03-01
+
+**Reason:** Factually wrong. `stdio_test.go:729` (`TestStdioApprovalInvalidParamsReturnsErrorCode`)
+tests the unmarshal-error path for `applyPatchApproval` through a real `StdioTransport`, sending
+invalid JSON params and verifying the `-32602` error code. `stdio_test.go:776`
+(`TestStdioApprovalHandlerErrorReturnsErrorCode`) tests the handler-error path for the same type.
+Since `handleApproval` is a generic function, testing one approval type exercises the generic
+unmarshal-error and handler-error code paths for all types.
+
+### Stream channel buffer size described as magic number
+
+**Location:** `run_streamed.go:18` — streamChannelBuffer constant
+**Date:** 2026-03-01
+
+**Reason:** The audit itself concludes "This is a named constant, not a magic number — no issue
+here" and "Suggested fix: None needed." A finding that self-invalidates is not actionable.
+
+### maxMessageSize described as magic number needing protocol documentation reference
+
+**Location:** `stdio.go:294` — maxMessageSize constant
+**Date:** 2026-03-01
+
+**Reason:** Duplicate of the known exception "Scanner buffer sizes are named constants, not magic
+numbers" which documents that `maxMessageSize` is a named constant with a descriptive comment.
+The suggestion to reference protocol documentation is a documentation enhancement request for
+a limit that is a defensive guess (not protocol-defined), not a code quality defect.
+
+### readLoop recovery from oversized messages claimed to be untested
+
+**Location:** `stdio.go:290` — readLoop scanner buffer overflow
+**Date:** 2026-03-01
+
+**Reason:** Factually wrong. `stdio_test.go:823` (`TestStdioScannerBufferOverflow`) sends a
+message exceeding the 10MB `maxMessageSize`, verifies the reader stops, and asserts that
+`ScanErr()` returns an error containing "token too long". The edge case the finding claims
+is untested has a dedicated test.
+
+### Notification listener registration race in executeStreamedTurn claimed but all listeners registered before RPC
+
+**Location:** `turn_lifecycle.go:101-234` — executeStreamedTurn listener registration order
+**Date:** 2026-03-01
+
+**Reason:** The audit claims a "narrow window" where the `turnDone` channel listener (registered
+"last") might not be wired when an early `turn/completed` arrives. This is factually wrong about
+the ordering being a problem. All `streamListen` calls and `on(...)` registrations (lines 120-201)
+happen sequentially **before** `Turn.Start` is called at line 203. The audit itself acknowledges
+"the streamed path has the same registration-before-start pattern" and that "the risk is theoretical
+in normal conditions." The pattern is identical to `executeTurn` which the audit considers correct.
+
+### ExecArgs flag bypass via space-separated value form described as a gap but no actual bypass exists
+
+**Location:** `process.go:93-105` — buildArgs flag rejection
+**Date:** 2026-03-01
+
+**Reason:** The audit describes the "real gap" as future CLI aliases or short flags (e.g. `-m` for
+`--model`) bypassing the check. This is speculation about future CLI changes, not an existing bug.
+The current code correctly rejects all current flag forms. The finding's own suggested fix is
+"Add a comment documenting this limitation" — a documentation suggestion, not a code defect.
+Typed safety flags are always appended after ExecArgs with last-wins semantics, so even a missed
+flag form would be overridden.
+
+### Silent discard of writeMessage errors described as new finding but covered by existing exception
+
+**Location:** `stdio.go:457, 498, 505, 530` — writeMessage error discards in handleRequest
+**Date:** 2026-03-01
+
+**Reason:** Duplicate of existing exception "writeMessage errors silently discarded in handleRequest
+goroutine" at `stdio.go:334, 356, 363`. The line numbers differ due to code changes but the issue
+is identical: `_ = t.writeMessage(...)` calls in goroutines spawned by `handleRequest` where there
+is no caller to return an error to.
+
+### McpToolCallResult.Content uses []interface{} described as new finding but covered by existing exception
+
+**Location:** `event_types.go:212` — McpToolCallResult.Content
+**Date:** 2026-03-01
+
+**Reason:** Duplicate of existing exception "McpToolCallResult.Content and MCP metadata fields use
+untyped interface{}" which explains that the upstream spec defines these as open-schema fields
+(`"items": true, "type": "array"`). Using `[]interface{}` is the correct mapping.
+
+### DynamicToolCallParams.Arguments uses interface{} described as new finding but covered by existing exception
+
+**Location:** `approval.go:754, thread_item.go:156, thread_item.go:180, turn.go:31` — interface{} fields
+**Date:** 2026-03-01
+
+**Reason:** Duplicate of existing exception "OutputSchema and DynamicToolCallParams.Arguments use bare
+interface{} instead of json.RawMessage" which explains the deliberate caller-convenience tradeoff.
+
+### Concurrent Turn exclusion claimed to lack real-timing test but test exists
+
+**Location:** `conversation.go:200-235` — errTurnInProgress guard
+**Date:** 2026-03-01
+
+**Reason:** The audit claims the test is "only in a sequential setup." This is factually wrong.
+`TestConversationConcurrentTurnRejected` (conversation_test.go:507) starts a turn in a goroutine,
+waits 50ms for it to become active, then calls `Turn` from the main goroutine — this IS a concurrent
+test with real timing. The mock hasn't responded yet when the second call happens, so the first turn
+is genuinely active. All four concurrent combinations (Turn/Turn, TurnStreamed/TurnStreamed,
+Turn/TurnStreamed, TurnStreamed/Turn) are tested at lines 507, 651, 697, and 746.
+
+### Process.Close grace period and SIGKILL escalation claimed to be untested
+
+**Location:** `process.go:197-228` — Process.Close shutdown sequence
+**Date:** 2026-03-01
+
+**Reason:** The audit claims "the test suite doesn't spawn a real subprocess" and "the isSignalError
+helper is also untested." Both claims are factually wrong. `TestProcessCloseForceKill`
+(process_test.go:472-512) spawns a real subprocess that traps SIGINT, calls `Close()`, and verifies
+it completes within 10 seconds — exercising the SIGINT→grace period→SIGKILL path. `isSignalError`
+has dedicated tests in `process_internal_test.go` covering nil error, non-ExitError, signal-killed
+process, and normal exit cases.
+
+### Approval handler wire-format fidelity for redacted types claimed to be untested
+
+**Location:** `approval.go:913-930` — ChatgptAuthTokensRefreshResponse marshalWire
+**Date:** 2026-03-01
+
+**Reason:** The audit claims "no test verifies that marshalForWire is actually used in the approval
+response path." This is factually wrong. `credential_redact_test.go:62-98`
+(`TestCredentialTypesRedactWithAllFormatVerbs/ChatgptAuthTokensRefresh/wireProtocol`) registers an
+`OnChatgptAuthTokensRefresh` handler returning a real token, simulates a server request through the
+transport via `InjectServerRequest`, and verifies the response JSON contains the unredacted token
+and does not contain `[REDACTED]`. This exercises the full `handleApproval` → `marshalForWire` path.
