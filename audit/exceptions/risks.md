@@ -226,3 +226,29 @@ increments it wraps to 0 and subsequent IDs could collide with still-registered 
 However, 2^64 operations is unreachable in any realistic runtime — at 1 billion increments
 per second it would take ~584 years. Adding overflow detection or a different ID scheme
 is disproportionate to the near-zero probability of occurrence.
+
+### ensureInit holds mutex across RPC round-trip, serializing concurrent callers
+
+**Location:** `process.go:192-206` — ensureInit
+**Date:** 2026-03-01
+
+**Reason:** `ensureInit` holds `initMu` across the `Initialize` RPC call. Concurrent
+`Run`/`RunStreamed` callers serialize behind this lock, and if the first caller's context
+expires mid-init, subsequent callers must retry. Replacing the mutex with a `sync.Once`-like
+done channel requires careful error-retry semantics (the current design deliberately retries
+on failure by keeping `initDone` false). The serialization only affects the very first call
+on a fresh Process — after `initDone` is latched, the lock is held for a single boolean
+check. The risk is low and the fix requires non-trivial concurrency redesign for a one-time
+startup path.
+
+### Process.Close transport error propagation lacks a unit test
+
+**Location:** `process.go:156-187` — Close transport.Close error path
+**Date:** 2026-03-01
+
+**Reason:** Testing that `transport.Close()` errors propagate through `Process.Close()`
+requires injecting a mock transport into the unexported `transport` field. The field is
+unexported by design (callers should not interact with the transport directly).
+Exporting it or adding a test-only constructor solely for this test adds public API surface
+for a Low-severity testing gap. The code path is trivial (one `if err != nil` assignment)
+and is exercised indirectly by integration tests with real processes.
