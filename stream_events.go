@@ -111,7 +111,7 @@ func newCollabEvent(phase CollabToolCallPhase, c *CollabAgentToolCallThreadItem)
 		AgentsStates:      states,
 		ReceiverThreadIds: ids,
 		SenderThreadId:    c.SenderThreadId,
-		Prompt:            c.Prompt,
+		Prompt:            cloneStringPtr(c.Prompt),
 	}
 }
 
