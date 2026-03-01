@@ -270,3 +270,16 @@ security behavior tests. This is intentional — actual security behavior (crede
 wire protocol safety) is tested in `credential_redact_test.go` and the transport tests.
 The documentation tests ensure the security policy file stays complete and accurate as the
 project evolves.
+
+### Internal notification listeners dispatched synchronously in handleNotification
+
+**Location:** `client.go:192-209` — handleNotification dispatches public + internal listeners sequentially
+**Date:** 2026-03-01
+
+**Reason:** Internal listeners run sequentially within the goroutine spawned by `StdioTransport.handleNotification`.
+If a listener blocks (e.g. on a full channel), it delays subsequent listeners for the same notification.
+This is acceptable by design: the backpressure model ensures slow consumers signal overload rather than
+silently dropping events. Internal listeners (e.g. `streamSendEvent`) use context-guarded sends that
+unblock on cancellation, preventing indefinite head-of-line blocking. Making listeners async would
+lose ordering guarantees and complicate error propagation. The sequential dispatch matches the
+single-goroutine-per-notification model that the transport layer establishes.
