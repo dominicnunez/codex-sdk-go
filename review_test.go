@@ -2,6 +2,7 @@ package codex_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/dominicnunez/codex-sdk-go"
@@ -148,4 +149,35 @@ func TestReviewServiceMethodSignatures(t *testing.T) {
 
 	// Verify ReviewService exists and has Start method
 	_ = client.Review.Start
+}
+
+func TestReviewStart_RPCError_ReturnsRPCError(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+
+	mock.SetResponse("review/start", codex.Response{
+		JSONRPC: "2.0",
+		Error: &codex.Error{
+			Code:    codex.ErrCodeInternalError,
+			Message: "review engine unavailable",
+		},
+	})
+
+	_, err := client.Review.Start(context.Background(), codex.ReviewStartParams{
+		ThreadID: "thread-err",
+		Target: codex.ReviewTargetWrapper{
+			Value: &codex.UncommittedChangesReviewTarget{},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	var rpcErr *codex.RPCError
+	if !errors.As(err, &rpcErr) {
+		t.Fatalf("expected error to unwrap to *RPCError, got %T", err)
+	}
+	if rpcErr.RPCError().Code != codex.ErrCodeInternalError {
+		t.Errorf("expected error code %d, got %d", codex.ErrCodeInternalError, rpcErr.RPCError().Code)
+	}
 }

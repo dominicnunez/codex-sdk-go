@@ -3,6 +3,7 @@ package codex_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go"
@@ -175,4 +176,32 @@ func TestCommandServiceMethodSignatures(t *testing.T) {
 
 	// Compile-time verification that all methods exist
 	var _ = client.Command.Exec
+}
+
+func TestCommandExec_RPCError_ReturnsRPCError(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+
+	mock.SetResponse("command/exec", codex.Response{
+		JSONRPC: "2.0",
+		Error: &codex.Error{
+			Code:    codex.ErrCodeInvalidParams,
+			Message: "command array must not be empty",
+		},
+	})
+
+	_, err := client.Command.Exec(context.Background(), codex.CommandExecParams{
+		Command: []string{},
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	var rpcErr *codex.RPCError
+	if !errors.As(err, &rpcErr) {
+		t.Fatalf("expected error to unwrap to *RPCError, got %T", err)
+	}
+	if rpcErr.RPCError().Code != codex.ErrCodeInvalidParams {
+		t.Errorf("expected error code %d, got %d", codex.ErrCodeInvalidParams, rpcErr.RPCError().Code)
+	}
 }

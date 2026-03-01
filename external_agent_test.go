@@ -2,6 +2,7 @@ package codex_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/dominicnunez/codex-sdk-go"
@@ -158,5 +159,31 @@ func TestExternalAgentServiceMethodSignatures(t *testing.T) {
 
 	_ = func(ctx context.Context, params codex.ExternalAgentConfigImportParams) (codex.ExternalAgentConfigImportResponse, error) {
 		return client.ExternalAgent.ConfigImport(ctx, params)
+	}
+}
+
+func TestExternalAgentConfigDetect_RPCError_ReturnsRPCError(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+
+	mock.SetResponse("externalAgentConfig/detect", codex.Response{
+		JSONRPC: "2.0",
+		Error: &codex.Error{
+			Code:    codex.ErrCodeInternalError,
+			Message: "detection failed",
+		},
+	})
+
+	_, err := client.ExternalAgent.ConfigDetect(context.Background(), codex.ExternalAgentConfigDetectParams{})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	var rpcErr *codex.RPCError
+	if !errors.As(err, &rpcErr) {
+		t.Fatalf("expected error to unwrap to *RPCError, got %T", err)
+	}
+	if rpcErr.RPCError().Code != codex.ErrCodeInternalError {
+		t.Errorf("expected error code %d, got %d", codex.ErrCodeInternalError, rpcErr.RPCError().Code)
 	}
 }

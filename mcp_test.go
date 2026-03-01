@@ -3,6 +3,7 @@ package codex_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/dominicnunez/codex-sdk-go"
@@ -301,4 +302,30 @@ func TestMcpServiceMethodSignatures(t *testing.T) {
 	var _ = client.Mcp.ListServerStatus
 	var _ = client.Mcp.OauthLogin
 	var _ = client.Mcp.Refresh
+}
+
+func TestMcpListServerStatus_RPCError_ReturnsRPCError(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+
+	mock.SetResponse("mcpServerStatus/list", codex.Response{
+		JSONRPC: "2.0",
+		Error: &codex.Error{
+			Code:    codex.ErrCodeInternalError,
+			Message: "mcp registry unavailable",
+		},
+	})
+
+	_, err := client.Mcp.ListServerStatus(context.Background(), codex.ListMcpServerStatusParams{})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	var rpcErr *codex.RPCError
+	if !errors.As(err, &rpcErr) {
+		t.Fatalf("expected error to unwrap to *RPCError, got %T", err)
+	}
+	if rpcErr.RPCError().Code != codex.ErrCodeInternalError {
+		t.Errorf("expected error code %d, got %d", codex.ErrCodeInternalError, rpcErr.RPCError().Code)
+	}
 }

@@ -3,6 +3,7 @@ package codex_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go"
@@ -552,5 +553,33 @@ func TestSystemServiceMethodSignatures(t *testing.T) {
 	})
 	if err != nil {
 		t.Errorf("WindowsSandboxSetupStart failed: %v", err)
+	}
+}
+
+func TestWindowsSandboxSetupStart_RPCError_ReturnsRPCError(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+
+	mock.SetResponse("windowsSandbox/setupStart", codex.Response{
+		JSONRPC: "2.0",
+		Error: &codex.Error{
+			Code:    codex.ErrCodeInternalError,
+			Message: "sandbox setup failed",
+		},
+	})
+
+	_, err := client.System.WindowsSandboxSetupStart(context.Background(), codex.WindowsSandboxSetupStartParams{
+		Mode: codex.WindowsSandboxSetupModeElevated,
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	var rpcErr *codex.RPCError
+	if !errors.As(err, &rpcErr) {
+		t.Fatalf("expected error to unwrap to *RPCError, got %T", err)
+	}
+	if rpcErr.RPCError().Code != codex.ErrCodeInternalError {
+		t.Errorf("expected error code %d, got %d", codex.ErrCodeInternalError, rpcErr.RPCError().Code)
 	}
 }

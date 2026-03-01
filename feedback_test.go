@@ -3,6 +3,7 @@ package codex_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go"
@@ -93,4 +94,33 @@ func TestFeedbackServiceMethodSignatures(t *testing.T) {
 	var _ interface {
 		Upload(context.Context, codex.FeedbackUploadParams) (codex.FeedbackUploadResponse, error)
 	} = client.Feedback
+}
+
+func TestFeedbackUpload_RPCError_ReturnsRPCError(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+
+	mock.SetResponse("feedback/upload", codex.Response{
+		JSONRPC: "2.0",
+		Error: &codex.Error{
+			Code:    codex.ErrCodeInvalidParams,
+			Message: "classification is required",
+		},
+	})
+
+	_, err := client.Feedback.Upload(context.Background(), codex.FeedbackUploadParams{
+		Classification: "",
+		IncludeLogs:    false,
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	var rpcErr *codex.RPCError
+	if !errors.As(err, &rpcErr) {
+		t.Fatalf("expected error to unwrap to *RPCError, got %T", err)
+	}
+	if rpcErr.RPCError().Code != codex.ErrCodeInvalidParams {
+		t.Errorf("expected error code %d, got %d", codex.ErrCodeInvalidParams, rpcErr.RPCError().Code)
+	}
 }

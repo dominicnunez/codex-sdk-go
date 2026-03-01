@@ -2,6 +2,7 @@ package codex_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go"
@@ -421,4 +422,30 @@ func TestSkillsServiceMethodSignatures(t *testing.T) {
 	var _ = client.Skills.ConfigWrite
 	var _ = client.Skills.RemoteRead
 	var _ = client.Skills.RemoteWrite
+}
+
+func TestSkillsList_RPCError_ReturnsRPCError(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+
+	mock.SetResponse("skills/list", codex.Response{
+		JSONRPC: "2.0",
+		Error: &codex.Error{
+			Code:    codex.ErrCodeInternalError,
+			Message: "skills backend unreachable",
+		},
+	})
+
+	_, err := client.Skills.List(context.Background(), codex.SkillsListParams{})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	var rpcErr *codex.RPCError
+	if !errors.As(err, &rpcErr) {
+		t.Fatalf("expected error to unwrap to *RPCError, got %T", err)
+	}
+	if rpcErr.RPCError().Code != codex.ErrCodeInternalError {
+		t.Errorf("expected error code %d, got %d", codex.ErrCodeInternalError, rpcErr.RPCError().Code)
+	}
 }
