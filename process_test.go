@@ -208,8 +208,8 @@ while true; do sleep 1; done
 	// (via exec.CommandContext).
 	cancel()
 
-	// Give it a moment to be killed, then close.
-	time.Sleep(100 * time.Millisecond)
+	// Wait for the process to exit before calling Close.
+	_ = proc.Wait()
 
 	if err := proc.Close(); err != nil {
 		// Close may return an error since the process was already killed,
@@ -347,7 +347,7 @@ exit 0
 	}
 
 	// Wait for process to exit naturally.
-	time.Sleep(100 * time.Millisecond)
+	_ = proc.Wait()
 
 	// Call Close multiple times — should not panic.
 	_ = proc.Close()
