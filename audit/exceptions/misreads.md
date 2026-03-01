@@ -173,3 +173,36 @@ a specific comment is duplicated across 25+ methods does not match the code.
 is the latest stable release." This is factually incorrect. Go 1.25 was released on August 12,
 2025 — over six months before this audit. The `go 1.25` directive in go.mod is valid and refers
 to an existing, stable Go release.
+
+### Process.Wait claimed to have zero test coverage
+
+**Location:** `process.go:191-198` — Process.Wait method
+**Date:** 2026-02-28
+
+**Reason:** The audit claims "Process.Wait() has zero test coverage. No test calls Wait()."
+This is factually wrong. `process_test.go` calls `proc.Wait()` at lines 97, 153, 245, and 333.
+The Wait+Close race is untested, but the method itself is exercised in multiple tests.
+
+### Conversation multi-turn accumulation claimed to be untested
+
+**Location:** `conversation.go:102-122` — Conversation.Turn multi-turn path
+**Date:** 2026-02-28
+
+**Reason:** The audit claims "conversation_test.go tests StartConversation and a single Turn, but
+does not test the multi-turn accumulation path where onComplete appends turns to c.thread.Turns."
+This is factually wrong. `TestConversationMultiTurn` (conversation_test.go:12-95) executes two turns
+on the same Conversation, then asserts `len(thread.Turns) == 2` at line 92-93. The `Thread()` snapshot
+method and multi-turn accumulation are both tested.
+
+### Streamed error paths claimed to have no coverage
+
+**Location:** `run_streamed_test.go` — streamed error path tests
+**Date:** 2026-02-28
+
+**Reason:** The audit claims "these are the three non-happy-path branches in executeStreamedTurn and
+none are exercised." Two of the three paths are tested: `turn/completed` with `Turn.Error` is tested
+by `TestRunStreamedTurnError` (run_streamed_test.go:128-173) and `TestConversationTurnStreamedTurnError`
+(conversation_test.go:348-390). Context cancellation during streaming is tested by
+`TestRunStreamedContextCancellation` (run_streamed_test.go:88-107) and
+`TestConversationTurnStreamedContextCancel` (conversation_test.go:392-416). Only the `turn/completed`
+unmarshal failure path genuinely lacks a test, but the blanket claim "none are exercised" is false.
