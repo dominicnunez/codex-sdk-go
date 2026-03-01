@@ -749,3 +749,38 @@ func TestRunStreamedInitRetry(t *testing.T) {
 		t.Error("expected TurnCompleted event after successful retry")
 	}
 }
+
+func TestRunStreamedTurnCompletedUnmarshalFailure(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "malformed completion"})
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Inject a turn/completed notification where the turn field is malformed.
+	// The threadId carrier unmarshal succeeds, but the full TurnCompletedNotification
+	// unmarshal fails because "turn" is not a valid Turn object.
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":12345,"status":false,"items":"not-an-array"}}`),
+	})
+
+	var gotErr error
+	for _, err := range stream.Events() {
+		if err != nil {
+			gotErr = err
+			break
+		}
+	}
+
+	if gotErr == nil {
+		t.Fatal("expected error from malformed turn/completed")
+	}
+	if !strings.Contains(gotErr.Error(), "unmarshal turn/completed") {
+		t.Errorf("error = %q, want it to mention 'unmarshal turn/completed'", gotErr)
+	}
+}

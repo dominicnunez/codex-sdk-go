@@ -563,6 +563,44 @@ func TestRunInitRetry(t *testing.T) {
 	}
 }
 
+func TestRunTurnCompletedUnmarshalFailure(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	type runResult struct {
+		result *codex.RunResult
+		err    error
+	}
+	ch := make(chan runResult, 1)
+
+	go func() {
+		r, err := proc.Run(ctx, codex.RunOptions{Prompt: "malformed completion"})
+		ch <- runResult{r, err}
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Inject a turn/completed with valid threadId but malformed turn body.
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":12345,"status":false,"items":"not-an-array"}}`),
+	})
+
+	result := <-ch
+	if result.err == nil {
+		t.Fatal("expected error from malformed turn/completed")
+	}
+	if !strings.Contains(result.err.Error(), "unmarshal turn/completed") {
+		t.Errorf("error = %q, want it to mention 'unmarshal turn/completed'", result.err)
+	}
+	if result.result != nil {
+		t.Error("expected nil result on unmarshal failure")
+	}
+}
+
 func TestProcessCloseFromClient(t *testing.T) {
 	mock := NewMockTransport()
 	client := codex.NewClient(mock)
