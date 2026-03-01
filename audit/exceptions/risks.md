@@ -293,6 +293,21 @@ only a concern if the server is malicious or buggy, neither of which is a realis
 for a local subprocess. The fix requires disproportionate complexity for a scenario outside the
 SDK's threat model.
 
+### Notification handlers dispatched concurrently without ordering guarantees
+
+**Location:** `stdio.go:478` — handleNotification goroutine dispatch
+**Date:** 2026-03-01
+
+**Reason:** `handleNotification` dispatches each notification handler in a new goroutine.
+Two rapid notifications can arrive in wire order but be delivered out of order. For streaming
+deltas (`item/agentMessage/delta`), this could cause text reassembly corruption. Fixing this
+requires either sequential dispatch (which blocks the readLoop on slow handlers) or an ordered
+queue per notification method (significant transport-layer redesign). The SDK's internal
+listeners already handle ordering at the consumer level — `streamSendEvent` delivers events
+through a channel that preserves insertion order. External `OnNotification` handlers receive
+raw notifications where ordering is the caller's responsibility. The architectural cost of
+transport-level ordering guarantees is disproportionate to the severity.
+
 ### Unbounded agent map growth in AgentTracker
 
 **Location:** `collab_tracker.go:51-73` — agents map never prunes terminal entries
