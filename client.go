@@ -11,7 +11,6 @@ import (
 )
 
 var errInvalidParams = errors.New("invalid params")
-var errHandlerFailed = errors.New("handler failed")
 
 // ErrEmptyResult indicates the server returned a successful response with a
 // null result where the caller expected a value.
@@ -318,7 +317,7 @@ func handleApproval[P any, R any](ctx context.Context, req Request, handler func
 
 	result, err := handler(ctx, params)
 	if err != nil {
-		return Response{}, fmt.Errorf("approval handler %s: %w: %w", req.Method, errHandlerFailed, err)
+		return Response{}, fmt.Errorf("approval handler %s failed: %w", req.Method, err)
 	}
 
 	resultJSON, err := marshalForWire(&result)
