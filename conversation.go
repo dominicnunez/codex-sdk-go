@@ -73,6 +73,7 @@ func (c *Conversation) Thread() Thread {
 		if turn.Error != nil {
 			e := *turn.Error
 			e.CodexErrorInfo = append(json.RawMessage(nil), turn.Error.CodexErrorInfo...)
+			e.AdditionalDetails = cloneStringPtr(turn.Error.AdditionalDetails)
 			t.Turns[i].Error = &e
 		}
 	}
