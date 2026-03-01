@@ -31,6 +31,9 @@ func TestSpecCoverage(t *testing.T) {
 		t.Fatalf("Failed to walk specs directory: %v", err)
 	}
 
+	if len(schemaToType) == 0 {
+		t.Fatal("found 0 JSON schemas in specs/ — tests must run from the package directory")
+	}
 	t.Logf("Found %d JSON schemas in specs/", len(schemaToType))
 
 	// Track missing types
@@ -143,11 +146,13 @@ func checkTypeExists(t *testing.T, typeName string) bool {
 
 	// Search through all .go files (except test files)
 	found := false
+	goFilesSeen := false
 	_ = filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 		if !info.IsDir() && strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, "_test.go") {
+			goFilesSeen = true
 			content, err := os.ReadFile(path)
 			if err != nil {
 				return err
@@ -162,6 +167,10 @@ func checkTypeExists(t *testing.T, typeName string) bool {
 		}
 		return nil
 	})
+
+	if !goFilesSeen {
+		t.Fatalf("checkTypeExists found no .go files — tests must run from the package directory")
+	}
 
 	return found
 }
