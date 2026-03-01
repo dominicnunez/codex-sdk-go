@@ -335,3 +335,27 @@ requires either adding `goleak` as a test dependency or using `runtime.NumGorout
 with timing-sensitive assertions. The handlers already recover from panics and the transport's
 context cancellation unblocks context-aware handlers. The risk of a goroutine leak on close is
 low given the process-scoped lifecycle of StdioTransport.
+
+### ExecArgs flag rejection does not cover abbreviated or prefix flags
+
+**Location:** `process.go:96-103` — buildArgs flag rejection loop
+**Date:** 2026-03-01
+
+**Reason:** The rejection logic already blocks `--model`, `-model`, and `=` variants. Prefix-matching
+(e.g. rejecting any arg starting with `--mod`) would create false positives for legitimate flags
+that share a prefix. The primary mitigation is last-wins ordering: typed safety flags are always
+appended after ExecArgs, so even if an abbreviated form slips through, the typed value takes
+precedence. This holds as long as the downstream CLI parser uses last-wins semantics, which is
+the standard convention and is documented as an assumption.
+
+### Conversation thread history grows unboundedly
+
+**Location:** `conversation.go:229-233` — turn append in addCompletedTurn
+**Date:** 2026-03-01
+
+**Reason:** Adding a cap or compaction strategy changes the observable behavior of `Conversation` —
+callers may depend on accessing the full turn history. A max-turns option would add a configuration
+knob for a scenario that is unlikely in practice (the SDK targets ephemeral single-turn or
+short multi-turn interactions, not long-lived chat sessions). Memory growth is linear in completed
+turns, and each turn's items are small Go structs. For the expected usage patterns, this is not
+a practical concern.

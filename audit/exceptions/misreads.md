@@ -777,3 +777,90 @@ for deep copy" which explicitly states: "The error path now panics (instead of s
 the original), ensuring the deep-copy guarantee is never silently broken." The panic is a deliberate
 design choice already analyzed and accepted. The alternative (returning an error from `Thread()`)
 would change the public API signature.
+
+### Unbounded goroutine spawning per server request described as new finding
+
+**Location:** `stdio.go:442, 530` — handleRequest and handleNotification goroutine dispatch
+**Date:** 2026-03-01
+
+**Reason:** This is a duplicate of the known exception "Unbounded goroutine spawning for incoming
+messages" which documents that adding a bounded worker pool requires architectural changes
+disproportionate to the threat model (local subprocess over stdio).
+
+### readLoop goroutine leak when child process does not exit described as new bug
+
+**Location:** `stdio.go:36-37, 290` — readLoop and Close interaction
+**Date:** 2026-03-01
+
+**Reason:** This is a duplicate of the known exception "StdioTransport.Close does not stop the
+reader goroutine" which documents that fixing this requires changing the public API from
+`io.Reader` to `io.ReadCloser`, a breaking change for all callers.
+
+### Invalid JSON from server silently skipped described as new finding
+
+**Location:** `stdio.go:307-310` — readLoop JSON unmarshal failure path
+**Date:** 2026-03-01
+
+**Reason:** This is a duplicate of the known exception "readLoop silently skips unparseable JSON
+lines with no diagnostic" which documents that surfacing dropped-line counts requires new public
+API surface disproportionate to the severity.
+
+### handleRequest writeMessage errors silently discarded described as new finding
+
+**Location:** `stdio.go:437, 478, 485` — writeMessage error discards in handleRequest
+**Date:** 2026-03-01
+
+**Reason:** This is a duplicate of the known exception "writeMessage errors silently discarded in
+handleRequest goroutine" which documents that surfacing write errors requires new public API
+surface disproportionate to the severity.
+
+### ensureInit holds mutex during blocking Initialize RPC described as new finding
+
+**Location:** `process.go:232-246` — ensureInit mutex held across RPC
+**Date:** 2026-03-01
+
+**Reason:** This is a duplicate of the known exception "ensureInit holds mutex across RPC
+round-trip, serializing concurrent callers" which documents that replacing the mutex with a
+`sync.Once`-like done channel requires non-trivial concurrency redesign for a one-time startup
+path.
+
+### TestErrorCodeConstants described as tautological
+
+**Location:** `jsonrpc_test.go:230-249` — table-driven test comparing constants to literals
+**Date:** 2026-03-01
+
+**Reason:** This is a duplicate of the known exception "TestErrorCodeConstants verifies constants
+against their literal definitions" which explains the test serves as executable documentation
+that the constants match the JSON-RPC 2.0 spec values.
+
+### ScanErr() claimed to never be called in any test
+
+**Location:** `stdio.go:244` — ScanErr public method
+**Date:** 2026-03-01
+
+**Reason:** This is factually wrong. `stdio_test.go:848-859` in `TestStdioScannerBufferOverflow`
+polls `transport.ScanErr()` in a loop until the reader processes the oversized line, then verifies
+the error is non-nil. The test at line 851 calls `transport.ScanErr()` and checks the result.
+
+### Notify after Close claimed to be untested
+
+**Location:** `stdio.go:160` — Notify after Close test coverage
+**Date:** 2026-03-01
+
+**Reason:** This is factually wrong. `stdio_test.go:470-478` tests Notify after Close: it calls
+`transport.Close()`, then calls `transport.Notify()`, and asserts at line 477 that the error is
+non-nil ("Notify after Close did not return error"). Additionally, `mock_transport_verify_test.go:346`
+tests the same behavior on MockTransport.
+
+### SessionSourceSubAgent round-trip serialization described as losing type discriminator
+
+**Location:** `thread.go:263-277` — SessionSourceWrapper.MarshalJSON SubAgent case
+**Date:** 2026-03-01
+
+**Reason:** The finding claims `json.Marshal(v)` for `SessionSourceSubAgent` "may not produce the
+correct wire format with type discriminators." This is incorrect. `SessionSourceSubAgent` has a
+`json:"subAgent"` struct tag (thread.go:66), and `SubAgentSourceThreadSpawn` has a `json:"thread_spawn"`
+struct tag (thread.go:89-95). Default `json.Marshal` produces `{"subAgent":{"thread_spawn":{...}}}`,
+which matches the format expected by `UnmarshalJSON` (line 213 checks for key `"subAgent"`, line 243
+checks for key `"thread_spawn"`). The round-trip is correct. This is also a duplicate of the known
+exception "SessionSourceSubAgent relies on implicit marshaling for SubAgentSource variants."
