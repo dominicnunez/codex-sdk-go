@@ -13,6 +13,13 @@ type threadIDCarrier struct {
 }
 
 // turnLifecycleParams configures a shared turn execution.
+//
+// Ordering assumption: notification listeners are registered before the
+// Turn.Start RPC is sent. The server writes the RPC response before any
+// turn-related notifications on the same stdio writer, so listeners are
+// guaranteed to be in place before the first notification arrives. If the
+// transport is ever replaced with one that multiplexes responses and
+// notifications on separate channels, this ordering must be preserved.
 type turnLifecycleParams struct {
 	client     *Client
 	turnParams TurnStartParams
@@ -40,7 +47,7 @@ func executeTurn(ctx context.Context, p turnLifecycleParams) (*RunResult, error)
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
 			p.client.reportHandlerError(notifyItemCompleted, fmt.Errorf("unmarshal %s: %w", notifyItemCompleted, err))
 			n.Item = ThreadItemWrapper{Value: &UnknownThreadItem{
-				Type: "unmarshal_error",
+				Type: UnmarshalErrorItemType,
 				Raw:  append(json.RawMessage(nil), notif.Params...),
 			}}
 		}
@@ -168,7 +175,7 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, g *guardedC
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
 			p.client.reportHandlerError(notifyItemCompleted, fmt.Errorf("unmarshal %s: %w", notifyItemCompleted, err))
 			n.Item = ThreadItemWrapper{Value: &UnknownThreadItem{
-				Type: "unmarshal_error",
+				Type: UnmarshalErrorItemType,
 				Raw:  append(json.RawMessage(nil), notif.Params...),
 			}}
 		}
