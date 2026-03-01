@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"strings"
 	"sync"
@@ -885,4 +886,75 @@ func TestStdioHandleResponseUnmarshalError(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("timeout: caller should have received a parse error, not hung")
 	}
+}
+
+// TestStdioConcurrentSendAndClose verifies that concurrent Send and Close calls
+// do not race or panic. Every Send must either succeed or return an error.
+func TestStdioConcurrentSendAndClose(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+
+	// Drain messages written by Send so writes don't block on the pipe.
+	go func() {
+		scanner := bufio.NewScanner(serverReader)
+		for scanner.Scan() {
+		}
+	}()
+
+	const senders = 10
+	var wg sync.WaitGroup
+	wg.Add(senders + 1) // senders + 1 closer
+
+	// Launch concurrent senders.
+	for i := 0; i < senders; i++ {
+		go func(id int) {
+			defer wg.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+			defer cancel()
+
+			req := codex.Request{
+				JSONRPC: "2.0",
+				ID:      codex.RequestID{Value: fmt.Sprintf("concurrent-%d", id)},
+				Method:  "test/concurrent",
+			}
+			_, err := transport.Send(ctx, req)
+			// Send must either succeed (nil) or return an error —
+			// any panic would be caught by the race detector / test runner.
+			if err == nil {
+				// A nil error means we got a response, which is unlikely
+				// without a responder, but not invalid.
+				return
+			}
+			// Acceptable errors: transport closed, context deadline,
+			// context canceled, or reader stopped.
+			errMsg := err.Error()
+			acceptable :=
+				strings.Contains(errMsg, "transport closed") ||
+					strings.Contains(errMsg, "context deadline exceeded") ||
+					strings.Contains(errMsg, "context canceled") ||
+					strings.Contains(errMsg, "transport reader stopped")
+			if !acceptable {
+				t.Errorf("Send(%d) returned unexpected error: %v", id, err)
+			}
+		}(i)
+	}
+
+	// Give senders a moment to start blocking in Send.
+	time.Sleep(10 * time.Millisecond)
+
+	// Close concurrently while sends are in-flight.
+	go func() {
+		defer wg.Done()
+		if err := transport.Close(); err != nil {
+			t.Errorf("Close returned error: %v", err)
+		}
+	}()
+
+	wg.Wait()
 }
