@@ -54,6 +54,9 @@ type Process struct {
 	cmd       *exec.Cmd
 	transport *StdioTransport
 	closeOnce sync.Once
+	waitOnce  sync.Once
+	waitErr   error
+	waitDone  chan struct{}
 	initMu    sync.Mutex
 	initDone  bool
 }
@@ -133,6 +136,7 @@ func StartProcess(ctx context.Context, opts *ProcessOptions) (*Process, error) {
 		Client:    client,
 		cmd:       cmd,
 		transport: transport,
+		waitDone:  make(chan struct{}),
 	}, nil
 }
 
@@ -152,17 +156,13 @@ func (p *Process) Close() error {
 		if p.cmd != nil && p.cmd.Process != nil {
 			_ = p.cmd.Process.Signal(os.Interrupt)
 
-			done := make(chan struct{})
-			go func() {
-				_ = p.cmd.Wait()
-				close(done)
-			}()
+			go p.doWait()
 
 			select {
-			case <-done:
+			case <-p.waitDone:
 			case <-time.After(processGracePeriod):
 				_ = p.cmd.Process.Kill()
-				<-done
+				<-p.waitDone
 			}
 		}
 	})
@@ -188,11 +188,21 @@ func (p *Process) ensureInit(ctx context.Context) error {
 	return nil
 }
 
+// doWait runs cmd.Wait exactly once and stores the result.
+func (p *Process) doWait() {
+	p.waitOnce.Do(func() {
+		p.waitErr = p.cmd.Wait()
+		close(p.waitDone)
+	})
+}
+
 // Wait waits for the child process to exit and returns the exit error.
 // Returns nil immediately when created via NewProcessFromClient (no child process).
+// Safe to call concurrently with Close.
 func (p *Process) Wait() error {
 	if p.cmd == nil {
 		return nil
 	}
-	return p.cmd.Wait()
+	p.doWait()
+	return p.waitErr
 }
