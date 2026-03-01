@@ -236,42 +236,42 @@ func (c *Conversation) Turn(ctx context.Context, opts TurnOptions) (*RunResult, 
 
 // TurnStreamed executes a streaming turn on the existing thread.
 func (c *Conversation) TurnStreamed(ctx context.Context, opts TurnOptions) *Stream {
-	ch := make(chan eventOrErr, streamChannelBuffer)
+	g := newGuardedChan(streamChannelBuffer)
 	s := &Stream{
 		done: make(chan struct{}),
 	}
 
 	s.events = func(yield func(Event, error) bool) {
-		for eoe := range ch {
+		for eoe := range g.ch {
 			if !yield(eoe.event, eoe.err) {
 				return
 			}
 		}
 	}
 
-	go c.turnStreamedLifecycle(ctx, opts, ch, s)
+	go c.turnStreamedLifecycle(ctx, opts, g, s)
 
 	return s
 }
 
-func (c *Conversation) turnStreamedLifecycle(ctx context.Context, opts TurnOptions, ch chan<- eventOrErr, s *Stream) {
-	defer close(ch)
+func (c *Conversation) turnStreamedLifecycle(ctx context.Context, opts TurnOptions, g *guardedChan, s *Stream) {
+	defer g.closeOnce()
 	defer close(s.done)
 
 	if opts.Prompt == "" {
-		streamSendErr(ctx, ch, errors.New("prompt is required"))
+		streamSendErr(ctx, g, errors.New("prompt is required"))
 		return
 	}
 
 	if err := c.process.ensureInit(ctx); err != nil {
-		streamSendErr(ctx, ch, err)
+		streamSendErr(ctx, g, err)
 		return
 	}
 
 	c.mu.Lock()
 	if c.activeTurn {
 		c.mu.Unlock()
-		streamSendErr(ctx, ch, errTurnInProgress)
+		streamSendErr(ctx, g, errTurnInProgress)
 		return
 	}
 	c.activeTurn = true
@@ -294,5 +294,5 @@ func (c *Conversation) turnStreamedLifecycle(ctx context.Context, opts TurnOptio
 			c.thread.Turns = append(c.thread.Turns, turn)
 			c.mu.Unlock()
 		},
-	}, ch, s)
+	}, g, s)
 }

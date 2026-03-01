@@ -21,6 +21,66 @@ const streamChannelBuffer = 64
 // events have already been consumed by a prior iteration.
 var ErrStreamConsumed = errors.New("stream events already consumed")
 
+// guardedChan wraps a channel with an RWMutex so that sends and close are
+// mutually exclusive. Senders hold a read lock (concurrent sends are fine);
+// the closer takes a write lock, ensuring no send is in flight when the
+// channel is closed.
+type guardedChan struct {
+	mu     sync.RWMutex
+	ch     chan eventOrErr
+	closed bool
+}
+
+func newGuardedChan(size int) *guardedChan {
+	return &guardedChan{ch: make(chan eventOrErr, size)}
+}
+
+// send writes an event/error pair to the channel, blocking until the send
+// succeeds or ctx is cancelled. Returns false if the channel is already closed.
+func (g *guardedChan) send(ctx context.Context, eoe eventOrErr) bool {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	if g.closed {
+		return false
+	}
+	select {
+	case g.ch <- eoe:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+
+// trySend attempts a non-blocking send, falling back to a blocking send
+// guarded by ctx. Returns false if the channel is closed or ctx cancelled.
+func (g *guardedChan) trySend(ctx context.Context, eoe eventOrErr) bool {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	if g.closed {
+		return false
+	}
+	select {
+	case g.ch <- eoe:
+		return true
+	default:
+		select {
+		case g.ch <- eoe:
+			return true
+		case <-ctx.Done():
+			return false
+		}
+	}
+}
+
+func (g *guardedChan) closeOnce() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if !g.closed {
+		g.closed = true
+		close(g.ch)
+	}
+}
+
 // eventOrErr pairs an Event with an error for channel transport.
 type eventOrErr struct {
 	event Event
@@ -64,52 +124,41 @@ func (s *Stream) Result() *RunResult {
 // through an iterator instead of blocking until completion. Returns immediately;
 // the lifecycle runs in a background goroutine.
 func (p *Process) RunStreamed(ctx context.Context, opts RunOptions) *Stream {
-	ch := make(chan eventOrErr, streamChannelBuffer)
+	g := newGuardedChan(streamChannelBuffer)
 	s := &Stream{
 		done: make(chan struct{}),
 	}
 
 	s.events = func(yield func(Event, error) bool) {
-		for eoe := range ch {
+		for eoe := range g.ch {
 			if !yield(eoe.event, eoe.err) {
 				return
 			}
 		}
 	}
 
-	go p.runStreamedLifecycle(ctx, opts, ch, s)
+	go p.runStreamedLifecycle(ctx, opts, g, s)
 
 	return s
 }
 
-// streamSendEvent sends an event on ch, blocking until the send succeeds or
-// ctx is cancelled. This respects backpressure from the consumer instead of
-// silently dropping events.
-func streamSendEvent(ctx context.Context, ch chan<- eventOrErr, event Event) {
-	select {
-	case ch <- eventOrErr{event: event}:
-	case <-ctx.Done():
-	}
+// streamSendEvent sends an event on g, blocking until the send succeeds,
+// ctx is cancelled, or the channel is closed.
+func streamSendEvent(ctx context.Context, g *guardedChan, event Event) {
+	g.send(ctx, eventOrErr{event: event})
 }
 
-// streamSendErr sends a terminal error on ch. It attempts a non-blocking send
+// streamSendErr sends a terminal error on g. It attempts a non-blocking send
 // first (sufficient when buffer space remains), then falls back to a blocking
 // send guarded by ctx to prevent goroutine leaks when the consumer stops reading.
-func streamSendErr(ctx context.Context, ch chan<- eventOrErr, err error) {
-	select {
-	case ch <- eventOrErr{err: err}:
-	default:
-		select {
-		case ch <- eventOrErr{err: err}:
-		case <-ctx.Done():
-		}
-	}
+func streamSendErr(ctx context.Context, g *guardedChan, err error) {
+	g.trySend(ctx, eventOrErr{err: err})
 }
 
 // streamListen registers a notification listener that unmarshals the
-// notification params into N, converts it to an Event, and sends it on ch.
+// notification params into N, converts it to an Event, and sends it on g.
 // Notifications with a threadId that does not match threadID are ignored.
-func streamListen[N any](ctx context.Context, on func(string, NotificationHandler), method string, ch chan<- eventOrErr, threadID string, reportErr func(string, error), convert func(N) Event) {
+func streamListen[N any](ctx context.Context, on func(string, NotificationHandler), method string, g *guardedChan, threadID string, reportErr func(string, error), convert func(N) Event) {
 	on(method, func(_ context.Context, notif Notification) {
 		var carrier threadIDCarrier
 		if err := json.Unmarshal(notif.Params, &carrier); err != nil || carrier.ThreadID != threadID {
@@ -120,27 +169,27 @@ func streamListen[N any](ctx context.Context, on func(string, NotificationHandle
 			reportErr(method, fmt.Errorf("unmarshal %s: %w", method, err))
 			return
 		}
-		streamSendEvent(ctx, ch, convert(n))
+		streamSendEvent(ctx, g, convert(n))
 	})
 }
 
-func (p *Process) runStreamedLifecycle(ctx context.Context, opts RunOptions, ch chan<- eventOrErr, s *Stream) {
-	defer close(ch)
+func (p *Process) runStreamedLifecycle(ctx context.Context, opts RunOptions, g *guardedChan, s *Stream) {
+	defer g.closeOnce()
 	defer close(s.done)
 
 	if opts.Prompt == "" {
-		streamSendErr(ctx, ch, errors.New("prompt is required"))
+		streamSendErr(ctx, g, errors.New("prompt is required"))
 		return
 	}
 
 	if err := p.ensureInit(ctx); err != nil {
-		streamSendErr(ctx, ch, err)
+		streamSendErr(ctx, g, err)
 		return
 	}
 
 	threadResp, err := p.Client.Thread.Start(ctx, buildThreadParams(opts))
 	if err != nil {
-		streamSendErr(ctx, ch, fmt.Errorf("thread/start: %w", err))
+		streamSendErr(ctx, g, fmt.Errorf("thread/start: %w", err))
 		return
 	}
 
@@ -149,5 +198,5 @@ func (p *Process) runStreamedLifecycle(ctx context.Context, opts RunOptions, ch 
 		turnParams: buildTurnParams(opts, threadResp.Thread.ID),
 		thread:     threadResp.Thread,
 		threadID:   threadResp.Thread.ID,
-	}, ch, s)
+	}, g, s)
 }

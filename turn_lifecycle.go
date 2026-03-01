@@ -98,7 +98,7 @@ func executeTurn(ctx context.Context, p turnLifecycleParams) (*RunResult, error)
 
 // executeStreamedTurn runs the streaming lifecycle: registers filtered listeners,
 // starts the turn, and sends events on ch until completion or context cancellation.
-func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, ch chan<- eventOrErr, s *Stream) {
+func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, g *guardedChan, s *Stream) {
 	var (
 		items      []ThreadItemWrapper
 		itemsMu    sync.Mutex
@@ -117,27 +117,27 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, ch chan<- e
 
 	turnDone := make(chan TurnCompletedNotification, 1)
 
-	streamListen(ctx, on, notifyTurnStarted, ch, p.threadID, p.client.reportHandlerError, func(n TurnStartedNotification) Event {
+	streamListen(ctx, on, notifyTurnStarted, g, p.threadID, p.client.reportHandlerError, func(n TurnStartedNotification) Event {
 		return &TurnStarted{Turn: n.Turn, ThreadID: n.ThreadID}
 	})
 
-	streamListen(ctx, on, notifyAgentMessageDelta, ch, p.threadID, p.client.reportHandlerError, func(n AgentMessageDeltaNotification) Event {
+	streamListen(ctx, on, notifyAgentMessageDelta, g, p.threadID, p.client.reportHandlerError, func(n AgentMessageDeltaNotification) Event {
 		return &TextDelta{Delta: n.Delta, ItemID: n.ItemID}
 	})
 
-	streamListen(ctx, on, notifyReasoningTextDelta, ch, p.threadID, p.client.reportHandlerError, func(n ReasoningTextDeltaNotification) Event {
+	streamListen(ctx, on, notifyReasoningTextDelta, g, p.threadID, p.client.reportHandlerError, func(n ReasoningTextDeltaNotification) Event {
 		return &ReasoningDelta{Delta: n.Delta, ItemID: n.ItemID, ContentIndex: n.ContentIndex}
 	})
 
-	streamListen(ctx, on, notifyReasoningSummaryTextDelta, ch, p.threadID, p.client.reportHandlerError, func(n ReasoningSummaryTextDeltaNotification) Event {
+	streamListen(ctx, on, notifyReasoningSummaryTextDelta, g, p.threadID, p.client.reportHandlerError, func(n ReasoningSummaryTextDeltaNotification) Event {
 		return &ReasoningSummaryDelta{Delta: n.Delta, ItemID: n.ItemID, SummaryIndex: n.SummaryIndex}
 	})
 
-	streamListen(ctx, on, notifyPlanDelta, ch, p.threadID, p.client.reportHandlerError, func(n PlanDeltaNotification) Event {
+	streamListen(ctx, on, notifyPlanDelta, g, p.threadID, p.client.reportHandlerError, func(n PlanDeltaNotification) Event {
 		return &PlanDelta{Delta: n.Delta, ItemID: n.ItemID}
 	})
 
-	streamListen(ctx, on, notifyFileChangeOutputDelta, ch, p.threadID, p.client.reportHandlerError, func(n FileChangeOutputDeltaNotification) Event {
+	streamListen(ctx, on, notifyFileChangeOutputDelta, g, p.threadID, p.client.reportHandlerError, func(n FileChangeOutputDeltaNotification) Event {
 		return &FileChangeDelta{Delta: n.Delta, ItemID: n.ItemID}
 	})
 
@@ -153,9 +153,9 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, ch chan<- e
 			return
 		}
 		if c, ok := n.Item.Value.(*CollabAgentToolCallThreadItem); ok {
-			streamSendEvent(ctx, ch, newCollabEvent(CollabToolCallStartedPhase, c))
+			streamSendEvent(ctx, g, newCollabEvent(CollabToolCallStartedPhase, c))
 		}
-		streamSendEvent(ctx, ch, &ItemStarted{Item: n.Item})
+		streamSendEvent(ctx, g, &ItemStarted{Item: n.Item})
 	})
 
 	// item/completed: emit collab event before generic event, and append to collected items.
@@ -176,9 +176,9 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, ch chan<- e
 		items = append(items, n.Item)
 		itemsMu.Unlock()
 		if c, ok := n.Item.Value.(*CollabAgentToolCallThreadItem); ok {
-			streamSendEvent(ctx, ch, newCollabEvent(CollabToolCallCompletedPhase, c))
+			streamSendEvent(ctx, g, newCollabEvent(CollabToolCallCompletedPhase, c))
 		}
-		streamSendEvent(ctx, ch, &ItemCompleted{Item: n.Item})
+		streamSendEvent(ctx, g, &ItemCompleted{Item: n.Item})
 	})
 
 	// turn/completed signals turnDone; synthesizes on unmarshal failure.
@@ -201,17 +201,17 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, ch chan<- e
 	})
 
 	if _, err := p.client.Turn.Start(ctx, p.turnParams); err != nil {
-		streamSendErr(ctx, ch, fmt.Errorf("turn/start: %w", err))
+		streamSendErr(ctx, g, fmt.Errorf("turn/start: %w", err))
 		return
 	}
 
 	// Wait for turn completion or context cancellation.
 	select {
 	case completed := <-turnDone:
-		streamSendEvent(ctx, ch, &TurnCompleted{Turn: completed.Turn})
+		streamSendEvent(ctx, g, &TurnCompleted{Turn: completed.Turn})
 
 		if completed.Turn.Error != nil {
-			streamSendErr(ctx, ch, fmt.Errorf("turn error: %w", completed.Turn.Error))
+			streamSendErr(ctx, g, fmt.Errorf("turn error: %w", completed.Turn.Error))
 			return
 		}
 
@@ -229,6 +229,6 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, ch chan<- e
 		s.mu.Unlock()
 
 	case <-ctx.Done():
-		streamSendErr(ctx, ch, ctx.Err())
+		streamSendErr(ctx, g, ctx.Err())
 	}
 }
