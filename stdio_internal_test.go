@@ -2,6 +2,7 @@ package codex
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"strings"
@@ -16,11 +17,15 @@ import (
 // the error response format for future-proofing.
 func TestHandleMalformedRequestSendsParseError(t *testing.T) {
 	var buf safeBuffer
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	transport := &StdioTransport{
 		reader:        strings.NewReader(""),
 		writer:        &buf,
 		pendingReqs:   make(map[string]pendingReq),
 		readerStopped: make(chan struct{}),
+		ctx:           ctx,
+		cancelCtx:     cancel,
 	}
 
 	// Call handleMalformedRequest with data containing a valid ID

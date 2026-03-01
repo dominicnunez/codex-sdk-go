@@ -247,8 +247,17 @@ func (t *StdioTransport) ScanErr() error {
 	return t.scanErr
 }
 
-// writeMessage writes a JSON-RPC message as newline-delimited JSON
+// writeMessage writes a JSON-RPC message as newline-delimited JSON.
+// It checks the transport context before acquiring the write lock so
+// that goroutines dispatched before Close() do not write to a
+// potentially invalid writer after the transport has shut down.
 func (t *StdioTransport) writeMessage(msg interface{}) error {
+	select {
+	case <-t.ctx.Done():
+		return NewTransportError("write message", errors.New("transport closed"))
+	default:
+	}
+
 	data, err := json.Marshal(msg)
 	if err != nil {
 		return NewTransportError("marshal message", err)
@@ -256,6 +265,14 @@ func (t *StdioTransport) writeMessage(msg interface{}) error {
 
 	t.writeMu.Lock()
 	defer t.writeMu.Unlock()
+
+	// Re-check after acquiring the lock: Close() may have been called
+	// while we were waiting on writeMu.
+	select {
+	case <-t.ctx.Done():
+		return NewTransportError("write message", errors.New("transport closed"))
+	default:
+	}
 
 	// Write message then newline delimiter, handling short writes.
 	// The newline is written separately to avoid copying the entire

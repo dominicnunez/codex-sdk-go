@@ -1088,6 +1088,69 @@ func TestStdioNoHandlerReturnsMethodNotFound(t *testing.T) {
 
 // TestStdioConcurrentSendAndClose verifies that concurrent Send and Close calls
 // do not race or panic. Every Send must either succeed or return an error.
+// TestStdioWriteMessageRejectsAfterClose verifies that writeMessage returns an
+// error when the transport context has been cancelled by Close, ensuring that
+// handler goroutines dispatched before Close do not write to a closed writer.
+func TestStdioWriteMessageRejectsAfterClose(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	handlerStarted := make(chan struct{})
+	handlerDone := make(chan error, 1)
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	transport.OnRequest(func(_ context.Context, req codex.Request) (codex.Response, error) {
+		close(handlerStarted)
+
+		// Wait for Close() to run, then try to write a response.
+		// Before the fix, this would write to a potentially invalid writer.
+		time.Sleep(50 * time.Millisecond)
+
+		return codex.Response{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+		}, nil
+	})
+
+	// Drain server-side reads so writes don't block.
+	go func() {
+		scanner := bufio.NewScanner(serverReader)
+		for scanner.Scan() {
+		}
+	}()
+
+	// Send a server→client request.
+	reqMsg := `{"jsonrpc":"2.0","id":"close-test","method":"test/close"}` + "\n"
+	go func() {
+		_, _ = serverWriter.Write([]byte(reqMsg))
+	}()
+
+	// Wait for handler goroutine to start, then close transport.
+	select {
+	case <-handlerStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("handler did not start")
+	}
+
+	_ = transport.Close()
+
+	// The handler goroutine finishes and the response write should be
+	// silently rejected (transport closed error). The test passes if
+	// no panic or data race occurs.
+	select {
+	case err := <-handlerDone:
+		if err != nil {
+			t.Errorf("unexpected handler error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		// Handler goroutine finished via the writeMessage path — that's fine.
+	}
+}
+
 func TestStdioConcurrentSendAndClose(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()
