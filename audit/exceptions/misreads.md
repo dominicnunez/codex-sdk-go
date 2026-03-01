@@ -1103,3 +1103,42 @@ response path." This is factually wrong. `credential_redact_test.go:62-98`
 `OnChatgptAuthTokensRefresh` handler returning a real token, simulates a server request through the
 transport via `InjectServerRequest`, and verifies the response JSON contains the unredacted token
 and does not contain `[REDACTED]`. This exercises the full `handleApproval` → `marshalForWire` path.
+
+### Thread service tests for empty-response methods claimed to discard meaningful responses
+
+**Location:** `thread_test.go:451,494,599` — TestThreadSetName, TestThreadArchive, TestThreadCompactStart
+**Date:** 2026-03-01
+
+**Reason:** The audit claims these tests "set up mock responses with thread data, call the service
+method, then discard the response with `_ = response`" and that "the mock response data is set up
+but never validated." This misreads the response types. `ThreadSetNameResponse`, `ThreadArchiveResponse`,
+and `ThreadCompactStartResponse` are all empty structs (per spec), and their service methods pass `nil`
+as the deserialization target to `sendRequest`. There is nothing to validate on the response — `_ = response`
+is correct. The mock response data setup is superfluous boilerplate, but discarding an empty struct
+is not a testing gap. (Note: `TestThreadUnsubscribe` is a separate case — `ThreadUnsubscribeResponse`
+has a `Status` field that the test genuinely does not validate.)
+
+### Approval handler dispatch claimed to be identically tested in two files
+
+**Location:** `approval_test.go:243`, `dispatch_test.go:208` — approval handler dispatch tests
+**Date:** 2026-03-01
+
+**Reason:** The audit claims these tests are identical and one should be removed. They test different
+aspects. `TestApprovalHandlerDispatch` (approval_test.go) registers all 7 handlers simultaneously
+and verifies each handler **was called** via boolean flags (integration-style test of the full
+handler set). `TestKnownApprovalHandlerDispatch` (dispatch_test.go) is table-driven, registers one
+handler per test case in isolation, and verifies the **response has no error** (unit-style test of
+individual dispatch correctness). These are complementary: one tests all handlers working together,
+the other tests each handler in isolation.
+
+### security_test.go described as testing markdown content instead of SDK security behavior
+
+**Location:** `security_test.go:9-109` — all tests
+**Date:** 2026-03-01
+
+**Reason:** The audit says these tests "provide a false sense of security test coverage" and should
+be deleted. They are documentation enforcement tests, not security behavior tests — and that is
+intentional. They verify that SECURITY.md exists and contains required sections (reporting guidance,
+security scope, dependency policy). Actual security behavior (credential redaction, wire protocol
+safety) is tested in `credential_redact_test.go` and transport tests. The documentation tests ensure
+the security policy file stays complete as the project evolves.
