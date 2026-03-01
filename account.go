@@ -163,6 +163,13 @@ type RateLimitWindow struct {
 	WindowDurationMins *int64 `json:"windowDurationMins,omitempty"`
 }
 
+// Login account param type discriminators (spec-defined).
+const (
+	loginTypeApiKey            = "apiKey"
+	loginTypeChatgpt           = "chatgpt"
+	loginTypeChatgptAuthTokens = "chatgptAuthTokens"
+)
+
 // LoginAccountParams is an interface for login parameter variants
 type LoginAccountParams interface {
 	isLoginAccountParams()
@@ -184,14 +191,16 @@ func (p *ApiKeyLoginAccountParams) MarshalJSON() ([]byte, error) {
 		ApiKey string `json:"apiKey"`
 	}
 	return json.Marshal(redacted{
-		Type:   p.Type,
+		Type:   loginTypeApiKey,
 		ApiKey: "[REDACTED]",
 	})
 }
 
 func (p *ApiKeyLoginAccountParams) marshalWire() ([]byte, error) {
 	type wire ApiKeyLoginAccountParams
-	return json.Marshal((*wire)(p))
+	w := (*wire)(p)
+	w.Type = loginTypeApiKey
+	return json.Marshal(w)
 }
 
 // String redacts the API key to prevent accidental credential leaks in logs.
@@ -214,6 +223,13 @@ type ChatgptLoginAccountParams struct {
 
 func (*ChatgptLoginAccountParams) isLoginAccountParams() {}
 
+func (p *ChatgptLoginAccountParams) marshalWire() ([]byte, error) {
+	type wire ChatgptLoginAccountParams
+	w := (*wire)(p)
+	w.Type = loginTypeChatgpt
+	return json.Marshal(w)
+}
+
 // ChatgptAuthTokensLoginAccountParams represents external auth token login parameters
 type ChatgptAuthTokensLoginAccountParams struct {
 	Type             string  `json:"type"`
@@ -234,7 +250,7 @@ func (p *ChatgptAuthTokensLoginAccountParams) MarshalJSON() ([]byte, error) {
 		ChatgptPlanType  *string `json:"chatgptPlanType,omitempty"`
 	}
 	return json.Marshal(redacted{
-		Type:             p.Type,
+		Type:             loginTypeChatgptAuthTokens,
 		AccessToken:      "[REDACTED]",
 		ChatgptAccountId: p.ChatgptAccountId,
 		ChatgptPlanType:  p.ChatgptPlanType,
@@ -243,7 +259,9 @@ func (p *ChatgptAuthTokensLoginAccountParams) MarshalJSON() ([]byte, error) {
 
 func (p *ChatgptAuthTokensLoginAccountParams) marshalWire() ([]byte, error) {
 	type wire ChatgptAuthTokensLoginAccountParams
-	return json.Marshal((*wire)(p))
+	w := (*wire)(p)
+	w.Type = loginTypeChatgptAuthTokens
+	return json.Marshal(w)
 }
 
 // String redacts the access token to prevent accidental credential leaks in logs.

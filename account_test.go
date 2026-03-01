@@ -141,6 +141,88 @@ func TestAccountGetRateLimits(t *testing.T) {
 	}
 }
 
+func TestLoginParamsMarshalJSONHardcodesType(t *testing.T) {
+	t.Run("ApiKey_redacted_uses_correct_type", func(t *testing.T) {
+		p := &codex.ApiKeyLoginAccountParams{ApiKey: "sk-xxx"} // Type intentionally omitted
+		b, err := json.Marshal(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out map[string]string
+		_ = json.Unmarshal(b, &out)
+		if out["type"] != "apiKey" {
+			t.Errorf("redacted type = %q, want %q", out["type"], "apiKey")
+		}
+		if out["apiKey"] != "[REDACTED]" {
+			t.Errorf("apiKey should be redacted, got %q", out["apiKey"])
+		}
+	})
+	t.Run("ChatgptAuthTokens_redacted_uses_correct_type", func(t *testing.T) {
+		p := &codex.ChatgptAuthTokensLoginAccountParams{AccessToken: "tok", ChatgptAccountId: "acct"}
+		b, err := json.Marshal(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out map[string]string
+		_ = json.Unmarshal(b, &out)
+		if out["type"] != "chatgptAuthTokens" {
+			t.Errorf("redacted type = %q, want %q", out["type"], "chatgptAuthTokens")
+		}
+	})
+}
+
+func TestLoginParamsHardcodeTypeDiscriminator(t *testing.T) {
+	tests := []struct {
+		name     string
+		params   codex.LoginAccountParams
+		wantType string
+	}{
+		{
+			name:     "ApiKey_without_Type_set",
+			params:   &codex.ApiKeyLoginAccountParams{ApiKey: "sk-xxx"},
+			wantType: "apiKey",
+		},
+		{
+			name:     "ApiKey_with_wrong_Type",
+			params:   &codex.ApiKeyLoginAccountParams{Type: "wrong", ApiKey: "sk-xxx"},
+			wantType: "apiKey",
+		},
+		{
+			name:     "Chatgpt_without_Type_set",
+			params:   &codex.ChatgptLoginAccountParams{},
+			wantType: "chatgpt",
+		},
+		{
+			name:     "ChatgptAuthTokens_without_Type_set",
+			params:   &codex.ChatgptAuthTokensLoginAccountParams{AccessToken: "tok", ChatgptAccountId: "acct"},
+			wantType: "chatgptAuthTokens",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := NewMockTransport()
+			client := codex.NewClient(transport)
+
+			_ = transport.SetResponseData("account/login/start", map[string]interface{}{
+				"type": tt.wantType,
+			})
+
+			_, _ = client.Account.Login(context.Background(), tt.params)
+
+			req := transport.GetSentRequest(0)
+			var envelope struct {
+				Type string `json:"type"`
+			}
+			if err := json.Unmarshal(req.Params, &envelope); err != nil {
+				t.Fatalf("unmarshal params: %v", err)
+			}
+			if envelope.Type != tt.wantType {
+				t.Errorf("wire type = %q, want %q", envelope.Type, tt.wantType)
+			}
+		})
+	}
+}
+
 func TestAccountLogin(t *testing.T) {
 	tests := []struct {
 		name     string
