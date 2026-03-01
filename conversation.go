@@ -46,9 +46,8 @@ func (c *Conversation) ThreadID() string {
 
 // Thread returns a deep-copy snapshot of the latest thread state.
 // The returned Thread is fully isolated from the Conversation's internal
-// state — mutations to the snapshot (including pointer fields) do not
-// affect the Conversation. The ThreadItemWrapper.Value interface pointers
-// within Items still share underlying memory with the original.
+// state — mutations to the snapshot do not affect the Conversation.
+// ThreadItemWrapper values within Items are cloned via JSON round-trip.
 func (c *Conversation) Thread() Thread {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -68,7 +67,9 @@ func (c *Conversation) Thread() Thread {
 	copy(t.Turns, c.thread.Turns)
 	for i, turn := range t.Turns {
 		t.Turns[i].Items = make([]ThreadItemWrapper, len(turn.Items))
-		copy(t.Turns[i].Items, turn.Items)
+		for j, item := range turn.Items {
+			t.Turns[i].Items[j] = cloneThreadItemWrapper(item)
+		}
 		if turn.Error != nil {
 			e := *turn.Error
 			e.CodexErrorInfo = append(json.RawMessage(nil), turn.Error.CodexErrorInfo...)
@@ -76,6 +77,22 @@ func (c *Conversation) Thread() Thread {
 		}
 	}
 	return t
+}
+
+// cloneThreadItemWrapper deep-copies a ThreadItemWrapper via JSON round-trip.
+func cloneThreadItemWrapper(w ThreadItemWrapper) ThreadItemWrapper {
+	if w.Value == nil {
+		return w
+	}
+	b, err := json.Marshal(w)
+	if err != nil {
+		return w
+	}
+	var clone ThreadItemWrapper
+	if err := json.Unmarshal(b, &clone); err != nil {
+		return w
+	}
+	return clone
 }
 
 func cloneStringPtr(s *string) *string {
