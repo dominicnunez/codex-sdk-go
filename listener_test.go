@@ -75,5 +75,4 @@ func (m *mockInternalTransport) Notify(_ context.Context, _ Notification) error 
 
 func (m *mockInternalTransport) OnNotify(_ NotificationHandler) {}
 func (m *mockInternalTransport) OnRequest(_ RequestHandler)     {}
-func (m *mockInternalTransport) OnPanic(_ func(any))            {}
 func (m *mockInternalTransport) Close() error                   { return nil }
