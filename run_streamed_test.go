@@ -896,3 +896,89 @@ func TestRunStreamedEventsSingleUse(t *testing.T) {
 		t.Errorf("second iteration yielded %d events, want 0", secondCount)
 	}
 }
+
+func TestRunStreamedIgnoresCrossThreadNotifications(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "Say hello"})
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Inject notifications for a different thread — these should be ignored.
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/agentMessage/delta",
+		Params:  json.RawMessage(`{"delta":"Wrong","itemId":"item-wrong","threadId":"thread-OTHER","turnId":"turn-1"}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-OTHER","turnId":"turn-1","item":{"type":"agentMessage","id":"item-wrong","text":"Wrong thread"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-OTHER","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	// Give time for the cross-thread notifications to be dispatched and filtered.
+	time.Sleep(50 * time.Millisecond)
+
+	// Now inject the correct notifications for thread-1.
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/agentMessage/delta",
+		Params:  json.RawMessage(`{"delta":"Correct","itemId":"item-1","threadId":"thread-1","turnId":"turn-1"}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-1","text":"Correct thread"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	var events []codex.Event
+	for event, err := range stream.Events() {
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		events = append(events, event)
+	}
+
+	// Should have exactly 3 events: TextDelta, ItemCompleted, TurnCompleted — all from thread-1.
+	if len(events) != 3 {
+		t.Fatalf("len(events) = %d, want 3; events: %v", len(events), events)
+	}
+
+	if td, ok := events[0].(*codex.TextDelta); !ok {
+		t.Errorf("events[0] type = %T, want *TextDelta", events[0])
+	} else if td.Delta != "Correct" {
+		t.Errorf("TextDelta.Delta = %q, want %q", td.Delta, "Correct")
+	}
+
+	if _, ok := events[1].(*codex.ItemCompleted); !ok {
+		t.Errorf("events[1] type = %T, want *ItemCompleted", events[1])
+	}
+
+	if _, ok := events[2].(*codex.TurnCompleted); !ok {
+		t.Errorf("events[2] type = %T, want *TurnCompleted", events[2])
+	}
+
+	result := stream.Result()
+	if result == nil {
+		t.Fatal("Result() returned nil")
+	}
+	if result.Response != "Correct thread" {
+		t.Errorf("Response = %q, want %q", result.Response, "Correct thread")
+	}
+	if len(result.Items) != 1 {
+		t.Fatalf("len(Items) = %d, want 1", len(result.Items))
+	}
+}

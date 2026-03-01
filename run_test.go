@@ -681,6 +681,69 @@ func TestRunApprovalFlowDuringTurn(t *testing.T) {
 	}
 }
 
+func TestRunIgnoresCrossThreadNotifications(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	type runResult struct {
+		result *codex.RunResult
+		err    error
+	}
+	ch := make(chan runResult, 1)
+
+	go func() {
+		r, err := proc.Run(ctx, codex.RunOptions{
+			Prompt: "Say hello",
+		})
+		ch <- runResult{r, err}
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Inject notifications for a different thread — these should be ignored.
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-OTHER","turnId":"turn-1","item":{"type":"agentMessage","id":"item-wrong","text":"Wrong thread"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-OTHER","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	// Give time for the cross-thread notifications to be dispatched and filtered.
+	time.Sleep(50 * time.Millisecond)
+
+	// Now inject the correct item and turn/completed for thread-1.
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-1","text":"Correct thread"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	result := <-ch
+	if result.err != nil {
+		t.Fatalf("Run() error: %v", result.err)
+	}
+
+	// Only the correct-thread item should be collected.
+	if len(result.result.Items) != 1 {
+		t.Fatalf("len(Items) = %d, want 1", len(result.result.Items))
+	}
+
+	if result.result.Response != "Correct thread" {
+		t.Errorf("Response = %q, want %q", result.result.Response, "Correct thread")
+	}
+}
+
 func TestProcessCloseFromClient(t *testing.T) {
 	mock := NewMockTransport()
 	client := codex.NewClient(mock)
