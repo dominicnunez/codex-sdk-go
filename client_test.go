@@ -123,8 +123,9 @@ func TestClientUnknownNotification(t *testing.T) {
 	// The test passing means no panic occurred
 }
 
-// TestClientRequestTimeout verifies that requests respect context timeouts.
-func TestClientRequestTimeout(t *testing.T) {
+// TestClientContextCancellation verifies that a pre-cancelled context
+// produces a CanceledError rather than blocking on the transport.
+func TestClientContextCancellation(t *testing.T) {
 	mock := NewMockTransport()
 	client := codex.NewClient(mock, codex.WithRequestTimeout(50*time.Millisecond))
 
@@ -151,35 +152,9 @@ func TestClientRequestTimeout(t *testing.T) {
 	}
 }
 
-// TestClientDefaultTimeout verifies that the client uses the default timeout when configured.
+// TestClientDefaultTimeout verifies that a slow response triggers a TimeoutError
+// when the client is configured with a default request timeout.
 func TestClientDefaultTimeout(t *testing.T) {
-	mock := NewMockTransport()
-	timeout := 100 * time.Millisecond
-	client := codex.NewClient(mock, codex.WithRequestTimeout(timeout))
-
-	// Send a request with a background context (no explicit timeout)
-	req := codex.Request{
-		JSONRPC: "2.0",
-		ID:      codex.RequestID{Value: "default-timeout"},
-		Method:  "test.method",
-		Params:  json.RawMessage(`{}`),
-	}
-
-	// Mock returns immediately, so this should succeed
-	ctx := context.Background()
-	_, err := client.Send(ctx, req)
-	if err != nil {
-		t.Fatalf("Send failed: %v", err)
-	}
-
-	// Verify request was sent
-	sentReq := mock.GetSentRequest(0)
-	if sentReq == nil {
-		t.Fatal("no request was sent")
-	}
-
-	// Now test that a slow response triggers a TimeoutError.
-	// Use a very short timeout so the mock's lack of response causes expiry.
 	shortTimeout := 25 * time.Millisecond
 	slowClient := codex.NewClient(NewSlowMockTransport(shortTimeout*2), codex.WithRequestTimeout(shortTimeout))
 
@@ -190,7 +165,7 @@ func TestClientDefaultTimeout(t *testing.T) {
 		Params:  json.RawMessage(`{}`),
 	}
 
-	_, err = slowClient.Send(context.Background(), slowReq)
+	_, err := slowClient.Send(context.Background(), slowReq)
 	if err == nil {
 		t.Fatal("expected TimeoutError, got nil")
 	}
@@ -275,7 +250,7 @@ func TestClientRPCError(t *testing.T) {
 
 	// Verify it's an RPCError
 	var rpcErr *codex.RPCError
-	if !isRPCError(err, &rpcErr) {
+	if !errors.As(err, &rpcErr) {
 		t.Fatalf("expected RPCError, got: %T", err)
 	}
 
@@ -291,15 +266,4 @@ func isTimeoutError(err error) bool {
 	}
 	var timeoutErr *codex.TimeoutError
 	return errors.As(err, &timeoutErr)
-}
-
-// isRPCError checks if err is or wraps an RPCError.
-func isRPCError(err error, target interface{}) bool {
-	switch v := target.(type) {
-	case **codex.RPCError:
-		return errors.As(err, v)
-	case **codex.TimeoutError:
-		return errors.As(err, v)
-	}
-	return false
 }
