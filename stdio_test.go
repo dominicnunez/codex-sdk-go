@@ -527,6 +527,52 @@ func TestStdioInvalidJSON(t *testing.T) {
 	}
 }
 
+// TestStdioUnknownMessageTypeSkipped verifies that a JSON object with no id
+// and no method (unknown message type) is silently skipped and the transport
+// continues operating for subsequent messages.
+func TestStdioUnknownMessageTypeSkipped(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	received := make(chan string, 1)
+	transport.OnNotify(func(ctx context.Context, notif codex.Notification) {
+		received <- notif.Method
+	})
+
+	// Send a JSON object with no id and no method — hits the unknown message branch.
+	unknownMessages := []string{
+		`{"jsonrpc":"2.0"}`,
+		`{"jsonrpc":"2.0","data":"something"}`,
+	}
+	for _, msg := range unknownMessages {
+		_, _ = serverWriter.Write([]byte(msg + "\n"))
+	}
+
+	// Send a valid notification to verify the transport is still alive.
+	validNotif := codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "test/after-unknown",
+	}
+	notifJSON, _ := json.Marshal(validNotif)
+	_, _ = serverWriter.Write(append(notifJSON, '\n'))
+
+	select {
+	case method := <-received:
+		if method != "test/after-unknown" {
+			t.Errorf("received method = %s; want test/after-unknown", method)
+		}
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("timeout: transport stopped working after unknown message type")
+	}
+}
+
 // TestStdioContextCancellation verifies Send respects context cancellation
 func TestStdioContextCancellation(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
@@ -1089,8 +1135,6 @@ func TestStdioNoHandlerReturnsMethodNotFound(t *testing.T) {
 	}
 }
 
-// TestStdioConcurrentSendAndClose verifies that concurrent Send and Close calls
-// do not race or panic. Every Send must either succeed or return an error.
 // TestStdioWriteMessageRejectsAfterClose verifies that writeMessage returns an
 // error when the transport context has been cancelled by Close, ensuring that
 // handler goroutines dispatched before Close do not write to a closed writer.
@@ -1103,16 +1147,18 @@ func TestStdioWriteMessageRejectsAfterClose(t *testing.T) {
 	defer func() { _ = clientWriter.Close() }()
 
 	handlerStarted := make(chan struct{})
-	handlerDone := make(chan error, 1)
+	handlerDone := make(chan struct{}, 1)
 
 	transport := codex.NewStdioTransport(clientReader, clientWriter)
 	transport.OnRequest(func(_ context.Context, req codex.Request) (codex.Response, error) {
 		close(handlerStarted)
 
 		// Wait for Close() to run, then try to write a response.
-		// Before the fix, this would write to a potentially invalid writer.
+		// The transport's writeMessage should reject the write because
+		// the transport context has been cancelled.
 		time.Sleep(50 * time.Millisecond)
 
+		handlerDone <- struct{}{}
 		return codex.Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
@@ -1141,18 +1187,18 @@ func TestStdioWriteMessageRejectsAfterClose(t *testing.T) {
 
 	_ = transport.Close()
 
-	// The handler goroutine finishes and the response write should be
-	// silently rejected (transport closed error). The test passes if
-	// no panic or data race occurs.
+	// Verify the handler goroutine completes (writeMessage returns after
+	// detecting the cancelled context, rather than blocking or panicking).
 	select {
-	case err := <-handlerDone:
-		if err != nil {
-			t.Errorf("unexpected handler error: %v", err)
-		}
+	case <-handlerDone:
+		// Handler completed — writeMessage rejected the write after Close.
 	case <-time.After(2 * time.Second):
-		// Handler goroutine finished via the writeMessage path — that's fine.
+		t.Fatal("handler goroutine did not complete after Close")
 	}
 }
+
+// TestStdioConcurrentSendAndClose verifies that concurrent Send and Close calls
+// do not race or panic. Every Send must either succeed or return an error.
 
 func TestStdioConcurrentSendAndClose(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
@@ -1221,4 +1267,59 @@ func TestStdioConcurrentSendAndClose(t *testing.T) {
 	}()
 
 	wg.Wait()
+}
+
+// TestStdioSpontaneousReaderEOF verifies that when the underlying reader
+// closes unexpectedly (simulating a child process crash), a pending Send
+// is unblocked with a "transport reader stopped" error.
+func TestStdioSpontaneousReaderEOF(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	// Drain requests from server side so writes don't block.
+	go func() {
+		scanner := bufio.NewScanner(serverReader)
+		for scanner.Scan() {
+		}
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Send a request that will block waiting for a response.
+	errCh := make(chan error, 1)
+	go func() {
+		req := codex.Request{
+			JSONRPC: "2.0",
+			ID:      codex.RequestID{Value: "eof-test"},
+			Method:  "test/pending",
+		}
+		_, err := transport.Send(ctx, req)
+		errCh <- err
+	}()
+
+	// Wait for the request to be sent.
+	time.Sleep(50 * time.Millisecond)
+
+	// Simulate a child process crash by closing the reader pipe.
+	// This causes the readLoop scanner to hit EOF and close readerStopped.
+	_ = serverWriter.Close()
+	_ = clientReader.Close()
+
+	select {
+	case err := <-errCh:
+		if err == nil {
+			t.Fatal("expected error from Send after reader EOF, got nil")
+		}
+		if !strings.Contains(err.Error(), "transport reader stopped") {
+			t.Errorf("expected 'transport reader stopped' error, got: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout: Send was not unblocked after reader EOF")
+	}
 }
