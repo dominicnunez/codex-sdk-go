@@ -181,12 +181,17 @@ type Turn struct {
 	Error  *TurnError          `json:"error,omitempty"`
 }
 
-// TurnError represents an error in a turn
+// TurnError represents an error in a turn.
+// It implements the error interface so callers can use errors.As to inspect
+// structured fields (CodexErrorInfo, AdditionalDetails).
 type TurnError struct {
 	Message           string          `json:"message"`
 	CodexErrorInfo    json.RawMessage `json:"codexErrorInfo,omitempty"`
 	AdditionalDetails *string         `json:"additionalDetails,omitempty"`
 }
+
+// Error implements the error interface.
+func (e *TurnError) Error() string { return e.Message }
 
 // SessionSourceWrapper wraps SessionSource for JSON marshaling
 type SessionSourceWrapper struct {

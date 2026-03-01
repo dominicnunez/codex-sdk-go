@@ -3,6 +3,7 @@ package codex_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -174,6 +175,53 @@ func TestRunTurnError(t *testing.T) {
 	}
 	if result.result != nil {
 		t.Errorf("expected nil result on error, got %+v", result.result)
+	}
+}
+
+func TestRunTurnErrorUnwrap(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	type runResult struct {
+		result *codex.RunResult
+		err    error
+	}
+	ch := make(chan runResult, 1)
+
+	go func() {
+		r, err := proc.Run(ctx, codex.RunOptions{
+			Prompt: "This will fail with details",
+		})
+		ch <- runResult{r, err}
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"failed","items":[],"error":{"message":"model rate limited","codexErrorInfo":{"code":"rate_limit"},"additionalDetails":"retry after 30s"}}}`),
+	})
+
+	result := <-ch
+	if result.err == nil {
+		t.Fatal("expected error from turn error")
+	}
+
+	var turnErr *codex.TurnError
+	if !errors.As(result.err, &turnErr) {
+		t.Fatalf("errors.As failed: could not extract *TurnError from %v", result.err)
+	}
+	if turnErr.Message != "model rate limited" {
+		t.Errorf("TurnError.Message = %q, want %q", turnErr.Message, "model rate limited")
+	}
+	if turnErr.CodexErrorInfo == nil {
+		t.Error("TurnError.CodexErrorInfo is nil, want non-nil")
+	}
+	if turnErr.AdditionalDetails == nil || *turnErr.AdditionalDetails != "retry after 30s" {
+		t.Errorf("TurnError.AdditionalDetails = %v, want %q", turnErr.AdditionalDetails, "retry after 30s")
 	}
 }
 
