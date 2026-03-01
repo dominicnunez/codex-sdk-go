@@ -56,7 +56,6 @@ type Process struct {
 	closeOnce sync.Once
 	initMu    sync.Mutex
 	initDone  bool
-	initErr   error
 }
 
 // buildArgs constructs the CLI argument list from typed fields and ExecArgs.
@@ -177,7 +176,7 @@ func (p *Process) ensureInit(ctx context.Context) error {
 	p.initMu.Lock()
 	defer p.initMu.Unlock()
 	if p.initDone {
-		return p.initErr
+		return nil
 	}
 	_, err := p.Client.Initialize(ctx, InitializeParams{
 		ClientInfo: ClientInfo{Name: "codex-sdk-go", Version: "0.1.0"},
