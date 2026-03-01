@@ -694,6 +694,93 @@ func TestConversationConcurrentTurnStreamedRejected(t *testing.T) {
 	}
 }
 
+func TestConversationConcurrentTurnVsTurnStreamedRejected(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+
+	// Start a Turn in background.
+	firstDone := make(chan error, 1)
+	go func() {
+		_, err := conv.Turn(ctx, codex.TurnOptions{Prompt: "first"})
+		firstDone <- err
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// TurnStreamed should be rejected while Turn is in progress.
+	stream := conv.TurnStreamed(ctx, codex.TurnOptions{Prompt: "second"})
+
+	var gotErr error
+	for _, err := range stream.Events() {
+		if err != nil {
+			gotErr = err
+			break
+		}
+	}
+	if gotErr == nil {
+		t.Fatal("expected error from concurrent TurnStreamed while Turn is active")
+	}
+	if gotErr.Error() != "a turn is already in progress on this conversation" {
+		t.Errorf("error = %q, want turn-in-progress error", gotErr)
+	}
+
+	// Complete the first turn.
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	if err := <-firstDone; err != nil {
+		t.Fatalf("first turn error: %v", err)
+	}
+}
+
+func TestConversationConcurrentTurnStreamedVsTurnRejected(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+
+	// Start a TurnStreamed in background.
+	stream := conv.TurnStreamed(ctx, codex.TurnOptions{Prompt: "first"})
+	time.Sleep(50 * time.Millisecond)
+
+	// Turn should be rejected while TurnStreamed is in progress.
+	_, err = conv.Turn(ctx, codex.TurnOptions{Prompt: "second"})
+	if err == nil {
+		t.Fatal("expected error from concurrent Turn while TurnStreamed is active")
+	}
+	if err.Error() != "a turn is already in progress on this conversation" {
+		t.Errorf("error = %q, want turn-in-progress error", err)
+	}
+
+	// Complete the first streamed turn.
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	for _, err := range stream.Events() {
+		if err != nil {
+			t.Fatalf("stream error: %v", err)
+		}
+	}
+}
+
 func TestConversationThreadDeepCopyIsolation(t *testing.T) {
 	proc, mock := mockProcess(t)
 
