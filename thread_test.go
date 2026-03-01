@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -766,6 +767,29 @@ func TestThreadServiceRPCError(t *testing.T) {
 				t.Errorf("expected error code %d, got %d", codex.ErrCodeInternalError, rpcErr.RPCError().Code)
 			}
 		})
+	}
+}
+
+// TestThreadReadMalformedResult verifies that a valid JSON-RPC response
+// envelope with an unexpected result shape returns a wrapped unmarshal error.
+func TestThreadReadMalformedResult(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+
+	// Return a result that cannot be deserialized into ThreadReadResponse
+	// (e.g. thread field is a string instead of an object).
+	mock.SetResponse("thread/read", codex.Response{
+		JSONRPC: "2.0",
+		Result:  json.RawMessage(`{"thread":"not-an-object","approvalPolicy":123}`),
+	})
+
+	_, err := client.Thread.Read(context.Background(), codex.ThreadReadParams{ThreadID: "t"})
+	if err == nil {
+		t.Fatal("expected unmarshal error for malformed result, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "unmarshal") {
+		t.Errorf("expected error to mention unmarshal, got: %v", err)
 	}
 }
 
