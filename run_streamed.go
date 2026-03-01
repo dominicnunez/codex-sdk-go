@@ -7,9 +7,14 @@ import (
 	"fmt"
 	"iter"
 	"sync"
+	"sync/atomic"
 )
 
 const streamChannelBuffer = 64
+
+// ErrStreamConsumed is returned when Events() is called on a Stream whose
+// events have already been consumed by a prior iteration.
+var ErrStreamConsumed = errors.New("stream events already consumed")
 
 // eventOrErr pairs an Event with an error for channel transport.
 type eventOrErr struct {
@@ -21,16 +26,22 @@ type eventOrErr struct {
 type Stream struct {
 	events iter.Seq2[Event, error]
 
-	result *RunResult
-	done   chan struct{}
-	mu     sync.Mutex
+	result   *RunResult
+	done     chan struct{}
+	mu       sync.Mutex
+	consumed atomic.Bool
 }
 
 // Events yields (Event, error) pairs. Iterate with a range-over-func loop.
 // Iteration ends when the turn completes, an error occurs, or the context is cancelled.
-// The iterator is single-use: subsequent iterations yield zero events because the
-// underlying channel is already drained and closed.
+// The iterator is single-use: subsequent calls return an iterator that yields
+// a single ErrStreamConsumed error.
 func (s *Stream) Events() iter.Seq2[Event, error] {
+	if !s.consumed.CompareAndSwap(false, true) {
+		return func(yield func(Event, error) bool) {
+			yield(nil, ErrStreamConsumed)
+		}
+	}
 	return s.events
 }
 

@@ -887,13 +887,16 @@ func TestRunStreamedEventsSingleUse(t *testing.T) {
 		t.Fatal("first iteration yielded zero events")
 	}
 
-	// Second iteration should yield zero events (channel already drained and closed).
-	var secondCount int
-	for range stream.Events() {
-		secondCount++
+	// Second call should yield a single ErrStreamConsumed error.
+	var gotErr error
+	for _, err := range stream.Events() {
+		if err != nil {
+			gotErr = err
+			break
+		}
 	}
-	if secondCount != 0 {
-		t.Errorf("second iteration yielded %d events, want 0", secondCount)
+	if gotErr != codex.ErrStreamConsumed {
+		t.Errorf("second Events() error = %v, want ErrStreamConsumed", gotErr)
 	}
 }
 
@@ -980,5 +983,41 @@ func TestRunStreamedIgnoresCrossThreadNotifications(t *testing.T) {
 	}
 	if len(result.Items) != 1 {
 		t.Fatalf("len(Items) = %d, want 1", len(result.Items))
+	}
+}
+
+func TestStreamEventsConsumedOnSecondCall(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "hello"})
+
+	time.Sleep(50 * time.Millisecond)
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	// Drain the first iterator.
+	for _, err := range stream.Events() {
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	}
+
+	// Second call should yield ErrStreamConsumed.
+	var gotErr error
+	for _, err := range stream.Events() {
+		if err != nil {
+			gotErr = err
+			break
+		}
+	}
+	if gotErr != codex.ErrStreamConsumed {
+		t.Errorf("second Events() error = %v, want ErrStreamConsumed", gotErr)
 	}
 }
