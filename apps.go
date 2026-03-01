@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 )
 
 // AppsListParams contains parameters for the apps/list request.
@@ -105,6 +106,7 @@ func (c *Client) OnAppListUpdated(handler func(AppListUpdatedNotification)) {
 	c.OnNotification(notifyAppListUpdated, func(ctx context.Context, notif Notification) {
 		var params AppListUpdatedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifyAppListUpdated, fmt.Errorf("unmarshal %s: %w", notifyAppListUpdated, err))
 			return
 		}
 		handler(params)

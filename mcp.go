@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 )
 
 // McpAuthStatus represents the authentication status of an MCP server.
@@ -145,6 +146,7 @@ func (c *Client) OnMcpServerOauthLoginCompleted(handler func(McpServerOauthLogin
 	c.OnNotification(notifyMcpServerOauthLoginCompleted, func(ctx context.Context, notif Notification) {
 		var params McpServerOauthLoginCompletedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifyMcpServerOauthLoginCompleted, fmt.Errorf("unmarshal %s: %w", notifyMcpServerOauthLoginCompleted, err))
 			return
 		}
 		handler(params)
@@ -160,6 +162,7 @@ func (c *Client) OnMcpToolCallProgress(handler func(McpToolCallProgressNotificat
 	c.OnNotification(notifyMcpToolCallProgress, func(ctx context.Context, notif Notification) {
 		var params McpToolCallProgressNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifyMcpToolCallProgress, fmt.Errorf("unmarshal %s: %w", notifyMcpToolCallProgress, err))
 			return
 		}
 		handler(params)

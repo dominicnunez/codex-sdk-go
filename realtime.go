@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 )
 
 // ThreadRealtimeStartedNotification is sent when a realtime connection starts for a thread.
@@ -57,6 +58,7 @@ func (c *Client) OnThreadRealtimeStarted(handler func(ThreadRealtimeStartedNotif
 	c.OnNotification(notifyRealtimeStarted, func(ctx context.Context, notif Notification) {
 		var params ThreadRealtimeStartedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifyRealtimeStarted, fmt.Errorf("unmarshal %s: %w", notifyRealtimeStarted, err))
 			return
 		}
 		handler(params)
@@ -72,6 +74,7 @@ func (c *Client) OnThreadRealtimeClosed(handler func(ThreadRealtimeClosedNotific
 	c.OnNotification(notifyRealtimeClosed, func(ctx context.Context, notif Notification) {
 		var params ThreadRealtimeClosedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifyRealtimeClosed, fmt.Errorf("unmarshal %s: %w", notifyRealtimeClosed, err))
 			return
 		}
 		handler(params)
@@ -87,6 +90,7 @@ func (c *Client) OnThreadRealtimeError(handler func(ThreadRealtimeErrorNotificat
 	c.OnNotification(notifyRealtimeError, func(ctx context.Context, notif Notification) {
 		var params ThreadRealtimeErrorNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifyRealtimeError, fmt.Errorf("unmarshal %s: %w", notifyRealtimeError, err))
 			return
 		}
 		handler(params)
@@ -102,6 +106,7 @@ func (c *Client) OnThreadRealtimeItemAdded(handler func(ThreadRealtimeItemAddedN
 	c.OnNotification(notifyRealtimeItemAdded, func(ctx context.Context, notif Notification) {
 		var params ThreadRealtimeItemAddedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifyRealtimeItemAdded, fmt.Errorf("unmarshal %s: %w", notifyRealtimeItemAdded, err))
 			return
 		}
 		handler(params)
@@ -117,6 +122,7 @@ func (c *Client) OnThreadRealtimeOutputAudioDelta(handler func(ThreadRealtimeOut
 	c.OnNotification(notifyRealtimeOutputAudioDelta, func(ctx context.Context, notif Notification) {
 		var params ThreadRealtimeOutputAudioDeltaNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifyRealtimeOutputAudioDelta, fmt.Errorf("unmarshal %s: %w", notifyRealtimeOutputAudioDelta, err))
 			return
 		}
 		handler(params)

@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 )
 
 // ModelListParams are parameters for listing available models.
@@ -124,6 +125,7 @@ func (c *Client) OnModelRerouted(handler func(ModelReroutedNotification)) {
 	c.OnNotification(notifyModelRerouted, func(ctx context.Context, notif Notification) {
 		var n ModelReroutedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			c.reportHandlerError(notifyModelRerouted, fmt.Errorf("unmarshal %s: %w", notifyModelRerouted, err))
 			return
 		}
 		handler(n)

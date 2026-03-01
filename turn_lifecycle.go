@@ -38,6 +38,7 @@ func executeTurn(ctx context.Context, p turnLifecycleParams) (*RunResult, error)
 		}
 		var n ItemCompletedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			p.client.reportHandlerError(notifyItemCompleted, fmt.Errorf("unmarshal %s: %w", notifyItemCompleted, err))
 			n.Item = ThreadItemWrapper{Value: &UnknownThreadItem{
 				Type: "unmarshal_error",
 				Raw:  append(json.RawMessage(nil), notif.Params...),
@@ -55,6 +56,7 @@ func executeTurn(ctx context.Context, p turnLifecycleParams) (*RunResult, error)
 		}
 		var n TurnCompletedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			p.client.reportHandlerError(notifyTurnCompleted, fmt.Errorf("unmarshal %s: %w", notifyTurnCompleted, err))
 			n = TurnCompletedNotification{
 				Turn: Turn{Error: &TurnError{Message: "failed to unmarshal turn/completed: " + err.Error()}},
 			}
@@ -115,27 +117,27 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, ch chan<- e
 
 	turnDone := make(chan TurnCompletedNotification, 1)
 
-	streamListen(ctx, on, notifyTurnStarted, ch, p.threadID, func(n TurnStartedNotification) Event {
+	streamListen(ctx, on, notifyTurnStarted, ch, p.threadID, p.client.reportHandlerError, func(n TurnStartedNotification) Event {
 		return &TurnStarted{Turn: n.Turn, ThreadID: n.ThreadID}
 	})
 
-	streamListen(ctx, on, notifyAgentMessageDelta, ch, p.threadID, func(n AgentMessageDeltaNotification) Event {
+	streamListen(ctx, on, notifyAgentMessageDelta, ch, p.threadID, p.client.reportHandlerError, func(n AgentMessageDeltaNotification) Event {
 		return &TextDelta{Delta: n.Delta, ItemID: n.ItemID}
 	})
 
-	streamListen(ctx, on, notifyReasoningTextDelta, ch, p.threadID, func(n ReasoningTextDeltaNotification) Event {
+	streamListen(ctx, on, notifyReasoningTextDelta, ch, p.threadID, p.client.reportHandlerError, func(n ReasoningTextDeltaNotification) Event {
 		return &ReasoningDelta{Delta: n.Delta, ItemID: n.ItemID, ContentIndex: n.ContentIndex}
 	})
 
-	streamListen(ctx, on, notifyReasoningSummaryTextDelta, ch, p.threadID, func(n ReasoningSummaryTextDeltaNotification) Event {
+	streamListen(ctx, on, notifyReasoningSummaryTextDelta, ch, p.threadID, p.client.reportHandlerError, func(n ReasoningSummaryTextDeltaNotification) Event {
 		return &ReasoningSummaryDelta{Delta: n.Delta, ItemID: n.ItemID, SummaryIndex: n.SummaryIndex}
 	})
 
-	streamListen(ctx, on, notifyPlanDelta, ch, p.threadID, func(n PlanDeltaNotification) Event {
+	streamListen(ctx, on, notifyPlanDelta, ch, p.threadID, p.client.reportHandlerError, func(n PlanDeltaNotification) Event {
 		return &PlanDelta{Delta: n.Delta, ItemID: n.ItemID}
 	})
 
-	streamListen(ctx, on, notifyFileChangeOutputDelta, ch, p.threadID, func(n FileChangeOutputDeltaNotification) Event {
+	streamListen(ctx, on, notifyFileChangeOutputDelta, ch, p.threadID, p.client.reportHandlerError, func(n FileChangeOutputDeltaNotification) Event {
 		return &FileChangeDelta{Delta: n.Delta, ItemID: n.ItemID}
 	})
 
@@ -147,6 +149,7 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, ch chan<- e
 		}
 		var n ItemStartedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			p.client.reportHandlerError(notifyItemStarted, fmt.Errorf("unmarshal %s: %w", notifyItemStarted, err))
 			return
 		}
 		if c, ok := n.Item.Value.(*CollabAgentToolCallThreadItem); ok {
@@ -163,6 +166,7 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, ch chan<- e
 		}
 		var n ItemCompletedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			p.client.reportHandlerError(notifyItemCompleted, fmt.Errorf("unmarshal %s: %w", notifyItemCompleted, err))
 			n.Item = ThreadItemWrapper{Value: &UnknownThreadItem{
 				Type: "unmarshal_error",
 				Raw:  append(json.RawMessage(nil), notif.Params...),
@@ -185,6 +189,7 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, ch chan<- e
 		}
 		var n TurnCompletedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			p.client.reportHandlerError(notifyTurnCompleted, fmt.Errorf("unmarshal %s: %w", notifyTurnCompleted, err))
 			n = TurnCompletedNotification{
 				Turn: Turn{Error: &TurnError{Message: "failed to unmarshal turn/completed: " + err.Error()}},
 			}

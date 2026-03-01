@@ -109,7 +109,7 @@ func streamSendErr(ctx context.Context, ch chan<- eventOrErr, err error) {
 // streamListen registers a notification listener that unmarshals the
 // notification params into N, converts it to an Event, and sends it on ch.
 // Notifications with a threadId that does not match threadID are ignored.
-func streamListen[N any](ctx context.Context, on func(string, NotificationHandler), method string, ch chan<- eventOrErr, threadID string, convert func(N) Event) {
+func streamListen[N any](ctx context.Context, on func(string, NotificationHandler), method string, ch chan<- eventOrErr, threadID string, reportErr func(string, error), convert func(N) Event) {
 	on(method, func(_ context.Context, notif Notification) {
 		var carrier threadIDCarrier
 		if err := json.Unmarshal(notif.Params, &carrier); err != nil || carrier.ThreadID != threadID {
@@ -117,6 +117,7 @@ func streamListen[N any](ctx context.Context, on func(string, NotificationHandle
 		}
 		var n N
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			reportErr(method, fmt.Errorf("unmarshal %s: %w", method, err))
 			return
 		}
 		streamSendEvent(ctx, ch, convert(n))

@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 )
 
 // CommandExecParams represents parameters for executing a command
@@ -55,6 +56,7 @@ func (c *Client) OnCommandExecutionOutputDelta(handler func(CommandExecutionOutp
 	c.OnNotification(notifyCommandExecutionOutputDelta, func(ctx context.Context, notif Notification) {
 		var notification CommandExecutionOutputDeltaNotification
 		if err := json.Unmarshal(notif.Params, &notification); err != nil {
+			c.reportHandlerError(notifyCommandExecutionOutputDelta, fmt.Errorf("unmarshal %s: %w", notifyCommandExecutionOutputDelta, err))
 			return
 		}
 		handler(notification)

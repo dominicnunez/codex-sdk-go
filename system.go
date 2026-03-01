@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 )
 
 // WindowsSandboxSetupMode represents the sandbox setup mode
@@ -102,6 +103,7 @@ func (c *Client) OnWindowsSandboxSetupCompleted(handler func(WindowsSandboxSetup
 	c.OnNotification(notifyWindowsSandboxSetupCompleted, func(ctx context.Context, notif Notification) {
 		var params WindowsSandboxSetupCompletedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifyWindowsSandboxSetupCompleted, fmt.Errorf("unmarshal %s: %w", notifyWindowsSandboxSetupCompleted, err))
 			return
 		}
 		handler(params)
@@ -117,6 +119,7 @@ func (c *Client) OnWindowsWorldWritableWarning(handler func(WindowsWorldWritable
 	c.OnNotification(notifyWindowsWorldWritableWarning, func(ctx context.Context, notif Notification) {
 		var params WindowsWorldWritableWarningNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifyWindowsWorldWritableWarning, fmt.Errorf("unmarshal %s: %w", notifyWindowsWorldWritableWarning, err))
 			return
 		}
 		handler(params)
@@ -133,6 +136,7 @@ func (c *Client) OnContextCompacted(handler func(ContextCompactedNotification)) 
 	c.OnNotification(notifyThreadCompacted, func(ctx context.Context, notif Notification) {
 		var params ContextCompactedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifyThreadCompacted, fmt.Errorf("unmarshal %s: %w", notifyThreadCompacted, err))
 			return
 		}
 		handler(params)
@@ -148,6 +152,7 @@ func (c *Client) OnDeprecationNotice(handler func(DeprecationNoticeNotification)
 	c.OnNotification(notifyDeprecationNotice, func(ctx context.Context, notif Notification) {
 		var params DeprecationNoticeNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifyDeprecationNotice, fmt.Errorf("unmarshal %s: %w", notifyDeprecationNotice, err))
 			return
 		}
 		handler(params)
@@ -163,6 +168,7 @@ func (c *Client) OnError(handler func(ErrorNotification)) {
 	c.OnNotification(notifyError, func(ctx context.Context, notif Notification) {
 		var params ErrorNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifyError, fmt.Errorf("unmarshal %s: %w", notifyError, err))
 			return
 		}
 		handler(params)
@@ -178,6 +184,7 @@ func (c *Client) OnTerminalInteraction(handler func(TerminalInteractionNotificat
 	c.OnNotification(notifyTerminalInteraction, func(ctx context.Context, notif Notification) {
 		var params TerminalInteractionNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifyTerminalInteraction, fmt.Errorf("unmarshal %s: %w", notifyTerminalInteraction, err))
 			return
 		}
 		handler(params)

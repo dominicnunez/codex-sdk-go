@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 )
 
 // ===== Turn Started Notification =====
@@ -22,6 +23,7 @@ func (c *Client) OnTurnStarted(handler func(TurnStartedNotification)) {
 	c.OnNotification(notifyTurnStarted, func(ctx context.Context, notif Notification) {
 		var params TurnStartedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifyTurnStarted, fmt.Errorf("unmarshal %s: %w", notifyTurnStarted, err))
 			return
 		}
 		handler(params)
@@ -45,6 +47,7 @@ func (c *Client) OnTurnCompleted(handler func(TurnCompletedNotification)) {
 	c.OnNotification(notifyTurnCompleted, func(ctx context.Context, notif Notification) {
 		var params TurnCompletedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifyTurnCompleted, fmt.Errorf("unmarshal %s: %w", notifyTurnCompleted, err))
 			return
 		}
 		handler(params)
@@ -85,6 +88,7 @@ func (c *Client) OnTurnPlanUpdated(handler func(TurnPlanUpdatedNotification)) {
 	c.OnNotification(notifyTurnPlanUpdated, func(ctx context.Context, notif Notification) {
 		var params TurnPlanUpdatedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifyTurnPlanUpdated, fmt.Errorf("unmarshal %s: %w", notifyTurnPlanUpdated, err))
 			return
 		}
 		handler(params)
@@ -109,6 +113,7 @@ func (c *Client) OnTurnDiffUpdated(handler func(TurnDiffUpdatedNotification)) {
 	c.OnNotification(notifyTurnDiffUpdated, func(ctx context.Context, notif Notification) {
 		var params TurnDiffUpdatedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifyTurnDiffUpdated, fmt.Errorf("unmarshal %s: %w", notifyTurnDiffUpdated, err))
 			return
 		}
 		handler(params)

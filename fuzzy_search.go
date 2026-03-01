@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 )
 
 // FuzzyFileSearchParams represents parameters for fuzzy file search.
@@ -65,6 +66,7 @@ func (c *Client) OnFuzzyFileSearchSessionCompleted(handler func(FuzzyFileSearchS
 	c.OnNotification(notifyFuzzyFileSearchSessionCompleted, func(ctx context.Context, notif Notification) {
 		var params FuzzyFileSearchSessionCompletedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifyFuzzyFileSearchSessionCompleted, fmt.Errorf("unmarshal %s: %w", notifyFuzzyFileSearchSessionCompleted, err))
 			return
 		}
 		handler(params)
@@ -80,6 +82,7 @@ func (c *Client) OnFuzzyFileSearchSessionUpdated(handler func(FuzzyFileSearchSes
 	c.OnNotification(notifyFuzzyFileSearchSessionUpdated, func(ctx context.Context, notif Notification) {
 		var params FuzzyFileSearchSessionUpdatedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifyFuzzyFileSearchSessionUpdated, fmt.Errorf("unmarshal %s: %w", notifyFuzzyFileSearchSessionUpdated, err))
 			return
 		}
 		handler(params)

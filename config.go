@@ -427,6 +427,7 @@ func (c *Client) OnConfigWarning(handler func(ConfigWarningNotification)) {
 	c.OnNotification(notifyConfigWarning, func(ctx context.Context, notif Notification) {
 		var n ConfigWarningNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			c.reportHandlerError(notifyConfigWarning, fmt.Errorf("unmarshal %s: %w", notifyConfigWarning, err))
 			return
 		}
 		handler(n)

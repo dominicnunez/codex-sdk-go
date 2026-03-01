@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 )
 
 // Streaming Notifications
@@ -93,7 +94,7 @@ func (c *Client) OnAgentMessageDelta(handler func(AgentMessageDeltaNotification)
 	c.OnNotification(notifyAgentMessageDelta, func(ctx context.Context, notif Notification) {
 		var n AgentMessageDeltaNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
-			// Silently ignore unmarshal errors (notification is malformed)
+			c.reportHandlerError(notifyAgentMessageDelta, fmt.Errorf("unmarshal %s: %w", notifyAgentMessageDelta, err))
 			return
 		}
 		handler(n)
@@ -109,6 +110,7 @@ func (c *Client) OnFileChangeOutputDelta(handler func(FileChangeOutputDeltaNotif
 	c.OnNotification(notifyFileChangeOutputDelta, func(ctx context.Context, notif Notification) {
 		var n FileChangeOutputDeltaNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			c.reportHandlerError(notifyFileChangeOutputDelta, fmt.Errorf("unmarshal %s: %w", notifyFileChangeOutputDelta, err))
 			return
 		}
 		handler(n)
@@ -124,6 +126,7 @@ func (c *Client) OnPlanDelta(handler func(PlanDeltaNotification)) {
 	c.OnNotification(notifyPlanDelta, func(ctx context.Context, notif Notification) {
 		var n PlanDeltaNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			c.reportHandlerError(notifyPlanDelta, fmt.Errorf("unmarshal %s: %w", notifyPlanDelta, err))
 			return
 		}
 		handler(n)
@@ -139,6 +142,7 @@ func (c *Client) OnReasoningTextDelta(handler func(ReasoningTextDeltaNotificatio
 	c.OnNotification(notifyReasoningTextDelta, func(ctx context.Context, notif Notification) {
 		var n ReasoningTextDeltaNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			c.reportHandlerError(notifyReasoningTextDelta, fmt.Errorf("unmarshal %s: %w", notifyReasoningTextDelta, err))
 			return
 		}
 		handler(n)
@@ -154,6 +158,7 @@ func (c *Client) OnReasoningSummaryTextDelta(handler func(ReasoningSummaryTextDe
 	c.OnNotification(notifyReasoningSummaryTextDelta, func(ctx context.Context, notif Notification) {
 		var n ReasoningSummaryTextDeltaNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			c.reportHandlerError(notifyReasoningSummaryTextDelta, fmt.Errorf("unmarshal %s: %w", notifyReasoningSummaryTextDelta, err))
 			return
 		}
 		handler(n)
@@ -169,6 +174,7 @@ func (c *Client) OnReasoningSummaryPartAdded(handler func(ReasoningSummaryPartAd
 	c.OnNotification(notifyReasoningSummaryPartAdded, func(ctx context.Context, notif Notification) {
 		var n ReasoningSummaryPartAddedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			c.reportHandlerError(notifyReasoningSummaryPartAdded, fmt.Errorf("unmarshal %s: %w", notifyReasoningSummaryPartAdded, err))
 			return
 		}
 		handler(n)
@@ -184,6 +190,7 @@ func (c *Client) OnItemStarted(handler func(ItemStartedNotification)) {
 	c.OnNotification(notifyItemStarted, func(ctx context.Context, notif Notification) {
 		var n ItemStartedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			c.reportHandlerError(notifyItemStarted, fmt.Errorf("unmarshal %s: %w", notifyItemStarted, err))
 			return
 		}
 		handler(n)
@@ -199,6 +206,7 @@ func (c *Client) OnItemCompleted(handler func(ItemCompletedNotification)) {
 	c.OnNotification(notifyItemCompleted, func(ctx context.Context, notif Notification) {
 		var n ItemCompletedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			c.reportHandlerError(notifyItemCompleted, fmt.Errorf("unmarshal %s: %w", notifyItemCompleted, err))
 			return
 		}
 		handler(n)
@@ -216,6 +224,7 @@ func (c *Client) OnCollabToolCallStarted(handler func(ItemStartedNotification, *
 	return c.addNotificationListener(notifyItemStarted, func(_ context.Context, notif Notification) {
 		var n ItemStartedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			c.reportHandlerError(notifyItemStarted, fmt.Errorf("unmarshal %s: %w", notifyItemStarted, err))
 			return
 		}
 		if collab, ok := n.Item.Value.(*CollabAgentToolCallThreadItem); ok {
@@ -235,6 +244,7 @@ func (c *Client) OnCollabToolCallCompleted(handler func(ItemCompletedNotificatio
 	return c.addNotificationListener(notifyItemCompleted, func(_ context.Context, notif Notification) {
 		var n ItemCompletedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			c.reportHandlerError(notifyItemCompleted, fmt.Errorf("unmarshal %s: %w", notifyItemCompleted, err))
 			return
 		}
 		if collab, ok := n.Item.Value.(*CollabAgentToolCallThreadItem); ok {
