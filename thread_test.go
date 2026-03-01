@@ -684,315 +684,88 @@ func TestThreadParamsSerialization(t *testing.T) {
 	})
 }
 
-func TestThreadStart_RPCError_ReturnsRPCError(t *testing.T) {
-	mock := NewMockTransport()
-	client := codex.NewClient(mock)
-
-	mock.SetResponse("thread/start", codex.Response{
-		JSONRPC: "2.0",
-		Error: &codex.Error{
-			Code:    codex.ErrCodeInternalError,
-			Message: "start failed",
-		},
-	})
-
-	_, err := client.Thread.Start(context.Background(), codex.ThreadStartParams{})
-	if err == nil {
-		t.Fatal("expected error, got nil")
+func TestThreadServiceRPCError(t *testing.T) {
+	tests := []struct {
+		name   string
+		method string
+		call   func(client *codex.Client) error
+	}{
+		{"Start", "thread/start", func(c *codex.Client) error {
+			_, err := c.Thread.Start(context.Background(), codex.ThreadStartParams{})
+			return err
+		}},
+		{"Read", "thread/read", func(c *codex.Client) error {
+			_, err := c.Thread.Read(context.Background(), codex.ThreadReadParams{ThreadID: "t"})
+			return err
+		}},
+		{"List", "thread/list", func(c *codex.Client) error {
+			_, err := c.Thread.List(context.Background(), codex.ThreadListParams{})
+			return err
+		}},
+		{"LoadedList", "thread/loaded/list", func(c *codex.Client) error {
+			_, err := c.Thread.LoadedList(context.Background(), codex.ThreadLoadedListParams{})
+			return err
+		}},
+		{"Resume", "thread/resume", func(c *codex.Client) error {
+			_, err := c.Thread.Resume(context.Background(), codex.ThreadResumeParams{ThreadID: "t"})
+			return err
+		}},
+		{"Fork", "thread/fork", func(c *codex.Client) error {
+			_, err := c.Thread.Fork(context.Background(), codex.ThreadForkParams{ThreadID: "t"})
+			return err
+		}},
+		{"Rollback", "thread/rollback", func(c *codex.Client) error {
+			_, err := c.Thread.Rollback(context.Background(), codex.ThreadRollbackParams{ThreadID: "t", NumTurns: 1})
+			return err
+		}},
+		{"SetName", "thread/name/set", func(c *codex.Client) error {
+			_, err := c.Thread.SetName(context.Background(), codex.ThreadSetNameParams{ThreadID: "t", Name: "n"})
+			return err
+		}},
+		{"Archive", "thread/archive", func(c *codex.Client) error {
+			_, err := c.Thread.Archive(context.Background(), codex.ThreadArchiveParams{ThreadID: "t"})
+			return err
+		}},
+		{"Unarchive", "thread/unarchive", func(c *codex.Client) error {
+			_, err := c.Thread.Unarchive(context.Background(), codex.ThreadUnarchiveParams{ThreadID: "t"})
+			return err
+		}},
+		{"Unsubscribe", "thread/unsubscribe", func(c *codex.Client) error {
+			_, err := c.Thread.Unsubscribe(context.Background(), codex.ThreadUnsubscribeParams{ThreadID: "t"})
+			return err
+		}},
+		{"CompactStart", "thread/compact/start", func(c *codex.Client) error {
+			_, err := c.Thread.CompactStart(context.Background(), codex.ThreadCompactStartParams{ThreadID: "t"})
+			return err
+		}},
 	}
 
-	var rpcErr *codex.RPCError
-	if !errors.As(err, &rpcErr) {
-		t.Fatalf("expected error to unwrap to *RPCError, got %T", err)
-	}
-	if rpcErr.RPCError().Code != codex.ErrCodeInternalError {
-		t.Errorf("expected error code %d, got %d", codex.ErrCodeInternalError, rpcErr.RPCError().Code)
-	}
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := NewMockTransport()
+			client := codex.NewClient(mock)
 
-func TestThreadRead_RPCError_ReturnsRPCError(t *testing.T) {
-	mock := NewMockTransport()
-	client := codex.NewClient(mock)
+			mock.SetResponse(tt.method, codex.Response{
+				JSONRPC: "2.0",
+				Error: &codex.Error{
+					Code:    codex.ErrCodeInternalError,
+					Message: tt.method + " failed",
+				},
+			})
 
-	mock.SetResponse("thread/read", codex.Response{
-		JSONRPC: "2.0",
-		Error: &codex.Error{
-			Code:    codex.ErrCodeInternalError,
-			Message: "read failed",
-		},
-	})
+			err := tt.call(client)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
 
-	_, err := client.Thread.Read(context.Background(), codex.ThreadReadParams{ThreadID: "t"})
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-
-	var rpcErr *codex.RPCError
-	if !errors.As(err, &rpcErr) {
-		t.Fatalf("expected error to unwrap to *RPCError, got %T", err)
-	}
-	if rpcErr.RPCError().Code != codex.ErrCodeInternalError {
-		t.Errorf("expected error code %d, got %d", codex.ErrCodeInternalError, rpcErr.RPCError().Code)
-	}
-}
-
-func TestThreadList_RPCError_ReturnsRPCError(t *testing.T) {
-	mock := NewMockTransport()
-	client := codex.NewClient(mock)
-
-	mock.SetResponse("thread/list", codex.Response{
-		JSONRPC: "2.0",
-		Error: &codex.Error{
-			Code:    codex.ErrCodeInternalError,
-			Message: "list failed",
-		},
-	})
-
-	_, err := client.Thread.List(context.Background(), codex.ThreadListParams{})
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-
-	var rpcErr *codex.RPCError
-	if !errors.As(err, &rpcErr) {
-		t.Fatalf("expected error to unwrap to *RPCError, got %T", err)
-	}
-	if rpcErr.RPCError().Code != codex.ErrCodeInternalError {
-		t.Errorf("expected error code %d, got %d", codex.ErrCodeInternalError, rpcErr.RPCError().Code)
-	}
-}
-
-func TestThreadLoadedList_RPCError_ReturnsRPCError(t *testing.T) {
-	mock := NewMockTransport()
-	client := codex.NewClient(mock)
-
-	mock.SetResponse("thread/loaded/list", codex.Response{
-		JSONRPC: "2.0",
-		Error: &codex.Error{
-			Code:    codex.ErrCodeInternalError,
-			Message: "loaded list failed",
-		},
-	})
-
-	_, err := client.Thread.LoadedList(context.Background(), codex.ThreadLoadedListParams{})
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-
-	var rpcErr *codex.RPCError
-	if !errors.As(err, &rpcErr) {
-		t.Fatalf("expected error to unwrap to *RPCError, got %T", err)
-	}
-	if rpcErr.RPCError().Code != codex.ErrCodeInternalError {
-		t.Errorf("expected error code %d, got %d", codex.ErrCodeInternalError, rpcErr.RPCError().Code)
-	}
-}
-
-func TestThreadResume_RPCError_ReturnsRPCError(t *testing.T) {
-	mock := NewMockTransport()
-	client := codex.NewClient(mock)
-
-	mock.SetResponse("thread/resume", codex.Response{
-		JSONRPC: "2.0",
-		Error: &codex.Error{
-			Code:    codex.ErrCodeInternalError,
-			Message: "resume failed",
-		},
-	})
-
-	_, err := client.Thread.Resume(context.Background(), codex.ThreadResumeParams{ThreadID: "t"})
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-
-	var rpcErr *codex.RPCError
-	if !errors.As(err, &rpcErr) {
-		t.Fatalf("expected error to unwrap to *RPCError, got %T", err)
-	}
-	if rpcErr.RPCError().Code != codex.ErrCodeInternalError {
-		t.Errorf("expected error code %d, got %d", codex.ErrCodeInternalError, rpcErr.RPCError().Code)
-	}
-}
-
-func TestThreadFork_RPCError_ReturnsRPCError(t *testing.T) {
-	mock := NewMockTransport()
-	client := codex.NewClient(mock)
-
-	mock.SetResponse("thread/fork", codex.Response{
-		JSONRPC: "2.0",
-		Error: &codex.Error{
-			Code:    codex.ErrCodeInternalError,
-			Message: "fork failed",
-		},
-	})
-
-	_, err := client.Thread.Fork(context.Background(), codex.ThreadForkParams{ThreadID: "t"})
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-
-	var rpcErr *codex.RPCError
-	if !errors.As(err, &rpcErr) {
-		t.Fatalf("expected error to unwrap to *RPCError, got %T", err)
-	}
-	if rpcErr.RPCError().Code != codex.ErrCodeInternalError {
-		t.Errorf("expected error code %d, got %d", codex.ErrCodeInternalError, rpcErr.RPCError().Code)
-	}
-}
-
-func TestThreadRollback_RPCError_ReturnsRPCError(t *testing.T) {
-	mock := NewMockTransport()
-	client := codex.NewClient(mock)
-
-	mock.SetResponse("thread/rollback", codex.Response{
-		JSONRPC: "2.0",
-		Error: &codex.Error{
-			Code:    codex.ErrCodeInternalError,
-			Message: "rollback failed",
-		},
-	})
-
-	_, err := client.Thread.Rollback(context.Background(), codex.ThreadRollbackParams{ThreadID: "t", NumTurns: 1})
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-
-	var rpcErr *codex.RPCError
-	if !errors.As(err, &rpcErr) {
-		t.Fatalf("expected error to unwrap to *RPCError, got %T", err)
-	}
-	if rpcErr.RPCError().Code != codex.ErrCodeInternalError {
-		t.Errorf("expected error code %d, got %d", codex.ErrCodeInternalError, rpcErr.RPCError().Code)
-	}
-}
-
-func TestThreadSetName_RPCError_ReturnsRPCError(t *testing.T) {
-	mock := NewMockTransport()
-	client := codex.NewClient(mock)
-
-	mock.SetResponse("thread/name/set", codex.Response{
-		JSONRPC: "2.0",
-		Error: &codex.Error{
-			Code:    codex.ErrCodeInternalError,
-			Message: "set name failed",
-		},
-	})
-
-	_, err := client.Thread.SetName(context.Background(), codex.ThreadSetNameParams{ThreadID: "t", Name: "n"})
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-
-	var rpcErr *codex.RPCError
-	if !errors.As(err, &rpcErr) {
-		t.Fatalf("expected error to unwrap to *RPCError, got %T", err)
-	}
-	if rpcErr.RPCError().Code != codex.ErrCodeInternalError {
-		t.Errorf("expected error code %d, got %d", codex.ErrCodeInternalError, rpcErr.RPCError().Code)
-	}
-}
-
-func TestThreadArchive_RPCError_ReturnsRPCError(t *testing.T) {
-	mock := NewMockTransport()
-	client := codex.NewClient(mock)
-
-	mock.SetResponse("thread/archive", codex.Response{
-		JSONRPC: "2.0",
-		Error: &codex.Error{
-			Code:    codex.ErrCodeInternalError,
-			Message: "archive failed",
-		},
-	})
-
-	_, err := client.Thread.Archive(context.Background(), codex.ThreadArchiveParams{ThreadID: "t"})
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-
-	var rpcErr *codex.RPCError
-	if !errors.As(err, &rpcErr) {
-		t.Fatalf("expected error to unwrap to *RPCError, got %T", err)
-	}
-	if rpcErr.RPCError().Code != codex.ErrCodeInternalError {
-		t.Errorf("expected error code %d, got %d", codex.ErrCodeInternalError, rpcErr.RPCError().Code)
-	}
-}
-
-func TestThreadUnarchive_RPCError_ReturnsRPCError(t *testing.T) {
-	mock := NewMockTransport()
-	client := codex.NewClient(mock)
-
-	mock.SetResponse("thread/unarchive", codex.Response{
-		JSONRPC: "2.0",
-		Error: &codex.Error{
-			Code:    codex.ErrCodeInternalError,
-			Message: "unarchive failed",
-		},
-	})
-
-	_, err := client.Thread.Unarchive(context.Background(), codex.ThreadUnarchiveParams{ThreadID: "t"})
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-
-	var rpcErr *codex.RPCError
-	if !errors.As(err, &rpcErr) {
-		t.Fatalf("expected error to unwrap to *RPCError, got %T", err)
-	}
-	if rpcErr.RPCError().Code != codex.ErrCodeInternalError {
-		t.Errorf("expected error code %d, got %d", codex.ErrCodeInternalError, rpcErr.RPCError().Code)
-	}
-}
-
-func TestThreadUnsubscribe_RPCError_ReturnsRPCError(t *testing.T) {
-	mock := NewMockTransport()
-	client := codex.NewClient(mock)
-
-	mock.SetResponse("thread/unsubscribe", codex.Response{
-		JSONRPC: "2.0",
-		Error: &codex.Error{
-			Code:    codex.ErrCodeInternalError,
-			Message: "unsubscribe failed",
-		},
-	})
-
-	_, err := client.Thread.Unsubscribe(context.Background(), codex.ThreadUnsubscribeParams{ThreadID: "t"})
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-
-	var rpcErr *codex.RPCError
-	if !errors.As(err, &rpcErr) {
-		t.Fatalf("expected error to unwrap to *RPCError, got %T", err)
-	}
-	if rpcErr.RPCError().Code != codex.ErrCodeInternalError {
-		t.Errorf("expected error code %d, got %d", codex.ErrCodeInternalError, rpcErr.RPCError().Code)
-	}
-}
-
-func TestThreadCompactStart_RPCError_ReturnsRPCError(t *testing.T) {
-	mock := NewMockTransport()
-	client := codex.NewClient(mock)
-
-	mock.SetResponse("thread/compact/start", codex.Response{
-		JSONRPC: "2.0",
-		Error: &codex.Error{
-			Code:    codex.ErrCodeInternalError,
-			Message: "compact start failed",
-		},
-	})
-
-	_, err := client.Thread.CompactStart(context.Background(), codex.ThreadCompactStartParams{ThreadID: "t"})
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-
-	var rpcErr *codex.RPCError
-	if !errors.As(err, &rpcErr) {
-		t.Fatalf("expected error to unwrap to *RPCError, got %T", err)
-	}
-	if rpcErr.RPCError().Code != codex.ErrCodeInternalError {
-		t.Errorf("expected error code %d, got %d", codex.ErrCodeInternalError, rpcErr.RPCError().Code)
+			var rpcErr *codex.RPCError
+			if !errors.As(err, &rpcErr) {
+				t.Fatalf("expected error to unwrap to *RPCError, got %T", err)
+			}
+			if rpcErr.RPCError().Code != codex.ErrCodeInternalError {
+				t.Errorf("expected error code %d, got %d", codex.ErrCodeInternalError, rpcErr.RPCError().Code)
+			}
+		})
 	}
 }
 
