@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -89,9 +90,9 @@ func (opts *ProcessOptions) buildArgs() ([]string, error) {
 		if arg == "--" {
 			return nil, errEndOfOptionsInExecArgs
 		}
-		for _, flag := range rejectedFlagPrefixes {
-			if arg == flag {
-				return nil, fmt.Errorf("%w: %s", errTypedFlagInExecArgs, flag)
+		for _, prefix := range rejectedFlagPrefixes {
+			if arg == prefix || strings.HasPrefix(arg, prefix+"=") {
+				return nil, fmt.Errorf("%w: %s", errTypedFlagInExecArgs, prefix)
 			}
 		}
 	}

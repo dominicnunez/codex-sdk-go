@@ -216,6 +216,46 @@ func TestStartProcessExecArgsWithTypedFlags(t *testing.T) {
 	}
 }
 
+// TestStartProcessExecArgsWithTypedFlagsCombinedForm verifies that
+// --flag=value combined forms are also rejected.
+func TestStartProcessExecArgsWithTypedFlagsCombinedForm(t *testing.T) {
+	rejectedFlags := []string{"--model", "--sandbox", "--approval-mode", "--config"}
+
+	for _, flag := range rejectedFlags {
+		t.Run(flag+"=value", func(t *testing.T) {
+			ctx := context.Background()
+			_, err := codex.StartProcess(ctx, &codex.ProcessOptions{
+				BinaryPath: "/nonexistent/binary",
+				ExecArgs:   []string{flag + "=evil-value"},
+			})
+			if err == nil {
+				t.Fatalf("expected error when ExecArgs contains %q", flag+"=evil-value")
+			}
+			if !strings.Contains(err.Error(), flag) {
+				t.Errorf("error message should mention %q, got: %v", flag, err)
+			}
+		})
+	}
+}
+
+// TestStartProcessExecArgsAllowsNonSafetyFlags verifies that non-safety
+// flags with = values are allowed through.
+func TestStartProcessExecArgsAllowsNonSafetyFlags(t *testing.T) {
+	ctx := context.Background()
+	// StartProcess will fail because the binary doesn't exist, but it
+	// should fail at exec, not at flag validation.
+	_, err := codex.StartProcess(ctx, &codex.ProcessOptions{
+		BinaryPath: "/nonexistent/binary",
+		ExecArgs:   []string{"--some-other-flag=value", "--another=123"},
+	})
+	if err == nil {
+		t.Fatal("expected error (binary not found), got nil")
+	}
+	if strings.Contains(err.Error(), "typed safety flags") {
+		t.Errorf("non-safety flags should not be rejected, got: %v", err)
+	}
+}
+
 // TestStartProcessContextCancellation verifies that canceling the context
 // causes the process to terminate.
 func TestStartProcessContextCancellation(t *testing.T) {
