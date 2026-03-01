@@ -416,11 +416,18 @@ func TestKnownApprovalHandlerDispatch(t *testing.T) {
 }
 
 // TestUnknownNotificationIgnored verifies that unknown notification methods
-// are silently ignored without error.
+// are silently ignored and do not dispatch to any registered handler.
 func TestUnknownNotificationIgnored(t *testing.T) {
 	ctx := context.Background()
 	mock := NewMockTransport()
-	_ = codex.NewClient(mock) // Need client to register notification handler
+	client := codex.NewClient(mock)
+
+	// Register a handler for a known method to verify it is NOT called
+	// for an unknown method.
+	called := false
+	client.OnNotification("known/method", func(_ context.Context, _ codex.Notification) {
+		called = true
+	})
 
 	// Inject unknown notification
 	notif := codex.Notification{
@@ -429,10 +436,11 @@ func TestUnknownNotificationIgnored(t *testing.T) {
 		Params:  json.RawMessage(`{"data":"test"}`),
 	}
 
-	// Should not panic or return error
 	mock.InjectServerNotification(ctx, notif)
 
-	// No error expected - unknown notifications are silently ignored
+	if called {
+		t.Error("known handler was called for an unknown notification method")
+	}
 }
 
 // TestUnknownRequestReturnsMethodNotFound verifies that unknown server→client
