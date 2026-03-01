@@ -317,6 +317,60 @@ func TestTurnDiffUpdatedNotification(t *testing.T) {
 	}
 }
 
+// TestTurnStartParamsApprovalPolicyMarshal verifies that TurnStartParams with
+// each AskForApproval variant marshals correctly for the wire protocol.
+func TestTurnStartParamsApprovalPolicyMarshal(t *testing.T) {
+	tests := []struct {
+		name   string
+		policy codex.AskForApproval
+		want   string
+	}{
+		{
+			name:   "never",
+			policy: codex.ApprovalPolicyNever,
+			want:   `"never"`,
+		},
+		{
+			name:   "untrusted",
+			policy: codex.ApprovalPolicyUntrusted,
+			want:   `"untrusted"`,
+		},
+		{
+			name:   "on-failure",
+			policy: codex.ApprovalPolicyOnFailure,
+			want:   `"on-failure"`,
+		},
+		{
+			name:   "on-request",
+			policy: codex.ApprovalPolicyOnRequest,
+			want:   `"on-request"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			params := codex.TurnStartParams{
+				ThreadID:       "thread-1",
+				Input:          []codex.UserInput{&codex.TextUserInput{Text: "hi"}},
+				ApprovalPolicy: &tt.policy,
+			}
+			data, err := json.Marshal(params)
+			if err != nil {
+				t.Fatalf("Marshal error: %v", err)
+			}
+
+			var raw map[string]json.RawMessage
+			if err := json.Unmarshal(data, &raw); err != nil {
+				t.Fatalf("Unmarshal error: %v", err)
+			}
+			got := string(raw["approvalPolicy"])
+			if got != tt.want {
+				t.Errorf("approvalPolicy = %s, want %s", got, tt.want)
+			}
+		})
+	}
+}
+
 // TestTurnUserInputTypes tests various UserInput type serialization
 func TestTurnUserInputTypes(t *testing.T) {
 	tests := []struct {
