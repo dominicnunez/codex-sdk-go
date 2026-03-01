@@ -1021,3 +1021,56 @@ func TestStreamEventsConsumedOnSecondCall(t *testing.T) {
 		t.Errorf("second Events() error = %v, want ErrStreamConsumed", gotErr)
 	}
 }
+
+func TestStreamEventsConcurrentConsumption(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "concurrent"})
+
+	time.Sleep(50 * time.Millisecond)
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	const goroutines = 10
+	results := make(chan bool, goroutines)
+	start := make(chan struct{})
+
+	for i := 0; i < goroutines; i++ {
+		go func() {
+			<-start
+			var gotConsumed bool
+			for _, err := range stream.Events() {
+				if err == codex.ErrStreamConsumed {
+					gotConsumed = true
+				}
+			}
+			results <- gotConsumed
+		}()
+	}
+
+	close(start)
+
+	var winnersCount int
+	var consumedCount int
+	for i := 0; i < goroutines; i++ {
+		if <-results {
+			consumedCount++
+		} else {
+			winnersCount++
+		}
+	}
+
+	if winnersCount != 1 {
+		t.Errorf("expected exactly 1 winner, got %d", winnersCount)
+	}
+	if consumedCount != goroutines-1 {
+		t.Errorf("expected %d ErrStreamConsumed, got %d", goroutines-1, consumedCount)
+	}
+}
