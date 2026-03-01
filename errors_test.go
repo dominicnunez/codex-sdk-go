@@ -29,8 +29,8 @@ func TestRPCError(t *testing.T) {
 
 	// Verify the error contains the JSON-RPC error code
 	expectedMsg := fmt.Sprintf("%d", codex.ErrCodeMethodNotFound)
-	if sdkErr.Error() == "" || len(expectedMsg) == 0 {
-		t.Error("RPCError.Error() should contain error code")
+	if !strings.Contains(sdkErr.Error(), expectedMsg) {
+		t.Errorf("RPCError.Error() should contain error code %s, got: %s", expectedMsg, sdkErr.Error())
 	}
 
 	// Test errors.As behavior
