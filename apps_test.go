@@ -156,7 +156,7 @@ func TestAppsList(t *testing.T) {
 			t.Fatal("expected request to be sent")
 		}
 		if req.Method != "app/list" {
-			t.Errorf("expected method apps/list, got %s", req.Method)
+			t.Errorf("expected method app/list, got %s", req.Method)
 		}
 
 		var sentParams codex.AppsListParams
@@ -240,15 +240,6 @@ func TestAppListUpdatedNotification(t *testing.T) {
 	if app.Name != "New App" {
 		t.Errorf("expected Name 'New App', got %s", app.Name)
 	}
-}
-
-// TestAppsServiceMethodSignatures is a compile-time test to verify the AppsService has the expected methods.
-func TestAppsServiceMethodSignatures(t *testing.T) {
-	mock := NewMockTransport()
-	client := codex.NewClient(mock)
-
-	// This will fail to compile if the method signature is wrong
-	var _ = client.Apps.List
 }
 
 func TestAppsList_RPCError_ReturnsRPCError(t *testing.T) {

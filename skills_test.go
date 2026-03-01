@@ -271,7 +271,7 @@ func TestSkillsConfigWrite(t *testing.T) {
 				t.Fatalf("expected 1 request, got %d", len(mock.SentRequests))
 			}
 			if mock.SentRequests[0].Method != "skills/config/write" {
-				t.Errorf("expected method = skills/configWrite, got %s", mock.SentRequests[0].Method)
+				t.Errorf("expected method = skills/config/write, got %s", mock.SentRequests[0].Method)
 			}
 		})
 	}
@@ -356,7 +356,7 @@ func TestSkillsRemoteRead(t *testing.T) {
 				t.Fatalf("expected 1 request, got %d", len(mock.SentRequests))
 			}
 			if mock.SentRequests[0].Method != "skills/remote/list" {
-				t.Errorf("expected method = skills/remoteRead, got %s", mock.SentRequests[0].Method)
+				t.Errorf("expected method = skills/remote/list, got %s", mock.SentRequests[0].Method)
 			}
 		})
 	}
@@ -407,21 +407,10 @@ func TestSkillsRemoteWrite(t *testing.T) {
 				t.Fatalf("expected 1 request, got %d", len(mock.SentRequests))
 			}
 			if mock.SentRequests[0].Method != "skills/remote/export" {
-				t.Errorf("expected method = skills/remoteWrite, got %s", mock.SentRequests[0].Method)
+				t.Errorf("expected method = skills/remote/export, got %s", mock.SentRequests[0].Method)
 			}
 		})
 	}
-}
-
-func TestSkillsServiceMethodSignatures(t *testing.T) {
-	mock := NewMockTransport()
-	client := codex.NewClient(mock)
-
-	// Compile-time verification that all methods exist with correct signatures
-	var _ = client.Skills.List
-	var _ = client.Skills.ConfigWrite
-	var _ = client.Skills.RemoteRead
-	var _ = client.Skills.RemoteWrite
 }
 
 func TestSkillsList_RPCError_ReturnsRPCError(t *testing.T) {

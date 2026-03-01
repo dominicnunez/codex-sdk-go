@@ -73,7 +73,7 @@ func TestAccountGet(t *testing.T) {
 			if err == nil {
 				req := transport.GetSentRequest(0)
 				if req.Method != "account/read" {
-					t.Errorf("expected method account/get, got %s", req.Method)
+					t.Errorf("expected method account/read, got %s", req.Method)
 				}
 
 				// Verify params serialization
@@ -130,7 +130,7 @@ func TestAccountGetRateLimits(t *testing.T) {
 
 	req := transport.GetSentRequest(0)
 	if req.Method != "account/rateLimits/read" {
-		t.Errorf("expected method account/getRateLimits, got %s", req.Method)
+		t.Errorf("expected method account/rateLimits/read, got %s", req.Method)
 	}
 
 	if resp.RateLimits.Primary == nil {
@@ -200,7 +200,7 @@ func TestAccountLogin(t *testing.T) {
 			if err == nil {
 				req := transport.GetSentRequest(0)
 				if req.Method != "account/login/start" {
-					t.Errorf("expected method account/login, got %s", req.Method)
+					t.Errorf("expected method account/login/start, got %s", req.Method)
 				}
 
 				// Verify response type matches request type
@@ -307,28 +307,6 @@ func TestAccountLogout(t *testing.T) {
 
 	// Response is a struct, so it can't be nil - just verify no error
 	_ = resp
-}
-
-func TestAccountServiceMethodSignatures(t *testing.T) {
-	transport := NewMockTransport()
-	client := codex.NewClient(transport)
-
-	// Compile-time verification that all methods exist with correct signatures
-	_ = func(ctx context.Context, params codex.GetAccountParams) (codex.GetAccountResponse, error) {
-		return client.Account.Get(ctx, params)
-	}
-	_ = func(ctx context.Context) (codex.GetAccountRateLimitsResponse, error) {
-		return client.Account.GetRateLimits(ctx)
-	}
-	_ = func(ctx context.Context, params codex.LoginAccountParams) (codex.LoginAccountResponse, error) {
-		return client.Account.Login(ctx, params)
-	}
-	_ = func(ctx context.Context, params codex.CancelLoginAccountParams) (codex.CancelLoginAccountResponse, error) {
-		return client.Account.CancelLogin(ctx, params)
-	}
-	_ = func(ctx context.Context) (codex.LogoutAccountResponse, error) {
-		return client.Account.Logout(ctx)
-	}
 }
 
 func TestAccountUpdatedNotification(t *testing.T) {

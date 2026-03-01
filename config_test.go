@@ -149,7 +149,7 @@ func TestConfigReadRequirements(t *testing.T) {
 			// Verify method name
 			req := mock.GetSentRequest(0)
 			if req == nil || req.Method != "configRequirements/read" {
-				t.Errorf("expected method config/requirements/read, got %v", req)
+				t.Errorf("expected method configRequirements/read, got %v", req)
 			}
 		})
 	}
@@ -298,7 +298,7 @@ func TestConfigBatchWrite(t *testing.T) {
 			// Verify method name
 			req := mock.GetSentRequest(0)
 			if req == nil || req.Method != "config/batchWrite" {
-				t.Errorf("expected method config/batch/write, got %v", req)
+				t.Errorf("expected method config/batchWrite, got %v", req)
 			}
 		})
 	}
@@ -337,17 +337,4 @@ func TestConfigWarningNotification(t *testing.T) {
 	if receivedNotif.Path == nil || *receivedNotif.Path != "/home/user/.claude/config.toml" {
 		t.Errorf("expected Path to config file, got %v", receivedNotif.Path)
 	}
-}
-
-func TestConfigServiceMethodSignatures(t *testing.T) {
-	// Compile-time verification that ConfigService has all required methods
-	mock := NewMockTransport()
-	client := codex.NewClient(mock)
-
-	var _ interface {
-		Read(context.Context, codex.ConfigReadParams) (codex.ConfigReadResponse, error)
-		ReadRequirements(context.Context) (codex.ConfigRequirementsReadResponse, error)
-		Write(context.Context, codex.ConfigValueWriteParams) (codex.ConfigWriteResponse, error)
-		BatchWrite(context.Context, codex.ConfigBatchWriteParams) (codex.ConfigWriteResponse, error)
-	} = client.Config
 }

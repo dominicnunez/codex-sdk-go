@@ -258,7 +258,7 @@ func TestThreadLoadedList(t *testing.T) {
 
 	req := transport.GetSentRequest(0)
 	if req.Method != "thread/loaded/list" {
-		t.Errorf("expected method 'thread/loadedList', got %q", req.Method)
+		t.Errorf("expected method 'thread/loaded/list', got %q", req.Method)
 	}
 }
 
@@ -451,7 +451,7 @@ func TestThreadSetName(t *testing.T) {
 
 	req := transport.GetSentRequest(0)
 	if req.Method != "thread/name/set" {
-		t.Errorf("expected method 'thread/setName', got %q", req.Method)
+		t.Errorf("expected method 'thread/name/set', got %q", req.Method)
 	}
 }
 
@@ -600,37 +600,8 @@ func TestThreadCompactStart(t *testing.T) {
 
 	req := transport.GetSentRequest(0)
 	if req.Method != "thread/compact/start" {
-		t.Errorf("expected method 'thread/compactStart', got %q", req.Method)
+		t.Errorf("expected method 'thread/compact/start', got %q", req.Method)
 	}
-}
-
-// TestThreadServiceMethodSignatures ensures all methods exist on ThreadService
-func TestThreadServiceMethodSignatures(t *testing.T) {
-	transport := NewMockTransport()
-	defer func() { _ = transport.Close() }()
-
-	client := codex.NewClient(transport)
-
-	// This test will fail to compile if any method is missing
-	var service = client.Thread
-
-	if service == nil {
-		t.Fatal("Thread service should not be nil")
-	}
-
-	// Verify methods exist (compile-time check)
-	_ = service.Start
-	_ = service.Read
-	_ = service.List
-	_ = service.LoadedList
-	_ = service.Resume
-	_ = service.Fork
-	_ = service.Rollback
-	_ = service.SetName
-	_ = service.Archive
-	_ = service.Unarchive
-	_ = service.Unsubscribe
-	_ = service.CompactStart
 }
 
 // TestThreadParamsSerialization tests that params serialize correctly to JSON
