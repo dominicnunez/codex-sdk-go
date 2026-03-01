@@ -601,6 +601,86 @@ func TestRunTurnCompletedUnmarshalFailure(t *testing.T) {
 	}
 }
 
+func TestRunApprovalFlowDuringTurn(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Register an approval handler that approves command execution.
+	var approvalCalled bool
+	proc.Client.SetApprovalHandlers(codex.ApprovalHandlers{
+		OnCommandExecutionRequestApproval: func(_ context.Context, p codex.CommandExecutionRequestApprovalParams) (codex.CommandExecutionRequestApprovalResponse, error) {
+			approvalCalled = true
+			if p.ItemID != "item-cmd-1" {
+				t.Errorf("approval ItemID = %q, want 'item-cmd-1'", p.ItemID)
+			}
+			return codex.CommandExecutionRequestApprovalResponse{
+				Decision: codex.CommandExecutionApprovalDecisionWrapper{
+					Value: "accept",
+				},
+			}, nil
+		},
+	})
+
+	type runResult struct {
+		result *codex.RunResult
+		err    error
+	}
+	ch := make(chan runResult, 1)
+
+	go func() {
+		r, err := proc.Run(ctx, codex.RunOptions{Prompt: "run a command"})
+		ch <- runResult{r, err}
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Inject a server→client approval request mid-turn.
+	approvalParams, _ := json.Marshal(codex.CommandExecutionRequestApprovalParams{
+		ItemID:   "item-cmd-1",
+		ThreadID: "thread-1",
+		TurnID:   "turn-1",
+		Command:  codex.Ptr("ls -la"),
+	})
+	resp, err := mock.InjectServerRequest(ctx, codex.Request{
+		JSONRPC: "2.0",
+		ID:      codex.RequestID{Value: "approval-1"},
+		Method:  "item/commandExecution/requestApproval",
+		Params:  approvalParams,
+	})
+	if err != nil {
+		t.Fatalf("InjectServerRequest error: %v", err)
+	}
+	if resp.Error != nil {
+		t.Fatalf("approval response has error: %v", resp.Error.Message)
+	}
+
+	if !approvalCalled {
+		t.Error("approval handler was not called during turn")
+	}
+
+	// Complete the turn normally.
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-1","text":"Done"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	result := <-ch
+	if result.err != nil {
+		t.Fatalf("Run() error: %v", result.err)
+	}
+	if result.result.Response != "Done" {
+		t.Errorf("Response = %q, want 'Done'", result.result.Response)
+	}
+}
+
 func TestProcessCloseFromClient(t *testing.T) {
 	mock := NewMockTransport()
 	client := codex.NewClient(mock)

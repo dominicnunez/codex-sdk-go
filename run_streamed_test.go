@@ -784,3 +784,75 @@ func TestRunStreamedTurnCompletedUnmarshalFailure(t *testing.T) {
 		t.Errorf("error = %q, want it to mention 'unmarshal turn/completed'", gotErr)
 	}
 }
+
+func TestRunStreamedApprovalFlowDuringTurn(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Register an approval handler.
+	var approvalCalled atomic.Bool
+	proc.Client.SetApprovalHandlers(codex.ApprovalHandlers{
+		OnCommandExecutionRequestApproval: func(_ context.Context, p codex.CommandExecutionRequestApprovalParams) (codex.CommandExecutionRequestApprovalResponse, error) {
+			approvalCalled.Store(true)
+			return codex.CommandExecutionRequestApprovalResponse{
+				Decision: codex.CommandExecutionApprovalDecisionWrapper{Value: "accept"},
+			}, nil
+		},
+	})
+
+	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "run a command"})
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Inject a server→client approval request mid-turn.
+	approvalParams, _ := json.Marshal(codex.CommandExecutionRequestApprovalParams{
+		ItemID:   "item-cmd-1",
+		ThreadID: "thread-1",
+		TurnID:   "turn-1",
+		Command:  codex.Ptr("ls -la"),
+	})
+	resp, err := mock.InjectServerRequest(ctx, codex.Request{
+		JSONRPC: "2.0",
+		ID:      codex.RequestID{Value: "approval-1"},
+		Method:  "item/commandExecution/requestApproval",
+		Params:  approvalParams,
+	})
+	if err != nil {
+		t.Fatalf("InjectServerRequest error: %v", err)
+	}
+	if resp.Error != nil {
+		t.Fatalf("approval response has error: %v", resp.Error.Message)
+	}
+
+	// Complete the turn normally.
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-1","text":"Done"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	for _, err := range stream.Events() {
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	}
+
+	if !approvalCalled.Load() {
+		t.Error("approval handler was not called during streamed turn")
+	}
+
+	result := stream.Result()
+	if result == nil {
+		t.Fatal("Result() returned nil")
+	}
+	if result.Response != "Done" {
+		t.Errorf("Response = %q, want 'Done'", result.Response)
+	}
+}
