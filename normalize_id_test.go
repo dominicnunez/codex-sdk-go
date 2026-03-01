@@ -31,10 +31,6 @@ func TestNormalizeID(t *testing.T) {
 
 		// string passthrough
 		{"string", "abc", "abc"},
-
-		// unknown types stringified
-		{"bool", true, "true"},
-		{"nil", nil, "<nil>"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -42,6 +38,27 @@ func TestNormalizeID(t *testing.T) {
 			if got != tt.want {
 				t.Errorf("normalizeID(%v) = %q; want %q", tt.in, got, tt.want)
 			}
+		})
+	}
+}
+
+func TestNormalizeIDPanicsOnUnexpectedType(t *testing.T) {
+	cases := []struct {
+		name string
+		in   interface{}
+	}{
+		{"bool", true},
+		{"nil", nil},
+		{"struct", struct{}{}},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r == nil {
+					t.Errorf("normalizeID(%v) did not panic for unexpected type", tt.in)
+				}
+			}()
+			normalizeID(tt.in)
 		})
 	}
 }

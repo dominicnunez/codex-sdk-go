@@ -65,7 +65,7 @@ func normalizeID(id interface{}) string {
 	case string:
 		return v
 	default:
-		return fmt.Sprintf("%v", id)
+		panic(fmt.Sprintf("normalizeID: unexpected ID type %T", id))
 	}
 }
 
