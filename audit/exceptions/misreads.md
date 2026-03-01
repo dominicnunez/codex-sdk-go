@@ -311,3 +311,36 @@ This is factually wrong. `conversation_test.go:505-515` contains a test that cal
 appends a Turn to the returned snapshot, then calls `conv.Thread()` again and asserts the length
 is unchanged — verifying that the Conversation's internal state is unaffected by mutations to
 the snapshot.
+
+### normalizeID uint64 overflow described as new finding but covered by existing precision exception
+
+**Location:** `stdio.go:47-51` — normalizeID float64 to uint64 cast
+**Date:** 2026-03-01
+
+**Reason:** The audit claims float64 values near `math.MaxUint64` produce undefined behavior in the
+uint64 cast. This is a subset of the existing exception "normalizeID relies on float64 precision for
+JSON number IDs" — values near `math.MaxUint64` are even more unrealistic than values above 2^53.
+JSON-RPC IDs are small sequential integers; the existing round-trip check `v == float64(u)` at
+lines 49-50 already guards against precision loss. The overflow edge case is not reachable in any
+realistic protocol usage.
+
+### handleApproval pointer-to-value wireMarshaler dispatch re-flagged as new finding
+
+**Location:** `client.go:324` — marshalForWire(&result) call
+**Date:** 2026-03-01
+
+**Reason:** This is a duplicate of the existing exception "handleApproval marshalForWire pointer-to-result
+described as a potential bug but works correctly." The audit itself concludes "No change needed for
+current types" — all existing approval response types use pointer receivers, and the `&result` pattern
+works correctly. A speculative concern about hypothetical future types is not an actionable finding.
+
+### RPCError.Is nil-nil path flagged as unreachable dead code
+
+**Location:** `errors.go:61-70` — RPCError.Is nil guard
+**Date:** 2026-03-01
+
+**Reason:** This is covered by the existing exception for RPCError.Is which states: "The nil-nil
+comparison path is unreachable since `NewRPCError` is never called with nil, but the nil guard is
+a defensive correctness check, not dead logic worth removing." Defensive nil checks in `Is()`
+implementations are standard Go practice — they prevent panics if the type is ever constructed
+outside the canonical constructor.
