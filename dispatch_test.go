@@ -18,15 +18,15 @@ func TestKnownNotificationDispatch(t *testing.T) {
 	tests := []struct {
 		name         string
 		method       string
-		registerFunc func()
+		register     func(client *codex.Client, called *bool)
 		params       interface{}
 		expectCalled bool
 	}{
 		{
 			name:   "thread/started",
 			method: "thread/started",
-			registerFunc: func() {
-				client.OnThreadStarted(func(n codex.ThreadStartedNotification) {})
+			register: func(client *codex.Client, called *bool) {
+				client.OnThreadStarted(func(n codex.ThreadStartedNotification) { *called = true })
 			},
 			params: map[string]interface{}{
 				"thread": map[string]interface{}{
@@ -47,8 +47,8 @@ func TestKnownNotificationDispatch(t *testing.T) {
 		{
 			name:   "thread/closed",
 			method: "thread/closed",
-			registerFunc: func() {
-				client.OnThreadClosed(func(n codex.ThreadClosedNotification) {})
+			register: func(client *codex.Client, called *bool) {
+				client.OnThreadClosed(func(n codex.ThreadClosedNotification) { *called = true })
 			},
 			params: map[string]interface{}{
 				"threadId": "thread-123",
@@ -58,8 +58,8 @@ func TestKnownNotificationDispatch(t *testing.T) {
 		{
 			name:   "turn/started",
 			method: "turn/started",
-			registerFunc: func() {
-				client.OnTurnStarted(func(n codex.TurnStartedNotification) {})
+			register: func(client *codex.Client, called *bool) {
+				client.OnTurnStarted(func(n codex.TurnStartedNotification) { *called = true })
 			},
 			params: map[string]interface{}{
 				"threadId": "thread-123",
@@ -70,8 +70,8 @@ func TestKnownNotificationDispatch(t *testing.T) {
 		{
 			name:   "turn/completed",
 			method: "turn/completed",
-			registerFunc: func() {
-				client.OnTurnCompleted(func(n codex.TurnCompletedNotification) {})
+			register: func(client *codex.Client, called *bool) {
+				client.OnTurnCompleted(func(n codex.TurnCompletedNotification) { *called = true })
 			},
 			params: map[string]interface{}{
 				"threadId": "thread-123",
@@ -82,8 +82,8 @@ func TestKnownNotificationDispatch(t *testing.T) {
 		{
 			name:   "account/updated",
 			method: "account/updated",
-			registerFunc: func() {
-				client.OnAccountUpdated(func(n codex.AccountUpdatedNotification) {})
+			register: func(client *codex.Client, called *bool) {
+				client.OnAccountUpdated(func(n codex.AccountUpdatedNotification) { *called = true })
 			},
 			params: map[string]interface{}{
 				"account": map[string]interface{}{
@@ -97,8 +97,8 @@ func TestKnownNotificationDispatch(t *testing.T) {
 		{
 			name:   "configWarning",
 			method: "configWarning",
-			registerFunc: func() {
-				client.OnConfigWarning(func(n codex.ConfigWarningNotification) {})
+			register: func(client *codex.Client, called *bool) {
+				client.OnConfigWarning(func(n codex.ConfigWarningNotification) { *called = true })
 			},
 			params: map[string]interface{}{
 				"summary": "Invalid config value",
@@ -108,8 +108,8 @@ func TestKnownNotificationDispatch(t *testing.T) {
 		{
 			name:   "model/rerouted",
 			method: "model/rerouted",
-			registerFunc: func() {
-				client.OnModelRerouted(func(n codex.ModelReroutedNotification) {})
+			register: func(client *codex.Client, called *bool) {
+				client.OnModelRerouted(func(n codex.ModelReroutedNotification) { *called = true })
 			},
 			params: map[string]interface{}{
 				"threadId":  "thread-123",
@@ -123,8 +123,8 @@ func TestKnownNotificationDispatch(t *testing.T) {
 		{
 			name:   "app/list/updated",
 			method: "app/list/updated",
-			registerFunc: func() {
-				client.OnAppListUpdated(func(n codex.AppListUpdatedNotification) {})
+			register: func(client *codex.Client, called *bool) {
+				client.OnAppListUpdated(func(n codex.AppListUpdatedNotification) { *called = true })
 			},
 			params: map[string]interface{}{
 				"data": []interface{}{},
@@ -134,8 +134,8 @@ func TestKnownNotificationDispatch(t *testing.T) {
 		{
 			name:   "item/agentMessage/delta",
 			method: "item/agentMessage/delta",
-			registerFunc: func() {
-				client.OnAgentMessageDelta(func(n codex.AgentMessageDeltaNotification) {})
+			register: func(client *codex.Client, called *bool) {
+				client.OnAgentMessageDelta(func(n codex.AgentMessageDeltaNotification) { *called = true })
 			},
 			params: map[string]interface{}{
 				"delta":    "Hello",
@@ -148,8 +148,8 @@ func TestKnownNotificationDispatch(t *testing.T) {
 		{
 			name:   "thread/realtime/started",
 			method: "thread/realtime/started",
-			registerFunc: func() {
-				client.OnThreadRealtimeStarted(func(n codex.ThreadRealtimeStartedNotification) {})
+			register: func(client *codex.Client, called *bool) {
+				client.OnThreadRealtimeStarted(func(n codex.ThreadRealtimeStartedNotification) { *called = true })
 			},
 			params: map[string]interface{}{
 				"threadId": "thread-123",
@@ -159,8 +159,8 @@ func TestKnownNotificationDispatch(t *testing.T) {
 		{
 			name:   "error",
 			method: "error",
-			registerFunc: func() {
-				client.OnError(func(n codex.ErrorNotification) {})
+			register: func(client *codex.Client, called *bool) {
+				client.OnError(func(n codex.ErrorNotification) { *called = true })
 			},
 			params: map[string]interface{}{
 				"error": map[string]interface{}{
@@ -179,53 +179,7 @@ func TestKnownNotificationDispatch(t *testing.T) {
 			client = codex.NewClient(mock)
 
 			called := false
-			// Override the registerFunc to track if the handler is called
-			switch tt.method {
-			case "thread/started":
-				client.OnThreadStarted(func(n codex.ThreadStartedNotification) {
-					called = true
-				})
-			case "thread/closed":
-				client.OnThreadClosed(func(n codex.ThreadClosedNotification) {
-					called = true
-				})
-			case "turn/started":
-				client.OnTurnStarted(func(n codex.TurnStartedNotification) {
-					called = true
-				})
-			case "turn/completed":
-				client.OnTurnCompleted(func(n codex.TurnCompletedNotification) {
-					called = true
-				})
-			case "account/updated":
-				client.OnAccountUpdated(func(n codex.AccountUpdatedNotification) {
-					called = true
-				})
-			case "configWarning":
-				client.OnConfigWarning(func(n codex.ConfigWarningNotification) {
-					called = true
-				})
-			case "model/rerouted":
-				client.OnModelRerouted(func(n codex.ModelReroutedNotification) {
-					called = true
-				})
-			case "app/list/updated":
-				client.OnAppListUpdated(func(n codex.AppListUpdatedNotification) {
-					called = true
-				})
-			case "item/agentMessage/delta":
-				client.OnAgentMessageDelta(func(n codex.AgentMessageDeltaNotification) {
-					called = true
-				})
-			case "thread/realtime/started":
-				client.OnThreadRealtimeStarted(func(n codex.ThreadRealtimeStartedNotification) {
-					called = true
-				})
-			case "error":
-				client.OnError(func(n codex.ErrorNotification) {
-					called = true
-				})
-			}
+			tt.register(client, &called)
 
 			// Inject server notification
 			paramsJSON, err := json.Marshal(tt.params)
