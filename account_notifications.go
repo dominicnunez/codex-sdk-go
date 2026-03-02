@@ -18,6 +18,7 @@ const (
 // AccountUpdatedNotification is sent when account information changes
 type AccountUpdatedNotification struct {
 	AuthMode *AuthMode `json:"authMode,omitempty"`
+	PlanType *PlanType `json:"planType,omitempty"`
 }
 
 // AccountLoginCompletedNotification is sent when a login attempt completes

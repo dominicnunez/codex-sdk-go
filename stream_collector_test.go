@@ -1,0 +1,164 @@
+package codex_test
+
+import (
+	"context"
+	"encoding/json"
+	"testing"
+	"time"
+
+	codex "github.com/dominicnunez/codex-sdk-go"
+)
+
+func TestStreamCollectorProcessLifecycleAndPlan(t *testing.T) {
+	collector := codex.NewStreamCollector()
+
+	collector.Process(&codex.PlanDelta{ItemID: "plan-1", Delta: "step 1"}, nil)
+	collector.Process(&codex.PlanDelta{ItemID: "plan-1", Delta: " + step 2"}, nil)
+
+	collector.Process(&codex.ItemStarted{
+		Item: codex.ThreadItemWrapper{
+			Value: &codex.CommandExecutionThreadItem{
+				ID:             "cmd-1",
+				Command:        "ls",
+				CommandActions: []codex.CommandActionWrapper{},
+				Cwd:            "/tmp",
+				Status:         codex.CommandExecutionStatusInProgress,
+			},
+		},
+	}, nil)
+
+	collector.Process(&codex.ItemCompleted{
+		Item: codex.ThreadItemWrapper{
+			Value: &codex.CommandExecutionThreadItem{
+				ID:               "cmd-1",
+				Command:          "ls",
+				CommandActions:   []codex.CommandActionWrapper{},
+				Cwd:              "/tmp",
+				Status:           codex.CommandExecutionStatusCompleted,
+				AggregatedOutput: ptr("output"),
+			},
+		},
+	}, nil)
+
+	collector.Process(&codex.ItemCompleted{
+		Item: codex.ThreadItemWrapper{
+			Value: &codex.PlanThreadItem{
+				ID:   "plan-final",
+				Text: "final plan",
+			},
+		},
+	}, nil)
+
+	summary := collector.Summary()
+
+	if summary.LatestPlanText == nil || *summary.LatestPlanText != "final plan" {
+		t.Fatalf("latest plan text = %v, want %q", summary.LatestPlanText, "final plan")
+	}
+	if summary.LatestPlanItemID == nil || *summary.LatestPlanItemID != "plan-final" {
+		t.Fatalf("latest plan item id = %v, want %q", summary.LatestPlanItemID, "plan-final")
+	}
+
+	cmd, ok := summary.CommandExecutions["cmd-1"]
+	if !ok {
+		t.Fatal("expected command execution lifecycle for cmd-1")
+	}
+	if !cmd.Started || !cmd.Completed {
+		t.Fatalf("command lifecycle started/completed = %v/%v, want true/true", cmd.Started, cmd.Completed)
+	}
+	if cmd.Status == nil || *cmd.Status != codex.CommandExecutionStatusCompleted {
+		t.Fatalf("command status = %v, want %v", cmd.Status, codex.CommandExecutionStatusCompleted)
+	}
+	if cmd.AggregatedOutput != "output" {
+		t.Fatalf("aggregated output = %q, want %q", cmd.AggregatedOutput, "output")
+	}
+}
+
+func TestRunStreamedWithCollectorCapturesNotificationConveniences(t *testing.T) {
+	proc, mock := mockProcess(t)
+	collector := codex.NewStreamCollector()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	stream := proc.RunStreamedWithCollector(ctx, codex.RunOptions{Prompt: "collect"}, collector)
+	time.Sleep(50 * time.Millisecond)
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/commandExecution/outputDelta",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","itemId":"cmd-1","delta":"out"}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "thread/tokenUsage/updated",
+		Params: json.RawMessage(`{
+			"threadId":"thread-1",
+			"turnId":"turn-1",
+			"tokenUsage":{
+				"last":{"cachedInputTokens":0,"inputTokens":10,"outputTokens":5,"reasoningOutputTokens":0,"totalTokens":15},
+				"total":{"cachedInputTokens":1,"inputTokens":20,"outputTokens":10,"reasoningOutputTokens":1,"totalTokens":31},
+				"modelContextWindow":128000
+			}
+		}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "error",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","willRetry":false,"error":{"message":"system failed"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "thread/realtime/error",
+		Params:  json.RawMessage(`{"threadId":"thread-1","message":"realtime failed"}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/started",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"commandExecution","id":"cmd-1","command":"ls","commandActions":[],"cwd":"/tmp","status":"inProgress"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"commandExecution","id":"cmd-1","command":"ls","commandActions":[],"cwd":"/tmp","status":"completed","aggregatedOutput":"out"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	for _, err := range stream.Events() {
+		if err != nil {
+			t.Fatalf("unexpected stream error: %v", err)
+		}
+	}
+
+	summary := collector.Summary()
+	if summary.LatestTokenUsage == nil {
+		t.Fatal("expected token usage summary")
+	}
+	if summary.LatestTokenUsage.Last.InputTokens != 10 {
+		t.Fatalf("last input tokens = %d, want 10", summary.LatestTokenUsage.Last.InputTokens)
+	}
+	if summary.LatestTokenUsage.Total.TotalTokens != 31 {
+		t.Fatalf("total tokens = %d, want 31", summary.LatestTokenUsage.Total.TotalTokens)
+	}
+
+	cmd, ok := summary.CommandExecutions["cmd-1"]
+	if !ok {
+		t.Fatal("expected command execution lifecycle for cmd-1")
+	}
+	if !cmd.Started || !cmd.Completed {
+		t.Fatalf("command lifecycle started/completed = %v/%v, want true/true", cmd.Started, cmd.Completed)
+	}
+	if len(cmd.OutputDeltas) != 1 || cmd.OutputDeltas[0] != "out" {
+		t.Fatalf("output deltas = %#v, want [\"out\"]", cmd.OutputDeltas)
+	}
+	if cmd.AggregatedOutput != "out" {
+		t.Fatalf("aggregated output = %q, want %q", cmd.AggregatedOutput, "out")
+	}
+
+	if len(summary.NormalizedErrors) < 2 {
+		t.Fatalf("expected >=2 normalized errors, got %d", len(summary.NormalizedErrors))
+	}
+}

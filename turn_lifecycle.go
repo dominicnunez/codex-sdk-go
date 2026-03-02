@@ -26,6 +26,7 @@ type turnLifecycleParams struct {
 	thread     Thread
 	threadID   string
 	onComplete func(Turn) // called on successful turn completion; nil = no-op
+	collector  *StreamCollector
 }
 
 // executeTurn runs a blocking turn: registers listeners, starts the turn,
@@ -121,104 +122,43 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, g *guardedC
 		unsub := p.client.addNotificationListener(method, handler)
 		unsubFuncs = append(unsubFuncs, unsub)
 	}
+	emit := func(event Event) {
+		if p.collector != nil {
+			p.collector.Process(event, nil)
+		}
+		streamSendEvent(ctx, g, event)
+	}
+	emitErr := func(err error) {
+		if p.collector != nil {
+			p.collector.Process(nil, err)
+		}
+		streamSendErr(ctx, g, err)
+	}
+	onEvent := func(event Event) {
+		if p.collector != nil {
+			p.collector.Process(event, nil)
+		}
+	}
 
 	turnDone := make(chan TurnCompletedNotification, 1)
 
-	streamListen(ctx, on, notifyTurnStarted, g, p.threadID, p.client.reportHandlerError, func(n TurnStartedNotification) Event {
-		return &TurnStarted{Turn: n.Turn, ThreadID: n.ThreadID}
-	})
-
-	streamListen(ctx, on, notifyAgentMessageDelta, g, p.threadID, p.client.reportHandlerError, func(n AgentMessageDeltaNotification) Event {
-		return &TextDelta{Delta: n.Delta, ItemID: n.ItemID}
-	})
-
-	streamListen(ctx, on, notifyReasoningTextDelta, g, p.threadID, p.client.reportHandlerError, func(n ReasoningTextDeltaNotification) Event {
-		return &ReasoningDelta{Delta: n.Delta, ItemID: n.ItemID, ContentIndex: n.ContentIndex}
-	})
-
-	streamListen(ctx, on, notifyReasoningSummaryTextDelta, g, p.threadID, p.client.reportHandlerError, func(n ReasoningSummaryTextDeltaNotification) Event {
-		return &ReasoningSummaryDelta{Delta: n.Delta, ItemID: n.ItemID, SummaryIndex: n.SummaryIndex}
-	})
-
-	streamListen(ctx, on, notifyPlanDelta, g, p.threadID, p.client.reportHandlerError, func(n PlanDeltaNotification) Event {
-		return &PlanDelta{Delta: n.Delta, ItemID: n.ItemID}
-	})
-
-	streamListen(ctx, on, notifyFileChangeOutputDelta, g, p.threadID, p.client.reportHandlerError, func(n FileChangeOutputDeltaNotification) Event {
-		return &FileChangeDelta{Delta: n.Delta, ItemID: n.ItemID}
-	})
-
-	// item/started: emit collab event before generic event when applicable.
-	on(notifyItemStarted, func(_ context.Context, notif Notification) {
-		var carrier threadIDCarrier
-		if err := json.Unmarshal(notif.Params, &carrier); err != nil || carrier.ThreadID != p.threadID {
-			return
-		}
-		var n ItemStartedNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
-			p.client.reportHandlerError(notifyItemStarted, fmt.Errorf("unmarshal %s: %w", notifyItemStarted, err))
-			return
-		}
-		if c, ok := n.Item.Value.(*CollabAgentToolCallThreadItem); ok {
-			streamSendEvent(ctx, g, newCollabEvent(CollabToolCallStartedPhase, c))
-		}
-		streamSendEvent(ctx, g, &ItemStarted{Item: n.Item})
-	})
-
-	// item/completed: emit collab event before generic event, and append to collected items.
-	on(notifyItemCompleted, func(_ context.Context, notif Notification) {
-		var carrier threadIDCarrier
-		if err := json.Unmarshal(notif.Params, &carrier); err != nil || carrier.ThreadID != p.threadID {
-			return
-		}
-		var n ItemCompletedNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
-			p.client.reportHandlerError(notifyItemCompleted, fmt.Errorf("unmarshal %s: %w", notifyItemCompleted, err))
-			n.Item = ThreadItemWrapper{Value: &UnknownThreadItem{
-				Type: UnmarshalErrorItemType,
-				Raw:  append(json.RawMessage(nil), notif.Params...),
-			}}
-		}
-		itemsMu.Lock()
-		items = append(items, n.Item)
-		itemsMu.Unlock()
-		if c, ok := n.Item.Value.(*CollabAgentToolCallThreadItem); ok {
-			streamSendEvent(ctx, g, newCollabEvent(CollabToolCallCompletedPhase, c))
-		}
-		streamSendEvent(ctx, g, &ItemCompleted{Item: n.Item})
-	})
-
-	// turn/completed signals turnDone; synthesizes on unmarshal failure.
-	on(notifyTurnCompleted, func(_ context.Context, notif Notification) {
-		var carrier threadIDCarrier
-		if err := json.Unmarshal(notif.Params, &carrier); err != nil || carrier.ThreadID != p.threadID {
-			return
-		}
-		var n TurnCompletedNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
-			p.client.reportHandlerError(notifyTurnCompleted, fmt.Errorf("unmarshal %s: %w", notifyTurnCompleted, err))
-			n = TurnCompletedNotification{
-				Turn: Turn{Error: &TurnError{Message: "failed to unmarshal turn/completed: " + err.Error()}},
-			}
-		}
-		select {
-		case turnDone <- n:
-		default:
-		}
-	})
+	registerStreamDeltaListeners(ctx, p, g, on, onEvent)
+	registerItemListeners(ctx, p, on, emit, &items, &itemsMu)
+	registerTurnCompletedListener(p, on, turnDone)
+	registerCollectorListeners(p, on)
 
 	if _, err := p.client.Turn.Start(ctx, p.turnParams); err != nil {
-		streamSendErr(ctx, g, fmt.Errorf("turn/start: %w", err))
+		emitErr(fmt.Errorf("turn/start: %w", err))
 		return
 	}
 
 	// Wait for turn completion or context cancellation.
 	select {
 	case completed := <-turnDone:
-		streamSendEvent(ctx, g, &TurnCompleted{Turn: completed.Turn})
+		emit(&TurnCompleted{Turn: completed.Turn})
 
 		if completed.Turn.Error != nil {
-			streamSendErr(ctx, g, fmt.Errorf("turn error: %w", completed.Turn.Error))
+			emitErr(fmt.Errorf("turn error: %w", completed.Turn.Error))
 			return
 		}
 
@@ -236,6 +176,147 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, g *guardedC
 		s.mu.Unlock()
 
 	case <-ctx.Done():
-		streamSendErr(ctx, g, ctx.Err())
+		emitErr(ctx.Err())
 	}
+}
+
+func registerStreamDeltaListeners(ctx context.Context, p turnLifecycleParams, g *guardedChan, on func(string, NotificationHandler), onEvent func(Event)) {
+	streamListen(ctx, on, notifyTurnStarted, g, p.threadID, p.client.reportHandlerError, onEvent, func(n TurnStartedNotification) Event {
+		return &TurnStarted{Turn: n.Turn, ThreadID: n.ThreadID}
+	})
+	streamListen(ctx, on, notifyAgentMessageDelta, g, p.threadID, p.client.reportHandlerError, onEvent, func(n AgentMessageDeltaNotification) Event {
+		return &TextDelta{Delta: n.Delta, ItemID: n.ItemID}
+	})
+	streamListen(ctx, on, notifyReasoningTextDelta, g, p.threadID, p.client.reportHandlerError, onEvent, func(n ReasoningTextDeltaNotification) Event {
+		return &ReasoningDelta{Delta: n.Delta, ItemID: n.ItemID, ContentIndex: n.ContentIndex}
+	})
+	streamListen(ctx, on, notifyReasoningSummaryTextDelta, g, p.threadID, p.client.reportHandlerError, onEvent, func(n ReasoningSummaryTextDeltaNotification) Event {
+		return &ReasoningSummaryDelta{Delta: n.Delta, ItemID: n.ItemID, SummaryIndex: n.SummaryIndex}
+	})
+	streamListen(ctx, on, notifyPlanDelta, g, p.threadID, p.client.reportHandlerError, onEvent, func(n PlanDeltaNotification) Event {
+		return &PlanDelta{Delta: n.Delta, ItemID: n.ItemID}
+	})
+	streamListen(ctx, on, notifyFileChangeOutputDelta, g, p.threadID, p.client.reportHandlerError, onEvent, func(n FileChangeOutputDeltaNotification) Event {
+		return &FileChangeDelta{Delta: n.Delta, ItemID: n.ItemID}
+	})
+}
+
+func registerItemListeners(ctx context.Context, p turnLifecycleParams, on func(string, NotificationHandler), emit func(Event), items *[]ThreadItemWrapper, itemsMu *sync.Mutex) {
+	on(notifyItemStarted, func(_ context.Context, notif Notification) {
+		var carrier threadIDCarrier
+		if err := json.Unmarshal(notif.Params, &carrier); err != nil || carrier.ThreadID != p.threadID {
+			return
+		}
+		var n ItemStartedNotification
+		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			p.client.reportHandlerError(notifyItemStarted, fmt.Errorf("unmarshal %s: %w", notifyItemStarted, err))
+			return
+		}
+		if c, ok := n.Item.Value.(*CollabAgentToolCallThreadItem); ok {
+			emit(newCollabEvent(CollabToolCallStartedPhase, c))
+		}
+		emit(&ItemStarted{Item: n.Item})
+	})
+
+	on(notifyItemCompleted, func(_ context.Context, notif Notification) {
+		var carrier threadIDCarrier
+		if err := json.Unmarshal(notif.Params, &carrier); err != nil || carrier.ThreadID != p.threadID {
+			return
+		}
+		var n ItemCompletedNotification
+		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			p.client.reportHandlerError(notifyItemCompleted, fmt.Errorf("unmarshal %s: %w", notifyItemCompleted, err))
+			n.Item = ThreadItemWrapper{Value: &UnknownThreadItem{
+				Type: UnmarshalErrorItemType,
+				Raw:  append(json.RawMessage(nil), notif.Params...),
+			}}
+		}
+		itemsMu.Lock()
+		*items = append(*items, n.Item)
+		itemsMu.Unlock()
+		if c, ok := n.Item.Value.(*CollabAgentToolCallThreadItem); ok {
+			emit(newCollabEvent(CollabToolCallCompletedPhase, c))
+		}
+		emit(&ItemCompleted{Item: n.Item})
+	})
+
+	_ = ctx // keeps signature consistent for future listener additions.
+}
+
+func registerTurnCompletedListener(p turnLifecycleParams, on func(string, NotificationHandler), turnDone chan<- TurnCompletedNotification) {
+	on(notifyTurnCompleted, func(_ context.Context, notif Notification) {
+		var carrier threadIDCarrier
+		if err := json.Unmarshal(notif.Params, &carrier); err != nil || carrier.ThreadID != p.threadID {
+			return
+		}
+		var n TurnCompletedNotification
+		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			p.client.reportHandlerError(notifyTurnCompleted, fmt.Errorf("unmarshal %s: %w", notifyTurnCompleted, err))
+			n = TurnCompletedNotification{
+				Turn: Turn{Error: &TurnError{Message: "failed to unmarshal turn/completed: " + err.Error()}},
+			}
+		}
+		select {
+		case turnDone <- n:
+		default:
+		}
+	})
+}
+
+func registerCollectorListeners(p turnLifecycleParams, on func(string, NotificationHandler)) {
+	if p.collector == nil {
+		return
+	}
+
+	on(notifyCommandExecutionOutputDelta, func(_ context.Context, notif Notification) {
+		var carrier threadIDCarrier
+		if err := json.Unmarshal(notif.Params, &carrier); err != nil || carrier.ThreadID != p.threadID {
+			return
+		}
+		var n CommandExecutionOutputDeltaNotification
+		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			p.client.reportHandlerError(notifyCommandExecutionOutputDelta, fmt.Errorf("unmarshal %s: %w", notifyCommandExecutionOutputDelta, err))
+			return
+		}
+		p.collector.processCommandExecutionOutputDelta(n)
+	})
+
+	on(notifyThreadTokenUsageUpdated, func(_ context.Context, notif Notification) {
+		var carrier threadIDCarrier
+		if err := json.Unmarshal(notif.Params, &carrier); err != nil || carrier.ThreadID != p.threadID {
+			return
+		}
+		var n ThreadTokenUsageUpdatedNotification
+		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			p.client.reportHandlerError(notifyThreadTokenUsageUpdated, fmt.Errorf("unmarshal %s: %w", notifyThreadTokenUsageUpdated, err))
+			return
+		}
+		p.collector.processThreadTokenUsageUpdated(n)
+	})
+
+	on(notifyError, func(_ context.Context, notif Notification) {
+		var carrier threadIDCarrier
+		if err := json.Unmarshal(notif.Params, &carrier); err != nil || carrier.ThreadID != p.threadID {
+			return
+		}
+		var n ErrorNotification
+		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			p.client.reportHandlerError(notifyError, fmt.Errorf("unmarshal %s: %w", notifyError, err))
+			return
+		}
+		p.collector.processSystemError(n)
+	})
+
+	on(notifyRealtimeError, func(_ context.Context, notif Notification) {
+		var carrier threadIDCarrier
+		if err := json.Unmarshal(notif.Params, &carrier); err != nil || carrier.ThreadID != p.threadID {
+			return
+		}
+		var n ThreadRealtimeErrorNotification
+		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			p.client.reportHandlerError(notifyRealtimeError, fmt.Errorf("unmarshal %s: %w", notifyRealtimeError, err))
+			return
+		}
+		p.collector.processThreadRealtimeError(n)
+	})
 }

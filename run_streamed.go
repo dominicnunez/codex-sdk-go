@@ -119,6 +119,17 @@ func (s *Stream) Result() *RunResult {
 // through an iterator instead of blocking until completion. Returns immediately;
 // the lifecycle runs in a background goroutine.
 func (p *Process) RunStreamed(ctx context.Context, opts RunOptions) *Stream {
+	return p.runStreamedWithCollector(ctx, opts, nil)
+}
+
+// RunStreamedWithCollector executes RunStreamed and feeds all streamed events
+// (plus selected notification-derived conveniences) into collector.
+// The collector is optional; passing nil behaves like RunStreamed.
+func (p *Process) RunStreamedWithCollector(ctx context.Context, opts RunOptions, collector *StreamCollector) *Stream {
+	return p.runStreamedWithCollector(ctx, opts, collector)
+}
+
+func (p *Process) runStreamedWithCollector(ctx context.Context, opts RunOptions, collector *StreamCollector) *Stream {
 	if opts.Prompt == "" {
 		return newErrorStream(errors.New("prompt is required"))
 	}
@@ -136,7 +147,7 @@ func (p *Process) RunStreamed(ctx context.Context, opts RunOptions) *Stream {
 		}
 	}
 
-	go p.runStreamedLifecycle(ctx, opts, g, s)
+	go p.runStreamedLifecycle(ctx, opts, g, s, collector)
 
 	return s
 }
@@ -170,7 +181,7 @@ func streamSendErr(ctx context.Context, g *guardedChan, err error) {
 // streamListen registers a notification listener that unmarshals the
 // notification params into N, converts it to an Event, and sends it on g.
 // Notifications with a threadId that does not match threadID are ignored.
-func streamListen[N any](ctx context.Context, on func(string, NotificationHandler), method string, g *guardedChan, threadID string, reportErr func(string, error), convert func(N) Event) {
+func streamListen[N any](ctx context.Context, on func(string, NotificationHandler), method string, g *guardedChan, threadID string, reportErr func(string, error), onEvent func(Event), convert func(N) Event) {
 	on(method, func(_ context.Context, notif Notification) {
 		var carrier threadIDCarrier
 		if err := json.Unmarshal(notif.Params, &carrier); err != nil || carrier.ThreadID != threadID {
@@ -181,21 +192,31 @@ func streamListen[N any](ctx context.Context, on func(string, NotificationHandle
 			reportErr(method, fmt.Errorf("unmarshal %s: %w", method, err))
 			return
 		}
-		streamSendEvent(ctx, g, convert(n))
+		ev := convert(n)
+		if onEvent != nil {
+			onEvent(ev)
+		}
+		streamSendEvent(ctx, g, ev)
 	})
 }
 
-func (p *Process) runStreamedLifecycle(ctx context.Context, opts RunOptions, g *guardedChan, s *Stream) {
+func (p *Process) runStreamedLifecycle(ctx context.Context, opts RunOptions, g *guardedChan, s *Stream, collector *StreamCollector) {
 	defer g.closeOnce()
 	defer close(s.done)
 
 	if err := p.ensureInit(ctx); err != nil {
+		if collector != nil {
+			collector.Process(nil, err)
+		}
 		streamSendErr(ctx, g, err)
 		return
 	}
 
 	threadResp, err := p.Client.Thread.Start(ctx, buildThreadParams(opts))
 	if err != nil {
+		if collector != nil {
+			collector.Process(nil, fmt.Errorf("thread/start: %w", err))
+		}
 		streamSendErr(ctx, g, fmt.Errorf("thread/start: %w", err))
 		return
 	}
@@ -205,5 +226,6 @@ func (p *Process) runStreamedLifecycle(ctx context.Context, opts RunOptions, g *
 		turnParams: buildTurnParams(opts, threadResp.Thread.ID),
 		thread:     threadResp.Thread,
 		threadID:   threadResp.Thread.ID,
+		collector:  collector,
 	}, g, s)
 }

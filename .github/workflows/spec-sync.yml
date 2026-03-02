@@ -2,7 +2,7 @@ name: Upstream Spec Sync Check
 
 on:
   schedule:
-    - cron: '0 9 * * 1' # Monday 9am UTC
+    - cron: '0 9 * * 3' # Wednesday 9am UTC
   workflow_dispatch: {}
 
 permissions:

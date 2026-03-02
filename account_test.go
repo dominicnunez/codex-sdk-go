@@ -398,22 +398,33 @@ func TestAccountUpdatedNotification(t *testing.T) {
 	tests := []struct {
 		name     string
 		authMode *codex.AuthMode
+		planType *codex.PlanType
 	}{
 		{
-			name:     "apikey_mode",
+			name:     "auth_mode_only_apikey",
 			authMode: authModePtr(codex.AuthModeAPIKey),
 		},
 		{
-			name:     "chatgpt_mode",
+			name:     "auth_mode_only_chatgpt",
 			authMode: authModePtr(codex.AuthModeChatGPT),
 		},
 		{
-			name:     "chatgpt_auth_tokens_mode",
+			name:     "auth_mode_only_chatgpt_auth_tokens",
 			authMode: authModePtr(codex.AuthModeChatGPTAuthTokens),
 		},
 		{
-			name:     "no_auth_mode",
+			name:     "plan_type_only",
+			planType: planTypePtr(codex.PlanTypePlus),
+		},
+		{
+			name:     "auth_mode_and_plan_type",
+			authMode: authModePtr(codex.AuthModeChatGPT),
+			planType: planTypePtr(codex.PlanTypePro),
+		},
+		{
+			name:     "neither_auth_mode_nor_plan_type",
 			authMode: nil,
+			planType: nil,
 		},
 	}
 
@@ -421,15 +432,20 @@ func TestAccountUpdatedNotification(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			notificationReceived := false
 			var receivedAuthMode *codex.AuthMode
+			var receivedPlanType *codex.PlanType
 
 			client.OnAccountUpdated(func(notif codex.AccountUpdatedNotification) {
 				notificationReceived = true
 				receivedAuthMode = notif.AuthMode
+				receivedPlanType = notif.PlanType
 			})
 
 			params := map[string]interface{}{}
 			if tt.authMode != nil {
 				params["authMode"] = string(*tt.authMode)
+			}
+			if tt.planType != nil {
+				params["planType"] = string(*tt.planType)
 			}
 			paramsJSON, _ := json.Marshal(params)
 
@@ -449,12 +465,22 @@ func TestAccountUpdatedNotification(t *testing.T) {
 			if receivedAuthMode != nil && tt.authMode != nil && *receivedAuthMode != *tt.authMode {
 				t.Errorf("authMode = %s, want %s", *receivedAuthMode, *tt.authMode)
 			}
+			if (receivedPlanType == nil) != (tt.planType == nil) {
+				t.Errorf("planType presence mismatch: got %v, want %v", receivedPlanType, tt.planType)
+			}
+			if receivedPlanType != nil && tt.planType != nil && *receivedPlanType != *tt.planType {
+				t.Errorf("planType = %s, want %s", *receivedPlanType, *tt.planType)
+			}
 		})
 	}
 }
 
 func authModePtr(m codex.AuthMode) *codex.AuthMode {
 	return &m
+}
+
+func planTypePtr(p codex.PlanType) *codex.PlanType {
+	return &p
 }
 
 func TestAccountLoginCompletedNotification(t *testing.T) {
