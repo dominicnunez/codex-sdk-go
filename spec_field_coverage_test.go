@@ -484,6 +484,15 @@ func testEnumValues(t *testing.T) {
 		},
 		{
 			specPath: "specs/v2/AccountUpdatedNotification.json",
+			defName:  "PlanType",
+			goValues: enumStrings(
+				PlanTypeFree, PlanTypeGo, PlanTypePlus, PlanTypePro,
+				PlanTypeTeam, PlanTypeBusiness, PlanTypeEnterprise,
+				PlanTypeEdu, PlanTypeUnknown,
+			),
+		},
+		{
+			specPath: "specs/v2/AccountUpdatedNotification.json",
 			defName:  "AuthMode",
 			goValues: enumStrings(
 				AuthModeAPIKey, AuthModeChatGPT, AuthModeChatGPTAuthTokens,
