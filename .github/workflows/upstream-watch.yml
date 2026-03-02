@@ -1,0 +1,134 @@
+name: Upstream Watch Check
+
+on:
+  schedule:
+    - cron: '0 9 * * 1' # Monday 9am UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  watch-upstream:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check watched upstream paths
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          upstream_repo="openai/codex"
+          baseline_file="specs/.upstream-watch-sha"
+          label="upstream-watch"
+
+          if [ ! -f "${baseline_file}" ]; then
+            echo "Missing baseline file: ${baseline_file}" >&2
+            exit 1
+          fi
+
+          # key<TAB>path
+          watched_paths=$(cat <<'PATHS'
+          exec_cli_rs	codex-rs/exec/src/cli.rs
+          exec_event_processor_jsonl_rs	codex-rs/exec/src/event_processor_with_jsonl_output.rs
+          exec_events_rs	codex-rs/exec/src/exec_events.rs
+          app_server_protocol_src_protocol	codex-rs/app-server-protocol/src/protocol
+          PATHS
+          )
+
+          tmpdir="$(mktemp -d)"
+          trap 'rm -rf "${tmpdir}"' EXIT
+
+          cp "${baseline_file}" "${tmpdir}/baseline.json"
+          cp "${baseline_file}" "${tmpdir}/next.json"
+
+          changes_found=0
+          report_items=""
+
+          while IFS=$'\t' read -r key path; do
+            [ -z "${key}" ] && continue
+
+            old_sha="$(jq -r --arg key "${key}" '.[$key] // empty' "${tmpdir}/baseline.json")"
+            if [ -z "${old_sha}" ] || [ "${old_sha}" = "null" ]; then
+              echo "Missing baseline key in ${baseline_file}: ${key}" >&2
+              exit 1
+            fi
+
+            new_sha="$(gh api "repos/${upstream_repo}/commits?path=${path}&per_page=1" --jq '.[0].sha')"
+            if [ -z "${new_sha}" ]; then
+              echo "Failed to resolve upstream SHA for ${path}" >&2
+              exit 1
+            fi
+
+            if [ "${old_sha}" != "${new_sha}" ]; then
+              changes_found=1
+              compare_url="https://github.com/${upstream_repo}/compare/${old_sha}...${new_sha}"
+              report_items="${report_items}\n- \`${key}\` (\`${path}\`): \`${old_sha:0:12}\` -> \`${new_sha:0:12}\` ([compare](${compare_url}))"
+              jq --arg key "${key}" --arg val "${new_sha}" '.[$key]=$val' "${tmpdir}/next.json" > "${tmpdir}/next.tmp"
+              mv "${tmpdir}/next.tmp" "${tmpdir}/next.json"
+            fi
+          done <<< "${watched_paths}"
+
+          if [ "${changes_found}" -eq 0 ]; then
+            echo "No watched upstream changes."
+            exit 0
+          fi
+
+          cp "${tmpdir}/next.json" "${baseline_file}"
+
+          if git diff --quiet -- "${baseline_file}"; then
+            echo "No effective baseline file changes after update."
+            exit 0
+          fi
+
+          # Ensure label exists
+          gh label create "${label}" --description "Upstream non-schema watch changes" --color "0E8A16" 2>/dev/null || true
+
+          short_sha="$(date -u +%Y%m%d%H%M%S)"
+          branch="upstream-watch/${short_sha}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "${branch}"
+          git add "${baseline_file}"
+          git commit -m "chore(watch): update upstream watch baselines to ${short_sha}"
+          git push origin "${branch}"
+
+          issue_body="## Upstream Watch Changes Detected
+
+          ### Changed Paths
+          $(echo -e "${report_items}")
+
+          ### Next Steps
+          1. Review upstream diffs linked above
+          2. Decide whether SDK behavior/contracts are affected
+          3. Open follow-up PR(s) if implementation changes are needed"
+          issue_body="$(echo "${issue_body}" | sed 's/^          //')"
+
+          pr_body="## Upstream Watch Baseline Update
+
+          This PR updates \`${baseline_file}\` for watched upstream paths.
+
+          ### Changed Paths
+          $(echo -e "${report_items}")"
+          pr_body="$(echo "${pr_body}" | sed 's/^          //')"
+
+          gh pr create \
+            --title "upstream-watch: watched upstream changes (${short_sha})" \
+            --body "${pr_body}" \
+            --label "${label}" \
+            --head "${branch}"
+
+          open_issue="$(gh issue list --label "${label}" --state open --json number --jq '.[0].number')"
+          if [ -n "${open_issue}" ]; then
+            gh issue comment "${open_issue}" --body "${issue_body}"
+          else
+            gh issue create \
+              --title "upstream-watch: watched upstream paths changed" \
+              --body "${issue_body}" \
+              --label "${label}"
+          fi
