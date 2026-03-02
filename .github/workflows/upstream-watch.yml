@@ -34,6 +34,9 @@ jobs:
           # key<TAB>path
           watched_paths=$(cat <<'PATHS'
           exec_cli_rs	codex-rs/exec/src/cli.rs
+          exec_lib_rs	codex-rs/exec/src/lib.rs
+          exec_main_rs	codex-rs/exec/src/main.rs
+          exec_event_processor_rs	codex-rs/exec/src/event_processor.rs
           exec_event_processor_jsonl_rs	codex-rs/exec/src/event_processor_with_jsonl_output.rs
           exec_events_rs	codex-rs/exec/src/exec_events.rs
           app_server_protocol_src_protocol	codex-rs/app-server-protocol/src/protocol
