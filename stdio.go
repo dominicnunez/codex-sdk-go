@@ -903,48 +903,35 @@ func (t *StdioTransport) handleMalformedResponse(data []byte) {
 }
 
 func normalizeJSONNumberString(raw string) (string, error) {
-	if strings.ContainsAny(raw, "eE") {
-		f, err := strconv.ParseFloat(raw, 64)
-		if err != nil {
-			return "", fmt.Errorf("%w: %q", errUnexpectedIDType, raw)
+	parts, err := parseNumberParts(raw)
+	if err != nil {
+		return "", err
+	}
+	if parts.isZero {
+		return "0", nil
+	}
+
+	significandLen := len(parts.significand)
+	if parts.exponent >= 0 {
+		return parts.sign + parts.significand + strings.Repeat("0", parts.exponent), nil
+	}
+
+	decimalPos := significandLen + parts.exponent
+	if decimalPos > 0 {
+		intPart := parts.significand[:decimalPos]
+		fracPart := strings.TrimRight(parts.significand[decimalPos:], "0")
+		if fracPart == "" {
+			return parts.sign + intPart, nil
 		}
-		return normalizeID(f)
+		return parts.sign + intPart + "." + fracPart, nil
 	}
 
-	if !strings.ContainsRune(raw, '.') {
-		if isNegativeZeroString(raw) {
-			return "0", nil
-		}
-		return raw, nil
-	}
-
-	sign := ""
-	rest := raw
-	if strings.HasPrefix(rest, "-") {
-		sign = "-"
-		rest = rest[1:]
-	}
-
-	parts := strings.SplitN(rest, ".", 2)
-	if len(parts) != 2 {
-		return "", fmt.Errorf("%w: %q", errUnexpectedIDType, raw)
-	}
-	intPart := parts[0]
-	fracPart := strings.TrimRight(parts[1], "0")
+	fracPart := strings.Repeat("0", -decimalPos) + parts.significand
+	fracPart = strings.TrimRight(fracPart, "0")
 	if fracPart == "" {
-		if sign == "-" && allDigitsAreZero(intPart) {
-			return "0", nil
-		}
-		return sign + intPart, nil
+		return "0", nil
 	}
-	return sign + intPart + "." + fracPart, nil
-}
-
-func isNegativeZeroString(raw string) bool {
-	if !strings.HasPrefix(raw, "-") {
-		return false
-	}
-	return allDigitsAreZero(raw[1:])
+	return parts.sign + "0." + fracPart, nil
 }
 
 func allDigitsAreZero(raw string) bool {
@@ -957,6 +944,84 @@ func allDigitsAreZero(raw string) bool {
 		}
 	}
 	return true
+}
+
+type numberParts struct {
+	sign        string
+	significand string
+	exponent    int
+	isZero      bool
+}
+
+func parseNumberParts(raw string) (numberParts, error) {
+	parts := numberParts{}
+	rest := raw
+	if strings.HasPrefix(rest, "-") {
+		parts.sign = "-"
+		rest = rest[1:]
+	}
+	if rest == "" || strings.HasPrefix(rest, "+") {
+		return numberParts{}, fmt.Errorf("%w: %q", errUnexpectedIDType, raw)
+	}
+
+	mantissa := rest
+	exponent := 0
+	if idx := strings.IndexAny(rest, "eE"); idx >= 0 {
+		mantissa = rest[:idx]
+		exponentText := rest[idx+1:]
+		parsedExponent, err := strconv.Atoi(exponentText)
+		if err != nil {
+			return numberParts{}, fmt.Errorf("%w: %q", errUnexpectedIDType, raw)
+		}
+		exponent = parsedExponent
+	}
+	if mantissa == "" {
+		return numberParts{}, fmt.Errorf("%w: %q", errUnexpectedIDType, raw)
+	}
+
+	intPart := mantissa
+	fracPart := ""
+	if dot := strings.IndexByte(mantissa, '.'); dot >= 0 {
+		if strings.IndexByte(mantissa[dot+1:], '.') >= 0 {
+			return numberParts{}, fmt.Errorf("%w: %q", errUnexpectedIDType, raw)
+		}
+		intPart = mantissa[:dot]
+		fracPart = mantissa[dot+1:]
+	}
+	if intPart == "" || !allDigits(intPart) || !allDigitsOrEmpty(fracPart) {
+		return numberParts{}, fmt.Errorf("%w: %q", errUnexpectedIDType, raw)
+	}
+	digits := intPart + fracPart
+	if !allDigits(digits) {
+		return numberParts{}, fmt.Errorf("%w: %q", errUnexpectedIDType, raw)
+	}
+	if allDigitsAreZero(digits) {
+		return numberParts{isZero: true}, nil
+	}
+
+	significand := strings.TrimLeft(digits, "0")
+	parts.significand = significand
+	parts.exponent = exponent - len(fracPart)
+	return parts, nil
+}
+
+func allDigits(raw string) bool {
+	if raw == "" {
+		return false
+	}
+	for _, ch := range raw {
+		if ch < '0' || ch > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func allDigitsOrEmpty(raw string) bool {
+	if raw == "" {
+		return true
+	}
+	return allDigits(raw)
 }
 
 func (t *StdioTransport) handleOversizedFrame(data []byte) {

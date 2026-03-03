@@ -121,3 +121,38 @@ func TestRequestIDEqualTreatsNegativeZeroAsZero(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeIDPreservesLargeExponentIntegers(t *testing.T) {
+	tests := []struct {
+		in   json.Number
+		want string
+	}{
+		{in: json.Number("9.007199254740992e15"), want: "9007199254740992"},
+		{in: json.Number("9.007199254740993e15"), want: "9007199254740993"},
+		{in: json.Number("9007199254740993e0"), want: "9007199254740993"},
+	}
+
+	for _, tt := range tests {
+		got, err := normalizeID(tt.in)
+		if err != nil {
+			t.Fatalf("normalizeID(%q) returned error: %v", tt.in, err)
+		}
+		if got != tt.want {
+			t.Fatalf("normalizeID(%q) = %q; want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
+func TestNormalizePendingRequestIDDoesNotCollideLargeExponentIntegers(t *testing.T) {
+	a, err := normalizePendingRequestID(json.Number("9.007199254740992e15"))
+	if err != nil {
+		t.Fatalf("normalizePendingRequestID(a) returned error: %v", err)
+	}
+	b, err := normalizePendingRequestID(json.Number("9.007199254740993e15"))
+	if err != nil {
+		t.Fatalf("normalizePendingRequestID(b) returned error: %v", err)
+	}
+	if a == b {
+		t.Fatalf("normalized IDs collided: %q == %q", a, b)
+	}
+}
