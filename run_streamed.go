@@ -196,9 +196,7 @@ func streamSendEvent(g *guardedChan, event Event) {
 	g.send(eventOrErr{event: event})
 }
 
-// streamSendErr sends a terminal error on g. It attempts a non-blocking send
-// first (sufficient when buffer space remains), then falls back to a blocking
-// send guarded by ctx to prevent goroutine leaks when the consumer stops reading.
+// streamSendErr records the terminal stream error.
 func streamSendErr(g *guardedChan, err error) {
 	g.setTerminalError(err)
 }
