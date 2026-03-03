@@ -60,14 +60,91 @@ func validateTurnCompletedNotification(n TurnCompletedNotification) error {
 	return nil
 }
 
+func matchesActiveTurn(activeTurnID string, n TurnCompletedNotification) bool {
+	if n.Turn.Error != nil {
+		return true
+	}
+	return n.Turn.ID == activeTurnID
+}
+
+type blockingTurnState struct {
+	mu                 sync.Mutex
+	ready              bool
+	turnID             string
+	pendingItems       []ItemCompletedNotification
+	pendingCompletions []TurnCompletedNotification
+}
+
+func (s *blockingTurnState) queueItem(n ItemCompletedNotification) (ThreadItemWrapper, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.ready {
+		s.pendingItems = append(s.pendingItems, n)
+		return ThreadItemWrapper{}, false
+	}
+	if n.TurnID != s.turnID {
+		return ThreadItemWrapper{}, false
+	}
+	return n.Item, true
+}
+
+func (s *blockingTurnState) queueCompletion(n TurnCompletedNotification) (TurnCompletedNotification, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.ready {
+		s.pendingCompletions = append(s.pendingCompletions, n)
+		return TurnCompletedNotification{}, false
+	}
+	if !matchesActiveTurn(s.turnID, n) {
+		return TurnCompletedNotification{}, false
+	}
+	return n, true
+}
+
+func (s *blockingTurnState) start(turnID string) ([]ItemCompletedNotification, []TurnCompletedNotification) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.ready = true
+	s.turnID = turnID
+	items := s.pendingItems
+	completions := s.pendingCompletions
+	s.pendingItems = nil
+	s.pendingCompletions = nil
+	return items, completions
+}
+
+func waitForTurnCompletion(ctx context.Context, done <-chan TurnCompletedNotification) (TurnCompletedNotification, error) {
+	select {
+	case completed := <-done:
+		return completed, nil
+	case <-ctx.Done():
+		return TurnCompletedNotification{}, ctx.Err()
+	}
+}
+
 // executeTurn runs a blocking turn: registers listeners, starts the turn,
 // collects items, and waits for completion or context cancellation.
-// Listeners are filtered by threadID to avoid cross-contamination.
+// Listeners are filtered by threadID and active turnID to avoid cross-turn contamination.
 func executeTurn(ctx context.Context, p turnLifecycleParams) (*RunResult, error) {
 	var (
-		items []ThreadItemWrapper
-		mu    sync.Mutex
-		done  = make(chan TurnCompletedNotification, 1)
+		items    []ThreadItemWrapper
+		itemsMu  sync.Mutex
+		state    blockingTurnState
+		done     = make(chan TurnCompletedNotification, 1)
+		sendDone = func(n TurnCompletedNotification) {
+			select {
+			case done <- n:
+			default:
+			}
+		}
+		appendItem = func(item ThreadItemWrapper) {
+			itemsMu.Lock()
+			items = append(items, item)
+			itemsMu.Unlock()
+		}
 	)
 
 	unsubItem := p.client.addNotificationListener(notifyItemCompleted, func(_ context.Context, notif Notification) {
@@ -83,9 +160,11 @@ func executeTurn(ctx context.Context, p turnLifecycleParams) (*RunResult, error)
 				Raw:  append(json.RawMessage(nil), notif.Params...),
 			}}
 		}
-		mu.Lock()
-		items = append(items, n.Item)
-		mu.Unlock()
+		item, ok := state.queueItem(n)
+		if !ok {
+			return
+		}
+		appendItem(item)
 	})
 
 	unsubTurn := p.client.addNotificationListener(notifyTurnCompleted, func(_ context.Context, notif Notification) {
@@ -113,48 +192,70 @@ func executeTurn(ctx context.Context, p turnLifecycleParams) (*RunResult, error)
 			p.client.reportHandlerError(notifyTurnCompleted, fmt.Errorf("validate %s: %w", notifyTurnCompleted, err))
 			n = invalidTurnCompletedNotification(err)
 		}
-		select {
-		case done <- n:
-		default:
+		completed, ok := state.queueCompletion(n)
+		if !ok {
+			return
 		}
+		sendDone(completed)
 	})
 
 	defer unsubItem()
 	defer unsubTurn()
 
-	if _, err := p.client.Turn.Start(ctx, p.turnParams); err != nil {
+	startResp, err := p.client.Turn.Start(ctx, p.turnParams)
+	if err != nil {
 		return nil, fmt.Errorf("turn/start: %w", err)
 	}
-
-	select {
-	case completed := <-done:
-		if completed.Turn.Error != nil {
-			return nil, fmt.Errorf("turn error: %w", completed.Turn.Error)
-		}
-
-		mu.Lock()
-		collectedItems := make([]ThreadItemWrapper, len(items))
-		copy(collectedItems, items)
-		mu.Unlock()
-
-		if p.onComplete != nil {
-			p.onComplete(completed.Turn)
-		}
-
-		return buildRunResult(p.thread, completed.Turn, collectedItems), nil
-
-	case <-ctx.Done():
-		return nil, ctx.Err()
+	if startResp.Turn.ID == "" {
+		return nil, fmt.Errorf("turn/start: missing turn.id")
 	}
+
+	bufferedItems, bufferedCompletions := state.start(startResp.Turn.ID)
+
+	for _, n := range bufferedItems {
+		if n.TurnID == startResp.Turn.ID {
+			appendItem(n.Item)
+		}
+	}
+	for _, n := range bufferedCompletions {
+		if !matchesActiveTurn(startResp.Turn.ID, n) {
+			continue
+		}
+		sendDone(n)
+	}
+
+	completed, err := waitForTurnCompletion(ctx, done)
+	if err != nil {
+		return nil, err
+	}
+	if completed.Turn.Error != nil {
+		return nil, fmt.Errorf("turn error: %w", completed.Turn.Error)
+	}
+
+	itemsMu.Lock()
+	collectedItems := make([]ThreadItemWrapper, len(items))
+	copy(collectedItems, items)
+	itemsMu.Unlock()
+
+	if p.onComplete != nil {
+		p.onComplete(completed.Turn)
+	}
+
+	return buildRunResult(p.thread, completed.Turn, collectedItems), nil
 }
 
 // executeStreamedTurn runs the streaming lifecycle: registers filtered listeners,
 // starts the turn, and sends events on ch until completion or context cancellation.
 func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, g *guardedChan, s *Stream) {
 	var (
-		items      []ThreadItemWrapper
-		itemsMu    sync.Mutex
-		unsubFuncs []func()
+		items                 []ThreadItemWrapper
+		itemsMu               sync.Mutex
+		turnStateMu           sync.Mutex
+		turnReady             bool
+		startedTurnID         string
+		pendingTurnScoped     []func(string)
+		pendingTurnCompletion []TurnCompletedNotification
+		unsubFuncs            []func()
 	)
 	defer func() {
 		for _, unsub := range unsubFuncs {
@@ -186,14 +287,81 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, g *guardedC
 
 	turnDone := make(chan TurnCompletedNotification, 1)
 
-	registerStreamDeltaListeners(p, g, on, onEvent)
-	registerItemListeners(ctx, p, on, emit, &items, &itemsMu)
-	registerTurnCompletedListener(p, on, turnDone)
-	registerCollectorListeners(p, on)
+	dispatchTurnScoped := func(turnID string, fn func()) {
+		turnStateMu.Lock()
+		if !turnReady {
+			capturedTurnID := turnID
+			pendingTurnScoped = append(pendingTurnScoped, func(activeTurnID string) {
+				if capturedTurnID == activeTurnID {
+					fn()
+				}
+			})
+			turnStateMu.Unlock()
+			return
+		}
+		activeTurnID := startedTurnID
+		turnStateMu.Unlock()
 
-	if _, err := p.client.Turn.Start(ctx, p.turnParams); err != nil {
+		if turnID != activeTurnID {
+			return
+		}
+		fn()
+	}
+
+	queueTurnCompletion := func(n TurnCompletedNotification) {
+		turnStateMu.Lock()
+		if !turnReady {
+			pendingTurnCompletion = append(pendingTurnCompletion, n)
+			turnStateMu.Unlock()
+			return
+		}
+		activeTurnID := startedTurnID
+		turnStateMu.Unlock()
+
+		if !matchesActiveTurn(activeTurnID, n) {
+			return
+		}
+		select {
+		case turnDone <- n:
+		default:
+		}
+	}
+
+	registerStreamDeltaListeners(p, g, on, onEvent, dispatchTurnScoped)
+	registerItemListeners(ctx, p, on, emit, &items, &itemsMu, dispatchTurnScoped)
+	registerTurnCompletedListener(p, on, queueTurnCompletion)
+	registerCollectorListeners(p, on, dispatchTurnScoped)
+
+	startResp, err := p.client.Turn.Start(ctx, p.turnParams)
+	if err != nil {
 		emitErr(fmt.Errorf("turn/start: %w", err))
 		return
+	}
+	if startResp.Turn.ID == "" {
+		emitErr(fmt.Errorf("turn/start: missing turn.id"))
+		return
+	}
+
+	turnStateMu.Lock()
+	turnReady = true
+	startedTurnID = startResp.Turn.ID
+	pendingEvents := pendingTurnScoped
+	pendingCompletions := pendingTurnCompletion
+	pendingTurnScoped = nil
+	pendingTurnCompletion = nil
+	turnStateMu.Unlock()
+
+	for _, pending := range pendingEvents {
+		pending(startedTurnID)
+	}
+	for _, n := range pendingCompletions {
+		if !matchesActiveTurn(startedTurnID, n) {
+			continue
+		}
+		select {
+		case turnDone <- n:
+		default:
+		}
 	}
 
 	// Wait for turn completion or context cancellation.
@@ -224,40 +392,71 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, g *guardedC
 	}
 }
 
-func registerStreamDeltaListeners(p turnLifecycleParams, g *guardedChan, on func(string, NotificationHandler), onEvent func(Event)) {
+func registerStreamDeltaListeners(p turnLifecycleParams, g *guardedChan, on func(string, NotificationHandler), onEvent func(Event), dispatchTurnScoped func(string, func())) {
 	streamListen(on, notifyTurnStarted, g, p.threadID, p.client.reportHandlerError, onEvent, func(n TurnStartedNotification) string {
 		return n.ThreadID
 	}, func(n TurnStartedNotification) Event {
 		return &TurnStarted{Turn: n.Turn, ThreadID: n.ThreadID}
 	})
-	streamListen(on, notifyAgentMessageDelta, g, p.threadID, p.client.reportHandlerError, onEvent, func(n AgentMessageDeltaNotification) string {
+	streamListenTurnScoped(on, notifyAgentMessageDelta, g, p.threadID, p.client.reportHandlerError, onEvent, dispatchTurnScoped, func(n AgentMessageDeltaNotification) string {
 		return n.ThreadID
+	}, func(n AgentMessageDeltaNotification) string {
+		return n.TurnID
 	}, func(n AgentMessageDeltaNotification) Event {
 		return &TextDelta{Delta: n.Delta, ItemID: n.ItemID}
 	})
-	streamListen(on, notifyReasoningTextDelta, g, p.threadID, p.client.reportHandlerError, onEvent, func(n ReasoningTextDeltaNotification) string {
+	streamListenTurnScoped(on, notifyReasoningTextDelta, g, p.threadID, p.client.reportHandlerError, onEvent, dispatchTurnScoped, func(n ReasoningTextDeltaNotification) string {
 		return n.ThreadID
+	}, func(n ReasoningTextDeltaNotification) string {
+		return n.TurnID
 	}, func(n ReasoningTextDeltaNotification) Event {
 		return &ReasoningDelta{Delta: n.Delta, ItemID: n.ItemID, ContentIndex: n.ContentIndex}
 	})
-	streamListen(on, notifyReasoningSummaryTextDelta, g, p.threadID, p.client.reportHandlerError, onEvent, func(n ReasoningSummaryTextDeltaNotification) string {
+	streamListenTurnScoped(on, notifyReasoningSummaryTextDelta, g, p.threadID, p.client.reportHandlerError, onEvent, dispatchTurnScoped, func(n ReasoningSummaryTextDeltaNotification) string {
 		return n.ThreadID
+	}, func(n ReasoningSummaryTextDeltaNotification) string {
+		return n.TurnID
 	}, func(n ReasoningSummaryTextDeltaNotification) Event {
 		return &ReasoningSummaryDelta{Delta: n.Delta, ItemID: n.ItemID, SummaryIndex: n.SummaryIndex}
 	})
-	streamListen(on, notifyPlanDelta, g, p.threadID, p.client.reportHandlerError, onEvent, func(n PlanDeltaNotification) string {
+	streamListenTurnScoped(on, notifyPlanDelta, g, p.threadID, p.client.reportHandlerError, onEvent, dispatchTurnScoped, func(n PlanDeltaNotification) string {
 		return n.ThreadID
+	}, func(n PlanDeltaNotification) string {
+		return n.TurnID
 	}, func(n PlanDeltaNotification) Event {
 		return &PlanDelta{Delta: n.Delta, ItemID: n.ItemID}
 	})
-	streamListen(on, notifyFileChangeOutputDelta, g, p.threadID, p.client.reportHandlerError, onEvent, func(n FileChangeOutputDeltaNotification) string {
+	streamListenTurnScoped(on, notifyFileChangeOutputDelta, g, p.threadID, p.client.reportHandlerError, onEvent, dispatchTurnScoped, func(n FileChangeOutputDeltaNotification) string {
 		return n.ThreadID
+	}, func(n FileChangeOutputDeltaNotification) string {
+		return n.TurnID
 	}, func(n FileChangeOutputDeltaNotification) Event {
 		return &FileChangeDelta{Delta: n.Delta, ItemID: n.ItemID}
 	})
 }
 
-func registerItemListeners(ctx context.Context, p turnLifecycleParams, on func(string, NotificationHandler), emit func(Event), items *[]ThreadItemWrapper, itemsMu *sync.Mutex) {
+func streamListenTurnScoped[N any](on func(string, NotificationHandler), method string, g *guardedChan, threadID string, reportErr func(string, error), onEvent func(Event), dispatchTurnScoped func(string, func()), threadIDOf func(N) string, turnIDOf func(N) string, convert func(N) Event) {
+	on(method, func(_ context.Context, notif Notification) {
+		var n N
+		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			reportErr(method, fmt.Errorf("unmarshal %s: %w", method, err))
+			return
+		}
+		if threadIDOf(n) != threadID {
+			return
+		}
+
+		ev := convert(n)
+		dispatchTurnScoped(turnIDOf(n), func() {
+			if onEvent != nil {
+				onEvent(ev)
+			}
+			streamSendEvent(g, ev)
+		})
+	})
+}
+
+func registerItemListeners(ctx context.Context, p turnLifecycleParams, on func(string, NotificationHandler), emit func(Event), items *[]ThreadItemWrapper, itemsMu *sync.Mutex, dispatchTurnScoped func(string, func())) {
 	on(notifyItemStarted, func(_ context.Context, notif Notification) {
 		var carrier threadIDCarrier
 		if err := json.Unmarshal(notif.Params, &carrier); err != nil || carrier.ThreadID != p.threadID {
@@ -268,10 +467,12 @@ func registerItemListeners(ctx context.Context, p turnLifecycleParams, on func(s
 			p.client.reportHandlerError(notifyItemStarted, fmt.Errorf("unmarshal %s: %w", notifyItemStarted, err))
 			return
 		}
-		if c, ok := n.Item.Value.(*CollabAgentToolCallThreadItem); ok {
-			emit(newCollabEvent(CollabToolCallStartedPhase, c))
-		}
-		emit(&ItemStarted{Item: n.Item})
+		dispatchTurnScoped(n.TurnID, func() {
+			if c, ok := n.Item.Value.(*CollabAgentToolCallThreadItem); ok {
+				emit(newCollabEvent(CollabToolCallStartedPhase, c))
+			}
+			emit(&ItemStarted{Item: n.Item})
+		})
 	})
 
 	on(notifyItemCompleted, func(_ context.Context, notif Notification) {
@@ -287,29 +488,28 @@ func registerItemListeners(ctx context.Context, p turnLifecycleParams, on func(s
 				Raw:  append(json.RawMessage(nil), notif.Params...),
 			}}
 		}
-		itemsMu.Lock()
-		*items = append(*items, n.Item)
-		itemsMu.Unlock()
-		if c, ok := n.Item.Value.(*CollabAgentToolCallThreadItem); ok {
-			emit(newCollabEvent(CollabToolCallCompletedPhase, c))
-		}
-		emit(&ItemCompleted{Item: n.Item})
+		dispatchTurnScoped(n.TurnID, func() {
+			itemsMu.Lock()
+			*items = append(*items, n.Item)
+			itemsMu.Unlock()
+			if c, ok := n.Item.Value.(*CollabAgentToolCallThreadItem); ok {
+				emit(newCollabEvent(CollabToolCallCompletedPhase, c))
+			}
+			emit(&ItemCompleted{Item: n.Item})
+		})
 	})
 
 	_ = ctx // keeps signature consistent for future listener additions.
 }
 
-func registerTurnCompletedListener(p turnLifecycleParams, on func(string, NotificationHandler), turnDone chan<- TurnCompletedNotification) {
+func registerTurnCompletedListener(p turnLifecycleParams, on func(string, NotificationHandler), queueTurnCompletion func(TurnCompletedNotification)) {
 	on(notifyTurnCompleted, func(_ context.Context, notif Notification) {
 		var carrier threadIDCarrier
 		if err := json.Unmarshal(notif.Params, &carrier); err != nil {
 			return
 		}
 		if carrier.ThreadID == "" {
-			select {
-			case turnDone <- invalidTurnCompletedNotification(fmt.Errorf("threadId is required")):
-			default:
-			}
+			queueTurnCompletion(invalidTurnCompletedNotification(fmt.Errorf("threadId is required")))
 			return
 		}
 		if carrier.ThreadID != p.threadID {
@@ -325,14 +525,11 @@ func registerTurnCompletedListener(p turnLifecycleParams, on func(string, Notifi
 			p.client.reportHandlerError(notifyTurnCompleted, fmt.Errorf("validate %s: %w", notifyTurnCompleted, err))
 			n = invalidTurnCompletedNotification(err)
 		}
-		select {
-		case turnDone <- n:
-		default:
-		}
+		queueTurnCompletion(n)
 	})
 }
 
-func registerCollectorListeners(p turnLifecycleParams, on func(string, NotificationHandler)) {
+func registerCollectorListeners(p turnLifecycleParams, on func(string, NotificationHandler), dispatchTurnScoped func(string, func())) {
 	if p.collector == nil {
 		return
 	}
@@ -347,7 +544,9 @@ func registerCollectorListeners(p turnLifecycleParams, on func(string, Notificat
 			p.client.reportHandlerError(notifyCommandExecutionOutputDelta, fmt.Errorf("unmarshal %s: %w", notifyCommandExecutionOutputDelta, err))
 			return
 		}
-		p.collector.processCommandExecutionOutputDelta(n)
+		dispatchTurnScoped(n.TurnID, func() {
+			p.collector.processCommandExecutionOutputDelta(n)
+		})
 	})
 
 	on(notifyThreadTokenUsageUpdated, func(_ context.Context, notif Notification) {
@@ -360,7 +559,9 @@ func registerCollectorListeners(p turnLifecycleParams, on func(string, Notificat
 			p.client.reportHandlerError(notifyThreadTokenUsageUpdated, fmt.Errorf("unmarshal %s: %w", notifyThreadTokenUsageUpdated, err))
 			return
 		}
-		p.collector.processThreadTokenUsageUpdated(n)
+		dispatchTurnScoped(n.TurnID, func() {
+			p.collector.processThreadTokenUsageUpdated(n)
+		})
 	})
 
 	on(notifyError, func(_ context.Context, notif Notification) {
@@ -373,7 +574,9 @@ func registerCollectorListeners(p turnLifecycleParams, on func(string, Notificat
 			p.client.reportHandlerError(notifyError, fmt.Errorf("unmarshal %s: %w", notifyError, err))
 			return
 		}
-		p.collector.processSystemError(n)
+		dispatchTurnScoped(n.TurnID, func() {
+			p.collector.processSystemError(n)
+		})
 	})
 
 	on(notifyRealtimeError, func(_ context.Context, notif Notification) {
