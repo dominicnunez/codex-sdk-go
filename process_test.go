@@ -212,6 +212,24 @@ func TestStartProcessBadBinaryDoesNotLeakFileDescriptors(t *testing.T) {
 	}
 }
 
+func TestNewProcessFromClientNilPanics(t *testing.T) {
+	defer func() {
+		recovered := recover()
+		if recovered == nil {
+			t.Fatal("expected panic when NewProcessFromClient is called with nil client")
+		}
+		msg, ok := recovered.(error)
+		if !ok {
+			t.Fatalf("panic value type = %T; want error", recovered)
+		}
+		if msg.Error() != "process client must not be nil" {
+			t.Fatalf("panic message = %q; want %q", msg.Error(), "process client must not be nil")
+		}
+	}()
+
+	_ = codex.NewProcessFromClient(nil)
+}
+
 // TestStartProcessExecArgsWithEndOfOptions verifies that StartProcess rejects
 // ExecArgs containing "--" (end-of-options marker), which would bypass typed flag safety.
 func TestStartProcessExecArgsWithEndOfOptions(t *testing.T) {
@@ -744,6 +762,17 @@ func TestRunAfterTransportClose(t *testing.T) {
 	_, err = proc.Run(ctx, codex.RunOptions{Prompt: "after close"})
 	if err == nil {
 		t.Fatal("expected error from Run after transport close, got nil")
+	}
+}
+
+func TestStartConversationOnZeroValueProcessReturnsError(t *testing.T) {
+	var proc codex.Process
+	_, err := proc.StartConversation(context.Background(), codex.ConversationOptions{})
+	if err == nil {
+		t.Fatal("expected error from StartConversation on zero-value Process")
+	}
+	if !strings.Contains(err.Error(), "process client must not be nil") {
+		t.Fatalf("error = %v; want nil-client error", err)
 	}
 }
 

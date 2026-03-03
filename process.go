@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -79,6 +80,7 @@ type Process struct {
 var errEndOfOptionsInExecArgs = errors.New(`ExecArgs must not contain "--" (end-of-options marker)`)
 
 var errTypedFlagInExecArgs = errors.New("ExecArgs must not contain typed safety flags")
+var errNilProcessClient = errors.New("process client must not be nil")
 
 // rejectedFlagNames are the bare names of typed safety flags (without dash
 // prefixes). buildArgs rejects both --name and -name variants to prevent
@@ -133,6 +135,9 @@ func (opts *ProcessOptions) buildArgs() ([]string, error) {
 // for testing or when managing the Codex CLI process lifecycle externally.
 // Close on the returned Process is a no-op since there is no child process.
 func NewProcessFromClient(client *Client) *Process {
+	if client == nil {
+		panic(errNilProcessClient)
+	}
 	done := make(chan struct{})
 	close(done)
 	return &Process{Client: client, waitDone: done}
@@ -209,14 +214,18 @@ func (p *Process) Close() error {
 
 		// Try graceful interrupt, then force kill after grace period.
 		if p.cmd != nil && p.cmd.Process != nil {
-			_ = p.cmd.Process.Signal(os.Interrupt)
+			if err := p.cmd.Process.Signal(os.Interrupt); err != nil && !isExpectedProcessStopError(err) {
+				closeErr = errors.Join(closeErr, fmt.Errorf("signal process: %w", err))
+			}
 
 			go p.doWait()
 
 			select {
 			case <-p.waitDone:
 			case <-time.After(processGracePeriod):
-				_ = p.cmd.Process.Kill()
+				if err := p.cmd.Process.Kill(); err != nil && !isExpectedProcessStopError(err) {
+					closeErr = errors.Join(closeErr, fmt.Errorf("kill process: %w", err))
+				}
 				<-p.waitDone
 			}
 
@@ -238,6 +247,9 @@ func (p *Process) ensureInit(ctx context.Context) error {
 	defer p.initMu.Unlock()
 	if p.initDone {
 		return nil
+	}
+	if p.Client == nil {
+		return errNilProcessClient
 	}
 	_, err := p.Client.Initialize(ctx, InitializeParams{
 		ClientInfo: ClientInfo{Name: "codex-sdk-go", Version: sdkVersion},
@@ -266,6 +278,10 @@ func isSignalError(err error) bool {
 		return false
 	}
 	return exitErr.ProcessState != nil && !exitErr.Exited()
+}
+
+func isExpectedProcessStopError(err error) bool {
+	return errors.Is(err, os.ErrProcessDone) || errors.Is(err, syscall.ESRCH)
 }
 
 // Wait waits for the child process to exit and returns the exit error.
