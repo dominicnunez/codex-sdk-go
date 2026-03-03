@@ -385,3 +385,10 @@ Removing the copy would require a documented no-mutation contract that callers c
 violate at compile time, trading correctness for a speculative performance gain. The
 current approach is correct-by-construction and consistent with how Thread() and other
 snapshot methods work in the codebase.
+
+### Inbound messages are decoded once for routing and again for typed handlers
+
+**Location:** `stdio.go:527` — read loop routes by top-level fields before typed decode in downstream handlers
+**Date:** 2026-03-03
+
+**Reason:** The current transport intentionally performs a lightweight envelope decode for routing (`id`, `method`, protocol checks) and leaves typed decoding to request/notification handlers. Eliminating the second decode would require broader restructuring across dispatch and handler contracts for marginal benefit in expected SDK workloads. The current design keeps routing logic simple, explicit, and resilient under malformed input while preserving typed parsing boundaries.
