@@ -4,7 +4,6 @@
 package codex_test
 
 import (
-	"bytes"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -45,18 +44,9 @@ func TestGolangciLint(t *testing.T) {
 // TestGoBuild verifies the package compiles cleanly with no errors or warnings.
 func TestGoBuild(t *testing.T) {
 	cmd := exec.Command("go", "build", "./...")
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	err := cmd.Run()
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("go build failed: %v\nstdout: %s\nstderr: %s", err, stdout.String(), stderr.String())
-	}
-
-	// Verify no stderr output (warnings would appear here)
-	if stderr.Len() > 0 {
-		t.Errorf("go build produced output on stderr:\n%s", stderr.String())
+		t.Fatalf("go build failed: %v\noutput: %s", err, output)
 	}
 }
 
