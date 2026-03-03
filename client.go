@@ -106,6 +106,10 @@ func WithHandlerErrorCallback(cb func(method string, err error)) ClientOption {
 
 // NewClient creates a new Client using the given transport and options.
 func NewClient(transport Transport, opts ...ClientOption) *Client {
+	if transport == nil {
+		panic("nil transport")
+	}
+
 	c := &Client{
 		transport:             transport,
 		notificationListeners: make(map[string]NotificationHandler),

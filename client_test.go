@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -257,6 +259,21 @@ func TestClientRPCError(t *testing.T) {
 	if rpcErr.RPCError().Code != -32600 {
 		t.Errorf("expected error code -32600, got %d", rpcErr.RPCError().Code)
 	}
+}
+
+func TestNewClientNilTransportPanics(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic for nil transport")
+		}
+		msg := fmt.Sprint(r)
+		if !strings.Contains(msg, "nil transport") {
+			t.Fatalf("panic message = %q; want to contain %q", msg, "nil transport")
+		}
+	}()
+
+	_ = codex.NewClient(nil)
 }
 
 // isTimeoutError checks if err is or wraps a TimeoutError or DeadlineExceeded.
