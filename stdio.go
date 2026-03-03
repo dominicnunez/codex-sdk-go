@@ -28,8 +28,10 @@ const (
 	inboundRequestQueueSize     = 64
 	inboundNotificationWorkers  = 8
 	criticalNotificationWorkers = 2
+	terminalNotificationWorkers = 2
 	inboundNotifQueueSize       = 128
 	criticalNotifQueueSize      = 64
+	terminalNotifQueueSize      = 64
 	outboundWriteQueueSize      = 256
 	readBufferSizeBytes         = 64 * 1024
 	maxInboundMessageSizeBytes  = 10 * 1024 * 1024
@@ -37,11 +39,10 @@ const (
 )
 
 const (
-	errNilTransportReader        = "stdio transport reader must not be nil"
-	errNilTransportWriter        = "stdio transport writer must not be nil"
-	errNonClosableTransportInput = "stdio transport reader must implement io.ReadCloser"
-	errInvalidJSONRPCVersion     = `invalid request: jsonrpc must be "2.0"`
-	errInvalidResponseJSONRPC    = `invalid response: jsonrpc must be "2.0"`
+	errNilTransportReader     = "stdio transport reader must not be nil"
+	errNilTransportWriter     = "stdio transport writer must not be nil"
+	errInvalidJSONRPCVersion  = `invalid request: jsonrpc must be "2.0"`
+	errInvalidResponseJSONRPC = `invalid response: jsonrpc must be "2.0"`
 )
 
 type writeEnvelope struct {
@@ -74,6 +75,7 @@ type StdioTransport struct {
 	notifHandler       NotificationHandler
 	requestQueue       chan Request
 	criticalNotifQueue chan Notification
+	terminalNotifQueue chan Notification
 	notifQueue         chan Notification
 	writeQueue         chan writeEnvelope
 	readerStopped      chan struct{}
@@ -130,11 +132,11 @@ func normalizeID(id interface{}) (string, error) {
 }
 
 // NewStdioTransport creates a new stdio transport using the provided reader and writer.
-// reader must implement io.ReadCloser so Close can always unblock the read loop.
+// reader is required to be an io.ReadCloser so Close can always unblock the read loop.
 // Typically, reader is os.Stdin and writer is os.Stdout.
 // The transport starts background goroutines for read/write and inbound dispatch.
 // It panics if reader/writer are invalid.
-func NewStdioTransport(reader io.Reader, writer io.Writer) *StdioTransport {
+func NewStdioTransport(reader io.ReadCloser, writer io.Writer) *StdioTransport {
 	if reader == nil {
 		panic(errNilTransportReader)
 	}
@@ -142,19 +144,15 @@ func NewStdioTransport(reader io.Reader, writer io.Writer) *StdioTransport {
 		panic(errNilTransportWriter)
 	}
 
-	readerCloser, ok := reader.(io.ReadCloser)
-	if !ok {
-		panic(errNonClosableTransportInput)
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	t := &StdioTransport{
 		reader:             reader,
-		readerCloser:       readerCloser,
+		readerCloser:       reader,
 		writer:             writer,
 		pendingReqs:        make(map[string]pendingReq),
 		requestQueue:       make(chan Request, inboundRequestQueueSize),
 		criticalNotifQueue: make(chan Notification, criticalNotifQueueSize),
+		terminalNotifQueue: make(chan Notification, terminalNotifQueueSize),
 		notifQueue:         make(chan Notification, inboundNotifQueueSize),
 		writeQueue:         make(chan writeEnvelope, outboundWriteQueueSize),
 		readerStopped:      make(chan struct{}),
@@ -169,6 +167,9 @@ func NewStdioTransport(reader io.Reader, writer io.Writer) *StdioTransport {
 	}
 	for range criticalNotificationWorkers {
 		go t.criticalNotificationWorker()
+	}
+	for range terminalNotificationWorkers {
+		go t.terminalNotificationWorker()
 	}
 	go t.writeLoop()
 	go t.readLoop()
@@ -447,6 +448,17 @@ func (t *StdioTransport) criticalNotificationWorker() {
 	}
 }
 
+func (t *StdioTransport) terminalNotificationWorker() {
+	for {
+		select {
+		case <-t.ctx.Done():
+			return
+		case notif := <-t.terminalNotifQueue:
+			t.handleNotification(notif)
+		}
+	}
+}
+
 // readLoop continuously reads newline-delimited JSON messages from the reader
 func (t *StdioTransport) readLoop() {
 	defer t.once.Do(func() { close(t.readerStopped) })
@@ -667,6 +679,10 @@ func (t *StdioTransport) enqueueRequest(req Request) {
 }
 
 func (t *StdioTransport) enqueueNotification(notif Notification) {
+	if isTerminalNotificationMethod(notif.Method) {
+		t.enqueueTerminalNotification(notif)
+		return
+	}
 	if isCriticalNotificationMethod(notif.Method) {
 		t.enqueueCriticalNotification(notif)
 		return
@@ -682,36 +698,48 @@ func (t *StdioTransport) enqueueNotification(notif Notification) {
 	}
 }
 
-func (t *StdioTransport) enqueueCriticalNotification(notif Notification) {
+func (t *StdioTransport) enqueueTerminalNotification(notif Notification) {
+	t.enqueueBoundedNotification(t.terminalNotifQueue, notif)
+}
+
+func (t *StdioTransport) enqueueBoundedNotification(queue chan Notification, notif Notification) {
 	select {
 	case <-t.ctx.Done():
 		return
-	case t.criticalNotifQueue <- notif:
+	case queue <- notif:
 		return
 	default:
 	}
 
-	// Queue is full: drop the oldest critical notification, then enqueue the
-	// newest without blocking the read loop.
+	// Queue is full: drop oldest and enqueue newest to preserve read-loop
+	// liveness under sustained notification pressure.
 	select {
-	case <-t.criticalNotifQueue:
+	case <-queue:
 	default:
 	}
 
 	select {
 	case <-t.ctx.Done():
-	case t.criticalNotifQueue <- notif:
+	case queue <- notif:
 	default:
 	}
 }
 
+func (t *StdioTransport) enqueueCriticalNotification(notif Notification) {
+	t.enqueueBoundedNotification(t.criticalNotifQueue, notif)
+}
+
 func isCriticalNotificationMethod(method string) bool {
 	switch method {
-	case notifyTurnCompleted, notifyItemCompleted, notifyError, notifyRealtimeError:
+	case notifyItemCompleted, notifyError, notifyRealtimeError:
 		return true
 	default:
 		return false
 	}
+}
+
+func isTerminalNotificationMethod(method string) bool {
+	return method == notifyTurnCompleted
 }
 
 func (t *StdioTransport) rejectRequestForOverload(req Request) {
@@ -825,12 +853,12 @@ func (t *StdioTransport) handleMalformedResponse(data []byte) {
 
 	id, err := parseRequestID(partial.ID)
 	if err != nil {
-		t.failAllPendingWithParseError("failed to parse server response id")
+		t.malformedCount.Add(1)
 		return
 	}
 	normalizedID, err := normalizeID(id.Value)
 	if err != nil {
-		t.failAllPendingWithParseError("failed to parse server response id")
+		t.malformedCount.Add(1)
 		return
 	}
 
@@ -914,39 +942,9 @@ func allDigitsAreZero(raw string) bool {
 	return true
 }
 
-func (t *StdioTransport) failAllPendingWithParseError(message string) {
-	t.mu.Lock()
-	if t.closed {
-		t.mu.Unlock()
-		return
-	}
-
-	pending := make([]pendingReq, 0, len(t.pendingReqs))
-	for id, req := range t.pendingReqs {
-		pending = append(pending, req)
-		delete(t.pendingReqs, id)
-	}
-	t.mu.Unlock()
-
-	for _, req := range pending {
-		req.ch <- Response{
-			JSONRPC: jsonrpcVersion,
-			ID:      req.id,
-			Error: &Error{
-				Code:    ErrCodeParseError,
-				Message: message,
-			},
-		}
-	}
-}
-
 func (t *StdioTransport) handleOversizedFrame(data []byte) {
 	id, hasID, hasMethod := extractTopLevelIDAndMethod(data)
-	if hasMethod {
-		return
-	}
-	if !hasID {
-		t.failAllPendingWithParseError("oversized server response frame")
+	if hasMethod || !hasID {
 		return
 	}
 

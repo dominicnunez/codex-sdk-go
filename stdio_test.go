@@ -1045,9 +1045,9 @@ func TestStdioOversizeResponseUnblocksPendingSend(t *testing.T) {
 	}
 }
 
-// TestStdioOversizeResponseWithLateIDFailsPendingSend verifies that oversized
-// response frames still fail pending sends when ID is beyond the metadata cap.
-func TestStdioOversizeResponseWithLateIDFailsPendingSend(t *testing.T) {
+// TestStdioOversizeAmbiguousFrameDoesNotFailPendingSend verifies that oversized
+// frames with no early routing keys are ignored instead of failing all pending sends.
+func TestStdioOversizeAmbiguousFrameDoesNotFailPendingSend(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()
 	defer func() { _ = clientReader.Close() }()
@@ -1065,7 +1065,7 @@ func TestStdioOversizeResponseWithLateIDFailsPendingSend(t *testing.T) {
 	go func() {
 		req := codex.Request{
 			JSONRPC: "2.0",
-			ID:      codex.RequestID{Value: "late-id"},
+			ID:      codex.RequestID{Value: "ambiguous-oversize"},
 			Method:  "test/method",
 		}
 		resp, err := transport.Send(ctx, req)
@@ -1073,16 +1073,12 @@ func TestStdioOversizeResponseWithLateIDFailsPendingSend(t *testing.T) {
 			errCh <- fmt.Errorf("Send returned unexpected error: %w", err)
 			return
 		}
-		if resp.Error == nil {
-			errCh <- fmt.Errorf("Send returned nil response error")
+		if resp.Error != nil {
+			errCh <- fmt.Errorf("Send returned unexpected response error: %v", resp.Error)
 			return
 		}
-		if resp.Error.Code != codex.ErrCodeParseError {
-			errCh <- fmt.Errorf("response error code = %d; want %d", resp.Error.Code, codex.ErrCodeParseError)
-			return
-		}
-		if !strings.Contains(resp.Error.Message, "oversized") {
-			errCh <- fmt.Errorf("response error message = %q; want to contain oversized", resp.Error.Message)
+		if string(resp.Result) != `{"ok":true}` {
+			errCh <- fmt.Errorf("response result = %s; want {\"ok\":true}", string(resp.Result))
 			return
 		}
 		errCh <- nil
@@ -1091,14 +1087,15 @@ func TestStdioOversizeResponseWithLateIDFailsPendingSend(t *testing.T) {
 	waitForOutboundRequest(t, serverReader)
 
 	const overSize = 11 * 1024 * 1024
-	const responsePrefix = `{"jsonrpc":"2.0","result":{"payload":"`
-	const responseSuffix = `"},"id":"late-id"}` + "\n"
-	payloadSize := overSize - len(responsePrefix) - len(responseSuffix)
+	const ambiguousPrefix = `{"jsonrpc":"2.0","params":{"payload":"`
+	const ambiguousSuffix = `"},"method":"thread/updated"}` + "\n"
+	payloadSize := overSize - len(ambiguousPrefix) - len(ambiguousSuffix)
 	if payloadSize <= 0 {
 		t.Fatal("invalid oversized payload size")
 	}
-	oversized := responsePrefix + strings.Repeat("x", payloadSize) + responseSuffix
+	oversized := ambiguousPrefix + strings.Repeat("x", payloadSize) + ambiguousSuffix
 	_, _ = serverWriter.Write([]byte(oversized))
+	_, _ = serverWriter.Write([]byte(`{"jsonrpc":"2.0","id":"ambiguous-oversize","result":{"ok":true}}` + "\n"))
 
 	select {
 	case err := <-errCh:
@@ -1107,6 +1104,66 @@ func TestStdioOversizeResponseWithLateIDFailsPendingSend(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("timeout waiting for oversized response handling")
+	}
+}
+
+func TestStdioOversizeNotificationWithLateMethodDoesNotFailPendingSend(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	errCh := make(chan error, 1)
+	go func() {
+		req := codex.Request{
+			JSONRPC: "2.0",
+			ID:      codex.RequestID{Value: "late-method"},
+			Method:  "test/method",
+		}
+		resp, err := transport.Send(ctx, req)
+		if err != nil {
+			errCh <- fmt.Errorf("Send returned unexpected error: %w", err)
+			return
+		}
+		if resp.Error != nil {
+			errCh <- fmt.Errorf("Send returned unexpected response error: %v", resp.Error)
+			return
+		}
+		if string(resp.Result) != `{"ok":true}` {
+			errCh <- fmt.Errorf("response result = %s; want {\"ok\":true}", string(resp.Result))
+			return
+		}
+		errCh <- nil
+	}()
+
+	waitForOutboundRequest(t, serverReader)
+
+	const overSize = 11 * 1024 * 1024
+	const notifPrefix = `{"jsonrpc":"2.0","params":{"payload":"`
+	const notifSuffix = `"},"method":"turn/updated"}` + "\n"
+	payloadSize := overSize - len(notifPrefix) - len(notifSuffix)
+	if payloadSize <= 0 {
+		t.Fatal("invalid oversized payload size")
+	}
+	oversized := notifPrefix + strings.Repeat("x", payloadSize) + notifSuffix
+	_, _ = serverWriter.Write([]byte(oversized))
+	_, _ = serverWriter.Write([]byte(`{"jsonrpc":"2.0","id":"late-method","result":{"ok":true}}` + "\n"))
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for pending send after oversized notification")
 	}
 }
 
@@ -1175,9 +1232,9 @@ func TestStdioOversizeResponseAtEOFFailsPendingSend(t *testing.T) {
 	}
 }
 
-// TestStdioCriticalNotificationsDoNotBlockReadLoop verifies that a full
-// critical notification queue does not block response processing.
-func TestStdioCriticalNotificationsDoNotBlockReadLoop(t *testing.T) {
+// TestStdioTerminalNotificationsDoNotBlockReadLoop verifies that a full
+// terminal notification queue does not block response processing.
+func TestStdioTerminalNotificationsDoNotBlockReadLoop(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()
 	defer func() { _ = clientReader.Close() }()
@@ -1211,7 +1268,7 @@ func TestStdioCriticalNotificationsDoNotBlockReadLoop(t *testing.T) {
 		defer cancel()
 		req := codex.Request{
 			JSONRPC: "2.0",
-			ID:      codex.RequestID{Value: "critical-queue"},
+			ID:      codex.RequestID{Value: "terminal-queue"},
 			Method:  "test/method",
 		}
 		resp, err := transport.Send(ctx, req)
@@ -1232,11 +1289,11 @@ func TestStdioCriticalNotificationsDoNotBlockReadLoop(t *testing.T) {
 		t.Fatal("timeout waiting for outbound request")
 	}
 
-	criticalNotif := `{"jsonrpc":"2.0","method":"turn/completed","params":{"n":1}}` + "\n"
+	terminalNotif := `{"jsonrpc":"2.0","method":"turn/completed","params":{"n":1}}` + "\n"
 	for i := 0; i < 200; i++ {
-		_, _ = serverWriter.Write([]byte(criticalNotif))
+		_, _ = serverWriter.Write([]byte(terminalNotif))
 	}
-	_, _ = serverWriter.Write([]byte(`{"jsonrpc":"2.0","id":"critical-queue","result":{"ok":true}}` + "\n"))
+	_, _ = serverWriter.Write([]byte(`{"jsonrpc":"2.0","id":"terminal-queue","result":{"ok":true}}` + "\n"))
 
 	select {
 	case err := <-errCh:
@@ -1244,7 +1301,7 @@ func TestStdioCriticalNotificationsDoNotBlockReadLoop(t *testing.T) {
 			t.Fatal(err)
 		}
 	case <-time.After(2 * time.Second):
-		t.Fatal("timeout waiting for response while critical queue is saturated")
+		t.Fatal("timeout waiting for response while terminal queue is saturated")
 	}
 }
 
@@ -1319,6 +1376,79 @@ func TestStdioErrorNotificationsUseCriticalQueue(t *testing.T) {
 	if !sawError.Load() {
 		t.Fatal("expected error notification to be delivered under queue pressure")
 	}
+}
+
+func TestStdioTurnCompletedDeliveredWhenCriticalQueueIsSaturated(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	blockCritical := make(chan struct{})
+	turnCompletedSeen := make(chan struct{}, 1)
+	transport.OnNotify(func(_ context.Context, notif codex.Notification) {
+		switch notif.Method {
+		case "item/completed":
+			<-blockCritical
+		case "turn/completed":
+			select {
+			case turnCompletedSeen <- struct{}{}:
+			default:
+			}
+		}
+	})
+
+	errCh := make(chan error, 1)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+		defer cancel()
+		req := codex.Request{
+			JSONRPC: "2.0",
+			ID:      codex.RequestID{Value: "turn-completed-guarantee"},
+			Method:  "test/method",
+		}
+		resp, err := transport.Send(ctx, req)
+		if err != nil {
+			errCh <- fmt.Errorf("Send returned error: %w", err)
+			return
+		}
+		if string(resp.Result) != `{"ok":true}` {
+			errCh <- fmt.Errorf("response result = %s; want {\"ok\":true}", string(resp.Result))
+			return
+		}
+		errCh <- nil
+	}()
+
+	waitForOutboundRequest(t, serverReader)
+
+	criticalItemCompleted := `{"jsonrpc":"2.0","method":"item/completed","params":{"threadId":"t","turnId":"u","item":{"type":"plan","id":"p","text":"done"}}}` + "\n"
+	for i := 0; i < 200; i++ {
+		_, _ = serverWriter.Write([]byte(criticalItemCompleted))
+	}
+	_, _ = serverWriter.Write([]byte(`{"jsonrpc":"2.0","method":"turn/completed","params":{"threadId":"t","turn":{"id":"u","status":"completed","items":[]}}}` + "\n"))
+	_, _ = serverWriter.Write([]byte(`{"jsonrpc":"2.0","id":"turn-completed-guarantee","result":{"ok":true}}` + "\n"))
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for response while critical queue is saturated")
+	}
+
+	select {
+	case <-turnCompletedSeen:
+	case <-time.After(2 * time.Second):
+		t.Fatal("expected turn/completed to be delivered under critical queue pressure")
+	}
+
+	close(blockCritical)
 }
 
 func TestStdioRejectsInvalidJSONRPCRequestVersion(t *testing.T) {
@@ -1566,7 +1696,7 @@ func TestStdioHandleResponseUnmarshalError(t *testing.T) {
 	}
 }
 
-func TestStdioMalformedResponseInvalidIDFailsPending(t *testing.T) {
+func TestStdioMalformedResponseInvalidIDDoesNotFailUnrelatedPending(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()
 	defer func() { _ = clientReader.Close() }()
@@ -1577,21 +1707,30 @@ func TestStdioMalformedResponseInvalidIDFailsPending(t *testing.T) {
 	transport := codex.NewStdioTransport(clientReader, clientWriter)
 	defer func() { _ = transport.Close() }()
 
-	// Drain requests from the server side.
-	go func() {
-		scanner := bufio.NewScanner(serverReader)
-		for scanner.Scan() {
-		}
-	}()
-
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	errCh := make(chan error, 1)
+	outboundReqIDs := make(chan string, 2)
+	go func() {
+		scanner := bufio.NewScanner(serverReader)
+		for scanner.Scan() {
+			var req codex.Request
+			if json.Unmarshal(scanner.Bytes(), &req) != nil {
+				continue
+			}
+			id, ok := req.ID.Value.(string)
+			if !ok {
+				continue
+			}
+			outboundReqIDs <- id
+		}
+	}()
+
+	errCh := make(chan error, 2)
 	go func() {
 		req := codex.Request{
 			JSONRPC: "2.0",
-			ID:      codex.RequestID{Value: "invalid-id-response"},
+			ID:      codex.RequestID{Value: "invalid-id-response-1"},
 			Method:  "test/method",
 		}
 		resp, err := transport.Send(ctx, req)
@@ -1599,27 +1738,64 @@ func TestStdioMalformedResponseInvalidIDFailsPending(t *testing.T) {
 			errCh <- err
 			return
 		}
-		if resp.Error == nil {
-			errCh <- fmt.Errorf("expected parse error response")
+		if resp.Error != nil {
+			errCh <- fmt.Errorf("request 1 returned unexpected response error: %v", resp.Error)
 			return
 		}
-		if resp.Error.Code != codex.ErrCodeParseError {
-			errCh <- fmt.Errorf("error code = %d; want %d", resp.Error.Code, codex.ErrCodeParseError)
+		if string(resp.Result) != `{"ok":1}` {
+			errCh <- fmt.Errorf("request 1 result = %s; want {\"ok\":1}", string(resp.Result))
 			return
 		}
 		errCh <- nil
 	}()
 
-	time.Sleep(50 * time.Millisecond)
-	_, _ = serverWriter.Write([]byte(`{"jsonrpc":"2.0","id":{"bad":"shape"},"result":{}}` + "\n"))
-
-	select {
-	case err := <-errCh:
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+	go func() {
+		req := codex.Request{
+			JSONRPC: "2.0",
+			ID:      codex.RequestID{Value: "invalid-id-response-2"},
+			Method:  "test/method",
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("timeout: malformed response id should fail pending sends")
+		resp, err := transport.Send(ctx, req)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		if resp.Error != nil {
+			errCh <- fmt.Errorf("request 2 returned unexpected response error: %v", resp.Error)
+			return
+		}
+		if string(resp.Result) != `{"ok":2}` {
+			errCh <- fmt.Errorf("request 2 result = %s; want {\"ok\":2}", string(resp.Result))
+			return
+		}
+		errCh <- nil
+	}()
+
+	seen := map[string]bool{}
+	for len(seen) < 2 {
+		select {
+		case id := <-outboundReqIDs:
+			seen[id] = true
+		case <-time.After(500 * time.Millisecond):
+			t.Fatal("timeout waiting for outbound requests")
+		}
+	}
+
+	// Malformed response with an invalid ID shape should be dropped without
+	// failing unrelated in-flight requests.
+	_, _ = serverWriter.Write([]byte(`{"jsonrpc":"2.0","id":{"bad":"shape"},"result":{}}` + "\n"))
+	_, _ = serverWriter.Write([]byte(`{"jsonrpc":"2.0","id":"invalid-id-response-1","result":{"ok":1}}` + "\n"))
+	_, _ = serverWriter.Write([]byte(`{"jsonrpc":"2.0","id":"invalid-id-response-2","result":{"ok":2}}` + "\n"))
+
+	for range 2 {
+		select {
+		case err := <-errCh:
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("timeout waiting for pending sends after malformed response id")
+		}
 	}
 }
 
