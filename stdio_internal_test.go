@@ -262,6 +262,68 @@ func TestStdioNotificationFloodStillDeliversTurnCompleted(t *testing.T) {
 	close(release)
 }
 
+func TestStdioNotificationFloodStillDeliversItemCompleted(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+
+	transport := NewStdioTransport(clientReader, &safeBuffer{})
+	defer func() { _ = transport.Close() }()
+
+	release := make(chan struct{})
+	itemSeen := make(chan struct{}, 1)
+	transport.OnNotify(func(_ context.Context, notif Notification) {
+		if notif.Method == notifyItemCompleted {
+			select {
+			case itemSeen <- struct{}{}:
+			default:
+			}
+			return
+		}
+		<-release
+	})
+
+	nonCritical := Notification{
+		JSONRPC: jsonrpcVersion,
+		Method:  notifyAgentMessageDelta,
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","itemId":"item-1","delta":"x"}`),
+	}
+	nonCriticalBytes, err := json.Marshal(nonCritical)
+	if err != nil {
+		t.Fatalf("marshal non-critical notification: %v", err)
+	}
+
+	totalFlood := inboundNotificationWorkers + inboundNotifQueueSize + 32
+	for range totalFlood {
+		if _, err := serverWriter.Write(append(nonCriticalBytes, '\n')); err != nil {
+			t.Fatalf("write flood notification: %v", err)
+		}
+	}
+
+	itemCompleted := Notification{
+		JSONRPC: jsonrpcVersion,
+		Method:  notifyItemCompleted,
+		Params: json.RawMessage(
+			`{"threadId":"thread-1","turnId":"turn-1","item":{"id":"item-1","type":"agent_message","text":"done"}}`,
+		),
+	}
+	itemBytes, err := json.Marshal(itemCompleted)
+	if err != nil {
+		t.Fatalf("marshal item/completed notification: %v", err)
+	}
+	if _, err := serverWriter.Write(append(itemBytes, '\n')); err != nil {
+		t.Fatalf("write item/completed notification: %v", err)
+	}
+
+	select {
+	case <-itemSeen:
+	case <-time.After(2 * time.Second):
+		t.Fatal("item/completed notification was not delivered under queue pressure")
+	}
+
+	close(release)
+}
+
 func TestStdioCloseStopsReaderForClosableReader(t *testing.T) {
 	reader := newBlockingReadCloser()
 	transport := NewStdioTransport(reader, &safeBuffer{})

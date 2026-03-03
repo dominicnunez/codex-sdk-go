@@ -176,6 +176,23 @@ func TestClientDefaultTimeout(t *testing.T) {
 	}
 }
 
+func TestClientSendRejectsNilContext(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+
+	req := codex.Request{
+		JSONRPC: "2.0",
+		ID:      codex.RequestID{Value: "nil-context"},
+		Method:  "test.method",
+	}
+
+	//nolint:staticcheck // nil context is intentional: this test verifies the guard path.
+	_, err := client.Send(nil, req)
+	if !errors.Is(err, codex.ErrNilContext) {
+		t.Fatalf("Send(nil, req) error = %v; want ErrNilContext", err)
+	}
+}
+
 // TestClientMultipleListeners verifies that multiple listeners for different methods work.
 func TestClientMultipleListeners(t *testing.T) {
 	mock := NewMockTransport()

@@ -254,7 +254,7 @@ func TestRequestIDStringInt64Union(t *testing.T) {
 		name     string
 		json     string
 		wantType string
-		wantVal  interface{}
+		wantVal  string
 	}{
 		{
 			name:     "string id",
@@ -263,16 +263,16 @@ func TestRequestIDStringInt64Union(t *testing.T) {
 			wantVal:  "req-123",
 		},
 		{
-			name:     "int64 id",
+			name:     "numeric id",
 			json:     `{"jsonrpc":"2.0","id":42,"method":"test"}`,
-			wantType: "int64",
-			wantVal:  int64(42),
+			wantType: "number",
+			wantVal:  "42",
 		},
 		{
 			name:     "null id",
 			json:     `{"jsonrpc":"2.0","id":null,"method":"test"}`,
 			wantType: "nil",
-			wantVal:  nil,
+			wantVal:  "",
 		},
 	}
 
@@ -288,19 +288,50 @@ func TestRequestIDStringInt64Union(t *testing.T) {
 				if s, ok := req.ID.Value.(string); !ok || s != tt.wantVal {
 					t.Errorf("Expected string ID %q, got %v (type %T)", tt.wantVal, req.ID.Value, req.ID.Value)
 				}
-			case "int64":
-				// JSON unmarshal gives us float64, not int64
-				if f, ok := req.ID.Value.(float64); ok {
-					if int64(f) != tt.wantVal {
-						t.Errorf("Expected int64 ID %d, got %v", tt.wantVal, int64(f))
-					}
-				} else if i, ok := req.ID.Value.(int64); !ok || i != tt.wantVal {
-					t.Errorf("Expected int64 ID %d, got %v (type %T)", tt.wantVal, req.ID.Value, req.ID.Value)
+			case "number":
+				if n, ok := req.ID.Value.(json.Number); !ok || n.String() != tt.wantVal {
+					t.Errorf("Expected json.Number ID %q, got %v (type %T)", tt.wantVal, req.ID.Value, req.ID.Value)
 				}
 			case "nil":
 				if req.ID.Value != nil {
 					t.Errorf("Expected nil ID, got %v", req.ID.Value)
 				}
+			}
+		})
+	}
+}
+
+func TestRequestIDUnmarshalPreservesLargeNumericPrecision(t *testing.T) {
+	var req codex.Request
+	raw := []byte(`{"jsonrpc":"2.0","id":9007199254740993,"method":"test"}`)
+	if err := json.Unmarshal(raw, &req); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+
+	id, ok := req.ID.Value.(json.Number)
+	if !ok {
+		t.Fatalf("ID type = %T, want json.Number", req.ID.Value)
+	}
+	if id.String() != "9007199254740993" {
+		t.Fatalf("ID value = %q, want 9007199254740993", id.String())
+	}
+}
+
+func TestRequestIDUnmarshalRejectsInvalidTypes(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+	}{
+		{name: "object id", raw: `{"jsonrpc":"2.0","id":{},"method":"test"}`},
+		{name: "array id", raw: `{"jsonrpc":"2.0","id":[],"method":"test"}`},
+		{name: "boolean id", raw: `{"jsonrpc":"2.0","id":true,"method":"test"}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var req codex.Request
+			if err := json.Unmarshal([]byte(tt.raw), &req); err == nil {
+				t.Fatalf("expected unmarshal error for invalid id type")
 			}
 		})
 	}
@@ -329,6 +360,12 @@ func toInt64(v interface{}) (int64, bool) {
 	switch val := v.(type) {
 	case int64:
 		return val, true
+	case json.Number:
+		i, err := val.Int64()
+		if err != nil {
+			return 0, false
+		}
+		return i, true
 	case float64:
 		return int64(val), true
 	case int:

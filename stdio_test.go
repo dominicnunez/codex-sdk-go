@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -165,7 +166,7 @@ func TestStdioResponseRequestIDMatching(t *testing.T) {
 	defer func() { _ = transport.Close() }()
 
 	// Read requests on the server side
-	sentRequests := make(chan codex.Request, 3)
+	sentRequests := make(chan codex.Request, 4)
 	go func() {
 		scanner := bufio.NewScanner(serverReader)
 		for scanner.Scan() {
@@ -178,13 +179,13 @@ func TestStdioResponseRequestIDMatching(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Send three requests with different ID types concurrently
+	// Send requests with different ID types concurrently.
 	type result struct {
 		id     interface{}
 		result json.RawMessage
 		err    error
 	}
-	results := make(chan result, 3)
+	results := make(chan result, 4)
 
 	// String ID
 	go func() {
@@ -219,11 +220,22 @@ func TestStdioResponseRequestIDMatching(t *testing.T) {
 		results <- result{id: float64(456), result: resp.Result, err: err}
 	}()
 
+	// Large uint64 ID above 2^53 must match exactly.
+	go func() {
+		req := codex.Request{
+			JSONRPC: "2.0",
+			ID:      codex.RequestID{Value: uint64(9007199254740993)},
+			Method:  "test/method4",
+		}
+		resp, err := transport.Send(ctx, req)
+		results <- result{id: uint64(9007199254740993), result: resp.Result, err: err}
+	}()
+
 	// Wait for all requests to be sent and collect them
 	time.Sleep(50 * time.Millisecond)
 
-	requests := make([]codex.Request, 0, 3)
-	for i := 0; i < 3; i++ {
+	requests := make([]codex.Request, 0, 4)
+	for i := 0; i < 4; i++ {
 		select {
 		case req := <-sentRequests:
 			requests = append(requests, req)
@@ -254,7 +266,7 @@ func TestStdioResponseRequestIDMatching(t *testing.T) {
 	}
 
 	// Verify each request got the response that was sent for its specific ID
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 4; i++ {
 		select {
 		case res := <-results:
 			if res.err != nil {
@@ -1190,6 +1202,91 @@ func TestStdioHandleResponseUnmarshalError(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("timeout: caller should have received a parse error, not hung")
+	}
+}
+
+func TestStdioMalformedResponseInvalidIDFailsPending(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	// Drain requests from the server side.
+	go func() {
+		scanner := bufio.NewScanner(serverReader)
+		for scanner.Scan() {
+		}
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	errCh := make(chan error, 1)
+	go func() {
+		req := codex.Request{
+			JSONRPC: "2.0",
+			ID:      codex.RequestID{Value: "invalid-id-response"},
+			Method:  "test/method",
+		}
+		resp, err := transport.Send(ctx, req)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		if resp.Error == nil {
+			errCh <- fmt.Errorf("expected parse error response")
+			return
+		}
+		if resp.Error.Code != codex.ErrCodeParseError {
+			errCh <- fmt.Errorf("error code = %d; want %d", resp.Error.Code, codex.ErrCodeParseError)
+			return
+		}
+		errCh <- nil
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	_, _ = serverWriter.Write([]byte(`{"jsonrpc":"2.0","id":{"bad":"shape"},"result":{}}` + "\n"))
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout: malformed response id should fail pending sends")
+	}
+}
+
+func TestStdioSendAndNotifyRejectNilContext(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, io.Discard)
+	defer func() { _ = transport.Close() }()
+
+	req := codex.Request{
+		JSONRPC: "2.0",
+		ID:      codex.RequestID{Value: "nil-context"},
+		Method:  "test/method",
+	}
+	//nolint:staticcheck // nil context is intentional: this test verifies the guard path.
+	if _, err := transport.Send(nil, req); !errors.Is(err, codex.ErrNilContext) {
+		t.Fatalf("Send(nil, req) error = %v; want ErrNilContext", err)
+	}
+
+	notif := codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "test/notify",
+	}
+	//nolint:staticcheck // nil context is intentional: this test verifies the guard path.
+	if err := transport.Notify(nil, notif); !errors.Is(err, codex.ErrNilContext) {
+		t.Fatalf("Notify(nil, notif) error = %v; want ErrNilContext", err)
 	}
 }
 

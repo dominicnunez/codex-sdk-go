@@ -1,6 +1,7 @@
 package codex
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
 )
@@ -31,6 +32,11 @@ func TestNormalizeID(t *testing.T) {
 
 		// uint64 passthrough
 		{"uint64", uint64(100), "100"},
+		{"json.Number large integer", json.Number("9007199254740993"), "9007199254740993"},
+		{"json.Number integer decimal form", json.Number("1.0"), "1"},
+		{"json.Number negative integer decimal form", json.Number("-7.0"), "-7"},
+		{"json.Number fractional", json.Number("2.5"), "2.5"},
+		{"json.Number exponent integer", json.Number("1e0"), "1"},
 
 		// string passthrough
 		{"string", "abc", "abc"},
