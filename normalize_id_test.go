@@ -29,8 +29,15 @@ func TestNormalizeID(t *testing.T) {
 		{"positive int", int(7), "7"},
 		{"zero int", int(0), "0"},
 		{"negative int", int(-5), "-5"},
+		{"positive int8", int8(8), "8"},
+		{"positive int16", int16(16), "16"},
+		{"positive int32", int32(32), "32"},
 
 		// uint64 passthrough
+		{"uint", uint(99), "99"},
+		{"uint8", uint8(8), "8"},
+		{"uint16", uint16(16), "16"},
+		{"uint32", uint32(32), "32"},
 		{"uint64", uint64(100), "100"},
 		{"json.Number large integer", json.Number("9007199254740993"), "9007199254740993"},
 		{"json.Number integer decimal form", json.Number("1.0"), "1"},
@@ -232,6 +239,41 @@ func TestNormalizePendingRequestIDRejectsOversizedNegativeExponent(t *testing.T)
 	}
 	if !errors.Is(err, errUnexpectedIDType) {
 		t.Fatalf("normalizePendingRequestID error = %v; want errUnexpectedIDType", err)
+	}
+}
+
+func TestNormalizePendingRequestIDSupportsAllIntegerKinds(t *testing.T) {
+	tests := []struct {
+		name string
+		in   interface{}
+		want string
+	}{
+		{name: "int32", in: int32(42), want: "n:42"},
+		{name: "uint32", in: uint32(42), want: "n:42"},
+		{name: "uint", in: uint(42), want: "n:42"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := normalizePendingRequestID(tt.in)
+			if err != nil {
+				t.Fatalf("normalizePendingRequestID(%v) returned error: %v", tt.in, err)
+			}
+			if got != tt.want {
+				t.Fatalf("normalizePendingRequestID(%v) = %q; want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRequestIDEqualMatchesAcrossIntegerKinds(t *testing.T) {
+	a := RequestID{Value: int32(7)}
+	b := RequestID{Value: uint16(7)}
+	if !a.Equal(b) {
+		t.Fatalf("RequestID(%v).Equal(%v) = false; want true", a.Value, b.Value)
+	}
+	if !b.Equal(a) {
+		t.Fatalf("RequestID(%v).Equal(%v) = false; want true", b.Value, a.Value)
 	}
 }
 

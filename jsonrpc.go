@@ -56,7 +56,7 @@ type Error struct {
 // precision loss for IDs larger than 2^53.
 // Use [RequestID.Equal] instead of == to compare IDs across type boundaries.
 type RequestID struct {
-	Value interface{} // string | json.Number | int64 | float64 | nil
+	Value interface{} // string | json.Number | float64 | any Go integer kind | nil
 }
 
 // Equal reports whether r and other represent the same logical request ID,
@@ -87,37 +87,11 @@ func (r RequestID) Equal(other RequestID) bool {
 // isNumericID normalizes a numeric ID value to a comparable string.
 // Returns the normalized form and true if the value is numeric, or ("", false) otherwise.
 func isNumericID(v interface{}) (string, bool) {
-	switch v := v.(type) {
-	case json.Number:
-		s, err := normalizeID(v)
-		if err != nil {
-			return "", false
-		}
-		return s, true
-	case float64:
-		s, _ := normalizeID(v) // err is unreachable: float64 is always handled
-		return s, true
-	case int64:
-		s, err := normalizeID(v)
-		if err != nil {
-			return "", false
-		}
-		return s, true
-	case int:
-		s, err := normalizeID(v)
-		if err != nil {
-			return "", false
-		}
-		return s, true
-	case uint64:
-		s, err := normalizeID(v)
-		if err != nil {
-			return "", false
-		}
-		return s, true
-	default:
+	s, isNumeric, err := normalizeNumericID(v)
+	if err != nil || !isNumeric {
 		return "", false
 	}
+	return s, true
 }
 
 // MarshalJSON implements json.Marshaler for RequestID.

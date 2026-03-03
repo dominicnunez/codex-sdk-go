@@ -370,6 +370,9 @@ func cloneMcpToolCallItem(in *McpToolCallThreadItem) *McpToolCallThreadItem {
 		return nil
 	}
 	cp := *in
+	cp.Arguments = cloneJSONValue(in.Arguments)
+	cp.Result = cloneMcpToolCallResult(in.Result)
+	cp.Error = cloneMcpToolCallError(in.Error)
 	cp.DurationMs = cloneInt64Ptr(in.DurationMs)
 	return &cp
 }
@@ -379,6 +382,10 @@ func cloneWebSearchItem(in *WebSearchThreadItem) *WebSearchThreadItem {
 		return nil
 	}
 	cp := *in
+	if in.Action != nil {
+		action := cloneWebSearchActionWrapper(*in.Action)
+		cp.Action = &action
+	}
 	return &cp
 }
 
@@ -387,9 +394,7 @@ func cloneFileChangeItem(in *FileChangeThreadItem) *FileChangeThreadItem {
 		return nil
 	}
 	cp := *in
-	if in.Changes != nil {
-		cp.Changes = append([]FileUpdateChange(nil), in.Changes...)
-	}
+	cp.Changes = cloneFileUpdateChanges(in.Changes)
 	return &cp
 }
 
