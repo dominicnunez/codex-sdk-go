@@ -1,9 +1,11 @@
 package codex
 
 import (
+	"context"
 	"errors"
 	"os/exec"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -57,4 +59,29 @@ func TestIsSignalError(t *testing.T) {
 			t.Errorf("normal exit(1) should not be a signal error: %v", err)
 		}
 	})
+}
+
+func TestBuildArgsEmitFlagsAcceptedByCodexCLI(t *testing.T) {
+	if _, err := exec.LookPath("codex"); err != nil {
+		t.Skip("codex binary not available in PATH")
+	}
+
+	opts := &ProcessOptions{
+		Model:        "o3",
+		Sandbox:      SandboxModeReadOnly,
+		ApprovalMode: "full-auto",
+		Config:       map[string]string{"foo": `"bar"`},
+		ExecArgs:     []string{"--help"},
+	}
+
+	args, err := opts.buildArgs()
+	if err != nil {
+		t.Fatalf("buildArgs: %v", err)
+	}
+
+	cmd := exec.CommandContext(context.Background(), "codex", args...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("codex %s failed: %v\noutput:\n%s", strings.Join(args, " "), err, string(out))
+	}
 }

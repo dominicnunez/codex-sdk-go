@@ -55,7 +55,9 @@ type ProcessOptions struct {
 	// Sandbox sets --sandbox (e.g. "read-only", "workspace-write", "danger-full-access").
 	Sandbox SandboxMode
 
-	// ApprovalMode sets --approval-mode (e.g. "full-auto", "suggest", "ask").
+	// ApprovalMode controls approval behavior for process startup.
+	// Supported value: "full-auto" (emits --full-auto).
+	// For other policies, set Config["approval_policy"] directly.
 	ApprovalMode string
 
 	// Config passes repeatable --config key=value flags.
@@ -82,10 +84,61 @@ var errEndOfOptionsInExecArgs = errors.New(`ExecArgs must not contain "--" (end-
 var errTypedFlagInExecArgs = errors.New("ExecArgs must not contain typed safety flags")
 var errNilProcessClient = errors.New("process client must not be nil")
 
-// rejectedFlagNames are the bare names of typed safety flags (without dash
-// prefixes). buildArgs rejects both --name and -name variants to prevent
-// bypass via single-dash long flags accepted by some CLI parsers.
-var rejectedFlagNames = []string{"model", "sandbox", "approval-mode", "config", "experimental-json"}
+const approvalModeFullAuto = "full-auto"
+
+// rejectedExecArgFlagAliases canonicalizes all blocked safety flags (including
+// short aliases and compatibility aliases) to the preferred long option.
+var rejectedExecArgFlagAliases = map[string]string{
+	"--model":             "--model",
+	"-model":              "--model",
+	"--sandbox":           "--sandbox",
+	"-sandbox":            "--sandbox",
+	"--config":            "--config",
+	"-config":             "--config",
+	"--experimental-json": "--experimental-json",
+	"-experimental-json":  "--experimental-json",
+	"--ask-for-approval":  "--ask-for-approval",
+	"-ask-for-approval":   "--ask-for-approval",
+	"--full-auto":         "--full-auto",
+	"-full-auto":          "--full-auto",
+	"--dangerously-bypass-approvals-and-sandbox": "--dangerously-bypass-approvals-and-sandbox",
+	"-dangerously-bypass-approvals-and-sandbox":  "--dangerously-bypass-approvals-and-sandbox",
+	"-m": "--model",
+	"-s": "--sandbox",
+	"-c": "--config",
+	"-a": "--ask-for-approval",
+}
+
+var rejectedShortFlagAliases = map[string]string{
+	"-m": "--model",
+	"-s": "--sandbox",
+	"-c": "--config",
+	"-a": "--ask-for-approval",
+}
+
+func canonicalRejectedExecArgFlag(arg string) (string, bool) {
+	if !strings.HasPrefix(arg, "-") || arg == "-" {
+		return "", false
+	}
+
+	token := arg
+	if i := strings.IndexByte(token, '='); i >= 0 {
+		token = token[:i]
+	}
+
+	if canonical, ok := rejectedExecArgFlagAliases[token]; ok {
+		return canonical, true
+	}
+
+	// Reject short alias forms with attached values (for example -mo3, -sread-only).
+	for shortAlias, canonical := range rejectedShortFlagAliases {
+		if strings.HasPrefix(token, shortAlias) && len(token) > len(shortAlias) {
+			return canonical, true
+		}
+	}
+
+	return "", false
+}
 
 // buildArgs constructs the CLI argument list from typed fields and ExecArgs.
 // ExecArgs are prepended before typed flags so that typed fields (Model,
@@ -96,13 +149,8 @@ func (opts *ProcessOptions) buildArgs() ([]string, error) {
 		if arg == "--" {
 			return nil, errEndOfOptionsInExecArgs
 		}
-		for _, name := range rejectedFlagNames {
-			doubleDash := "--" + name
-			singleDash := "-" + name
-			if arg == doubleDash || strings.HasPrefix(arg, doubleDash+"=") ||
-				arg == singleDash || strings.HasPrefix(arg, singleDash+"=") {
-				return nil, fmt.Errorf("%w: %s", errTypedFlagInExecArgs, doubleDash)
-			}
+		if canonicalFlag, blocked := canonicalRejectedExecArgFlag(arg); blocked {
+			return nil, fmt.Errorf("%w: %s", errTypedFlagInExecArgs, canonicalFlag)
 		}
 	}
 
@@ -117,7 +165,12 @@ func (opts *ProcessOptions) buildArgs() ([]string, error) {
 		args = append(args, "--sandbox", string(opts.Sandbox))
 	}
 	if opts.ApprovalMode != "" {
-		args = append(args, "--approval-mode", opts.ApprovalMode)
+		switch opts.ApprovalMode {
+		case approvalModeFullAuto:
+			args = append(args, "--full-auto")
+		default:
+			return nil, fmt.Errorf("ApprovalMode %q is unsupported; use %q or set Config[\"approval_policy\"]", opts.ApprovalMode, approvalModeFullAuto)
+		}
 	}
 	keys := make([]string, 0, len(opts.Config))
 	for k := range opts.Config {

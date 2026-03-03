@@ -111,7 +111,7 @@ exit 0
 		"exec", "--experimental-json",
 		"--model o3",
 		"--sandbox read-only",
-		"--approval-mode full-auto",
+		"--full-auto",
 		"--config key1=val1",
 		"--extra flag",
 	} {
@@ -249,7 +249,14 @@ func TestStartProcessExecArgsWithEndOfOptions(t *testing.T) {
 // TestStartProcessExecArgsWithTypedFlags verifies that StartProcess rejects
 // ExecArgs containing typed safety flags that could override critical settings.
 func TestStartProcessExecArgsWithTypedFlags(t *testing.T) {
-	rejectedFlags := []string{"--model", "--sandbox", "--approval-mode", "--config", "--experimental-json"}
+	rejectedFlags := []string{
+		"--model",
+		"--sandbox",
+		"--config",
+		"--experimental-json",
+		"--ask-for-approval",
+		"--full-auto",
+	}
 
 	for _, flag := range rejectedFlags {
 		t.Run(flag, func(t *testing.T) {
@@ -271,7 +278,7 @@ func TestStartProcessExecArgsWithTypedFlags(t *testing.T) {
 // TestStartProcessExecArgsWithTypedFlagsCombinedForm verifies that
 // --flag=value combined forms are also rejected.
 func TestStartProcessExecArgsWithTypedFlagsCombinedForm(t *testing.T) {
-	rejectedFlags := []string{"--model", "--sandbox", "--approval-mode", "--config", "--experimental-json"}
+	rejectedFlags := []string{"--model", "--sandbox", "--config", "--experimental-json"}
 
 	for _, flag := range rejectedFlags {
 		t.Run(flag+"=value", func(t *testing.T) {
@@ -290,10 +297,10 @@ func TestStartProcessExecArgsWithTypedFlagsCombinedForm(t *testing.T) {
 	}
 }
 
-// TestStartProcessExecArgsWithSingleDashTypedFlags verifies that single-dash
-// variants of typed safety flags are also rejected.
+// TestStartProcessExecArgsWithSingleDashTypedFlags verifies that both
+// single-dash long-form and current short aliases for typed safety flags are rejected.
 func TestStartProcessExecArgsWithSingleDashTypedFlags(t *testing.T) {
-	rejectedFlags := []string{"-model", "-sandbox", "-approval-mode", "-config", "-experimental-json"}
+	rejectedFlags := []string{"-model", "-sandbox", "-config", "-experimental-json", "-m", "-s", "-c", "-a"}
 
 	for _, flag := range rejectedFlags {
 		t.Run(flag, func(t *testing.T) {
@@ -323,6 +330,20 @@ func TestStartProcessExecArgsWithSingleDashTypedFlags(t *testing.T) {
 				t.Errorf("error should mention typed safety flags, got: %v", err)
 			}
 		})
+	}
+}
+
+func TestStartProcessApprovalModeRejectsUnknownValue(t *testing.T) {
+	ctx := context.Background()
+	_, err := codex.StartProcess(ctx, &codex.ProcessOptions{
+		BinaryPath:   "/nonexistent/binary",
+		ApprovalMode: "ask",
+	})
+	if err == nil {
+		t.Fatal("expected error for unsupported approval mode")
+	}
+	if !strings.Contains(err.Error(), "ApprovalMode") {
+		t.Fatalf("expected error to mention ApprovalMode, got: %v", err)
 	}
 }
 
