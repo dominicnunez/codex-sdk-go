@@ -1,6 +1,3 @@
-//go:build tools
-// +build tools
-
 package codex_test
 
 import (
