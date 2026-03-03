@@ -241,13 +241,7 @@ func (c *Conversation) TurnStreamed(ctx context.Context, opts TurnOptions) *Stre
 		done: make(chan struct{}),
 	}
 
-	s.events = func(yield func(Event, error) bool) {
-		for eoe := range g.ch {
-			if !yield(eoe.event, eoe.err) {
-				return
-			}
-		}
-	}
+	s.events = streamIterator(g)
 
 	go c.turnStreamedLifecycle(ctx, opts, g, s)
 

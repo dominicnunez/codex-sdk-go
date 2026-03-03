@@ -26,17 +26,17 @@ var ErrStreamConsumed = errors.New("stream events already consumed")
 // the closer takes a write lock, ensuring no send is in flight when the
 // channel is closed.
 type guardedChan struct {
-	mu     sync.RWMutex
-	ch     chan eventOrErr
-	closed bool
+	mu          sync.RWMutex
+	ch          chan eventOrErr
+	closed      bool
+	terminalErr error
 }
 
 func newGuardedChan(size int) *guardedChan {
 	return &guardedChan{ch: make(chan eventOrErr, size)}
 }
 
-// send writes an event/error pair to the channel, blocking until the send
-// succeeds, or the channel is already closed. When the channel is full, the
+// send writes an event/error pair to the channel. When the channel is full, the
 // oldest queued element is dropped so lifecycle completion never depends on
 // the consumer draining Events().
 func (g *guardedChan) send(eoe eventOrErr) {
@@ -64,10 +64,25 @@ func (g *guardedChan) send(eoe eventOrErr) {
 	}
 }
 
-// trySend attempts a non-blocking send, then falls back to bounded-loss send.
-// No-ops if the channel is closed or ctx cancelled.
-func (g *guardedChan) trySend(eoe eventOrErr) {
-	g.send(eoe)
+// setTerminalError records the terminal stream error exactly once.
+// It is stored out-of-band from the lossy event buffer so it cannot be dropped
+// when producers are contending on a full channel.
+func (g *guardedChan) setTerminalError(err error) {
+	if err == nil {
+		return
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.closed || g.terminalErr != nil {
+		return
+	}
+	g.terminalErr = err
+}
+
+func (g *guardedChan) terminalError() error {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return g.terminalErr
 }
 
 func (g *guardedChan) closeOnce() {
@@ -142,13 +157,7 @@ func (p *Process) runStreamedWithCollector(ctx context.Context, opts RunOptions,
 		done: make(chan struct{}),
 	}
 
-	s.events = func(yield func(Event, error) bool) {
-		for eoe := range g.ch {
-			if !yield(eoe.event, eoe.err) {
-				return
-			}
-		}
-	}
+	s.events = streamIterator(g)
 
 	go p.runStreamedLifecycle(ctx, opts, g, s, collector)
 
@@ -160,11 +169,25 @@ func (p *Process) runStreamedWithCollector(ctx context.Context, opts RunOptions,
 func newErrorStream(err error) *Stream {
 	done := make(chan struct{})
 	close(done)
+	g := newGuardedChan(1)
+	g.setTerminalError(err)
+	g.closeOnce()
 	return &Stream{
-		done: done,
-		events: func(yield func(Event, error) bool) {
-			yield(nil, err)
-		},
+		done:   done,
+		events: streamIterator(g),
+	}
+}
+
+func streamIterator(g *guardedChan) iter.Seq2[Event, error] {
+	return func(yield func(Event, error) bool) {
+		for eoe := range g.ch {
+			if !yield(eoe.event, eoe.err) {
+				return
+			}
+		}
+		if err := g.terminalError(); err != nil {
+			_ = yield(nil, err)
+		}
 	}
 }
 
@@ -177,7 +200,7 @@ func streamSendEvent(g *guardedChan, event Event) {
 // first (sufficient when buffer space remains), then falls back to a blocking
 // send guarded by ctx to prevent goroutine leaks when the consumer stops reading.
 func streamSendErr(g *guardedChan, err error) {
-	g.trySend(eventOrErr{err: err})
+	g.setTerminalError(err)
 }
 
 // streamListen registers a notification listener that unmarshals the
