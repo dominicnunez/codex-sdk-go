@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"sync/atomic"
 )
 
 // pendingReq holds a pending request's response channel and original ID.
@@ -20,11 +21,13 @@ type pendingReq struct {
 // large enough for normal bursts, bounded to prevent untrusted-peer DoS via
 // unbounded goroutine or memory growth.
 const (
-	inboundRequestWorkers      = 8
-	inboundRequestQueueSize    = 64
-	inboundNotificationWorkers = 8
-	inboundNotifQueueSize      = 128
-	outboundWriteQueueSize     = 256
+	inboundRequestWorkers       = 8
+	inboundRequestQueueSize     = 64
+	inboundNotificationWorkers  = 8
+	criticalNotificationWorkers = 2
+	inboundNotifQueueSize       = 128
+	criticalNotifQueueSize      = 64
+	outboundWriteQueueSize      = 256
 )
 
 type writeEnvelope struct {
@@ -37,23 +40,26 @@ type writeEnvelope struct {
 // - Client→Server: Send requests and notifications
 // - Server→Client: Receive requests (for approval flows) and notifications (for events)
 type StdioTransport struct {
-	reader io.Reader
-	writer io.Writer
+	reader       io.Reader
+	readerCloser io.Closer
+	writer       io.Writer
 
-	mu            sync.Mutex
-	closed        bool
-	pendingReqs   map[string]pendingReq
-	reqHandler    RequestHandler
-	notifHandler  NotificationHandler
-	requestQueue  chan []byte
-	notifQueue    chan []byte
-	writeQueue    chan writeEnvelope
-	readerStopped chan struct{}
-	once          sync.Once
-	scanErr       error // set by readLoop when scanner fails
-	panicHandler  func(v any)
-	ctx           context.Context
-	cancelCtx     context.CancelFunc
+	mu                 sync.Mutex
+	closed             bool
+	pendingReqs        map[string]pendingReq
+	reqHandler         RequestHandler
+	notifHandler       NotificationHandler
+	requestQueue       chan []byte
+	criticalNotifQueue chan []byte
+	notifQueue         chan []byte
+	writeQueue         chan writeEnvelope
+	readerStopped      chan struct{}
+	once               sync.Once
+	scanErr            error // set by readLoop when scanner fails
+	malformedCount     atomic.Uint64
+	panicHandler       func(v any)
+	ctx                context.Context
+	cancelCtx          context.CancelFunc
 }
 
 // errUnexpectedIDType is returned when normalizeID encounters an ID value
@@ -103,22 +109,31 @@ func normalizeID(id interface{}) (string, error) {
 // The transport starts a background goroutine to read incoming messages.
 func NewStdioTransport(reader io.Reader, writer io.Writer) *StdioTransport {
 	ctx, cancel := context.WithCancel(context.Background())
+	var readerCloser io.Closer
+	if c, ok := reader.(io.Closer); ok {
+		readerCloser = c
+	}
 	t := &StdioTransport{
-		reader:        reader,
-		writer:        writer,
-		pendingReqs:   make(map[string]pendingReq),
-		requestQueue:  make(chan []byte, inboundRequestQueueSize),
-		notifQueue:    make(chan []byte, inboundNotifQueueSize),
-		writeQueue:    make(chan writeEnvelope, outboundWriteQueueSize),
-		readerStopped: make(chan struct{}),
-		ctx:           ctx,
-		cancelCtx:     cancel,
+		reader:             reader,
+		readerCloser:       readerCloser,
+		writer:             writer,
+		pendingReqs:        make(map[string]pendingReq),
+		requestQueue:       make(chan []byte, inboundRequestQueueSize),
+		criticalNotifQueue: make(chan []byte, criticalNotifQueueSize),
+		notifQueue:         make(chan []byte, inboundNotifQueueSize),
+		writeQueue:         make(chan writeEnvelope, outboundWriteQueueSize),
+		readerStopped:      make(chan struct{}),
+		ctx:                ctx,
+		cancelCtx:          cancel,
 	}
 	for range inboundRequestWorkers {
 		go t.requestWorker()
 	}
 	for range inboundNotificationWorkers {
 		go t.notificationWorker()
+	}
+	for range criticalNotificationWorkers {
+		go t.criticalNotificationWorker()
 	}
 	go t.writeLoop()
 	go t.readLoop()
@@ -216,6 +231,9 @@ func (t *StdioTransport) Close() error {
 
 	t.closed = true
 	t.cancelCtx()
+	if t.readerCloser != nil {
+		_ = t.readerCloser.Close()
+	}
 
 	// Unblock all pending request waiters with an error response indicating
 	// the transport was closed. We send rather than close because
@@ -247,6 +265,11 @@ func (t *StdioTransport) ScanErr() error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return t.scanErr
+}
+
+// MalformedMessageCount reports how many inbound lines were invalid JSON.
+func (t *StdioTransport) MalformedMessageCount() uint64 {
+	return t.malformedCount.Load()
 }
 
 // writeRawMessage writes a pre-marshaled JSON-RPC message and trailing newline.
@@ -363,6 +386,17 @@ func (t *StdioTransport) notificationWorker() {
 	}
 }
 
+func (t *StdioTransport) criticalNotificationWorker() {
+	for {
+		select {
+		case <-t.ctx.Done():
+			return
+		case data := <-t.criticalNotifQueue:
+			t.handleNotification(data)
+		}
+	}
+}
+
 // readLoop continuously reads newline-delimited JSON messages from the reader
 func (t *StdioTransport) readLoop() {
 	defer t.once.Do(func() { close(t.readerStopped) })
@@ -382,7 +416,7 @@ func (t *StdioTransport) readLoop() {
 		}
 
 		if err := json.Unmarshal(line, &msg); err != nil {
-			// Invalid JSON - skip it (transport stays alive)
+			t.malformedCount.Add(1)
 			continue
 		}
 
@@ -402,7 +436,7 @@ func (t *StdioTransport) readLoop() {
 
 		// Notification: has method but no ID
 		if msg.Method != "" {
-			t.enqueueNotification(line)
+			t.enqueueNotification(line, msg.Method)
 			continue
 		}
 
@@ -430,7 +464,16 @@ func (t *StdioTransport) enqueueRequest(data []byte) {
 	}
 }
 
-func (t *StdioTransport) enqueueNotification(data []byte) {
+func (t *StdioTransport) enqueueNotification(data []byte, method string) {
+	if isCriticalNotificationMethod(method) {
+		select {
+		case <-t.ctx.Done():
+			return
+		case t.criticalNotifQueue <- data:
+			return
+		}
+	}
+
 	select {
 	case <-t.ctx.Done():
 		return
@@ -439,6 +482,10 @@ func (t *StdioTransport) enqueueNotification(data []byte) {
 		// Notifications are fire-and-forget. If the queue is full we drop to
 		// preserve process liveness and bound memory use under abuse.
 	}
+}
+
+func isCriticalNotificationMethod(method string) bool {
+	return method == notifyTurnCompleted
 }
 
 func (t *StdioTransport) rejectRequestForOverload(data []byte) {

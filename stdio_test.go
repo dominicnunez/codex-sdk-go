@@ -525,6 +525,10 @@ func TestStdioInvalidJSON(t *testing.T) {
 	case <-time.After(200 * time.Millisecond):
 		t.Error("timeout waiting for valid notification after invalid JSON")
 	}
+
+	if got, want := transport.MalformedMessageCount(), uint64(len(invalidLines)); got != want {
+		t.Errorf("MalformedMessageCount = %d; want %d", got, want)
+	}
 }
 
 // TestStdioUnknownMessageTypeSkipped verifies that a JSON object with no id

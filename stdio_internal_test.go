@@ -202,6 +202,81 @@ func TestNotifyCanceledContextDoesNotAttemptWrite(t *testing.T) {
 	}
 }
 
+func TestStdioNotificationFloodStillDeliversTurnCompleted(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+
+	transport := NewStdioTransport(clientReader, &safeBuffer{})
+	defer func() { _ = transport.Close() }()
+
+	release := make(chan struct{})
+	criticalSeen := make(chan struct{}, 1)
+	transport.OnNotify(func(_ context.Context, notif Notification) {
+		if notif.Method == notifyTurnCompleted {
+			select {
+			case criticalSeen <- struct{}{}:
+			default:
+			}
+			return
+		}
+		<-release
+	})
+
+	nonCritical := Notification{
+		JSONRPC: jsonrpcVersion,
+		Method:  notifyAgentMessageDelta,
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","itemId":"item-1","delta":"x"}`),
+	}
+	nonCriticalBytes, err := json.Marshal(nonCritical)
+	if err != nil {
+		t.Fatalf("marshal non-critical notification: %v", err)
+	}
+
+	totalFlood := inboundNotificationWorkers + inboundNotifQueueSize + 32
+	for range totalFlood {
+		if _, err := serverWriter.Write(append(nonCriticalBytes, '\n')); err != nil {
+			t.Fatalf("write flood notification: %v", err)
+		}
+	}
+
+	critical := Notification{
+		JSONRPC: jsonrpcVersion,
+		Method:  notifyTurnCompleted,
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	}
+	criticalBytes, err := json.Marshal(critical)
+	if err != nil {
+		t.Fatalf("marshal critical notification: %v", err)
+	}
+	if _, err := serverWriter.Write(append(criticalBytes, '\n')); err != nil {
+		t.Fatalf("write critical notification: %v", err)
+	}
+
+	select {
+	case <-criticalSeen:
+	case <-time.After(2 * time.Second):
+		t.Fatal("turn/completed notification was not delivered under queue pressure")
+	}
+
+	close(release)
+}
+
+func TestStdioCloseStopsReaderForClosableReader(t *testing.T) {
+	reader := newBlockingReadCloser()
+	transport := NewStdioTransport(reader, &safeBuffer{})
+
+	if err := transport.Close(); err != nil {
+		t.Fatalf("Close returned error: %v", err)
+	}
+
+	select {
+	case <-transport.readerStopped:
+	case <-time.After(2 * time.Second):
+		t.Fatal("reader goroutine did not stop after Close")
+	}
+}
+
 // safeBuffer is a concurrency-safe bytes.Buffer for testing.
 type safeBuffer struct {
 	mu  sync.Mutex
@@ -227,4 +302,25 @@ type writeCountWriter struct {
 func (w *writeCountWriter) Write(p []byte) (int, error) {
 	w.calls.Add(1)
 	return len(p), nil
+}
+
+type blockingReadCloser struct {
+	once sync.Once
+	done chan struct{}
+}
+
+func newBlockingReadCloser() *blockingReadCloser {
+	return &blockingReadCloser{done: make(chan struct{})}
+}
+
+func (r *blockingReadCloser) Read(_ []byte) (int, error) {
+	<-r.done
+	return 0, io.EOF
+}
+
+func (r *blockingReadCloser) Close() error {
+	r.once.Do(func() {
+		close(r.done)
+	})
+	return nil
 }
