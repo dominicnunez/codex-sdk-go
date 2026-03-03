@@ -29,6 +29,9 @@ const (
 	inboundNotifQueueSize       = 128
 	criticalNotifQueueSize      = 64
 	outboundWriteQueueSize      = 256
+	readBufferSizeBytes         = 64 * 1024
+	maxInboundMessageSizeBytes  = 10 * 1024 * 1024
+	oversizeMetadataBytes       = 64 * 1024
 )
 
 type writeEnvelope struct {
@@ -402,11 +405,9 @@ func (t *StdioTransport) criticalNotificationWorker() {
 func (t *StdioTransport) readLoop() {
 	defer t.once.Do(func() { close(t.readerStopped) })
 
-	const readBufferSize = 64 * 1024        // 64KB
-	const maxMessageSize = 10 * 1024 * 1024 // 10MB — file diffs and base64 payloads exceed the default
-	reader := bufio.NewReaderSize(t.reader, readBufferSize)
+	reader := bufio.NewReaderSize(t.reader, readBufferSizeBytes)
 	for {
-		line, overLimit, err := readLimitedLine(reader, maxMessageSize)
+		line, overLimit, err := readLimitedLine(reader, maxInboundMessageSizeBytes)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				return
@@ -417,7 +418,9 @@ func (t *StdioTransport) readLoop() {
 			return
 		}
 		if overLimit {
-			// Drop oversized frames and keep processing subsequent messages.
+			// Best-effort: fail matching pending responses so Send callers do not
+			// block waiting on a frame we intentionally discarded.
+			t.handleOversizedFrame(line)
 			continue
 		}
 
@@ -467,11 +470,10 @@ func readLimitedLine(r *bufio.Reader, limit int) ([]byte, bool, error) {
 	for {
 		frag, err := r.ReadSlice('\n')
 		total += len(frag)
-		if total > limit {
-			return handleOversizedLine(r, err)
-		}
-
 		line = append(line, frag...)
+		if total > limit {
+			return handleOversizedLine(r, err, line)
+		}
 		switch {
 		case err == nil:
 			return bytes.TrimSuffix(line, []byte{'\n'}), false, nil
@@ -488,23 +490,24 @@ func readLimitedLine(r *bufio.Reader, limit int) ([]byte, bool, error) {
 	}
 }
 
-func handleOversizedLine(r *bufio.Reader, readErr error) ([]byte, bool, error) {
+func handleOversizedLine(r *bufio.Reader, readErr error, line []byte) ([]byte, bool, error) {
+	prefix := capSlice(line, oversizeMetadataBytes)
 	switch {
 	case readErr == nil:
-		return nil, true, nil
+		return prefix, true, nil
 	case errors.Is(readErr, io.EOF):
-		return nil, true, io.EOF
+		return prefix, true, io.EOF
 	case !errors.Is(readErr, bufio.ErrBufferFull):
 		return nil, false, readErr
 	}
 
 	if err := discardUntilNewline(r); err != nil {
 		if errors.Is(err, io.EOF) {
-			return nil, true, io.EOF
+			return prefix, true, io.EOF
 		}
 		return nil, false, err
 	}
-	return nil, true, nil
+	return prefix, true, nil
 }
 
 func discardUntilNewline(r *bufio.Reader) error {
@@ -534,12 +537,8 @@ func (t *StdioTransport) enqueueRequest(data []byte) {
 
 func (t *StdioTransport) enqueueNotification(data []byte, method string) {
 	if isCriticalNotificationMethod(method) {
-		select {
-		case <-t.ctx.Done():
-			return
-		case t.criticalNotifQueue <- data:
-			return
-		}
+		t.enqueueCriticalNotification(data)
+		return
 	}
 
 	select {
@@ -549,6 +548,29 @@ func (t *StdioTransport) enqueueNotification(data []byte, method string) {
 	default:
 		// Notifications are fire-and-forget. If the queue is full we drop to
 		// preserve process liveness and bound memory use under abuse.
+	}
+}
+
+func (t *StdioTransport) enqueueCriticalNotification(data []byte) {
+	select {
+	case <-t.ctx.Done():
+		return
+	case t.criticalNotifQueue <- data:
+		return
+	default:
+	}
+
+	// Queue is full: drop the oldest critical notification, then enqueue the
+	// newest without blocking the read loop.
+	select {
+	case <-t.criticalNotifQueue:
+	default:
+	}
+
+	select {
+	case <-t.ctx.Done():
+	case t.criticalNotifQueue <- data:
+	default:
 	}
 }
 
@@ -640,6 +662,128 @@ func (t *StdioTransport) handleMalformedResponse(data []byte) {
 			},
 		}
 	}
+}
+
+func (t *StdioTransport) handleOversizedFrame(data []byte) {
+	id, hasID, hasMethod := extractTopLevelIDAndMethod(data)
+	if !hasID || hasMethod {
+		return
+	}
+
+	normalizedID, err := normalizeID(id.Value)
+	if err != nil {
+		return
+	}
+
+	t.mu.Lock()
+	if t.closed {
+		t.mu.Unlock()
+		return
+	}
+	pending, ok := t.pendingReqs[normalizedID]
+	if ok {
+		delete(t.pendingReqs, normalizedID)
+	}
+	t.mu.Unlock()
+
+	if ok {
+		pending.ch <- Response{
+			JSONRPC: jsonrpcVersion,
+			ID:      pending.id,
+			Error: &Error{
+				Code:    ErrCodeParseError,
+				Message: "oversized server response frame",
+			},
+		}
+	}
+}
+
+func extractTopLevelIDAndMethod(data []byte) (RequestID, bool, bool) {
+	var id RequestID
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+
+	start, err := decoder.Token()
+	if err != nil {
+		return id, false, false
+	}
+	delim, ok := start.(json.Delim)
+	if !ok || delim != '{' {
+		return id, false, false
+	}
+
+	var hasID bool
+	var hasMethod bool
+	for decoder.More() {
+		keyTok, err := decoder.Token()
+		if err != nil {
+			return id, hasID, hasMethod
+		}
+		key, ok := keyTok.(string)
+		if !ok {
+			return id, hasID, hasMethod
+		}
+
+		valueTok, err := decoder.Token()
+		if err != nil {
+			return id, hasID, hasMethod
+		}
+
+		switch key {
+		case "id":
+			switch v := valueTok.(type) {
+			case string:
+				id = RequestID{Value: v}
+				hasID = true
+			case json.Number:
+				id = RequestID{Value: v.String()}
+				hasID = true
+			case float64:
+				id = RequestID{Value: v}
+				hasID = true
+			}
+		case "method":
+			if _, ok := valueTok.(string); ok {
+				hasMethod = true
+			}
+		}
+
+		if valueDelim, ok := valueTok.(json.Delim); ok && (valueDelim == '{' || valueDelim == '[') {
+			if err := consumeNestedJSONValue(decoder); err != nil {
+				return id, hasID, hasMethod
+			}
+		}
+	}
+
+	return id, hasID, hasMethod
+}
+
+func consumeNestedJSONValue(decoder *json.Decoder) error {
+	depth := 1
+	for depth > 0 {
+		tok, err := decoder.Token()
+		if err != nil {
+			return err
+		}
+		d, ok := tok.(json.Delim)
+		if !ok {
+			continue
+		}
+		switch d {
+		case '{', '[':
+			depth++
+		case '}', ']':
+			depth--
+		}
+	}
+	return nil
+}
+
+func capSlice(data []byte, limit int) []byte {
+	if len(data) <= limit {
+		return data
+	}
+	return data[:limit]
 }
 
 // handleRequest dispatches an incoming server→client request to the handler
