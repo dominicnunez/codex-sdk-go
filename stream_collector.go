@@ -356,7 +356,7 @@ func cloneCommandExecutionItem(in *CommandExecutionThreadItem) *CommandExecution
 	}
 	cp := *in
 	if in.CommandActions != nil {
-		cp.CommandActions = append([]CommandActionWrapper(nil), in.CommandActions...)
+		cp.CommandActions = cloneCommandActions(in.CommandActions)
 	}
 	cp.AggregatedOutput = cloneStringPtr(in.AggregatedOutput)
 	cp.DurationMs = cloneInt64Ptr(in.DurationMs)

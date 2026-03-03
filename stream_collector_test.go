@@ -188,12 +188,12 @@ func TestStreamCollectorSummaryIsDeepCopied(t *testing.T) {
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "item/started",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"commandExecution","id":"cmd-copy","command":"ls","commandActions":[],"cwd":"/tmp","status":"inProgress","processId":"123"}}`),
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"commandExecution","id":"cmd-copy","command":"ls","commandActions":[{"type":"search","path":"/workspace","query":"needle"}],"cwd":"/tmp","status":"inProgress","processId":"123"}}`),
 	})
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "item/completed",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"commandExecution","id":"cmd-copy","command":"ls","commandActions":[],"cwd":"/tmp","status":"completed","aggregatedOutput":"chunk"}}`),
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"commandExecution","id":"cmd-copy","command":"ls","commandActions":[{"type":"search","path":"/workspace","query":"needle"}],"cwd":"/tmp","status":"completed","aggregatedOutput":"chunk"}}`),
 	})
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
@@ -241,6 +241,9 @@ func TestStreamCollectorSummaryIsDeepCopied(t *testing.T) {
 	cmd := summary.CommandExecutions["cmd-copy"]
 	*cmd.Status = codex.CommandExecutionStatusFailed
 	cmd.StartedItem.Command = "rm -rf /"
+	cmdAction := cmd.StartedItem.CommandActions[0].Value.(*codex.SearchCommandAction)
+	*cmdAction.Path = "/mutated"
+	*cmdAction.Query = "changed-needle"
 	cmd.StartedItem.ProcessId = ptr("999")
 	cmd.OutputDeltas[0] = "mutated"
 	summary.CommandExecutions["cmd-copy"] = cmd
@@ -274,6 +277,16 @@ func TestStreamCollectorSummaryIsDeepCopied(t *testing.T) {
 	}
 	if got.StartedItem.ProcessId == nil || *got.StartedItem.ProcessId != "123" {
 		t.Fatalf("process id leaked mutation: %v", got.StartedItem.ProcessId)
+	}
+	if len(got.StartedItem.CommandActions) != 1 {
+		t.Fatalf("command actions length leaked mutation: %d", len(got.StartedItem.CommandActions))
+	}
+	gotAction := got.StartedItem.CommandActions[0].Value.(*codex.SearchCommandAction)
+	if gotAction.Path == nil || *gotAction.Path != "/workspace" {
+		t.Fatalf("command action path leaked mutation: %#v", gotAction)
+	}
+	if gotAction.Query == nil || *gotAction.Query != "needle" {
+		t.Fatalf("command action query leaked mutation: %#v", gotAction)
 	}
 	if len(got.OutputDeltas) != 1 || got.OutputDeltas[0] != "chunk" {
 		t.Fatalf("output deltas leaked mutation: %v", got.OutputDeltas)
