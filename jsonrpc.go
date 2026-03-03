@@ -1,6 +1,11 @@
 package codex
 
-import "encoding/json"
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"io"
+)
 
 // jsonrpcVersion is the protocol version string for JSON-RPC 2.0.
 const jsonrpcVersion = "2.0"
@@ -44,15 +49,14 @@ type Error struct {
 	Data    json.RawMessage `json:"data,omitempty"`
 }
 
-// RequestID is a union type that can be a string, int64, or null.
+// RequestID is a union type that can be a string, number, or null.
 // JSON-RPC 2.0 spec allows id to be string | number | null.
 //
-// Because Go's encoding/json decodes JSON numbers as float64, the concrete
-// type of Value may differ depending on whether the ID was constructed
-// locally (uint64 from nextRequestID) or decoded from the wire (float64).
+// Numeric values decoded from wire are preserved as json.Number to avoid
+// precision loss for IDs larger than 2^53.
 // Use [RequestID.Equal] instead of == to compare IDs across type boundaries.
 type RequestID struct {
-	Value interface{} // string | int64 | float64 | nil
+	Value interface{} // string | json.Number | int64 | float64 | nil
 }
 
 // Equal reports whether r and other represent the same logical request ID,
@@ -84,6 +88,9 @@ func (r RequestID) Equal(other RequestID) bool {
 // Returns the normalized form and true if the value is numeric, or ("", false) otherwise.
 func isNumericID(v interface{}) (string, bool) {
 	switch v := v.(type) {
+	case json.Number:
+		s, _ := normalizeID(v)
+		return s, true
 	case float64:
 		s, _ := normalizeID(v) // err is unreachable: float64 is always handled
 		return s, true
@@ -108,11 +115,27 @@ func (r RequestID) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements json.Unmarshaler for RequestID.
 func (r *RequestID) UnmarshalJSON(data []byte) error {
-	// Try to unmarshal as-is to preserve type
+	if bytes.Equal(data, []byte("null")) {
+		r.Value = nil
+		return nil
+	}
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+
 	var v interface{}
-	if err := json.Unmarshal(data, &v); err != nil {
+	if err := dec.Decode(&v); err != nil {
 		return err
 	}
-	r.Value = v
-	return nil
+	var trailing interface{}
+	if err := dec.Decode(&trailing); !errors.Is(err, io.EOF) {
+		return errors.New("invalid request id")
+	}
+	switch v := v.(type) {
+	case string, json.Number, nil:
+		r.Value = v
+		return nil
+	default:
+		return errors.New("invalid request id type")
+	}
 }

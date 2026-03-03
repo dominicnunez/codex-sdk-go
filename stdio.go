@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 )
@@ -111,7 +113,7 @@ func normalizeID(id interface{}) (string, error) {
 		}
 		return fmt.Sprintf("%v", v), nil
 	case json.Number:
-		return v.String(), nil
+		return normalizeJSONNumberString(v.String())
 	case int64:
 		return fmt.Sprintf("%d", v), nil
 	case int:
@@ -174,6 +176,10 @@ func NewStdioTransport(reader io.Reader, writer io.Writer) *StdioTransport {
 // Send transmits a JSON-RPC request and waits for the response.
 // The response is matched to this request by ID.
 func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error) {
+	if ctx == nil {
+		return Response{}, NewTransportError("send failed", ErrNilContext)
+	}
+
 	t.mu.Lock()
 	if t.closed {
 		t.mu.Unlock()
@@ -218,6 +224,10 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 
 // Notify transmits a JSON-RPC notification (fire-and-forget).
 func (t *StdioTransport) Notify(ctx context.Context, notif Notification) error {
+	if ctx == nil {
+		return NewTransportError("notify failed", ErrNilContext)
+	}
+
 	t.mu.Lock()
 	if t.closed {
 		t.mu.Unlock()
@@ -606,7 +616,7 @@ func (t *StdioTransport) enqueueCriticalNotification(notif Notification) {
 }
 
 func isCriticalNotificationMethod(method string) bool {
-	return method == notifyTurnCompleted
+	return method == notifyTurnCompleted || method == notifyItemCompleted
 }
 
 func (t *StdioTransport) rejectRequestForOverload(req Request) {
@@ -711,14 +721,21 @@ func (t *StdioTransport) handleResponse(resp Response) {
 // handleMalformedResponse attempts to extract the ID from a response that
 // failed full unmarshal, and sends a parse error to the pending caller.
 func (t *StdioTransport) handleMalformedResponse(data []byte) {
-	var idOnly struct {
-		ID RequestID `json:"id"`
+	var partial struct {
+		ID json.RawMessage `json:"id"`
 	}
-	if json.Unmarshal(data, &idOnly) != nil {
+	if json.Unmarshal(data, &partial) != nil || len(partial.ID) == 0 {
 		return
 	}
-	normalizedID, err := normalizeID(idOnly.ID.Value)
+
+	id, err := parseRequestID(partial.ID)
 	if err != nil {
+		t.failAllPendingWithParseError("failed to parse server response id")
+		return
+	}
+	normalizedID, err := normalizeID(id.Value)
+	if err != nil {
+		t.failAllPendingWithParseError("failed to parse server response id")
 		return
 	}
 
@@ -740,6 +757,67 @@ func (t *StdioTransport) handleMalformedResponse(data []byte) {
 			Error: &Error{
 				Code:    ErrCodeParseError,
 				Message: "failed to parse server response",
+			},
+		}
+	}
+}
+
+func normalizeJSONNumberString(raw string) (string, error) {
+	if strings.ContainsAny(raw, "eE") {
+		f, err := strconv.ParseFloat(raw, 64)
+		if err != nil {
+			return "", fmt.Errorf("%w: %q", errUnexpectedIDType, raw)
+		}
+		return normalizeID(f)
+	}
+
+	if !strings.ContainsRune(raw, '.') {
+		return raw, nil
+	}
+
+	sign := ""
+	rest := raw
+	if strings.HasPrefix(rest, "-") {
+		sign = "-"
+		rest = rest[1:]
+	}
+
+	parts := strings.SplitN(rest, ".", 2)
+	if len(parts) != 2 {
+		return "", fmt.Errorf("%w: %q", errUnexpectedIDType, raw)
+	}
+	intPart := parts[0]
+	fracPart := strings.TrimRight(parts[1], "0")
+	if fracPart == "" {
+		if intPart == "0" {
+			return "0", nil
+		}
+		return sign + intPart, nil
+	}
+	return sign + intPart + "." + fracPart, nil
+}
+
+func (t *StdioTransport) failAllPendingWithParseError(message string) {
+	t.mu.Lock()
+	if t.closed {
+		t.mu.Unlock()
+		return
+	}
+
+	pending := make([]pendingReq, 0, len(t.pendingReqs))
+	for id, req := range t.pendingReqs {
+		pending = append(pending, req)
+		delete(t.pendingReqs, id)
+	}
+	t.mu.Unlock()
+
+	for _, req := range pending {
+		req.ch <- Response{
+			JSONRPC: jsonrpcVersion,
+			ID:      req.id,
+			Error: &Error{
+				Code:    ErrCodeParseError,
+				Message: message,
 			},
 		}
 	}

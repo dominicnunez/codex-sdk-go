@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -22,14 +23,29 @@ type wireMarshaler interface {
 	marshalWire() ([]byte, error)
 }
 
+var errNilWireMarshaler = errors.New("nil wire marshaler")
+
 // marshalForWire marshals v for wire-protocol use. If v implements wireMarshaler
 // (because its MarshalJSON redacts sensitive fields), the unredacted wire
 // representation is returned instead.
 func marshalForWire(v interface{}) ([]byte, error) {
 	if wm, ok := v.(wireMarshaler); ok {
+		if isNilWireMarshaler(wm) {
+			return nil, errNilWireMarshaler
+		}
 		return wm.marshalWire()
 	}
 	return json.Marshal(v)
+}
+
+func isNilWireMarshaler(wm wireMarshaler) bool {
+	rv := reflect.ValueOf(wm)
+	switch rv.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return rv.IsNil()
+	default:
+		return false
+	}
 }
 
 // internalListener is a notification handler registered via addNotificationListener.
@@ -152,6 +168,10 @@ func NewClient(transport Transport, opts ...ClientOption) *Client {
 // Returns a TimeoutError if the context deadline is exceeded.
 // Returns a TransportError if the transport fails.
 func (c *Client) Send(ctx context.Context, req Request) (Response, error) {
+	if ctx == nil {
+		return Response{}, ErrNilContext
+	}
+
 	// Apply default timeout if context has no deadline and we have a default timeout
 	if c.requestTimeout > 0 {
 		if _, hasDeadline := ctx.Deadline(); !hasDeadline {
