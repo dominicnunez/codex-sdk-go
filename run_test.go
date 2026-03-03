@@ -78,8 +78,7 @@ func TestRunSuccess(t *testing.T) {
 		ch <- runResult{r, err}
 	}()
 
-	// Give Run() time to register listeners and send requests.
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 1)
 
 	// Inject item/completed notification with an agentMessage.
 	mock.InjectServerNotification(ctx, codex.Notification{
@@ -160,7 +159,7 @@ func TestRunTurnError(t *testing.T) {
 		ch <- runResult{r, err}
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 1)
 
 	// Inject turn/completed with an error.
 	mock.InjectServerNotification(ctx, codex.Notification{
@@ -197,7 +196,7 @@ func TestRunTurnErrorUnwrap(t *testing.T) {
 		ch <- runResult{r, err}
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 1)
 
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
@@ -355,7 +354,7 @@ func TestRunWithAllOptions(t *testing.T) {
 		ch <- runResult{r, err}
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 1)
 
 	// Verify the thread/start params contain our options.
 	var threadReq *codex.Request
@@ -450,7 +449,7 @@ func TestRunMultipleItems(t *testing.T) {
 		ch <- runResult{r, err}
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 1)
 
 	// Inject multiple item/completed notifications.
 	mock.InjectServerNotification(ctx, codex.Notification{
@@ -546,7 +545,7 @@ func TestRunInitRetry(t *testing.T) {
 		ch <- runResult{r, err}
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 1)
 
 	mock.InjectServerNotification(ctx2, codex.Notification{
 		JSONRPC: "2.0",
@@ -580,7 +579,7 @@ func TestRunTurnCompletedUnmarshalFailure(t *testing.T) {
 		ch <- runResult{r, err}
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 1)
 
 	// Inject a turn/completed with valid threadId but malformed turn body.
 	mock.InjectServerNotification(ctx, codex.Notification{
@@ -634,7 +633,7 @@ func TestRunApprovalFlowDuringTurn(t *testing.T) {
 		ch <- runResult{r, err}
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 1)
 
 	// Inject a server→client approval request mid-turn.
 	approvalParams, _ := json.Marshal(codex.CommandExecutionRequestApprovalParams{
@@ -700,7 +699,7 @@ func TestRunIgnoresCrossThreadNotifications(t *testing.T) {
 		ch <- runResult{r, err}
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 1)
 
 	// Inject notifications for a different thread — these should be ignored.
 	mock.InjectServerNotification(ctx, codex.Notification{
@@ -713,9 +712,6 @@ func TestRunIgnoresCrossThreadNotifications(t *testing.T) {
 		Method:  "turn/completed",
 		Params:  json.RawMessage(`{"threadId":"thread-OTHER","turn":{"id":"turn-1","status":"completed","items":[]}}`),
 	})
-
-	// Give time for the cross-thread notifications to be dispatched and filtered.
-	time.Sleep(50 * time.Millisecond)
 
 	// Now inject the correct item and turn/completed for thread-1.
 	mock.InjectServerNotification(ctx, codex.Notification{

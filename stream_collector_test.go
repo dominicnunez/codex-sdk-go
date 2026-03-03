@@ -83,7 +83,7 @@ func TestRunStreamedWithCollectorCapturesNotificationConveniences(t *testing.T) 
 	defer cancel()
 
 	stream := proc.RunStreamedWithCollector(ctx, codex.RunOptions{Prompt: "collect"}, collector)
-	time.Sleep(50 * time.Millisecond)
+	waitForRunStreamedReady(t, mock)
 
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
@@ -173,7 +173,7 @@ func TestStreamCollectorSummaryIsDeepCopied(t *testing.T) {
 	defer cancel()
 
 	stream := proc.RunStreamedWithCollector(ctx, codex.RunOptions{Prompt: "collect"}, collector)
-	time.Sleep(50 * time.Millisecond)
+	waitForRunStreamedReady(t, mock)
 
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
@@ -197,6 +197,36 @@ func TestStreamCollectorSummaryIsDeepCopied(t *testing.T) {
 	})
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
+		Method:  "item/started",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"mcpToolCall","id":"mcp-copy","server":"local","tool":"search","status":"inProgress","arguments":{"outer":{"inner":"value"}}}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"mcpToolCall","id":"mcp-copy","server":"local","tool":"search","status":"completed","arguments":{"outer":{"inner":"value"}},"result":{"content":[{"kind":"text","value":"ok"}],"structuredContent":{"result":{"value":"ok"}}}}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/started",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"webSearch","id":"web-copy","query":"original query","action":{"type":"search","query":"start query","queries":["start-a","start-b"]}}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"webSearch","id":"web-copy","query":"original query","action":{"type":"findInPage","url":"https://example.com","pattern":"needle"}}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/started",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"fileChange","id":"file-copy","status":"inProgress","changes":[{"path":"old.txt","diff":"@@ -1 +1 @@","kind":{"type":"update","move_path":"new.txt"}}]}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"fileChange","id":"file-copy","status":"completed","changes":[{"path":"old.txt","diff":"@@ -1 +1 @@","kind":{"type":"update","move_path":"new.txt"}}]}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
 		Method:  "turn/completed",
 		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
 	})
@@ -214,6 +244,23 @@ func TestStreamCollectorSummaryIsDeepCopied(t *testing.T) {
 	cmd.StartedItem.ProcessId = ptr("999")
 	cmd.OutputDeltas[0] = "mutated"
 	summary.CommandExecutions["cmd-copy"] = cmd
+	mcp := summary.McpToolCalls["mcp-copy"]
+	*mcp.Status = codex.McpToolCallStatusFailed
+	mcp.StartedItem.Arguments.(map[string]interface{})["outer"] = "changed"
+	mcp.CompletedItem.Result.StructuredContent.(map[string]interface{})["result"] = "changed"
+	summary.McpToolCalls["mcp-copy"] = mcp
+	web := summary.WebSearches["web-copy"]
+	searchAction := web.StartedItem.Action.Value.(*codex.SearchWebSearchAction)
+	*searchAction.Query = "changed query"
+	(*searchAction.Queries)[0] = "changed-list-query"
+	findAction := web.CompletedItem.Action.Value.(*codex.FindInPageWebSearchAction)
+	*findAction.Pattern = "changed-pattern"
+	summary.WebSearches["web-copy"] = web
+	file := summary.FileChanges["file-copy"]
+	*file.Status = codex.PatchApplyStatusFailed
+	updateKind := file.StartedItem.Changes[0].Kind.Value.(*codex.UpdatePatchChangeKind)
+	*updateKind.MovePath = "changed.txt"
+	summary.FileChanges["file-copy"] = file
 	summary.NormalizedErrors[0].Message = "changed"
 	*summary.NormalizedErrors[0].ThreadID = "mutated-thread"
 
@@ -230,6 +277,38 @@ func TestStreamCollectorSummaryIsDeepCopied(t *testing.T) {
 	}
 	if len(got.OutputDeltas) != 1 || got.OutputDeltas[0] != "chunk" {
 		t.Fatalf("output deltas leaked mutation: %v", got.OutputDeltas)
+	}
+	mcpAfter := after.McpToolCalls["mcp-copy"]
+	if mcpAfter.Status == nil || *mcpAfter.Status != codex.McpToolCallStatusCompleted {
+		t.Fatalf("mcp status leaked mutation: %v", mcpAfter.Status)
+	}
+	mcpArgs := mcpAfter.StartedItem.Arguments.(map[string]interface{})
+	if _, ok := mcpArgs["outer"].(map[string]interface{}); !ok {
+		t.Fatalf("mcp arguments leaked mutation: %#v", mcpArgs)
+	}
+	mcpResult := mcpAfter.CompletedItem.Result.StructuredContent.(map[string]interface{})
+	if _, ok := mcpResult["result"].(map[string]interface{}); !ok {
+		t.Fatalf("mcp structured content leaked mutation: %#v", mcpResult)
+	}
+	webAfter := after.WebSearches["web-copy"]
+	webStart := webAfter.StartedItem.Action.Value.(*codex.SearchWebSearchAction)
+	if webStart.Query == nil || *webStart.Query != "start query" {
+		t.Fatalf("web start action leaked query mutation: %#v", webStart)
+	}
+	if webStart.Queries == nil || len(*webStart.Queries) != 2 || (*webStart.Queries)[0] != "start-a" {
+		t.Fatalf("web start action leaked queries mutation: %#v", webStart.Queries)
+	}
+	webCompleted := webAfter.CompletedItem.Action.Value.(*codex.FindInPageWebSearchAction)
+	if webCompleted.Pattern == nil || *webCompleted.Pattern != "needle" {
+		t.Fatalf("web completed action leaked pattern mutation: %#v", webCompleted)
+	}
+	fileAfter := after.FileChanges["file-copy"]
+	if fileAfter.Status == nil || *fileAfter.Status != codex.PatchApplyStatusCompleted {
+		t.Fatalf("file status leaked mutation: %v", fileAfter.Status)
+	}
+	fileUpdateKind := fileAfter.StartedItem.Changes[0].Kind.Value.(*codex.UpdatePatchChangeKind)
+	if fileUpdateKind.MovePath == nil || *fileUpdateKind.MovePath != "new.txt" {
+		t.Fatalf("file change kind leaked mutation: %#v", fileUpdateKind)
 	}
 	if len(after.NormalizedErrors) == 0 || after.NormalizedErrors[0].Message != "system failed" {
 		t.Fatalf("normalized error message leaked mutation: %v", after.NormalizedErrors)
@@ -264,7 +343,7 @@ func TestStreamCollectorBoundsOutputDeltaHistory(t *testing.T) {
 	defer cancel()
 
 	stream := proc.RunStreamedWithCollector(ctx, codex.RunOptions{Prompt: "collect output deltas"}, collector)
-	time.Sleep(50 * time.Millisecond)
+	waitForRunStreamedReady(t, mock)
 
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
@@ -319,7 +398,7 @@ func TestStreamCollectorBoundsRawOutputChunksAndFinalizesOnCompletion(t *testing
 	defer cancel()
 
 	stream := proc.RunStreamedWithCollector(ctx, codex.RunOptions{Prompt: "collect raw chunks"}, collector)
-	time.Sleep(50 * time.Millisecond)
+	waitForRunStreamedReady(t, mock)
 
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",

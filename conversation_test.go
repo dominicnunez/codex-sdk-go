@@ -39,7 +39,7 @@ func TestConversationMultiTurn(t *testing.T) {
 		ch <- turnResult{r, err}
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 1)
 
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
@@ -67,7 +67,7 @@ func TestConversationMultiTurn(t *testing.T) {
 		ch2 <- turnResult{r, err}
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 2)
 
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
@@ -108,7 +108,7 @@ func TestConversationTurnStreamed(t *testing.T) {
 
 	stream := conv.TurnStreamed(ctx, codex.TurnOptions{Prompt: "Stream me"})
 
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 1)
 
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
@@ -164,7 +164,7 @@ func TestConversationTurnIgnoresStaleTurnNotifications(t *testing.T) {
 		firstDone <- err
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 1)
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "item/completed",
@@ -189,7 +189,7 @@ func TestConversationTurnIgnoresStaleTurnNotifications(t *testing.T) {
 		secondDone <- turnResult{result: r, err: err}
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 2)
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "item/completed",
@@ -240,7 +240,7 @@ func TestConversationTurnStreamedIgnoresStaleTurnNotifications(t *testing.T) {
 		firstDone <- err
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 1)
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "turn/completed",
@@ -251,7 +251,7 @@ func TestConversationTurnStreamedIgnoresStaleTurnNotifications(t *testing.T) {
 	}
 
 	stream := conv.TurnStreamed(ctx, codex.TurnOptions{Prompt: "second"})
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 2)
 
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
@@ -327,7 +327,7 @@ func TestConversationTurnIgnoresStaleFailedTurnNotifications(t *testing.T) {
 		firstDone <- err
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 1)
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "turn/completed",
@@ -347,7 +347,7 @@ func TestConversationTurnIgnoresStaleFailedTurnNotifications(t *testing.T) {
 		secondDone <- turnResult{result: r, err: err}
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 2)
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "turn/completed",
@@ -393,7 +393,7 @@ func TestConversationTurnStreamedIgnoresStaleFailedTurnNotifications(t *testing.
 		firstDone <- err
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 1)
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "turn/completed",
@@ -404,7 +404,7 @@ func TestConversationTurnStreamedIgnoresStaleFailedTurnNotifications(t *testing.
 	}
 
 	stream := conv.TurnStreamed(ctx, codex.TurnOptions{Prompt: "second"})
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 2)
 
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
@@ -557,7 +557,7 @@ func TestConversationTurnWithAllOptions(t *testing.T) {
 		ch <- err
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 1)
 
 	// Find the turn/start request and verify it has effort and model.
 	var turnReq *codex.Request
@@ -615,7 +615,7 @@ func TestConversationTurnError(t *testing.T) {
 		ch <- turnResult{r, err}
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 1)
 
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
@@ -662,7 +662,7 @@ func TestConversationTurnStreamedTurnError(t *testing.T) {
 
 	stream := conv.TurnStreamed(ctx, codex.TurnOptions{Prompt: "fail"})
 
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 1)
 
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
@@ -742,7 +742,7 @@ func TestConversationWithCollaborationMode(t *testing.T) {
 		ch <- err
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 1)
 
 	// Verify the turn/start request contains collaborationMode.
 	var turnReq *codex.Request
@@ -825,7 +825,7 @@ func TestConversationConcurrentTurnRejected(t *testing.T) {
 		firstDone <- err
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 1)
 
 	// Second turn should be rejected while the first is in progress.
 	_, err = conv.Turn(ctx, codex.TurnOptions{Prompt: "second"})
@@ -854,7 +854,7 @@ func TestConversationConcurrentTurnRejected(t *testing.T) {
 		thirdDone <- err
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 2)
 
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
@@ -884,7 +884,7 @@ func TestConversationThreadDeepCopyTurnError(t *testing.T) {
 		turnDone <- err
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 1)
 
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
@@ -921,7 +921,7 @@ func TestConversationConcurrentTurnStreamedRejected(t *testing.T) {
 
 	// Start first streamed turn in background.
 	stream1 := conv.TurnStreamed(ctx, codex.TurnOptions{Prompt: "first"})
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 1)
 
 	// Second TurnStreamed should be rejected while the first is in progress.
 	stream2 := conv.TurnStreamed(ctx, codex.TurnOptions{Prompt: "second"})
@@ -972,7 +972,7 @@ func TestConversationConcurrentTurnVsTurnStreamedRejected(t *testing.T) {
 		firstDone <- err
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 1)
 
 	// TurnStreamed should be rejected while Turn is in progress.
 	stream := conv.TurnStreamed(ctx, codex.TurnOptions{Prompt: "second"})
@@ -1016,7 +1016,7 @@ func TestConversationConcurrentTurnStreamedVsTurnRejected(t *testing.T) {
 
 	// Start a TurnStreamed in background.
 	stream := conv.TurnStreamed(ctx, codex.TurnOptions{Prompt: "first"})
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 1)
 
 	// Turn should be rejected while TurnStreamed is in progress.
 	_, err = conv.Turn(ctx, codex.TurnOptions{Prompt: "second"})
@@ -1059,7 +1059,7 @@ func TestConversationThreadDeepCopyIsolation(t *testing.T) {
 		turnDone <- err
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 1)
 
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
@@ -1101,7 +1101,7 @@ func TestConversationThreadDeepCopyItemValueIsolation(t *testing.T) {
 		turnDone <- err
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 1)
 
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
@@ -1157,7 +1157,7 @@ func TestConversationThreadSnapshotDuringTurnCompletion(t *testing.T) {
 		turnDone <- err
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 1)
 
 	// Concurrently call Thread() while completing the turn.
 	// Run with -race to verify no data race.
@@ -1195,7 +1195,7 @@ func TestConversationStreamedThreadSnapshotDuringTurnCompletion(t *testing.T) {
 
 	stream := conv.TurnStreamed(ctx, codex.TurnOptions{Prompt: "race"})
 
-	time.Sleep(50 * time.Millisecond)
+	waitForMethodCallCount(t, mock, "turn/start", 1)
 
 	// Concurrently call Thread() while iterating streamed events.
 	// Run with -race to verify no data race on the shared thread state.
