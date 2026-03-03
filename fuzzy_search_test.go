@@ -9,7 +9,7 @@ import (
 )
 
 // TestFuzzyFileSearchParamsResponse tests FuzzyFileSearch params/response round-trip.
-// FuzzyFileSearch is a server→client request, so params/response are already defined in approval.go.
+// FuzzyFileSearchService.Search is a client→server request defined in fuzzy_search.go.
 func TestFuzzyFileSearchParamsResponse(t *testing.T) {
 	tests := []struct {
 		name   string
