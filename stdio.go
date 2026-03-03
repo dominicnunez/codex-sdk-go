@@ -220,6 +220,13 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 	case <-ctx.Done():
 		return Response{}, ctx.Err()
 	case <-t.readerStopped:
+		// Prefer a response already delivered to this request over the generic
+		// reader-stopped error; both can become ready at nearly the same time.
+		select {
+		case resp := <-respChan:
+			return resp, nil
+		default:
+		}
 		return Response{}, NewTransportError("send failed", errors.New("transport reader stopped"))
 	}
 }
@@ -447,6 +454,22 @@ func (t *StdioTransport) readLoop() {
 	reader := bufio.NewReaderSize(t.reader, readBufferSizeBytes)
 	for {
 		line, overLimit, err := readLimitedLine(reader, maxInboundMessageSizeBytes)
+		if overLimit {
+			// Best-effort: fail matching pending responses so Send callers do not
+			// block waiting on a frame we intentionally discarded.
+			t.handleOversizedFrame(line)
+			if errors.Is(err, io.EOF) {
+				return
+			}
+			if err != nil {
+				t.mu.Lock()
+				t.scanErr = err
+				t.mu.Unlock()
+				return
+			}
+			continue
+		}
+
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				return
@@ -455,12 +478,6 @@ func (t *StdioTransport) readLoop() {
 			t.scanErr = err
 			t.mu.Unlock()
 			return
-		}
-		if overLimit {
-			// Best-effort: fail matching pending responses so Send callers do not
-			// block waiting on a frame we intentionally discarded.
-			t.handleOversizedFrame(line)
-			continue
 		}
 
 		frame, err := decodeInboundFrame(line)
@@ -850,6 +867,9 @@ func normalizeJSONNumberString(raw string) (string, error) {
 	}
 
 	if !strings.ContainsRune(raw, '.') {
+		if isNegativeZeroString(raw) {
+			return "0", nil
+		}
 		return raw, nil
 	}
 
@@ -867,12 +887,31 @@ func normalizeJSONNumberString(raw string) (string, error) {
 	intPart := parts[0]
 	fracPart := strings.TrimRight(parts[1], "0")
 	if fracPart == "" {
-		if intPart == "0" {
+		if sign == "-" && allDigitsAreZero(intPart) {
 			return "0", nil
 		}
 		return sign + intPart, nil
 	}
 	return sign + intPart + "." + fracPart, nil
+}
+
+func isNegativeZeroString(raw string) bool {
+	if !strings.HasPrefix(raw, "-") {
+		return false
+	}
+	return allDigitsAreZero(raw[1:])
+}
+
+func allDigitsAreZero(raw string) bool {
+	if raw == "" {
+		return false
+	}
+	for _, ch := range raw {
+		if ch != '0' {
+			return false
+		}
+	}
+	return true
 }
 
 func (t *StdioTransport) failAllPendingWithParseError(message string) {

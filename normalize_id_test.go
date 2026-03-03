@@ -37,6 +37,8 @@ func TestNormalizeID(t *testing.T) {
 		{"json.Number negative integer decimal form", json.Number("-7.0"), "-7"},
 		{"json.Number fractional", json.Number("2.5"), "2.5"},
 		{"json.Number exponent integer", json.Number("1e0"), "1"},
+		{"json.Number negative zero", json.Number("-0"), "0"},
+		{"json.Number negative zero decimal", json.Number("-0.0"), "0"},
 
 		// string passthrough
 		{"string", "abc", "abc"},
@@ -82,5 +84,40 @@ func TestNormalizeIDReturnsErrorOnNilID(t *testing.T) {
 	}
 	if !errors.Is(err, errNullID) {
 		t.Errorf("normalizeID(nil) error = %v; want errNullID", err)
+	}
+}
+
+func TestRequestIDEqualTreatsNegativeZeroAsZero(t *testing.T) {
+	tests := []struct {
+		name string
+		a    RequestID
+		b    RequestID
+	}{
+		{
+			name: "json.Number -0 equals float zero",
+			a:    RequestID{Value: json.Number("-0")},
+			b:    RequestID{Value: float64(0)},
+		},
+		{
+			name: "json.Number -0 equals int zero",
+			a:    RequestID{Value: json.Number("-0")},
+			b:    RequestID{Value: int(0)},
+		},
+		{
+			name: "json.Number -0 equals uint64 zero",
+			a:    RequestID{Value: json.Number("-0")},
+			b:    RequestID{Value: uint64(0)},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if !tt.a.Equal(tt.b) {
+				t.Fatalf("RequestID(%v).Equal(%v) = false; want true", tt.a.Value, tt.b.Value)
+			}
+			if !tt.b.Equal(tt.a) {
+				t.Fatalf("RequestID(%v).Equal(%v) = false; want true", tt.b.Value, tt.a.Value)
+			}
+		})
 	}
 }
