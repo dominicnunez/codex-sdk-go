@@ -1,3 +1,6 @@
+//go:build tooling
+// +build tooling
+
 package codex_test
 
 import (
