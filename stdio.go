@@ -43,6 +43,8 @@ const (
 	errNilTransportWriter     = "stdio transport writer must not be nil"
 	errInvalidJSONRPCVersion  = `invalid request: jsonrpc must be "2.0"`
 	errInvalidResponseJSONRPC = `invalid response: jsonrpc must be "2.0"`
+	requestIDKeyPrefixNumber  = "n:"
+	requestIDKeyPrefixString  = "s:"
 )
 
 type writeEnvelope struct {
@@ -131,6 +133,21 @@ func normalizeID(id interface{}) (string, error) {
 	}
 }
 
+func normalizePendingRequestID(id interface{}) (string, error) {
+	normalizedID, err := normalizeID(id)
+	if err != nil {
+		return "", err
+	}
+	switch id.(type) {
+	case float64, json.Number, int64, int, uint64:
+		return requestIDKeyPrefixNumber + normalizedID, nil
+	case string:
+		return requestIDKeyPrefixString + normalizedID, nil
+	default:
+		return "", fmt.Errorf("%w: %T", errUnexpectedIDType, id)
+	}
+}
+
 // NewStdioTransport creates a new stdio transport using the provided reader and writer.
 // reader is required to be an io.ReadCloser so Close can always unblock the read loop.
 // Typically, reader is os.Stdin and writer is os.Stdout.
@@ -190,7 +207,7 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 	}
 
 	// Create response channel and store with normalized ID for matching
-	normalizedID, err := normalizeID(req.ID.Value)
+	normalizedID, err := normalizePendingRequestID(req.ID.Value)
 	if err != nil {
 		t.mu.Unlock()
 		return Response{}, NewTransportError("send failed", err)
@@ -575,7 +592,7 @@ func (t *StdioTransport) failPendingWithInvalidProtocolVersion(rawID json.RawMes
 	if err != nil {
 		return
 	}
-	normalizedID, err := normalizeID(id.Value)
+	normalizedID, err := normalizePendingRequestID(id.Value)
 	if err != nil {
 		return
 	}
@@ -820,7 +837,7 @@ func (f inboundFrame) toNotification() Notification {
 // to the channel without holding the mutex during the send.
 func (t *StdioTransport) handleResponse(resp Response) {
 	// Normalize ID for matching
-	normalizedID, err := normalizeID(resp.ID.Value)
+	normalizedID, err := normalizePendingRequestID(resp.ID.Value)
 	if err != nil {
 		return
 	}
@@ -856,7 +873,7 @@ func (t *StdioTransport) handleMalformedResponse(data []byte) {
 		t.malformedCount.Add(1)
 		return
 	}
-	normalizedID, err := normalizeID(id.Value)
+	normalizedID, err := normalizePendingRequestID(id.Value)
 	if err != nil {
 		t.malformedCount.Add(1)
 		return
@@ -948,7 +965,7 @@ func (t *StdioTransport) handleOversizedFrame(data []byte) {
 		return
 	}
 
-	normalizedID, err := normalizeID(id.Value)
+	normalizedID, err := normalizePendingRequestID(id.Value)
 	if err != nil {
 		return
 	}

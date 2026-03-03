@@ -288,6 +288,112 @@ func TestStdioResponseRequestIDMatching(t *testing.T) {
 	}
 }
 
+func TestStdioRequestIDTypeFamiliesDoNotCollide(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	type sendResult struct {
+		label  string
+		result string
+		err    error
+	}
+	results := make(chan sendResult, 2)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	go func() {
+		resp, err := transport.Send(ctx, codex.Request{
+			JSONRPC: "2.0",
+			ID:      codex.RequestID{Value: "1"},
+			Method:  "test/string-id",
+		})
+		results <- sendResult{label: "string", result: string(resp.Result), err: err}
+	}()
+
+	go func() {
+		resp, err := transport.Send(ctx, codex.Request{
+			JSONRPC: "2.0",
+			ID:      codex.RequestID{Value: int64(1)},
+			Method:  "test/numeric-id",
+		})
+		results <- sendResult{label: "number", result: string(resp.Result), err: err}
+	}()
+
+	scannedRequests := make(chan codex.Request, 2)
+	scanErr := make(chan error, 1)
+	go func() {
+		scanner := bufio.NewScanner(serverReader)
+		for scanner.Scan() {
+			var req codex.Request
+			if err := json.Unmarshal(scanner.Bytes(), &req); err != nil {
+				scanErr <- err
+				return
+			}
+			scannedRequests <- req
+			if len(scannedRequests) == 2 {
+				return
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			scanErr <- err
+		}
+	}()
+
+	sentRequests := make([]codex.Request, 0, 2)
+	for len(sentRequests) < 2 {
+		select {
+		case req := <-scannedRequests:
+			sentRequests = append(sentRequests, req)
+		case err := <-scanErr:
+			t.Fatalf("scan outbound requests: %v", err)
+		case <-time.After(500 * time.Millisecond):
+			t.Fatalf("expected two outbound requests, got %d", len(sentRequests))
+		}
+	}
+
+	for i := len(sentRequests) - 1; i >= 0; i-- {
+		req := sentRequests[i]
+		payload := `{"matched":"numeric"}`
+		if _, ok := req.ID.Value.(string); ok {
+			payload = `{"matched":"string"}`
+		}
+		resp := codex.Response{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Result:  json.RawMessage(payload),
+		}
+		respJSON, _ := json.Marshal(resp)
+		_, _ = serverWriter.Write(append(respJSON, '\n'))
+	}
+
+	got := make(map[string]string, 2)
+	for range 2 {
+		select {
+		case res := <-results:
+			if res.err != nil {
+				t.Fatalf("%s-id send returned error: %v", res.label, res.err)
+			}
+			got[res.label] = res.result
+		case <-time.After(500 * time.Millisecond):
+			t.Fatal("timeout waiting for responses")
+		}
+	}
+
+	if got["string"] != `{"matched":"string"}` {
+		t.Fatalf("string id response = %s; want %s", got["string"], `{"matched":"string"}`)
+	}
+	if got["number"] != `{"matched":"numeric"}` {
+		t.Fatalf("number id response = %s; want %s", got["number"], `{"matched":"numeric"}`)
+	}
+}
+
 // TestStdioNotificationDispatch verifies notifications are dispatched to the handler
 func TestStdioNotificationDispatch(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
