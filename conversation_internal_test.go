@@ -169,3 +169,96 @@ func TestCloneThreadItemWrapperRoundTrip(t *testing.T) {
 		})
 	}
 }
+
+func TestThreadCloneNestedItemIsolation(t *testing.T) {
+	path := "/tmp"
+	placeholder := "file-path"
+	conv := &Conversation{
+		thread: Thread{
+			Turns: []Turn{{
+				ID:     "t1",
+				Status: TurnStatusCompleted,
+				Items: []ThreadItemWrapper{
+					{
+						Value: &UserMessageThreadItem{
+							ID: "u1",
+							Content: []UserInput{
+								&TextUserInput{
+									Text: "hello",
+									TextElements: []TextElement{{
+										ByteRange:   ByteRange{Start: 0, End: 5},
+										Placeholder: &placeholder,
+									}},
+								},
+							},
+						},
+					},
+					{
+						Value: &CommandExecutionThreadItem{
+							ID:      "cmd-1",
+							Command: "rg",
+							Cwd:     "/tmp",
+							Status:  CommandExecutionStatusCompleted,
+							CommandActions: []CommandActionWrapper{
+								{Value: &SearchCommandAction{Command: "rg", Path: &path}},
+							},
+						},
+					},
+				},
+			}},
+		},
+	}
+
+	snap := conv.Thread()
+	user := snap.Turns[0].Items[0].Value.(*UserMessageThreadItem)
+	text := user.Content[0].(*TextUserInput)
+	*text.TextElements[0].Placeholder = "changed"
+
+	cmd := snap.Turns[0].Items[1].Value.(*CommandExecutionThreadItem)
+	search := cmd.CommandActions[0].Value.(*SearchCommandAction)
+	*search.Path = "/changed"
+
+	origUser := conv.thread.Turns[0].Items[0].Value.(*UserMessageThreadItem)
+	origText := origUser.Content[0].(*TextUserInput)
+	if *origText.TextElements[0].Placeholder != "file-path" {
+		t.Fatalf("placeholder mutation leaked: got %q, want %q", *origText.TextElements[0].Placeholder, "file-path")
+	}
+
+	origCmd := conv.thread.Turns[0].Items[1].Value.(*CommandExecutionThreadItem)
+	origSearch := origCmd.CommandActions[0].Value.(*SearchCommandAction)
+	if *origSearch.Path != "/tmp" {
+		t.Fatalf("command action path mutation leaked: got %q, want %q", *origSearch.Path, "/tmp")
+	}
+}
+
+func TestThreadCloneDoesNotPanicOnUnmarshalableDynamicArguments(t *testing.T) {
+	conv := &Conversation{
+		thread: Thread{
+			Turns: []Turn{{
+				ID:     "t1",
+				Status: TurnStatusCompleted,
+				Items: []ThreadItemWrapper{
+					{
+						Value: &DynamicToolCallThreadItem{
+							ID:        "dyn-1",
+							Tool:      "tool",
+							Status:    DynamicToolCallStatusCompleted,
+							Arguments: func() {},
+						},
+					},
+				},
+			}},
+		},
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("Thread() panicked: %v", r)
+		}
+	}()
+
+	snap := conv.Thread()
+	if snap.Turns[0].Items[0].Value == nil {
+		t.Fatal("expected cloned item")
+	}
+}

@@ -47,7 +47,6 @@ func (c *Conversation) ThreadID() string {
 // Thread returns a deep-copy snapshot of the latest thread state.
 // The returned Thread is fully isolated from the Conversation's internal
 // state — mutations to the snapshot do not affect the Conversation.
-// ThreadItemWrapper values within Items are cloned via JSON round-trip.
 func (c *Conversation) Thread() Thread {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -82,57 +81,472 @@ func (c *Conversation) Thread() Thread {
 	return t
 }
 
-// cloneThreadItemWrapper deep-copies a ThreadItemWrapper via JSON round-trip.
-// Panics on marshal/unmarshal failure — these indicate a bug in a type's JSON
-// methods and must not be silently swallowed (returning the original would
-// break the deep-copy isolation guarantee).
 func cloneThreadItemWrapper(w ThreadItemWrapper) ThreadItemWrapper {
 	if w.Value == nil {
 		return w
 	}
-	b, err := json.Marshal(w)
-	if err != nil {
-		panic(fmt.Sprintf("cloneThreadItemWrapper: marshal failed: %v", err))
+	switch v := w.Value.(type) {
+	case *UserMessageThreadItem:
+		cp := *v
+		cp.Content = cloneUserInputs(v.Content)
+		return ThreadItemWrapper{Value: &cp}
+	case *AgentMessageThreadItem:
+		cp := *v
+		cp.Phase = cloneMessagePhasePtr(v.Phase)
+		return ThreadItemWrapper{Value: &cp}
+	case *PlanThreadItem:
+		cp := *v
+		return ThreadItemWrapper{Value: &cp}
+	case *ReasoningThreadItem:
+		cp := *v
+		cp.Content = append([]string(nil), v.Content...)
+		cp.Summary = append([]string(nil), v.Summary...)
+		return ThreadItemWrapper{Value: &cp}
+	case *CommandExecutionThreadItem:
+		cp := *v
+		cp.CommandActions = cloneCommandActions(v.CommandActions)
+		cp.AggregatedOutput = cloneStringPtr(v.AggregatedOutput)
+		cp.DurationMs = cloneInt64Ptr(v.DurationMs)
+		cp.ExitCode = cloneInt32Ptr(v.ExitCode)
+		cp.ProcessId = cloneStringPtr(v.ProcessId)
+		return ThreadItemWrapper{Value: &cp}
+	case *FileChangeThreadItem:
+		cp := *v
+		cp.Changes = cloneFileUpdateChanges(v.Changes)
+		return ThreadItemWrapper{Value: &cp}
+	case *McpToolCallThreadItem:
+		cp := *v
+		cp.Arguments = cloneJSONValue(v.Arguments)
+		cp.Result = cloneMcpToolCallResult(v.Result)
+		cp.Error = cloneMcpToolCallError(v.Error)
+		cp.DurationMs = cloneInt64Ptr(v.DurationMs)
+		return ThreadItemWrapper{Value: &cp}
+	case *DynamicToolCallThreadItem:
+		cp := *v
+		cp.Arguments = cloneJSONValue(v.Arguments)
+		cp.ContentItems = cloneDynamicToolCallOutputContentItems(v.ContentItems)
+		cp.Success = cloneBoolPtr(v.Success)
+		cp.DurationMs = cloneInt64Ptr(v.DurationMs)
+		return ThreadItemWrapper{Value: &cp}
+	case *CollabAgentToolCallThreadItem:
+		cp := *v
+		cp.AgentsStates = cloneCollabAgentStates(v.AgentsStates)
+		cp.ReceiverThreadIds = append([]string(nil), v.ReceiverThreadIds...)
+		cp.Prompt = cloneStringPtr(v.Prompt)
+		return ThreadItemWrapper{Value: &cp}
+	case *WebSearchThreadItem:
+		cp := *v
+		if v.Action != nil {
+			action := cloneWebSearchActionWrapper(*v.Action)
+			cp.Action = &action
+		}
+		return ThreadItemWrapper{Value: &cp}
+	case *ImageViewThreadItem:
+		cp := *v
+		return ThreadItemWrapper{Value: &cp}
+	case *EnteredReviewModeThreadItem:
+		cp := *v
+		return ThreadItemWrapper{Value: &cp}
+	case *ExitedReviewModeThreadItem:
+		cp := *v
+		return ThreadItemWrapper{Value: &cp}
+	case *ContextCompactionThreadItem:
+		cp := *v
+		return ThreadItemWrapper{Value: &cp}
+	case *UnknownThreadItem:
+		cp := *v
+		cp.Raw = append(json.RawMessage(nil), v.Raw...)
+		return ThreadItemWrapper{Value: &cp}
+	default:
+		// Unknown future variants must preserve data; JSON fallback keeps parity.
+		return cloneThreadItemWrapperFallback(w)
 	}
-	var clone ThreadItemWrapper
-	if err := json.Unmarshal(b, &clone); err != nil {
-		panic(fmt.Sprintf("cloneThreadItemWrapper: unmarshal failed: %v", err))
-	}
-	return clone
 }
 
-// cloneSessionSourceWrapper deep-copies a SessionSourceWrapper via JSON round-trip.
-// Same strategy as cloneThreadItemWrapper — panics on marshal/unmarshal failure.
 func cloneSessionSourceWrapper(w SessionSourceWrapper) SessionSourceWrapper {
 	if w.Value == nil {
 		return w
 	}
-	b, err := json.Marshal(w)
-	if err != nil {
-		panic(fmt.Sprintf("cloneSessionSourceWrapper: marshal failed: %v", err))
+	switch v := w.Value.(type) {
+	case sessionSourceLiteral:
+		return SessionSourceWrapper{Value: v}
+	case SessionSourceSubAgent:
+		return SessionSourceWrapper{Value: SessionSourceSubAgent{SubAgent: cloneSubAgentSource(v.SubAgent)}}
+	case UnknownSessionSource:
+		cp := v
+		cp.Raw = append(json.RawMessage(nil), v.Raw...)
+		return SessionSourceWrapper{Value: cp}
+	default:
+		return cloneSessionSourceWrapperFallback(w)
 	}
-	var clone SessionSourceWrapper
-	if err := json.Unmarshal(b, &clone); err != nil {
-		panic(fmt.Sprintf("cloneSessionSourceWrapper: unmarshal failed: %v", err))
-	}
-	return clone
 }
 
-// cloneThreadStatusWrapper deep-copies a ThreadStatusWrapper via JSON round-trip.
-// Same strategy as cloneThreadItemWrapper — panics on marshal/unmarshal failure.
 func cloneThreadStatusWrapper(w ThreadStatusWrapper) ThreadStatusWrapper {
 	if w.Value == nil {
 		return w
 	}
-	b, err := json.Marshal(w)
-	if err != nil {
-		panic(fmt.Sprintf("cloneThreadStatusWrapper: marshal failed: %v", err))
+	switch v := w.Value.(type) {
+	case ThreadStatusNotLoaded:
+		return ThreadStatusWrapper{Value: v}
+	case ThreadStatusIdle:
+		return ThreadStatusWrapper{Value: v}
+	case ThreadStatusSystemError:
+		return ThreadStatusWrapper{Value: v}
+	case ThreadStatusActive:
+		cp := v
+		cp.ActiveFlags = append([]ThreadActiveFlag(nil), v.ActiveFlags...)
+		return ThreadStatusWrapper{Value: cp}
+	case UnknownThreadStatus:
+		cp := v
+		cp.Raw = append(json.RawMessage(nil), v.Raw...)
+		return ThreadStatusWrapper{Value: cp}
+	default:
+		return cloneThreadStatusWrapperFallback(w)
 	}
+}
+
+func cloneSubAgentSource(src SubAgentSource) SubAgentSource {
+	if src == nil {
+		return nil
+	}
+	switch v := src.(type) {
+	case subAgentSourceLiteral:
+		return v
+	case SubAgentSourceThreadSpawn:
+		cp := v
+		return cp
+	case SubAgentSourceOther:
+		cp := v
+		return cp
+	case UnknownSubAgentSource:
+		cp := v
+		cp.Raw = append(json.RawMessage(nil), v.Raw...)
+		return cp
+	default:
+		return cloneSubAgentSourceFallback(src)
+	}
+}
+
+func cloneUserInputs(in []UserInput) []UserInput {
+	if in == nil {
+		return nil
+	}
+	out := make([]UserInput, len(in))
+	for i, input := range in {
+		out[i] = cloneUserInput(input)
+	}
+	return out
+}
+
+func cloneUserInput(in UserInput) UserInput {
+	if in == nil {
+		return nil
+	}
+	switch v := in.(type) {
+	case *TextUserInput:
+		cp := *v
+		cp.TextElements = cloneTextElements(v.TextElements)
+		return &cp
+	case *ImageUserInput:
+		cp := *v
+		return &cp
+	case *LocalImageUserInput:
+		cp := *v
+		return &cp
+	case *SkillUserInput:
+		cp := *v
+		return &cp
+	case *MentionUserInput:
+		cp := *v
+		return &cp
+	case *UnknownUserInput:
+		cp := *v
+		cp.Raw = append(json.RawMessage(nil), v.Raw...)
+		return &cp
+	default:
+		return cloneUserInputFallback(in)
+	}
+}
+
+func cloneTextElements(in []TextElement) []TextElement {
+	if in == nil {
+		return nil
+	}
+	out := make([]TextElement, len(in))
+	for i, element := range in {
+		out[i] = element
+		out[i].Placeholder = cloneStringPtr(element.Placeholder)
+	}
+	return out
+}
+
+func cloneCommandActions(in []CommandActionWrapper) []CommandActionWrapper {
+	if in == nil {
+		return nil
+	}
+	out := make([]CommandActionWrapper, len(in))
+	for i, action := range in {
+		out[i] = cloneCommandActionWrapper(action)
+	}
+	return out
+}
+
+func cloneCommandActionWrapper(w CommandActionWrapper) CommandActionWrapper {
+	switch v := w.Value.(type) {
+	case *ReadCommandAction:
+		cp := *v
+		return CommandActionWrapper{Value: &cp}
+	case *ListFilesCommandAction:
+		cp := *v
+		cp.Path = cloneStringPtr(v.Path)
+		return CommandActionWrapper{Value: &cp}
+	case *SearchCommandAction:
+		cp := *v
+		cp.Path = cloneStringPtr(v.Path)
+		cp.Query = cloneStringPtr(v.Query)
+		return CommandActionWrapper{Value: &cp}
+	case *UnknownCommandAction:
+		cp := *v
+		return CommandActionWrapper{Value: &cp}
+	default:
+		return cloneCommandActionWrapperFallback(w)
+	}
+}
+
+func cloneFileUpdateChanges(in []FileUpdateChange) []FileUpdateChange {
+	if in == nil {
+		return nil
+	}
+	out := make([]FileUpdateChange, len(in))
+	for i, change := range in {
+		out[i] = change
+		out[i].Kind = clonePatchChangeKindWrapper(change.Kind)
+	}
+	return out
+}
+
+func clonePatchChangeKindWrapper(w PatchChangeKindWrapper) PatchChangeKindWrapper {
+	switch v := w.Value.(type) {
+	case *AddPatchChangeKind:
+		return PatchChangeKindWrapper{Value: &AddPatchChangeKind{}}
+	case *DeletePatchChangeKind:
+		return PatchChangeKindWrapper{Value: &DeletePatchChangeKind{}}
+	case *UpdatePatchChangeKind:
+		cp := *v
+		cp.MovePath = cloneStringPtr(v.MovePath)
+		return PatchChangeKindWrapper{Value: &cp}
+	case *UnknownPatchChangeKind:
+		cp := *v
+		cp.Raw = append(json.RawMessage(nil), v.Raw...)
+		return PatchChangeKindWrapper{Value: &cp}
+	default:
+		return clonePatchChangeKindWrapperFallback(w)
+	}
+}
+
+func cloneMcpToolCallResult(in *McpToolCallResult) *McpToolCallResult {
+	if in == nil {
+		return nil
+	}
+	out := &McpToolCallResult{
+		Content:           make([]interface{}, len(in.Content)),
+		StructuredContent: cloneJSONValue(in.StructuredContent),
+	}
+	for i, item := range in.Content {
+		out.Content[i] = cloneJSONValue(item)
+	}
+	return out
+}
+
+func cloneMcpToolCallError(in *McpToolCallError) *McpToolCallError {
+	if in == nil {
+		return nil
+	}
+	cp := *in
+	return &cp
+}
+
+func cloneDynamicToolCallOutputContentItems(in []DynamicToolCallOutputContentItemWrapper) []DynamicToolCallOutputContentItemWrapper {
+	if in == nil {
+		return nil
+	}
+	out := make([]DynamicToolCallOutputContentItemWrapper, len(in))
+	for i, item := range in {
+		out[i] = cloneDynamicToolCallOutputContentItemWrapper(item)
+	}
+	return out
+}
+
+func cloneDynamicToolCallOutputContentItemWrapper(w DynamicToolCallOutputContentItemWrapper) DynamicToolCallOutputContentItemWrapper {
+	switch v := w.Value.(type) {
+	case *InputTextDynamicToolCallOutputContentItem:
+		cp := *v
+		return DynamicToolCallOutputContentItemWrapper{Value: &cp}
+	case *InputImageDynamicToolCallOutputContentItem:
+		cp := *v
+		return DynamicToolCallOutputContentItemWrapper{Value: &cp}
+	case *UnknownDynamicToolCallOutputContentItem:
+		cp := *v
+		cp.Raw = append(json.RawMessage(nil), v.Raw...)
+		return DynamicToolCallOutputContentItemWrapper{Value: &cp}
+	default:
+		return cloneDynamicToolCallOutputContentItemWrapperFallback(w)
+	}
+}
+
+func cloneCollabAgentStates(in map[string]CollabAgentState) map[string]CollabAgentState {
+	if in == nil {
+		return nil
+	}
+	out := make(map[string]CollabAgentState, len(in))
+	for key, value := range in {
+		cp := value
+		cp.Message = cloneStringPtr(value.Message)
+		out[key] = cp
+	}
+	return out
+}
+
+func cloneWebSearchActionWrapper(w WebSearchActionWrapper) WebSearchActionWrapper {
+	switch v := w.Value.(type) {
+	case *SearchWebSearchAction:
+		cp := *v
+		cp.Query = cloneStringPtr(v.Query)
+		cp.Queries = cloneStringSlicePtr(v.Queries)
+		return WebSearchActionWrapper{Value: &cp}
+	case *OpenPageWebSearchAction:
+		cp := *v
+		cp.URL = cloneStringPtr(v.URL)
+		return WebSearchActionWrapper{Value: &cp}
+	case *FindInPageWebSearchAction:
+		cp := *v
+		cp.URL = cloneStringPtr(v.URL)
+		cp.Pattern = cloneStringPtr(v.Pattern)
+		return WebSearchActionWrapper{Value: &cp}
+	case *OtherWebSearchAction:
+		return WebSearchActionWrapper{Value: &OtherWebSearchAction{}}
+	case *UnknownWebSearchAction:
+		cp := *v
+		cp.Raw = append(json.RawMessage(nil), v.Raw...)
+		return WebSearchActionWrapper{Value: &cp}
+	default:
+		return cloneWebSearchActionWrapperFallback(w)
+	}
+}
+
+func cloneThreadItemWrapperFallback(w ThreadItemWrapper) ThreadItemWrapper {
+	var clone ThreadItemWrapper
+	if cloneViaJSON(w, &clone) {
+		return clone
+	}
+	return w
+}
+
+func cloneSessionSourceWrapperFallback(w SessionSourceWrapper) SessionSourceWrapper {
+	var clone SessionSourceWrapper
+	if cloneViaJSON(w, &clone) {
+		return clone
+	}
+	return w
+}
+
+func cloneThreadStatusWrapperFallback(w ThreadStatusWrapper) ThreadStatusWrapper {
 	var clone ThreadStatusWrapper
-	if err := json.Unmarshal(b, &clone); err != nil {
-		panic(fmt.Sprintf("cloneThreadStatusWrapper: unmarshal failed: %v", err))
+	if cloneViaJSON(w, &clone) {
+		return clone
 	}
-	return clone
+	return w
+}
+
+func cloneSubAgentSourceFallback(src SubAgentSource) SubAgentSource {
+	var clone SubAgentSource
+	if cloneViaJSON(src, &clone) {
+		return clone
+	}
+	return src
+}
+
+func cloneUserInputFallback(input UserInput) UserInput {
+	var clone UserInput
+	if cloneViaJSON(input, &clone) {
+		return clone
+	}
+	return input
+}
+
+func cloneCommandActionWrapperFallback(w CommandActionWrapper) CommandActionWrapper {
+	var clone CommandActionWrapper
+	if cloneViaJSON(w, &clone) {
+		return clone
+	}
+	return w
+}
+
+func clonePatchChangeKindWrapperFallback(w PatchChangeKindWrapper) PatchChangeKindWrapper {
+	var clone PatchChangeKindWrapper
+	if cloneViaJSON(w, &clone) {
+		return clone
+	}
+	return w
+}
+
+func cloneDynamicToolCallOutputContentItemWrapperFallback(w DynamicToolCallOutputContentItemWrapper) DynamicToolCallOutputContentItemWrapper {
+	var clone DynamicToolCallOutputContentItemWrapper
+	if cloneViaJSON(w, &clone) {
+		return clone
+	}
+	return w
+}
+
+func cloneWebSearchActionWrapperFallback(w WebSearchActionWrapper) WebSearchActionWrapper {
+	var clone WebSearchActionWrapper
+	if cloneViaJSON(w, &clone) {
+		return clone
+	}
+	return w
+}
+
+func cloneViaJSON(in, out interface{}) bool {
+	b, err := json.Marshal(in)
+	if err != nil {
+		return false
+	}
+	return json.Unmarshal(b, out) == nil
+}
+
+func cloneJSONValue(in interface{}) interface{} {
+	if in == nil {
+		return nil
+	}
+	var out interface{}
+	if cloneViaJSON(in, &out) {
+		return out
+	}
+	return in
+}
+
+func cloneMessagePhasePtr(in *MessagePhase) *MessagePhase {
+	if in == nil {
+		return nil
+	}
+	v := *in
+	return &v
+}
+
+func cloneBoolPtr(in *bool) *bool {
+	if in == nil {
+		return nil
+	}
+	v := *in
+	return &v
+}
+
+func cloneStringSlicePtr(in *[]string) *[]string {
+	if in == nil {
+		return nil
+	}
+	out := append([]string(nil), (*in)...)
+	return &out
 }
 
 func cloneStringPtr(s *string) *string {
