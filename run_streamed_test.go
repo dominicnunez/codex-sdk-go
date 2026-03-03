@@ -829,6 +829,62 @@ func TestRunStreamedTurnCompletedUnmarshalFailure(t *testing.T) {
 	}
 }
 
+func TestRunStreamedItemCompletedUnmarshalFailureStillEmitsFallbackItem(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "malformed item fallback"})
+
+	waitForRunStreamedReady(t, mock)
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","item":"bad-item","turnId":"turn-1"}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	var fallbackSeen bool
+	for event, err := range stream.Events() {
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		completed, ok := event.(*codex.ItemCompleted)
+		if !ok {
+			continue
+		}
+		item, ok := completed.Item.Value.(*codex.UnknownThreadItem)
+		if !ok {
+			t.Fatalf("item type = %T, want *UnknownThreadItem", completed.Item.Value)
+		}
+		if item.Type != codex.UnmarshalErrorItemType {
+			t.Fatalf("UnknownThreadItem.Type = %q, want %q", item.Type, codex.UnmarshalErrorItemType)
+		}
+		fallbackSeen = true
+	}
+
+	if !fallbackSeen {
+		t.Fatal("expected streamed fallback ItemCompleted event")
+	}
+
+	result := stream.Result()
+	if result == nil {
+		t.Fatal("Result() returned nil")
+	}
+	if len(result.Items) != 1 {
+		t.Fatalf("len(Items) = %d, want 1", len(result.Items))
+	}
+	if _, ok := result.Items[0].Value.(*codex.UnknownThreadItem); !ok {
+		t.Fatalf("result item type = %T, want *UnknownThreadItem", result.Items[0].Value)
+	}
+}
+
 func TestRunStreamedApprovalFlowDuringTurn(t *testing.T) {
 	proc, mock := mockProcess(t)
 

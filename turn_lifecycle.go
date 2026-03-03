@@ -7,9 +7,10 @@ import (
 	"sync"
 )
 
-// threadIDCarrier extracts the threadId from raw notification JSON for filtering.
+// threadIDCarrier extracts thread-scoping fields from raw notification JSON for filtering.
 type threadIDCarrier struct {
 	ThreadID string `json:"threadId"`
+	TurnID   string `json:"turnId"`
 }
 
 func unmarshalThreadIDCarrier(params json.RawMessage) (threadIDCarrier, bool) {
@@ -27,6 +28,8 @@ func parseItemCompletedForThread(params json.RawMessage, threadID string) (ItemC
 		if !ok || carrier.ThreadID != threadID {
 			return ItemCompletedNotification{}, false, nil
 		}
+		n.ThreadID = carrier.ThreadID
+		n.TurnID = carrier.TurnID
 		n.Item = ThreadItemWrapper{Value: &UnknownThreadItem{
 			Type: UnmarshalErrorItemType,
 			Raw:  append(json.RawMessage(nil), params...),

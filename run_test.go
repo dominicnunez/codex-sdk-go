@@ -600,6 +600,59 @@ func TestRunTurnCompletedUnmarshalFailure(t *testing.T) {
 	}
 }
 
+func TestRunItemCompletedUnmarshalFailureStillCollectsFallbackItem(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	type runResult struct {
+		result *codex.RunResult
+		err    error
+	}
+	ch := make(chan runResult, 1)
+
+	go func() {
+		r, err := proc.Run(ctx, codex.RunOptions{Prompt: "malformed item fallback"})
+		ch <- runResult{r, err}
+	}()
+
+	waitForMethodCallCount(t, mock, "turn/start", 1)
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","item":"bad-item","turnId":"turn-1"}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	result := <-ch
+	if result.err != nil {
+		t.Fatalf("Run() error: %v", result.err)
+	}
+	if result.result == nil {
+		t.Fatal("expected non-nil run result")
+	}
+	if len(result.result.Items) != 1 {
+		t.Fatalf("len(Items) = %d, want 1", len(result.result.Items))
+	}
+
+	item, ok := result.result.Items[0].Value.(*codex.UnknownThreadItem)
+	if !ok {
+		t.Fatalf("item type = %T, want *UnknownThreadItem", result.result.Items[0].Value)
+	}
+	if item.Type != codex.UnmarshalErrorItemType {
+		t.Fatalf("UnknownThreadItem.Type = %q, want %q", item.Type, codex.UnmarshalErrorItemType)
+	}
+	if result.result.Turn.ID != "turn-1" {
+		t.Fatalf("Turn.ID = %q, want turn-1", result.result.Turn.ID)
+	}
+}
+
 func TestRunApprovalFlowDuringTurn(t *testing.T) {
 	proc, mock := mockProcess(t)
 
