@@ -903,7 +903,11 @@ func (t *StdioTransport) failAllPendingWithParseError(message string) {
 
 func (t *StdioTransport) handleOversizedFrame(data []byte) {
 	id, hasID, hasMethod := extractTopLevelIDAndMethod(data)
-	if !hasID || hasMethod {
+	if hasMethod {
+		return
+	}
+	if !hasID {
+		t.failAllPendingWithParseError("oversized server response frame")
 		return
 	}
 

@@ -1045,6 +1045,71 @@ func TestStdioOversizeResponseUnblocksPendingSend(t *testing.T) {
 	}
 }
 
+// TestStdioOversizeResponseWithLateIDFailsPendingSend verifies that oversized
+// response frames still fail pending sends when ID is beyond the metadata cap.
+func TestStdioOversizeResponseWithLateIDFailsPendingSend(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	errCh := make(chan error, 1)
+	go func() {
+		req := codex.Request{
+			JSONRPC: "2.0",
+			ID:      codex.RequestID{Value: "late-id"},
+			Method:  "test/method",
+		}
+		resp, err := transport.Send(ctx, req)
+		if err != nil {
+			errCh <- fmt.Errorf("Send returned unexpected error: %w", err)
+			return
+		}
+		if resp.Error == nil {
+			errCh <- fmt.Errorf("Send returned nil response error")
+			return
+		}
+		if resp.Error.Code != codex.ErrCodeParseError {
+			errCh <- fmt.Errorf("response error code = %d; want %d", resp.Error.Code, codex.ErrCodeParseError)
+			return
+		}
+		if !strings.Contains(resp.Error.Message, "oversized") {
+			errCh <- fmt.Errorf("response error message = %q; want to contain oversized", resp.Error.Message)
+			return
+		}
+		errCh <- nil
+	}()
+
+	waitForOutboundRequest(t, serverReader)
+
+	const overSize = 11 * 1024 * 1024
+	const responsePrefix = `{"jsonrpc":"2.0","result":{"payload":"`
+	const responseSuffix = `"},"id":"late-id"}` + "\n"
+	payloadSize := overSize - len(responsePrefix) - len(responseSuffix)
+	if payloadSize <= 0 {
+		t.Fatal("invalid oversized payload size")
+	}
+	oversized := responsePrefix + strings.Repeat("x", payloadSize) + responseSuffix
+	_, _ = serverWriter.Write([]byte(oversized))
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for oversized response handling")
+	}
+}
+
 // TestStdioCriticalNotificationsDoNotBlockReadLoop verifies that a full
 // critical notification queue does not block response processing.
 func TestStdioCriticalNotificationsDoNotBlockReadLoop(t *testing.T) {
