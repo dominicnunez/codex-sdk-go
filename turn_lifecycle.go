@@ -29,6 +29,37 @@ type turnLifecycleParams struct {
 	collector  *StreamCollector
 }
 
+func isTerminalTurnStatus(status TurnStatus) bool {
+	switch status {
+	case TurnStatusCompleted, TurnStatusInterrupted, TurnStatusFailed:
+		return true
+	default:
+		return false
+	}
+}
+
+func invalidTurnCompletedNotification(err error) TurnCompletedNotification {
+	return TurnCompletedNotification{
+		Turn: Turn{
+			Status: TurnStatusFailed,
+			Error:  &TurnError{Message: "invalid turn/completed notification: " + err.Error()},
+		},
+	}
+}
+
+func validateTurnCompletedNotification(n TurnCompletedNotification) error {
+	if n.ThreadID == "" {
+		return fmt.Errorf("threadId is required")
+	}
+	if n.Turn.ID == "" {
+		return fmt.Errorf("turn.id is required")
+	}
+	if !isTerminalTurnStatus(n.Turn.Status) {
+		return fmt.Errorf("turn.status must be terminal, got %q", n.Turn.Status)
+	}
+	return nil
+}
+
 // executeTurn runs a blocking turn: registers listeners, starts the turn,
 // collects items, and waits for completion or context cancellation.
 // Listeners are filtered by threadID to avoid cross-contamination.
@@ -59,7 +90,17 @@ func executeTurn(ctx context.Context, p turnLifecycleParams) (*RunResult, error)
 
 	unsubTurn := p.client.addNotificationListener(notifyTurnCompleted, func(_ context.Context, notif Notification) {
 		var carrier threadIDCarrier
-		if err := json.Unmarshal(notif.Params, &carrier); err != nil || carrier.ThreadID != p.threadID {
+		if err := json.Unmarshal(notif.Params, &carrier); err != nil {
+			return
+		}
+		if carrier.ThreadID == "" {
+			select {
+			case done <- invalidTurnCompletedNotification(fmt.Errorf("threadId is required")):
+			default:
+			}
+			return
+		}
+		if carrier.ThreadID != p.threadID {
 			return
 		}
 		var n TurnCompletedNotification
@@ -68,6 +109,9 @@ func executeTurn(ctx context.Context, p turnLifecycleParams) (*RunResult, error)
 			n = TurnCompletedNotification{
 				Turn: Turn{Error: &TurnError{Message: "failed to unmarshal turn/completed: " + err.Error()}},
 			}
+		} else if err := validateTurnCompletedNotification(n); err != nil {
+			p.client.reportHandlerError(notifyTurnCompleted, fmt.Errorf("validate %s: %w", notifyTurnCompleted, err))
+			n = invalidTurnCompletedNotification(err)
 		}
 		select {
 		case done <- n:
@@ -258,7 +302,17 @@ func registerItemListeners(ctx context.Context, p turnLifecycleParams, on func(s
 func registerTurnCompletedListener(p turnLifecycleParams, on func(string, NotificationHandler), turnDone chan<- TurnCompletedNotification) {
 	on(notifyTurnCompleted, func(_ context.Context, notif Notification) {
 		var carrier threadIDCarrier
-		if err := json.Unmarshal(notif.Params, &carrier); err != nil || carrier.ThreadID != p.threadID {
+		if err := json.Unmarshal(notif.Params, &carrier); err != nil {
+			return
+		}
+		if carrier.ThreadID == "" {
+			select {
+			case turnDone <- invalidTurnCompletedNotification(fmt.Errorf("threadId is required")):
+			default:
+			}
+			return
+		}
+		if carrier.ThreadID != p.threadID {
 			return
 		}
 		var n TurnCompletedNotification
@@ -267,6 +321,9 @@ func registerTurnCompletedListener(p turnLifecycleParams, on func(string, Notifi
 			n = TurnCompletedNotification{
 				Turn: Turn{Error: &TurnError{Message: "failed to unmarshal turn/completed: " + err.Error()}},
 			}
+		} else if err := validateTurnCompletedNotification(n); err != nil {
+			p.client.reportHandlerError(notifyTurnCompleted, fmt.Errorf("validate %s: %w", notifyTurnCompleted, err))
+			n = invalidTurnCompletedNotification(err)
 		}
 		select {
 		case turnDone <- n:
