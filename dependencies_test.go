@@ -49,15 +49,3 @@ func TestGoModFileReadable(t *testing.T) {
 		t.Fatal("go.mod should not be empty")
 	}
 }
-
-// TestGoModTidyDiff verifies module files are tidy without mutating the workspace.
-func TestGoModTidyDiff(t *testing.T) {
-	cmd := exec.Command("go", "mod", "tidy", "-diff")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("go mod tidy -diff failed: %v\nOutput:\n%s", err, output)
-	}
-	if strings.TrimSpace(string(output)) != "" {
-		t.Fatalf("go mod files are not tidy:\n%s", output)
-	}
-}

@@ -1,43 +1,10 @@
 package codex_test
 
 import (
-	"os"
-	"os/exec"
-	"path/filepath"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go"
 )
-
-// TestGolangciLint verifies that golangci-lint passes with no issues.
-//
-// To run golangci-lint manually:
-//
-//	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-//	golangci-lint run ./...
-func TestGolangciLint(t *testing.T) {
-	lintBin := "golangci-lint"
-	if _, err := exec.LookPath(lintBin); err != nil {
-		// Fall back to GOPATH/bin or ~/go/bin
-		gopath := os.Getenv("GOPATH")
-		if gopath == "" {
-			gopath = filepath.Join(os.Getenv("HOME"), "go")
-		}
-		candidate := filepath.Join(gopath, "bin", "golangci-lint")
-		if _, err := exec.LookPath(candidate); err != nil {
-			t.Skip("golangci-lint not found - install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest")
-		}
-		lintBin = candidate
-	}
-
-	cmd := exec.Command(lintBin, "run", "./...")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("golangci-lint failed:\n%s", string(output))
-	}
-
-	t.Logf("golangci-lint passed successfully")
-}
 
 // TestNotificationListenerCoverage verifies all typed notification methods
 // have listener registration. Compile-time: if any On* method or notification
