@@ -2,7 +2,13 @@ package codex
 
 import (
 	"encoding/json"
+	"strings"
 	"sync"
+)
+
+const (
+	streamCollectorErrorHistoryLimit       = 256
+	streamCollectorOutputDeltaHistoryLimit = 512
 )
 
 // NormalizedStreamError is a helper view that normalizes stream- and
@@ -19,14 +25,15 @@ type NormalizedStreamError struct {
 // CommandExecutionLifecycle tracks start/completion state and output deltas for
 // a command execution thread item.
 type CommandExecutionLifecycle struct {
-	ItemID           string
-	Started          bool
-	Completed        bool
-	Status           *CommandExecutionStatus
-	StartedItem      *CommandExecutionThreadItem
-	CompletedItem    *CommandExecutionThreadItem
-	OutputDeltas     []string
-	AggregatedOutput string
+	ItemID              string
+	Started             bool
+	Completed           bool
+	Status              *CommandExecutionStatus
+	StartedItem         *CommandExecutionThreadItem
+	CompletedItem       *CommandExecutionThreadItem
+	OutputDeltas        []string
+	DroppedOutputDeltas int
+	AggregatedOutput    string
 }
 
 // McpToolCallLifecycle tracks start/completion state for an MCP tool call item.
@@ -64,7 +71,8 @@ type StreamSummary struct {
 	LatestPlanItemID *string
 	LatestTokenUsage *ThreadTokenUsage
 
-	NormalizedErrors []NormalizedStreamError
+	NormalizedErrors        []NormalizedStreamError
+	DroppedNormalizedErrors int
 
 	CommandExecutions map[string]CommandExecutionLifecycle
 	McpToolCalls      map[string]McpToolCallLifecycle
@@ -81,21 +89,24 @@ type StreamCollector struct {
 	latestPlanItemID *string
 	latestTokenUsage *ThreadTokenUsage
 
-	normalizedErrors []NormalizedStreamError
+	normalizedErrors        []NormalizedStreamError
+	droppedNormalizedErrors int
 
-	commandExecutions map[string]CommandExecutionLifecycle
-	mcpToolCalls      map[string]McpToolCallLifecycle
-	webSearches       map[string]WebSearchLifecycle
-	fileChanges       map[string]FileChangeLifecycle
+	commandExecutions   map[string]CommandExecutionLifecycle
+	commandOutputChunks map[string][]string
+	mcpToolCalls        map[string]McpToolCallLifecycle
+	webSearches         map[string]WebSearchLifecycle
+	fileChanges         map[string]FileChangeLifecycle
 }
 
 // NewStreamCollector constructs a ready-to-use collector.
 func NewStreamCollector() *StreamCollector {
 	return &StreamCollector{
-		commandExecutions: make(map[string]CommandExecutionLifecycle),
-		mcpToolCalls:      make(map[string]McpToolCallLifecycle),
-		webSearches:       make(map[string]WebSearchLifecycle),
-		fileChanges:       make(map[string]FileChangeLifecycle),
+		commandExecutions:   make(map[string]CommandExecutionLifecycle),
+		commandOutputChunks: make(map[string][]string),
+		mcpToolCalls:        make(map[string]McpToolCallLifecycle),
+		webSearches:         make(map[string]WebSearchLifecycle),
+		fileChanges:         make(map[string]FileChangeLifecycle),
 	}
 }
 
@@ -138,34 +149,37 @@ func (c *StreamCollector) Summary() StreamSummary {
 	defer c.mu.Unlock()
 
 	out := StreamSummary{
-		LatestPlanText:    cloneStringPtr(c.latestPlanText),
-		LatestPlanItemID:  cloneStringPtr(c.latestPlanItemID),
-		NormalizedErrors:  make([]NormalizedStreamError, len(c.normalizedErrors)),
-		CommandExecutions: make(map[string]CommandExecutionLifecycle, len(c.commandExecutions)),
-		McpToolCalls:      make(map[string]McpToolCallLifecycle, len(c.mcpToolCalls)),
-		WebSearches:       make(map[string]WebSearchLifecycle, len(c.webSearches)),
-		FileChanges:       make(map[string]FileChangeLifecycle, len(c.fileChanges)),
+		LatestPlanText:          cloneStringPtr(c.latestPlanText),
+		LatestPlanItemID:        cloneStringPtr(c.latestPlanItemID),
+		NormalizedErrors:        make([]NormalizedStreamError, len(c.normalizedErrors)),
+		DroppedNormalizedErrors: c.droppedNormalizedErrors,
+		CommandExecutions:       make(map[string]CommandExecutionLifecycle, len(c.commandExecutions)),
+		McpToolCalls:            make(map[string]McpToolCallLifecycle, len(c.mcpToolCalls)),
+		WebSearches:             make(map[string]WebSearchLifecycle, len(c.webSearches)),
+		FileChanges:             make(map[string]FileChangeLifecycle, len(c.fileChanges)),
 	}
 
 	if c.latestTokenUsage != nil {
-		tu := *c.latestTokenUsage
-		out.LatestTokenUsage = &tu
+		out.LatestTokenUsage = cloneThreadTokenUsage(c.latestTokenUsage)
 	}
 
-	copy(out.NormalizedErrors, c.normalizedErrors)
+	for i, err := range c.normalizedErrors {
+		out.NormalizedErrors[i] = cloneNormalizedStreamError(err)
+	}
 	for k, v := range c.commandExecutions {
-		v2 := v
-		v2.OutputDeltas = append([]string(nil), v.OutputDeltas...)
-		out.CommandExecutions[k] = v2
+		out.CommandExecutions[k] = cloneCommandExecutionLifecycle(
+			v,
+			c.commandOutputChunks[k],
+		)
 	}
 	for k, v := range c.mcpToolCalls {
-		out.McpToolCalls[k] = v
+		out.McpToolCalls[k] = cloneMcpToolCallLifecycle(v)
 	}
 	for k, v := range c.webSearches {
-		out.WebSearches[k] = v
+		out.WebSearches[k] = cloneWebSearchLifecycle(v)
 	}
 	for k, v := range c.fileChanges {
-		out.FileChanges[k] = v
+		out.FileChanges[k] = cloneFileChangeLifecycle(v)
 	}
 
 	return out
@@ -177,8 +191,13 @@ func (c *StreamCollector) processCommandExecutionOutputDelta(n CommandExecutionO
 
 	lc := c.commandExecutions[n.ItemID]
 	lc.ItemID = n.ItemID
-	lc.OutputDeltas = append(lc.OutputDeltas, n.Delta)
-	lc.AggregatedOutput += n.Delta
+	lc.OutputDeltas, lc.DroppedOutputDeltas = appendBoundedHistory(
+		lc.OutputDeltas,
+		n.Delta,
+		lc.DroppedOutputDeltas,
+		streamCollectorOutputDeltaHistoryLimit,
+	)
+	c.commandOutputChunks[n.ItemID] = append(c.commandOutputChunks[n.ItemID], n.Delta)
 	c.commandExecutions[n.ItemID] = lc
 }
 
@@ -213,7 +232,12 @@ func (c *StreamCollector) processThreadRealtimeError(n ThreadRealtimeErrorNotifi
 }
 
 func (c *StreamCollector) appendErrorLocked(e NormalizedStreamError) {
-	c.normalizedErrors = append(c.normalizedErrors, e)
+	c.normalizedErrors, c.droppedNormalizedErrors = appendBoundedHistory(
+		c.normalizedErrors,
+		e,
+		c.droppedNormalizedErrors,
+		streamCollectorErrorHistoryLimit,
+	)
 }
 
 func (c *StreamCollector) mergePlanDeltaLocked(p *PlanDelta) {
@@ -282,6 +306,7 @@ func (c *StreamCollector) ingestCompletedItemLocked(item ThreadItem) {
 		lc.CompletedItem = cloneCommandExecutionItem(v)
 		if v.AggregatedOutput != nil {
 			lc.AggregatedOutput = *v.AggregatedOutput
+			c.commandOutputChunks[v.ID] = nil
 		}
 		c.commandExecutions[v.ID] = lc
 	case *McpToolCallThreadItem:
@@ -366,4 +391,92 @@ func cloneInt32Ptr(v *int32) *int32 {
 	}
 	n := *v
 	return &n
+}
+
+func cloneThreadTokenUsage(v *ThreadTokenUsage) *ThreadTokenUsage {
+	if v == nil {
+		return nil
+	}
+	cp := *v
+	cp.ModelContextWindow = cloneInt64Ptr(v.ModelContextWindow)
+	return &cp
+}
+
+func cloneNormalizedStreamError(in NormalizedStreamError) NormalizedStreamError {
+	in.ThreadID = cloneStringPtr(in.ThreadID)
+	in.TurnID = cloneStringPtr(in.TurnID)
+	in.SourceMethod = cloneStringPtr(in.SourceMethod)
+	in.Raw = append(json.RawMessage(nil), in.Raw...)
+	return in
+}
+
+func cloneCommandExecutionLifecycle(in CommandExecutionLifecycle, outputChunks []string) CommandExecutionLifecycle {
+	cp := in
+	cp.Status = cloneCommandExecutionStatusPtr(in.Status)
+	cp.StartedItem = cloneCommandExecutionItem(in.StartedItem)
+	cp.CompletedItem = cloneCommandExecutionItem(in.CompletedItem)
+	cp.OutputDeltas = append([]string(nil), in.OutputDeltas...)
+	if len(outputChunks) > 0 {
+		cp.AggregatedOutput = strings.Join(outputChunks, "")
+	}
+	return cp
+}
+
+func cloneMcpToolCallLifecycle(in McpToolCallLifecycle) McpToolCallLifecycle {
+	cp := in
+	cp.Status = cloneMcpToolCallStatusPtr(in.Status)
+	cp.StartedItem = cloneMcpToolCallItem(in.StartedItem)
+	cp.CompletedItem = cloneMcpToolCallItem(in.CompletedItem)
+	return cp
+}
+
+func cloneWebSearchLifecycle(in WebSearchLifecycle) WebSearchLifecycle {
+	cp := in
+	cp.StartedItem = cloneWebSearchItem(in.StartedItem)
+	cp.CompletedItem = cloneWebSearchItem(in.CompletedItem)
+	return cp
+}
+
+func cloneFileChangeLifecycle(in FileChangeLifecycle) FileChangeLifecycle {
+	cp := in
+	cp.Status = clonePatchApplyStatusPtr(in.Status)
+	cp.StartedItem = cloneFileChangeItem(in.StartedItem)
+	cp.CompletedItem = cloneFileChangeItem(in.CompletedItem)
+	return cp
+}
+
+func cloneCommandExecutionStatusPtr(v *CommandExecutionStatus) *CommandExecutionStatus {
+	if v == nil {
+		return nil
+	}
+	cp := *v
+	return &cp
+}
+
+func cloneMcpToolCallStatusPtr(v *McpToolCallStatus) *McpToolCallStatus {
+	if v == nil {
+		return nil
+	}
+	cp := *v
+	return &cp
+}
+
+func clonePatchApplyStatusPtr(v *PatchApplyStatus) *PatchApplyStatus {
+	if v == nil {
+		return nil
+	}
+	cp := *v
+	return &cp
+}
+
+func appendBoundedHistory[T any](history []T, next T, dropped int, limit int) ([]T, int) {
+	if limit <= 0 {
+		return history, dropped
+	}
+	if len(history) < limit {
+		return append(history, next), dropped
+	}
+	copy(history, history[1:])
+	history[len(history)-1] = next
+	return history, dropped + 1
 }

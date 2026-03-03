@@ -3,6 +3,7 @@ package codex_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -160,5 +161,151 @@ func TestRunStreamedWithCollectorCapturesNotificationConveniences(t *testing.T) 
 
 	if len(summary.NormalizedErrors) < 2 {
 		t.Fatalf("expected >=2 normalized errors, got %d", len(summary.NormalizedErrors))
+	}
+}
+
+func TestStreamCollectorSummaryIsDeepCopied(t *testing.T) {
+	proc, mock := mockProcess(t)
+	collector := codex.NewStreamCollector()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	stream := proc.RunStreamedWithCollector(ctx, codex.RunOptions{Prompt: "collect"}, collector)
+	time.Sleep(50 * time.Millisecond)
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/commandExecution/outputDelta",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","itemId":"cmd-copy","delta":"chunk"}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "error",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","willRetry":false,"error":{"message":"system failed"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/started",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"commandExecution","id":"cmd-copy","command":"ls","commandActions":[],"cwd":"/tmp","status":"inProgress","processId":"123"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"commandExecution","id":"cmd-copy","command":"ls","commandActions":[],"cwd":"/tmp","status":"completed","aggregatedOutput":"chunk"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	for _, err := range stream.Events() {
+		if err != nil {
+			t.Fatalf("unexpected stream error: %v", err)
+		}
+	}
+
+	summary := collector.Summary()
+	cmd := summary.CommandExecutions["cmd-copy"]
+	*cmd.Status = codex.CommandExecutionStatusFailed
+	cmd.StartedItem.Command = "rm -rf /"
+	cmd.StartedItem.ProcessId = ptr("999")
+	cmd.OutputDeltas[0] = "mutated"
+	summary.CommandExecutions["cmd-copy"] = cmd
+	summary.NormalizedErrors[0].Message = "changed"
+	*summary.NormalizedErrors[0].ThreadID = "mutated-thread"
+
+	after := collector.Summary()
+	got := after.CommandExecutions["cmd-copy"]
+	if got.Status == nil || *got.Status != codex.CommandExecutionStatusCompleted {
+		t.Fatalf("status leaked mutation: %v", got.Status)
+	}
+	if got.StartedItem == nil || got.StartedItem.Command != "ls" {
+		t.Fatalf("started item command leaked mutation: %v", got.StartedItem)
+	}
+	if got.StartedItem.ProcessId == nil || *got.StartedItem.ProcessId != "123" {
+		t.Fatalf("process id leaked mutation: %v", got.StartedItem.ProcessId)
+	}
+	if len(got.OutputDeltas) != 1 || got.OutputDeltas[0] != "chunk" {
+		t.Fatalf("output deltas leaked mutation: %v", got.OutputDeltas)
+	}
+	if len(after.NormalizedErrors) == 0 || after.NormalizedErrors[0].Message != "system failed" {
+		t.Fatalf("normalized error message leaked mutation: %v", after.NormalizedErrors)
+	}
+	if after.NormalizedErrors[0].ThreadID == nil || *after.NormalizedErrors[0].ThreadID != "thread-1" {
+		t.Fatalf("normalized error thread id leaked mutation: %v", after.NormalizedErrors[0].ThreadID)
+	}
+}
+
+func TestStreamCollectorBoundsNormalizedErrorHistory(t *testing.T) {
+	collector := codex.NewStreamCollector()
+
+	const totalErrors = 600
+	for i := 0; i < totalErrors; i++ {
+		collector.Process(nil, fmt.Errorf("err-%d", i))
+	}
+
+	summary := collector.Summary()
+	if len(summary.NormalizedErrors) >= totalErrors {
+		t.Fatalf("normalized errors retained = %d; want bounded history smaller than %d", len(summary.NormalizedErrors), totalErrors)
+	}
+	if summary.DroppedNormalizedErrors == 0 {
+		t.Fatal("expected dropped normalized error count to be tracked")
+	}
+}
+
+func TestStreamCollectorBoundsOutputDeltaHistory(t *testing.T) {
+	proc, mock := mockProcess(t)
+	collector := codex.NewStreamCollector()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	stream := proc.RunStreamedWithCollector(ctx, codex.RunOptions{Prompt: "collect output deltas"}, collector)
+	time.Sleep(50 * time.Millisecond)
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/started",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"commandExecution","id":"cmd-many","command":"echo","commandActions":[],"cwd":"/tmp","status":"inProgress"}}`),
+	})
+	for i := 0; i < 1200; i++ {
+		mock.InjectServerNotification(ctx, codex.Notification{
+			JSONRPC: "2.0",
+			Method:  "item/commandExecution/outputDelta",
+			Params: json.RawMessage(fmt.Sprintf(
+				`{"threadId":"thread-1","turnId":"turn-1","itemId":"cmd-many","delta":"d%04d"}`,
+				i,
+			)),
+		})
+	}
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"commandExecution","id":"cmd-many","command":"echo","commandActions":[],"cwd":"/tmp","status":"completed","aggregatedOutput":"done"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	for _, err := range stream.Events() {
+		if err != nil {
+			t.Fatalf("unexpected stream error: %v", err)
+		}
+	}
+
+	summary := collector.Summary()
+	cmd, ok := summary.CommandExecutions["cmd-many"]
+	if !ok {
+		t.Fatal("expected command execution lifecycle for cmd-many")
+	}
+	if len(cmd.OutputDeltas) >= 1200 {
+		t.Fatalf("output delta history retained = %d; want bounded history smaller than %d", len(cmd.OutputDeltas), 1200)
+	}
+	if cmd.DroppedOutputDeltas == 0 {
+		t.Fatal("expected dropped output delta count to be tracked")
 	}
 }
