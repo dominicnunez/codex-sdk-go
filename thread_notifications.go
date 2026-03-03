@@ -179,7 +179,7 @@ func (c *Client) OnServerRequestResolved(handler func(ServerRequestResolvedNotif
 	})
 }
 
-// OnThreadTokenUsageUpdated registers a listener for thread/tokenUsageUpdated notifications
+// OnThreadTokenUsageUpdated registers a listener for thread/tokenUsage/updated notifications
 func (c *Client) OnThreadTokenUsageUpdated(handler func(ThreadTokenUsageUpdatedNotification)) {
 	if handler == nil {
 		c.OnNotification(notifyThreadTokenUsageUpdated, nil)
