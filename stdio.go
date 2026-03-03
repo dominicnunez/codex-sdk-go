@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // pendingReq holds a pending request's response channel and original ID.
@@ -36,6 +37,7 @@ const (
 	readBufferSizeBytes         = 64 * 1024
 	maxInboundMessageSizeBytes  = 10 * 1024 * 1024
 	oversizeMetadataBytes       = 64 * 1024
+	defaultSendTimeout          = 5 * time.Minute
 )
 
 const (
@@ -78,6 +80,8 @@ type StdioTransport struct {
 	pendingReqs        map[string]pendingReq
 	reqHandler         RequestHandler
 	notifHandler       NotificationHandler
+	pendingReqHandler  []Request
+	pendingNotifHandle []Notification
 	requestQueue       chan Request
 	criticalNotifQueue chan Notification
 	terminalNotifQueue chan Notification
@@ -85,6 +89,7 @@ type StdioTransport struct {
 	writeQueue         chan writeEnvelope
 	readerStopped      chan struct{}
 	once               sync.Once
+	startReadLoopOnce  sync.Once
 	scanErr            error // set by readLoop when an unrecoverable read error occurs
 	malformedCount     atomic.Uint64
 	panicHandler       func(v any)
@@ -144,7 +149,9 @@ func normalizePendingRequestID(id interface{}) (string, error) {
 // NewStdioTransport creates a new stdio transport using the provided reader and writer.
 // reader is required to be an io.ReadCloser so Close can always unblock the read loop.
 // Typically, reader is os.Stdin and writer is os.Stdout.
-// The transport starts background goroutines for read/write and inbound dispatch.
+// The transport starts background goroutines for write and inbound dispatch.
+// The read loop starts lazily when inbound handling is first configured or
+// when outbound traffic begins.
 // It panics if reader/writer are invalid.
 func NewStdioTransport(reader io.ReadCloser, writer io.Writer) *StdioTransport {
 	if reader == nil {
@@ -182,7 +189,7 @@ func NewStdioTransport(reader io.ReadCloser, writer io.Writer) *StdioTransport {
 		go t.terminalNotificationWorker()
 	}
 	go t.writeLoop()
-	go t.readLoop()
+	t.ensureReadLoopStarted()
 	return t
 }
 
@@ -192,6 +199,10 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 	if ctx == nil {
 		return Response{}, NewTransportError("send failed", ErrNilContext)
 	}
+	ctx, cancel := applyDefaultSendTimeout(ctx)
+	defer cancel()
+
+	t.ensureReadLoopStarted()
 
 	t.mu.Lock()
 	if t.closed {
@@ -247,6 +258,7 @@ func (t *StdioTransport) Notify(ctx context.Context, notif Notification) error {
 	if ctx == nil {
 		return NewTransportError("notify failed", ErrNilContext)
 	}
+	t.ensureReadLoopStarted()
 
 	t.mu.Lock()
 	if t.closed {
@@ -261,15 +273,27 @@ func (t *StdioTransport) Notify(ctx context.Context, notif Notification) error {
 // OnRequest registers a handler for incoming JSON-RPC requests from the server.
 func (t *StdioTransport) OnRequest(handler RequestHandler) {
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	t.reqHandler = handler
+	pending := t.pendingReqHandler
+	t.pendingReqHandler = nil
+	t.mu.Unlock()
+
+	for _, req := range pending {
+		t.enqueueRequest(req)
+	}
 }
 
 // OnNotify registers a handler for incoming JSON-RPC notifications from the server.
 func (t *StdioTransport) OnNotify(handler NotificationHandler) {
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	t.notifHandler = handler
+	pending := t.pendingNotifHandle
+	t.pendingNotifHandle = nil
+	t.mu.Unlock()
+
+	for _, notif := range pending {
+		t.enqueueNotification(notif)
+	}
 }
 
 // OnPanic registers a handler called when a notification handler panics.
@@ -283,45 +307,11 @@ func (t *StdioTransport) OnPanic(handler func(v any)) {
 
 // Close shuts down the transport. Safe to call multiple times.
 func (t *StdioTransport) Close() error {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	if t.closed {
-		return nil
-	}
-
-	t.closed = true
-	t.cancelCtx()
-	if t.readerCloser != nil {
-		_ = t.readerCloser.Close()
-	}
-
-	// Unblock all pending request waiters with an error response indicating
-	// the transport was closed. We send rather than close because
-	// handleResponse may concurrently hold a reference to the channel.
-	for key, pending := range t.pendingReqs {
-		resp := Response{
-			JSONRPC: jsonrpcVersion,
-			ID:      pending.id,
-			Error: &Error{
-				Code:    ErrCodeInternalError,
-				Message: errTransportClosed.Error(),
-				Data:    json.RawMessage(transportClosedErrorData),
-			},
-		}
-		// Defensive: default branch guards against a handleResponse
-		// send racing between the closed check and this loop iteration.
-		select {
-		case pending.ch <- resp:
-		default:
-		}
-		delete(t.pendingReqs, key)
-	}
-
+	t.closeWithFailure(nil, errTransportClosed.Error(), json.RawMessage(transportClosedErrorData))
 	return nil
 }
 
-// ScanErr returns the error (if any) from the reader goroutine's read loop.
+// ScanErr returns the terminal transport I/O error, if any.
 // Returns nil if the reader stopped due to EOF or hasn't stopped yet.
 func (t *StdioTransport) ScanErr() error {
 	t.mu.Lock()
@@ -332,6 +322,65 @@ func (t *StdioTransport) ScanErr() error {
 // MalformedMessageCount reports how many inbound lines were invalid JSON.
 func (t *StdioTransport) MalformedMessageCount() uint64 {
 	return t.malformedCount.Load()
+}
+
+func applyDefaultSendTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
+	if _, hasDeadline := ctx.Deadline(); hasDeadline {
+		return ctx, func() {}
+	}
+	return context.WithTimeout(ctx, defaultSendTimeout)
+}
+
+func (t *StdioTransport) ensureReadLoopStarted() {
+	t.startReadLoopOnce.Do(func() {
+		go t.readLoop()
+	})
+}
+
+func (t *StdioTransport) closeWithFailure(scanErr error, message string, data json.RawMessage) {
+	t.mu.Lock()
+	if scanErr != nil && t.scanErr == nil {
+		t.scanErr = scanErr
+	}
+	if t.closed {
+		t.mu.Unlock()
+		return
+	}
+	t.closed = true
+	pending := t.pendingReqs
+	t.pendingReqs = make(map[string]pendingReq)
+	cancel := t.cancelCtx
+	readerCloser := t.readerCloser
+	t.mu.Unlock()
+
+	cancel()
+	t.once.Do(func() { close(t.readerStopped) })
+	if readerCloser != nil {
+		_ = readerCloser.Close()
+	}
+
+	for _, pendingReq := range pending {
+		resp := Response{
+			JSONRPC: jsonrpcVersion,
+			ID:      pendingReq.id,
+			Error: &Error{
+				Code:    ErrCodeInternalError,
+				Message: message,
+				Data:    data,
+			},
+		}
+		select {
+		case pendingReq.ch <- resp:
+		default:
+		}
+	}
+}
+
+func (t *StdioTransport) handleWriteFailure(err error) {
+	if err == nil {
+		return
+	}
+	t.closeWithFailure(err, "transport writer failed", nil)
 }
 
 // writeRawMessage writes a pre-marshaled JSON-RPC message and trailing newline.
@@ -422,6 +471,10 @@ func (t *StdioTransport) writeLoop() {
 		case env := <-t.writeQueue:
 			err := t.writeRawMessage(env.payload)
 			env.done <- err
+			if err != nil {
+				t.handleWriteFailure(err)
+				return
+			}
 		}
 	}
 }
@@ -486,7 +539,9 @@ func (t *StdioTransport) readLoop() {
 			}
 			if err != nil {
 				t.mu.Lock()
-				t.scanErr = err
+				if t.scanErr == nil {
+					t.scanErr = err
+				}
 				t.mu.Unlock()
 				return
 			}
@@ -498,70 +553,72 @@ func (t *StdioTransport) readLoop() {
 				return
 			}
 			t.mu.Lock()
-			t.scanErr = err
+			if t.scanErr == nil {
+				t.scanErr = err
+			}
 			t.mu.Unlock()
 			return
 		}
 
-		frame, err := decodeInboundFrame(line)
+		t.processInboundLine(line)
+	}
+}
+
+func (t *StdioTransport) processInboundLine(line []byte) {
+	frame, err := decodeInboundFrame(line)
+	if err != nil {
+		t.handleMalformedFrame(line)
+		return
+	}
+
+	hasID := frameHasID(frame.ID)
+	if frame.JSONRPC != jsonrpcVersion {
+		t.handleInvalidJSONRPCVersion(frame, hasID)
+		return
+	}
+
+	// Response: has ID but no method.
+	if hasID && frame.Method == "" {
+		id, err := parseRequestID(frame.ID)
 		if err != nil {
-			t.malformedCount.Add(1)
-			continue
+			t.handleMalformedResponse(line)
+			return
 		}
-
-		hasID := frameHasID(frame.ID)
-
-		if frame.JSONRPC != jsonrpcVersion {
-			t.handleInvalidJSONRPCVersion(frame, hasID)
-			continue
+		rpcErr, err := parseResponseError(frame.Error)
+		if err != nil {
+			t.handleMalformedResponse(line)
+			return
 		}
-
-		// Response: has ID but no method
-		if hasID && frame.Method == "" {
-			id, err := parseRequestID(frame.ID)
-			if err != nil {
-				t.handleMalformedResponse(line)
-				continue
-			}
-			rpcErr, err := parseResponseError(frame.Error)
-			if err != nil {
-				t.handleMalformedResponse(line)
-				continue
-			}
-			resp := Response{
-				JSONRPC: frame.JSONRPC,
-				ID:      id,
-				Result:  frame.Result,
-				Error:   rpcErr,
-			}
-			t.handleResponse(resp)
-			continue
+		resp := Response{
+			JSONRPC: frame.JSONRPC,
+			ID:      id,
+			Result:  frame.Result,
+			Error:   rpcErr,
 		}
+		t.handleResponse(resp)
+		return
+	}
 
-		// Request: has both ID and method
-		if hasID && frame.Method != "" {
-			id, err := parseRequestID(frame.ID)
-			if err != nil {
-				t.handleMalformedRequest(line)
-				continue
-			}
-			req := Request{
-				JSONRPC: frame.JSONRPC,
-				ID:      id,
-				Method:  frame.Method,
-				Params:  frame.Params,
-			}
-			t.enqueueRequest(req)
-			continue
+	// Request: has both ID and method.
+	if hasID && frame.Method != "" {
+		id, err := parseRequestID(frame.ID)
+		if err != nil {
+			t.handleMalformedRequest(line)
+			return
 		}
-
-		// Notification: has method but no ID
-		if frame.Method != "" {
-			t.enqueueNotification(frame.toNotification())
-			continue
+		req := Request{
+			JSONRPC: frame.JSONRPC,
+			ID:      id,
+			Method:  frame.Method,
+			Params:  frame.Params,
 		}
+		t.enqueueRequest(req)
+		return
+	}
 
-		// Unknown message type - skip it
+	// Notification: has method but no ID.
+	if frame.Method != "" {
+		t.enqueueNotification(frame.toNotification())
 	}
 }
 
@@ -588,14 +645,16 @@ func (t *StdioTransport) rejectInvalidProtocolVersion(rawID json.RawMessage) {
 	if parsed, err := parseRequestID(rawID); err == nil {
 		id = parsed
 	}
-	_ = t.writeMessage(Response{
+	if err := t.writeMessage(Response{
 		JSONRPC: jsonrpcVersion,
 		ID:      id,
 		Error: &Error{
 			Code:    ErrCodeInvalidRequest,
 			Message: errInvalidJSONRPCVersion,
 		},
-	})
+	}); err != nil {
+		t.handleWriteFailure(err)
+	}
 }
 
 func (t *StdioTransport) failPendingWithInvalidProtocolVersion(rawID json.RawMessage) {
@@ -771,14 +830,16 @@ func isTerminalNotificationMethod(method string) bool {
 }
 
 func (t *StdioTransport) rejectRequestForOverload(req Request) {
-	_ = t.writeMessage(Response{
+	if err := t.writeMessage(Response{
 		JSONRPC: jsonrpcVersion,
 		ID:      req.ID,
 		Error: &Error{
 			Code:    ErrCodeInternalError,
 			Message: "too many pending inbound requests",
 		},
-	})
+	}); err != nil {
+		t.handleWriteFailure(err)
+	}
 }
 
 func decodeInboundFrame(data []byte) (inboundFrame, error) {
@@ -844,6 +905,41 @@ func (t *StdioTransport) handleResponse(resp Response) {
 
 	if ok {
 		pending.ch <- resp // safe: buffer 1, only one sender claims via delete
+	}
+}
+
+func (t *StdioTransport) handleMalformedFrame(data []byte) {
+	t.malformedCount.Add(1)
+
+	id, hasID, hasMethod := extractTopLevelIDAndMethod(data)
+	if !hasID || hasMethod {
+		return
+	}
+	normalizedID, err := normalizePendingRequestID(id.Value)
+	if err != nil {
+		return
+	}
+
+	t.mu.Lock()
+	if t.closed {
+		t.mu.Unlock()
+		return
+	}
+	pending, ok := t.pendingReqs[normalizedID]
+	if ok {
+		delete(t.pendingReqs, normalizedID)
+	}
+	t.mu.Unlock()
+
+	if ok {
+		pending.ch <- Response{
+			JSONRPC: jsonrpcVersion,
+			ID:      pending.id,
+			Error: &Error{
+				Code:    ErrCodeParseError,
+				Message: "failed to parse server response",
+			},
+		}
 	}
 }
 
@@ -1172,13 +1268,11 @@ func capSlice(data []byte, limit int) []byte {
 
 // handleRequest dispatches an incoming server→client request to the handler
 func (t *StdioTransport) handleRequest(req Request) {
-	t.mu.Lock()
-	handler := t.reqHandler
-	panicFn := t.panicHandler
-	t.mu.Unlock()
-
+	handler, panicFn, queued := t.resolveRequestHandler(req)
 	if handler == nil {
-		// No handler registered - send method not found error
+		if queued {
+			return
+		}
 		errorResp := Response{
 			JSONRPC: jsonrpcVersion,
 			ID:      req.ID,
@@ -1187,7 +1281,9 @@ func (t *StdioTransport) handleRequest(req Request) {
 				Message: "method not found",
 			},
 		}
-		_ = t.writeMessage(errorResp) // Error writing error response - nothing more we can do
+		if err := t.writeMessage(errorResp); err != nil {
+			t.handleWriteFailure(err)
+		}
 		return
 	}
 
@@ -1201,7 +1297,9 @@ func (t *StdioTransport) handleRequest(req Request) {
 					Message: "internal handler error",
 				},
 			}
-			_ = t.writeMessage(errorResp)
+			if err := t.writeMessage(errorResp); err != nil {
+				t.handleWriteFailure(err)
+			}
 			if panicFn != nil {
 				panicFn(r)
 			}
@@ -1226,14 +1324,32 @@ func (t *StdioTransport) handleRequest(req Request) {
 				Message: msg,
 			},
 		}
-		_ = t.writeMessage(errorResp) // Error writing error response - nothing more we can do
+		if err := t.writeMessage(errorResp); err != nil {
+			t.handleWriteFailure(err)
+		}
 		return
 	}
 
 	// Ensure response has correct ID and version
 	resp.JSONRPC = jsonrpcVersion
 	resp.ID = req.ID
-	_ = t.writeMessage(resp) // Error writing response - nothing more we can do
+	if err := t.writeMessage(resp); err != nil {
+		t.handleWriteFailure(err)
+	}
+}
+
+func (t *StdioTransport) resolveRequestHandler(req Request) (RequestHandler, func(any), bool) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.reqHandler != nil {
+		return t.reqHandler, t.panicHandler, false
+	}
+	if len(t.pendingReqHandler) >= inboundRequestQueueSize {
+		return nil, nil, false
+	}
+	t.pendingReqHandler = append(t.pendingReqHandler, req)
+	return nil, nil, true
 }
 
 // handleMalformedRequest attempts to extract the ID from a request that
@@ -1261,7 +1377,9 @@ func (t *StdioTransport) handleMalformedRequest(data []byte) {
 			Message: "failed to parse server request",
 		},
 	}
-	_ = t.writeMessage(errorResp)
+	if err := t.writeMessage(errorResp); err != nil {
+		t.handleWriteFailure(err)
+	}
 }
 
 // handleNotification dispatches an incoming server→client notification to the handler
@@ -1272,7 +1390,19 @@ func (t *StdioTransport) handleNotification(notif Notification) {
 	t.mu.Unlock()
 
 	if handler == nil {
-		return
+		t.mu.Lock()
+		if t.notifHandler == nil {
+			if len(t.pendingNotifHandle) >= inboundNotifQueueSize {
+				t.pendingNotifHandle = append(t.pendingNotifHandle[1:], notif)
+			} else {
+				t.pendingNotifHandle = append(t.pendingNotifHandle, notif)
+			}
+			t.mu.Unlock()
+			return
+		}
+		handler = t.notifHandler
+		panicFn = t.panicHandler
+		t.mu.Unlock()
 	}
 
 	defer func() {

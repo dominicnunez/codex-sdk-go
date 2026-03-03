@@ -1747,6 +1747,14 @@ func (w *shortWriter) Bytes() []byte {
 	return out
 }
 
+type errorWriter struct {
+	err error
+}
+
+func (w *errorWriter) Write(_ []byte) (int, error) {
+	return 0, w.err
+}
+
 // TestStdioHandleResponseUnmarshalError verifies that when a response has a
 // valid ID but fails full unmarshal, the pending caller receives a parse error
 // instead of hanging until timeout.
@@ -2002,10 +2010,7 @@ func TestStdioSpuriousResponseUnknownID(t *testing.T) {
 	}
 }
 
-// TestStdioNoHandlerReturnsMethodNotFound verifies that a server→client request
-// with no registered handler gets a method-not-found error response instead of
-// being silently dropped.
-func TestStdioNoHandlerReturnsMethodNotFound(t *testing.T) {
+func TestStdioInboundRequestBeforeHandlerRegistrationWaitsForHandler(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()
 	defer func() { _ = clientReader.Close() }()
@@ -2016,33 +2021,91 @@ func TestStdioNoHandlerReturnsMethodNotFound(t *testing.T) {
 	transport := codex.NewStdioTransport(clientReader, clientWriter)
 	defer func() { _ = transport.Close() }()
 
-	// Read responses from the transport
-	responseChan := make(chan codex.Response, 1)
+	req := `{"jsonrpc":"2.0","id":"early-request","method":"approval/test","params":{"v":1}}` + "\n"
+	writeErrCh := make(chan error, 1)
+	go func() {
+		_, err := serverWriter.Write([]byte(req))
+		writeErrCh <- err
+	}()
+
+	transport.OnRequest(func(_ context.Context, req codex.Request) (codex.Response, error) {
+		return codex.Response{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Result:  json.RawMessage(`{"handled":true}`),
+		}, nil
+	})
+
+	select {
+	case err := <-writeErrCh:
+		if err != nil {
+			t.Fatalf("write early request: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for early request write completion")
+	}
+
+	respCh := make(chan codex.Response, 1)
 	go func() {
 		scanner := bufio.NewScanner(serverReader)
 		for scanner.Scan() {
 			var resp codex.Response
-			if err := json.Unmarshal(scanner.Bytes(), &resp); err == nil && resp.Error != nil {
-				responseChan <- resp
+			if err := json.Unmarshal(scanner.Bytes(), &resp); err == nil && resp.ID.Value == "early-request" {
+				respCh <- resp
 				return
 			}
 		}
 	}()
 
-	// No OnRequest handler registered — should get method-not-found
-	req := `{"jsonrpc":"2.0","id":"no-handler","method":"unknown/method","params":{}}` + "\n"
-	_, _ = serverWriter.Write([]byte(req))
-
 	select {
-	case resp := <-responseChan:
-		if resp.Error.Code != codex.ErrCodeMethodNotFound {
-			t.Errorf("error code = %d; want %d (ErrCodeMethodNotFound)", resp.Error.Code, codex.ErrCodeMethodNotFound)
+	case resp := <-respCh:
+		if resp.Error != nil {
+			t.Fatalf("unexpected error response: %+v", resp.Error)
 		}
-		if resp.ID.Value != "no-handler" {
-			t.Errorf("response ID = %v; want no-handler", resp.ID.Value)
+		if string(resp.Result) != `{"handled":true}` {
+			t.Fatalf("response result = %s; want {\"handled\":true}", resp.Result)
 		}
 	case <-time.After(2 * time.Second):
-		t.Fatal("timeout: expected method-not-found response")
+		t.Fatal("timeout waiting for response to early request")
+	}
+}
+
+func TestStdioNotificationBeforeHandlerRegistrationIsDelivered(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, io.Discard)
+	defer func() { _ = transport.Close() }()
+
+	notif := `{"jsonrpc":"2.0","method":"thread/started","params":{"threadId":"thread-1"}}` + "\n"
+	writeErrCh := make(chan error, 1)
+	go func() {
+		_, err := serverWriter.Write([]byte(notif))
+		writeErrCh <- err
+	}()
+
+	received := make(chan codex.Notification, 1)
+	transport.OnNotify(func(_ context.Context, n codex.Notification) {
+		received <- n
+	})
+
+	select {
+	case err := <-writeErrCh:
+		if err != nil {
+			t.Fatalf("write early notification: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for early notification write completion")
+	}
+
+	select {
+	case n := <-received:
+		if n.Method != "thread/started" {
+			t.Fatalf("notification method = %q; want thread/started", n.Method)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for early notification delivery")
 	}
 }
 
@@ -2105,6 +2168,125 @@ func TestStdioWriteMessageRejectsAfterClose(t *testing.T) {
 		// Handler completed — writeMessage rejected the write after Close.
 	case <-time.After(2 * time.Second):
 		t.Fatal("handler goroutine did not complete after Close")
+	}
+}
+
+func TestStdioRequestHandlerWriteFailureSetsScanErr(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, _ := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+
+	writeErr := errors.New("write failed")
+	transport := codex.NewStdioTransport(clientReader, &errorWriter{err: writeErr})
+	defer func() { _ = transport.Close() }()
+
+	transport.OnRequest(func(_ context.Context, req codex.Request) (codex.Response, error) {
+		return codex.Response{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Result:  json.RawMessage(`{"ok":true}`),
+		}, nil
+	})
+
+	req := `{"jsonrpc":"2.0","id":"write-fail-ok","method":"approval/test","params":{}}` + "\n"
+	if _, err := serverWriter.Write([]byte(req)); err != nil {
+		t.Fatalf("write server request: %v", err)
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if err := transport.ScanErr(); err != nil {
+			if !strings.Contains(err.Error(), "write failed") {
+				t.Fatalf("scan error = %v; want write failure", err)
+			}
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("expected scan error after handler response write failure")
+}
+
+func TestStdioRequestHandlerErrorResponseWriteFailureSetsScanErr(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, _ := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+
+	writeErr := errors.New("error response write failed")
+	transport := codex.NewStdioTransport(clientReader, &errorWriter{err: writeErr})
+	defer func() { _ = transport.Close() }()
+
+	transport.OnRequest(func(_ context.Context, _ codex.Request) (codex.Response, error) {
+		return codex.Response{}, errors.New("handler failure")
+	})
+
+	req := `{"jsonrpc":"2.0","id":"write-fail-err","method":"approval/test","params":{}}` + "\n"
+	if _, err := serverWriter.Write([]byte(req)); err != nil {
+		t.Fatalf("write server request: %v", err)
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if err := transport.ScanErr(); err != nil {
+			if !strings.Contains(err.Error(), "error response write failed") {
+				t.Fatalf("scan error = %v; want write failure", err)
+			}
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("expected scan error after handler error-response write failure")
+}
+
+func TestStdioMalformedResponseFrameWithRecoverableIDFailsPending(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	errCh := make(chan error, 1)
+	go func() {
+		resp, err := transport.Send(ctx, codex.Request{
+			JSONRPC: "2.0",
+			ID:      codex.RequestID{Value: "malformed-recoverable-id"},
+			Method:  "test/method",
+		})
+		if err != nil {
+			errCh <- err
+			return
+		}
+		if resp.Error == nil {
+			errCh <- fmt.Errorf("expected parse-error response, got nil error")
+			return
+		}
+		if resp.Error.Code != codex.ErrCodeParseError {
+			errCh <- fmt.Errorf("response code = %d; want %d", resp.Error.Code, codex.ErrCodeParseError)
+			return
+		}
+		errCh <- nil
+	}()
+
+	waitForOutboundRequest(t, serverReader)
+	// Invalid JSON after id/method; id is still recoverable via token scanning.
+	_, _ = serverWriter.Write([]byte(`{"jsonrpc":"2.0","id":"malformed-recoverable-id","result":{"ok":true` + "\n"))
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for malformed response handling")
 	}
 }
 
