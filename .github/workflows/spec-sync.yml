@@ -163,13 +163,13 @@ jobs:
           fi
 
           # --- 7. Branch, commit, push ---
-          branch="spec-sync/${short_upstream}"
+          branch="spec-sync/${short_upstream}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b "${branch}"
           git add "${local_specs}"
           git commit -m "chore(specs): sync upstream schemas to ${short_upstream}"
-          git push --force origin "${branch}"
+          git push -u origin "${branch}"
 
           # --- 8. Ensure the label exists ---
           gh label create "${label}" --description "Upstream spec schema changes" --color "D93F0B" 2>/dev/null || true
