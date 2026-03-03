@@ -2,6 +2,8 @@ package codex_test
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/dominicnunez/codex-sdk-go"
@@ -294,4 +296,62 @@ func verifyMethod(t *testing.T, transport *MockTransport, expectedMethod string,
 		return false
 	}
 	return true
+}
+
+func TestRepresentativeRequestMethodOutcomes(t *testing.T) {
+	transport := NewMockTransport()
+	client := codex.NewClient(transport)
+	ctx := context.Background()
+
+	_ = transport.SetResponseData("initialize", map[string]interface{}{
+		"userAgent": "codex-test/1.0",
+	})
+	_ = transport.SetResponseData("thread/start", map[string]interface{}{
+		"thread": map[string]interface{}{
+			"id":            "thread-1",
+			"cliVersion":    "1.0.0",
+			"createdAt":     1700000000,
+			"cwd":           "/tmp",
+			"modelProvider": "openai",
+			"preview":       "",
+			"source":        "exec",
+			"status":        map[string]interface{}{"type": "idle"},
+			"turns":         []interface{}{},
+			"updatedAt":     1700000000,
+			"ephemeral":     true,
+		},
+		"cwd":            "/tmp",
+		"model":          "o3",
+		"modelProvider":  "openai",
+		"approvalPolicy": "never",
+		"sandbox":        map[string]interface{}{"type": "readOnly"},
+	})
+	transport.SetResponse("account/read", codex.Response{
+		JSONRPC: "2.0",
+		Result:  json.RawMessage(`"not-an-object"`),
+	})
+
+	initResp, err := client.Initialize(ctx, codex.InitializeParams{})
+	if err != nil {
+		t.Fatalf("Initialize() unexpected error: %v", err)
+	}
+	if initResp.UserAgent != "codex-test/1.0" {
+		t.Fatalf("Initialize() userAgent = %q, want %q", initResp.UserAgent, "codex-test/1.0")
+	}
+
+	threadResp, err := client.Thread.Start(ctx, codex.ThreadStartParams{Ephemeral: codex.Ptr(false)})
+	if err != nil {
+		t.Fatalf("Thread.Start() unexpected error: %v", err)
+	}
+	if threadResp.Thread.ID != "thread-1" {
+		t.Fatalf("Thread.Start() thread.id = %q, want %q", threadResp.Thread.ID, "thread-1")
+	}
+
+	_, err = client.Account.Get(ctx, codex.GetAccountParams{})
+	if err == nil {
+		t.Fatal("Account.Get() expected decode error from invalid response payload")
+	}
+	if !strings.Contains(err.Error(), "cannot unmarshal") {
+		t.Fatalf("Account.Get() error = %q, want decode failure context", err)
+	}
 }

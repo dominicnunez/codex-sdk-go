@@ -1,6 +1,7 @@
 package codex_test
 
 import (
+	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -38,33 +39,25 @@ func TestZeroExternalDependencies(t *testing.T) {
 	}
 }
 
-// TestGoModTidy verifies that 'go mod tidy' produces no changes.
-// If this test fails, it means go.mod is out of sync with the codebase.
-func TestGoModTidy(t *testing.T) {
-	// Read go.mod before
-	cmd := exec.Command("cat", "go.mod")
-	beforeBytes, err := cmd.CombinedOutput()
+// TestGoModFileReadable verifies go.mod exists and can be read portably.
+func TestGoModFileReadable(t *testing.T) {
+	content, err := os.ReadFile("go.mod")
 	if err != nil {
-		t.Fatalf("Failed to read go.mod before tidy: %v", err)
+		t.Fatalf("failed to read go.mod: %v", err)
 	}
-	before := string(beforeBytes)
-
-	// Run go mod tidy
-	cmd = exec.Command("go", "mod", "tidy")
-	if output, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("go mod tidy failed: %v\nOutput: %s", err, output)
+	if len(content) == 0 {
+		t.Fatal("go.mod should not be empty")
 	}
+}
 
-	// Read go.mod after
-	cmd = exec.Command("cat", "go.mod")
-	afterBytes, err := cmd.CombinedOutput()
+// TestGoModTidyDiff verifies module files are tidy without mutating the workspace.
+func TestGoModTidyDiff(t *testing.T) {
+	cmd := exec.Command("go", "mod", "tidy", "-diff")
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("Failed to read go.mod after tidy: %v", err)
+		t.Fatalf("go mod tidy -diff failed: %v\nOutput:\n%s", err, output)
 	}
-	after := string(afterBytes)
-
-	// They should be identical
-	if before != after {
-		t.Errorf("go.mod changed after 'go mod tidy'. This means go.mod is out of sync.\nBefore:\n%s\n\nAfter:\n%s", before, after)
+	if strings.TrimSpace(string(output)) != "" {
+		t.Fatalf("go mod files are not tidy:\n%s", output)
 	}
 }
