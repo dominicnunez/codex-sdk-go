@@ -34,9 +34,24 @@ const (
 	oversizeMetadataBytes       = 64 * 1024
 )
 
+const (
+	errNilTransportReader        = "stdio transport reader must not be nil"
+	errNilTransportWriter        = "stdio transport writer must not be nil"
+	errNonClosableTransportInput = "stdio transport reader must implement io.ReadCloser"
+)
+
 type writeEnvelope struct {
 	payload []byte
 	done    chan error
+}
+
+type inboundFrame struct {
+	JSONRPC string          `json:"jsonrpc"`
+	ID      json.RawMessage `json:"id"`
+	Method  string          `json:"method"`
+	Params  json.RawMessage `json:"params,omitempty"`
+	Result  json.RawMessage `json:"result,omitempty"`
+	Error   json.RawMessage `json:"error,omitempty"`
 }
 
 // StdioTransport implements the Transport interface using stdin/stdout with newline-delimited JSON.
@@ -53,9 +68,9 @@ type StdioTransport struct {
 	pendingReqs        map[string]pendingReq
 	reqHandler         RequestHandler
 	notifHandler       NotificationHandler
-	requestQueue       chan []byte
-	criticalNotifQueue chan []byte
-	notifQueue         chan []byte
+	requestQueue       chan Request
+	criticalNotifQueue chan Notification
+	notifQueue         chan Notification
 	writeQueue         chan writeEnvelope
 	readerStopped      chan struct{}
 	once               sync.Once
@@ -95,6 +110,8 @@ func normalizeID(id interface{}) (string, error) {
 			}
 		}
 		return fmt.Sprintf("%v", v), nil
+	case json.Number:
+		return v.String(), nil
 	case int64:
 		return fmt.Sprintf("%d", v), nil
 	case int:
@@ -109,22 +126,32 @@ func normalizeID(id interface{}) (string, error) {
 }
 
 // NewStdioTransport creates a new stdio transport using the provided reader and writer.
+// reader must implement io.ReadCloser so Close can always unblock the read loop.
 // Typically, reader is os.Stdin and writer is os.Stdout.
-// The transport starts a background goroutine to read incoming messages.
+// The transport starts background goroutines for read/write and inbound dispatch.
+// It panics if reader/writer are invalid.
 func NewStdioTransport(reader io.Reader, writer io.Writer) *StdioTransport {
-	ctx, cancel := context.WithCancel(context.Background())
-	var readerCloser io.Closer
-	if c, ok := reader.(io.Closer); ok {
-		readerCloser = c
+	if reader == nil {
+		panic(errNilTransportReader)
 	}
+	if writer == nil {
+		panic(errNilTransportWriter)
+	}
+
+	readerCloser, ok := reader.(io.ReadCloser)
+	if !ok {
+		panic(errNonClosableTransportInput)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
 	t := &StdioTransport{
 		reader:             reader,
 		readerCloser:       readerCloser,
 		writer:             writer,
 		pendingReqs:        make(map[string]pendingReq),
-		requestQueue:       make(chan []byte, inboundRequestQueueSize),
-		criticalNotifQueue: make(chan []byte, criticalNotifQueueSize),
-		notifQueue:         make(chan []byte, inboundNotifQueueSize),
+		requestQueue:       make(chan Request, inboundRequestQueueSize),
+		criticalNotifQueue: make(chan Notification, criticalNotifQueueSize),
+		notifQueue:         make(chan Notification, inboundNotifQueueSize),
 		writeQueue:         make(chan writeEnvelope, outboundWriteQueueSize),
 		readerStopped:      make(chan struct{}),
 		ctx:                ctx,
@@ -373,8 +400,8 @@ func (t *StdioTransport) requestWorker() {
 		select {
 		case <-t.ctx.Done():
 			return
-		case data := <-t.requestQueue:
-			t.handleRequest(data)
+		case req := <-t.requestQueue:
+			t.handleRequest(req)
 		}
 	}
 }
@@ -384,8 +411,8 @@ func (t *StdioTransport) notificationWorker() {
 		select {
 		case <-t.ctx.Done():
 			return
-		case data := <-t.notifQueue:
-			t.handleNotification(data)
+		case notif := <-t.notifQueue:
+			t.handleNotification(notif)
 		}
 	}
 }
@@ -395,8 +422,8 @@ func (t *StdioTransport) criticalNotificationWorker() {
 		select {
 		case <-t.ctx.Done():
 			return
-		case data := <-t.criticalNotifQueue:
-			t.handleNotification(data)
+		case notif := <-t.criticalNotifQueue:
+			t.handleNotification(notif)
 		}
 	}
 }
@@ -424,35 +451,39 @@ func (t *StdioTransport) readLoop() {
 			continue
 		}
 
-		// Parse the message to determine its type
-		var msg struct {
-			JSONRPC string          `json:"jsonrpc"`
-			ID      json.RawMessage `json:"id"`
-			Method  string          `json:"method"`
-		}
-
-		if err := json.Unmarshal(line, &msg); err != nil {
+		frame, err := decodeInboundFrame(line)
+		if err != nil {
 			t.malformedCount.Add(1)
 			continue
 		}
 
-		hasID := len(msg.ID) > 0 && string(msg.ID) != "null"
+		hasID := len(frame.ID) > 0 && string(frame.ID) != "null"
 
 		// Response: has ID but no method
-		if hasID && msg.Method == "" {
-			t.handleResponse(line)
+		if hasID && frame.Method == "" {
+			resp, err := frame.toResponse()
+			if err != nil {
+				t.handleMalformedResponse(line)
+				continue
+			}
+			t.handleResponse(resp)
 			continue
 		}
 
 		// Request: has both ID and method
-		if hasID && msg.Method != "" {
-			t.enqueueRequest(line)
+		if hasID && frame.Method != "" {
+			req, err := frame.toRequest()
+			if err != nil {
+				t.handleMalformedRequest(line)
+				continue
+			}
+			t.enqueueRequest(req)
 			continue
 		}
 
 		// Notification: has method but no ID
-		if msg.Method != "" {
-			t.enqueueNotification(line, msg.Method)
+		if frame.Method != "" {
+			t.enqueueNotification(frame.toNotification())
 			continue
 		}
 
@@ -524,38 +555,38 @@ func discardUntilNewline(r *bufio.Reader) error {
 	}
 }
 
-func (t *StdioTransport) enqueueRequest(data []byte) {
+func (t *StdioTransport) enqueueRequest(req Request) {
 	select {
 	case <-t.ctx.Done():
 		return
-	case t.requestQueue <- data:
+	case t.requestQueue <- req:
 		return
 	default:
-		t.rejectRequestForOverload(data)
+		t.rejectRequestForOverload(req)
 	}
 }
 
-func (t *StdioTransport) enqueueNotification(data []byte, method string) {
-	if isCriticalNotificationMethod(method) {
-		t.enqueueCriticalNotification(data)
+func (t *StdioTransport) enqueueNotification(notif Notification) {
+	if isCriticalNotificationMethod(notif.Method) {
+		t.enqueueCriticalNotification(notif)
 		return
 	}
 
 	select {
 	case <-t.ctx.Done():
 		return
-	case t.notifQueue <- data:
+	case t.notifQueue <- notif:
 	default:
 		// Notifications are fire-and-forget. If the queue is full we drop to
 		// preserve process liveness and bound memory use under abuse.
 	}
 }
 
-func (t *StdioTransport) enqueueCriticalNotification(data []byte) {
+func (t *StdioTransport) enqueueCriticalNotification(notif Notification) {
 	select {
 	case <-t.ctx.Done():
 		return
-	case t.criticalNotifQueue <- data:
+	case t.criticalNotifQueue <- notif:
 		return
 	default:
 	}
@@ -569,7 +600,7 @@ func (t *StdioTransport) enqueueCriticalNotification(data []byte) {
 
 	select {
 	case <-t.ctx.Done():
-	case t.criticalNotifQueue <- data:
+	case t.criticalNotifQueue <- notif:
 	default:
 	}
 }
@@ -578,12 +609,7 @@ func isCriticalNotificationMethod(method string) bool {
 	return method == notifyTurnCompleted
 }
 
-func (t *StdioTransport) rejectRequestForOverload(data []byte) {
-	var req Request
-	if err := json.Unmarshal(data, &req); err != nil {
-		t.handleMalformedRequest(data)
-		return
-	}
+func (t *StdioTransport) rejectRequestForOverload(req Request) {
 	_ = t.writeMessage(Response{
 		JSONRPC: jsonrpcVersion,
 		ID:      req.ID,
@@ -594,17 +620,72 @@ func (t *StdioTransport) rejectRequestForOverload(data []byte) {
 	})
 }
 
+func decodeInboundFrame(data []byte) (inboundFrame, error) {
+	var frame inboundFrame
+	if err := json.Unmarshal(data, &frame); err != nil {
+		return inboundFrame{}, err
+	}
+	return frame, nil
+}
+
+func parseRequestID(data json.RawMessage) (RequestID, error) {
+	if len(data) == 0 {
+		return RequestID{}, errors.New("missing id")
+	}
+	var id RequestID
+	if err := json.Unmarshal(data, &id); err != nil {
+		return RequestID{}, err
+	}
+	return id, nil
+}
+
+func (f inboundFrame) toResponse() (Response, error) {
+	id, err := parseRequestID(f.ID)
+	if err != nil {
+		return Response{}, err
+	}
+	var rpcErr *Error
+	if len(f.Error) > 0 && string(f.Error) != "null" {
+		var parsed Error
+		if err := json.Unmarshal(f.Error, &parsed); err != nil {
+			return Response{}, err
+		}
+		rpcErr = &parsed
+	}
+	return Response{
+		JSONRPC: f.JSONRPC,
+		ID:      id,
+		Result:  f.Result,
+		Error:   rpcErr,
+	}, nil
+}
+
+func (f inboundFrame) toRequest() (Request, error) {
+	id, err := parseRequestID(f.ID)
+	if err != nil {
+		return Request{}, err
+	}
+	return Request{
+		JSONRPC: f.JSONRPC,
+		ID:      id,
+		Method:  f.Method,
+		Params:  f.Params,
+	}, nil
+}
+
+func (f inboundFrame) toNotification() Notification {
+	return Notification{
+		JSONRPC: f.JSONRPC,
+		Method:  f.Method,
+		Params:  f.Params,
+	}
+}
+
 // handleResponse routes an incoming response to the pending request channel.
 // It claims the channel under the lock via delete, then sends outside the
 // lock. The delete-then-unlock-then-send pattern ensures exclusive access
 // to the channel without holding the mutex during the send.
-func (t *StdioTransport) handleResponse(data []byte) {
-	var resp Response
-	if err := json.Unmarshal(data, &resp); err != nil {
-		t.handleMalformedResponse(data)
-		return
-	}
-
+func (t *StdioTransport) handleResponse(resp Response) {
 	// Normalize ID for matching
 	normalizedID, err := normalizeID(resp.ID.Value)
 	if err != nil {
@@ -787,13 +868,7 @@ func capSlice(data []byte, limit int) []byte {
 }
 
 // handleRequest dispatches an incoming server→client request to the handler
-func (t *StdioTransport) handleRequest(data []byte) {
-	var req Request
-	if err := json.Unmarshal(data, &req); err != nil {
-		t.handleMalformedRequest(data)
-		return
-	}
-
+func (t *StdioTransport) handleRequest(req Request) {
 	t.mu.Lock()
 	handler := t.reqHandler
 	panicFn := t.panicHandler
@@ -887,12 +962,7 @@ func (t *StdioTransport) handleMalformedRequest(data []byte) {
 }
 
 // handleNotification dispatches an incoming server→client notification to the handler
-func (t *StdioTransport) handleNotification(data []byte) {
-	var notif Notification
-	if err := json.Unmarshal(data, &notif); err != nil {
-		return
-	}
-
+func (t *StdioTransport) handleNotification(notif Notification) {
 	t.mu.Lock()
 	handler := t.notifHandler
 	panicFn := t.panicHandler

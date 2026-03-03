@@ -277,6 +277,38 @@ func TestStdioCloseStopsReaderForClosableReader(t *testing.T) {
 	}
 }
 
+func TestNewStdioTransportPanicsOnNilReader(t *testing.T) {
+	defer func() {
+		if got := recover(); got != errNilTransportReader {
+			t.Fatalf("panic = %v; want %q", got, errNilTransportReader)
+		}
+	}()
+
+	NewStdioTransport(nil, &safeBuffer{})
+}
+
+func TestNewStdioTransportPanicsOnNilWriter(t *testing.T) {
+	reader := newBlockingReadCloser()
+	defer func() { _ = reader.Close() }()
+	defer func() {
+		if got := recover(); got != errNilTransportWriter {
+			t.Fatalf("panic = %v; want %q", got, errNilTransportWriter)
+		}
+	}()
+
+	NewStdioTransport(reader, nil)
+}
+
+func TestNewStdioTransportPanicsOnNonClosableReader(t *testing.T) {
+	defer func() {
+		if got := recover(); got != errNonClosableTransportInput {
+			t.Fatalf("panic = %v; want %q", got, errNonClosableTransportInput)
+		}
+	}()
+
+	NewStdioTransport(strings.NewReader(""), &safeBuffer{})
+}
+
 // safeBuffer is a concurrency-safe bytes.Buffer for testing.
 type safeBuffer struct {
 	mu  sync.Mutex
