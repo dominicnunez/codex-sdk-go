@@ -75,6 +75,7 @@ type Process struct {
 	waitDone  chan struct{}
 	initMu    sync.Mutex
 	initDone  bool
+	initWait  chan struct{}
 }
 
 // errEndOfOptionsInExecArgs is returned when ExecArgs contains "--", which
@@ -200,6 +201,10 @@ func NewProcessFromClient(client *Client) *Process {
 // connects a StdioTransport to its stdin/stdout, and returns a ready-to-use Client.
 // The returned Process must be closed when done.
 func StartProcess(ctx context.Context, opts *ProcessOptions) (*Process, error) {
+	if ctx == nil {
+		return nil, ErrNilContext
+	}
+
 	if opts == nil {
 		opts = &ProcessOptions{}
 	}
@@ -296,22 +301,47 @@ func (p *Process) Close() error {
 // latched so future calls return immediately. On failure the next call retries,
 // allowing recovery from transient errors.
 func (p *Process) ensureInit(ctx context.Context) error {
-	p.initMu.Lock()
-	defer p.initMu.Unlock()
-	if p.initDone {
+	for {
+		p.initMu.Lock()
+		if p.initDone {
+			p.initMu.Unlock()
+			return nil
+		}
+		if p.Client == nil {
+			p.initMu.Unlock()
+			return errNilProcessClient
+		}
+		if wait := p.initWait; wait != nil {
+			p.initMu.Unlock()
+			select {
+			case <-wait:
+				continue
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+
+		wait := make(chan struct{})
+		p.initWait = wait
+		p.initMu.Unlock()
+
+		_, err := p.Client.Initialize(ctx, InitializeParams{
+			ClientInfo: ClientInfo{Name: "codex-sdk-go", Version: sdkVersion},
+		})
+
+		p.initMu.Lock()
+		if err == nil {
+			p.initDone = true
+		}
+		p.initWait = nil
+		close(wait)
+		p.initMu.Unlock()
+
+		if err != nil {
+			return fmt.Errorf("initialize: %w", err)
+		}
 		return nil
 	}
-	if p.Client == nil {
-		return errNilProcessClient
-	}
-	_, err := p.Client.Initialize(ctx, InitializeParams{
-		ClientInfo: ClientInfo{Name: "codex-sdk-go", Version: sdkVersion},
-	})
-	if err != nil {
-		return fmt.Errorf("initialize: %w", err)
-	}
-	p.initDone = true
-	return nil
 }
 
 // doWait runs cmd.Wait exactly once and stores the result.
