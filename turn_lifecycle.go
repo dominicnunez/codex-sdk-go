@@ -57,10 +57,9 @@ func parseTurnCompletedForThread(params json.RawMessage, threadID string) (turnC
 		}, true, err
 	}
 	if n.ThreadID == "" {
-		return turnCompletionCandidate{
-			notification:       invalidTurnCompletedNotification(fmt.Errorf("threadId is required")),
-			allowMissingTurnID: true,
-		}, true, nil
+		// Without threadId this completion cannot be attributed to a specific
+		// lifecycle, so ignore it rather than failing all active turns.
+		return turnCompletionCandidate{}, false, nil
 	}
 	if n.ThreadID != threadID {
 		return turnCompletionCandidate{}, false, nil
