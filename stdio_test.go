@@ -870,48 +870,53 @@ func TestStdioApprovalHandlerErrorReturnsErrorCode(t *testing.T) {
 	}
 }
 
-// TestStdioScannerBufferOverflow verifies that a message exceeding maxMessageSize
-// causes the reader to stop and ScanErr to return the buffer overflow error.
-func TestStdioScannerBufferOverflow(t *testing.T) {
+// TestStdioOversizeInboundLineIsSkipped verifies that oversized inbound frames
+// are dropped without terminating the reader goroutine.
+func TestStdioOversizeInboundLineIsSkipped(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
-	_, clientWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
 	defer func() { _ = clientReader.Close() }()
 	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
 	defer func() { _ = clientWriter.Close() }()
 
 	transport := codex.NewStdioTransport(clientReader, clientWriter)
 	defer func() { _ = transport.Close() }()
 
-	// Write a single line exceeding the 10MB max message size.
+	received := make(chan string, 1)
+	transport.OnNotify(func(_ context.Context, notif codex.Notification) {
+		received <- notif.Method
+	})
+
+	// Write one oversized line (11MB) that is not valid JSON.
 	const oversize = 11 * 1024 * 1024
 	oversizeLine := make([]byte, oversize)
 	for i := range oversizeLine {
 		oversizeLine[i] = 'x'
 	}
 	oversizeLine[len(oversizeLine)-1] = '\n'
+	_, _ = serverWriter.Write(oversizeLine)
 
-	go func() {
-		_, _ = serverWriter.Write(oversizeLine)
-		_ = serverWriter.Close()
-	}()
+	// Follow with a valid notification. If reader survived the oversized frame,
+	// this should still be dispatched.
+	validNotif := codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "test/after-oversize",
+	}
+	notifJSON, _ := json.Marshal(validNotif)
+	_, _ = serverWriter.Write(append(notifJSON, '\n'))
 
-	// Poll ScanErr until the reader processes the oversized line and stops.
-	deadline := time.After(5 * time.Second)
-	for {
-		if err := transport.ScanErr(); err != nil {
-			if !strings.Contains(err.Error(), "byte limit") {
-				t.Errorf("ScanErr should mention byte limit, got: %v", err)
-			}
-			if !strings.Contains(err.Error(), "token too long") {
-				t.Errorf("ScanErr should wrap original error, got: %v", err)
-			}
-			break
+	select {
+	case method := <-received:
+		if method != "test/after-oversize" {
+			t.Fatalf("received method = %s; want test/after-oversize", method)
 		}
-		select {
-		case <-deadline:
-			t.Fatal("timeout waiting for ScanErr to be set")
-		case <-time.After(10 * time.Millisecond):
-		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for notification after oversized frame")
+	}
+
+	if err := transport.ScanErr(); err != nil {
+		t.Fatalf("ScanErr = %v; want nil after oversize frame recovery", err)
 	}
 }
 

@@ -2,6 +2,7 @@ package codex
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -55,7 +56,7 @@ type StdioTransport struct {
 	writeQueue         chan writeEnvelope
 	readerStopped      chan struct{}
 	once               sync.Once
-	scanErr            error // set by readLoop when scanner fails
+	scanErr            error // set by readLoop when an unrecoverable read error occurs
 	malformedCount     atomic.Uint64
 	panicHandler       func(v any)
 	ctx                context.Context
@@ -259,7 +260,7 @@ func (t *StdioTransport) Close() error {
 	return nil
 }
 
-// ScanErr returns the error (if any) from the reader goroutine's scanner.
+// ScanErr returns the error (if any) from the reader goroutine's read loop.
 // Returns nil if the reader stopped due to EOF or hasn't stopped yet.
 func (t *StdioTransport) ScanErr() error {
 	t.mu.Lock()
@@ -401,12 +402,24 @@ func (t *StdioTransport) criticalNotificationWorker() {
 func (t *StdioTransport) readLoop() {
 	defer t.once.Do(func() { close(t.readerStopped) })
 
-	const initialBufferSize = 64 * 1024     // 64KB
+	const readBufferSize = 64 * 1024        // 64KB
 	const maxMessageSize = 10 * 1024 * 1024 // 10MB — file diffs and base64 payloads exceed the default
-	scanner := bufio.NewScanner(t.reader)
-	scanner.Buffer(make([]byte, 0, initialBufferSize), maxMessageSize)
-	for scanner.Scan() {
-		line := append([]byte(nil), scanner.Bytes()...)
+	reader := bufio.NewReaderSize(t.reader, readBufferSize)
+	for {
+		line, overLimit, err := readLimitedLine(reader, maxMessageSize)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return
+			}
+			t.mu.Lock()
+			t.scanErr = err
+			t.mu.Unlock()
+			return
+		}
+		if overLimit {
+			// Drop oversized frames and keep processing subsequent messages.
+			continue
+		}
 
 		// Parse the message to determine its type
 		var msg struct {
@@ -442,14 +455,69 @@ func (t *StdioTransport) readLoop() {
 
 		// Unknown message type - skip it
 	}
+}
 
-	if err := scanner.Err(); err != nil {
-		if errors.Is(err, bufio.ErrTooLong) {
-			err = fmt.Errorf("message exceeded %d byte limit: %w", maxMessageSize, err)
+// readLimitedLine reads one newline-delimited frame and enforces an upper size
+// bound. If a frame exceeds max bytes, it is fully discarded and overLimit=true
+// is returned so callers can skip just that message and continue.
+func readLimitedLine(r *bufio.Reader, limit int) ([]byte, bool, error) {
+	var line []byte
+	total := 0
+
+	for {
+		frag, err := r.ReadSlice('\n')
+		total += len(frag)
+		if total > limit {
+			return handleOversizedLine(r, err)
 		}
-		t.mu.Lock()
-		t.scanErr = err
-		t.mu.Unlock()
+
+		line = append(line, frag...)
+		switch {
+		case err == nil:
+			return bytes.TrimSuffix(line, []byte{'\n'}), false, nil
+		case errors.Is(err, bufio.ErrBufferFull):
+			continue
+		case errors.Is(err, io.EOF):
+			if len(line) == 0 {
+				return nil, false, io.EOF
+			}
+			return line, false, nil
+		default:
+			return nil, false, err
+		}
+	}
+}
+
+func handleOversizedLine(r *bufio.Reader, readErr error) ([]byte, bool, error) {
+	switch {
+	case readErr == nil:
+		return nil, true, nil
+	case errors.Is(readErr, io.EOF):
+		return nil, true, io.EOF
+	case !errors.Is(readErr, bufio.ErrBufferFull):
+		return nil, false, readErr
+	}
+
+	if err := discardUntilNewline(r); err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil, true, io.EOF
+		}
+		return nil, false, err
+	}
+	return nil, true, nil
+}
+
+func discardUntilNewline(r *bufio.Reader) error {
+	for {
+		_, err := r.ReadSlice('\n')
+		switch {
+		case err == nil:
+			return nil
+		case errors.Is(err, bufio.ErrBufferFull):
+			continue
+		default:
+			return err
+		}
 	}
 }
 
