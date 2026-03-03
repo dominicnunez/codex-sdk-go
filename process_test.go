@@ -3,6 +3,7 @@ package codex_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -454,17 +455,108 @@ exit 0
 	}
 }
 
-// TestStartProcessNilOptions verifies that nil options defaults to the "codex"
-// binary name. When "codex" is not in PATH, the error should reference it.
-func TestStartProcessNilOptions(t *testing.T) {
+func TestStartProcessNilOptionsRequiresBinaryPath(t *testing.T) {
 	ctx := context.Background()
 	_, err := codex.StartProcess(ctx, nil)
 	if err == nil {
-		t.Skip("codex binary found in PATH; cannot verify default binary name from error")
+		t.Fatal("expected error for missing BinaryPath")
 	}
-	// The error should mention "codex" — the default binary name.
-	if !strings.Contains(err.Error(), "codex") {
-		t.Errorf("expected error to mention default binary name %q, got: %v", "codex", err)
+	if !strings.Contains(err.Error(), "BinaryPath") {
+		t.Errorf("expected error to mention BinaryPath, got: %v", err)
+	}
+}
+
+func TestStartProcessRejectsRelativeBinaryPath(t *testing.T) {
+	ctx := context.Background()
+	_, err := codex.StartProcess(ctx, &codex.ProcessOptions{BinaryPath: "./codex"})
+	if err == nil {
+		t.Fatal("expected error for relative BinaryPath")
+	}
+	if !strings.Contains(err.Error(), "absolute") {
+		t.Errorf("expected error to mention absolute path requirement, got: %v", err)
+	}
+}
+
+func TestStartProcessMinimalEnvByDefault(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("process test requires unix shell script")
+	}
+
+	t.Setenv("CODEX_SDK_GO_TEST_SECRET", "should-not-leak")
+
+	dir := t.TempDir()
+	fakeBinary := filepath.Join(dir, "fake-codex")
+	envFile := filepath.Join(dir, "env.txt")
+	script := `#!/bin/sh
+env > ` + envFile + `
+exit 0
+`
+	if err := os.WriteFile(fakeBinary, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake binary: %v", err)
+	}
+
+	proc, err := codex.StartProcess(context.Background(), &codex.ProcessOptions{
+		BinaryPath: fakeBinary,
+	})
+	if err != nil {
+		t.Fatalf("StartProcess: %v", err)
+	}
+
+	_ = proc.Wait()
+	_ = proc.Close()
+
+	data, err := os.ReadFile(envFile)
+	if err != nil {
+		t.Fatalf("read env file: %v", err)
+	}
+	if strings.Contains(string(data), "CODEX_SDK_GO_TEST_SECRET=should-not-leak") {
+		t.Fatal("child inherited secret env var by default")
+	}
+}
+
+func TestStartProcessCanInheritParentEnv(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("process test requires unix shell script")
+	}
+
+	t.Setenv("CODEX_SDK_GO_TEST_SECRET", "expected-leak")
+
+	dir := t.TempDir()
+	fakeBinary := filepath.Join(dir, "fake-codex")
+	envFile := filepath.Join(dir, "env.txt")
+	script := `#!/bin/sh
+env > ` + envFile + `
+exit 0
+`
+	if err := os.WriteFile(fakeBinary, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake binary: %v", err)
+	}
+
+	proc, err := codex.StartProcess(context.Background(), &codex.ProcessOptions{
+		BinaryPath:       fakeBinary,
+		InheritParentEnv: true,
+	})
+	if err != nil {
+		t.Fatalf("StartProcess: %v", err)
+	}
+
+	_ = proc.Wait()
+	_ = proc.Close()
+
+	data, err := os.ReadFile(envFile)
+	if err != nil {
+		t.Fatalf("read env file: %v", err)
+	}
+	if !strings.Contains(string(data), "CODEX_SDK_GO_TEST_SECRET=expected-leak") {
+		t.Fatal("child should inherit parent env when InheritParentEnv is true")
+	}
+}
+
+func TestStartProcessNilContext(t *testing.T) {
+	var nilCtx context.Context
+	_, err := codex.StartProcess(nilCtx, &codex.ProcessOptions{})
+	if !errors.Is(err, codex.ErrNilContext) {
+		t.Fatalf("StartProcess(nil, ...) error = %v; want ErrNilContext", err)
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -28,8 +29,8 @@ const (
 
 // ProcessOptions configures how the Codex CLI process is spawned.
 type ProcessOptions struct {
-	// Path to the codex binary. If empty, "codex" is resolved from PATH.
-	// Must be a trusted value — passed directly to exec.CommandContext.
+	// Path to the codex binary. Must be an absolute path to a trusted binary.
+	// Relative paths and PATH lookup are rejected to avoid binary hijacking.
 	BinaryPath string
 
 	// Extra arguments prepended before typed flags (so typed flags win via last-wins).
@@ -37,8 +38,13 @@ type ProcessOptions struct {
 	// Must not contain "--" (end-of-options marker), which would bypass typed flag safety.
 	ExecArgs []string
 
-	// Environment variables for the child process. Nil inherits the parent environment.
+	// Environment variables for the child process. Nil uses a minimal allowlist
+	// from the parent environment unless InheritParentEnv is true.
 	Env []string
+
+	// InheritParentEnv forwards the full parent environment to the child when
+	// Env is nil. Disabled by default to avoid leaking unrelated secrets.
+	InheritParentEnv bool
 
 	// Working directory for the child process. Empty inherits the parent.
 	Dir string
@@ -86,6 +92,20 @@ var errTypedFlagInExecArgs = errors.New("ExecArgs must not contain typed safety 
 var errNilProcessClient = errors.New("process client must not be nil")
 
 const approvalModeFullAuto = "full-auto"
+
+var defaultChildEnvKeys = []string{
+	"HOME",
+	"LANG",
+	"LC_ALL",
+	"LC_CTYPE",
+	"PATH",
+	"SHELL",
+	"SYSTEMROOT",
+	"TMP",
+	"TEMP",
+	"TMPDIR",
+	"USER",
+}
 
 // rejectedExecArgFlagAliases canonicalizes all blocked safety flags (including
 // short aliases and compatibility aliases) to the preferred long option.
@@ -209,18 +229,18 @@ func StartProcess(ctx context.Context, opts *ProcessOptions) (*Process, error) {
 		opts = &ProcessOptions{}
 	}
 
-	binary := opts.BinaryPath
-	if binary == "" {
-		binary = defaultBinaryName
-	}
-
 	args, err := opts.buildArgs()
 	if err != nil {
 		return nil, err
 	}
 
+	binary, err := resolveBinaryPath(opts.BinaryPath)
+	if err != nil {
+		return nil, err
+	}
+
 	cmd := exec.CommandContext(ctx, binary, args...)
-	cmd.Env = opts.Env
+	cmd.Env = resolveProcessEnv(opts)
 	cmd.Dir = opts.Dir
 
 	stderr := opts.Stderr
@@ -256,6 +276,36 @@ func StartProcess(ctx context.Context, opts *ProcessOptions) (*Process, error) {
 		transport: transport,
 		waitDone:  make(chan struct{}),
 	}, nil
+}
+
+func resolveBinaryPath(binaryPath string) (string, error) {
+	if binaryPath == "" {
+		return "", fmt.Errorf("BinaryPath is required and must be an absolute path to %q", defaultBinaryName)
+	}
+	if !filepath.IsAbs(binaryPath) {
+		return "", fmt.Errorf("BinaryPath must be absolute: %q", binaryPath)
+	}
+	return filepath.Clean(binaryPath), nil
+}
+
+func resolveProcessEnv(opts *ProcessOptions) []string {
+	if opts.Env != nil {
+		return opts.Env
+	}
+	if opts.InheritParentEnv {
+		return os.Environ()
+	}
+	return minimalChildEnv()
+}
+
+func minimalChildEnv() []string {
+	env := make([]string, 0, len(defaultChildEnvKeys))
+	for _, key := range defaultChildEnvKeys {
+		if val, ok := os.LookupEnv(key); ok {
+			env = append(env, key+"="+val)
+		}
+	}
+	return env
 }
 
 // Close stops the child process and closes the transport.
