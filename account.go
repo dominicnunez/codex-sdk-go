@@ -3,7 +3,9 @@ package codex
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"reflect"
 )
 
 // GetAccountParams are parameters for the account/get method
@@ -170,6 +172,8 @@ const (
 	loginTypeChatgptAuthTokens = "chatgptAuthTokens"
 )
 
+var errNilLoginAccountParams = errors.New("login params cannot be nil")
+
 // LoginAccountParams is an interface for login parameter variants
 type LoginAccountParams interface {
 	isLoginAccountParams()
@@ -197,9 +201,13 @@ func (p *ApiKeyLoginAccountParams) MarshalJSON() ([]byte, error) {
 }
 
 func (p *ApiKeyLoginAccountParams) marshalWire() ([]byte, error) {
-	type wire ApiKeyLoginAccountParams
-	w := (*wire)(p)
-	w.Type = loginTypeApiKey
+	if p == nil {
+		return nil, errNilLoginAccountParams
+	}
+	w := ApiKeyLoginAccountParams{
+		Type:   loginTypeApiKey,
+		ApiKey: p.ApiKey,
+	}
 	return json.Marshal(w)
 }
 
@@ -224,9 +232,12 @@ type ChatgptLoginAccountParams struct {
 func (*ChatgptLoginAccountParams) isLoginAccountParams() {}
 
 func (p *ChatgptLoginAccountParams) marshalWire() ([]byte, error) {
-	type wire ChatgptLoginAccountParams
-	w := (*wire)(p)
-	w.Type = loginTypeChatgpt
+	if p == nil {
+		return nil, errNilLoginAccountParams
+	}
+	w := ChatgptLoginAccountParams{
+		Type: loginTypeChatgpt,
+	}
 	return json.Marshal(w)
 }
 
@@ -258,9 +269,15 @@ func (p *ChatgptAuthTokensLoginAccountParams) MarshalJSON() ([]byte, error) {
 }
 
 func (p *ChatgptAuthTokensLoginAccountParams) marshalWire() ([]byte, error) {
-	type wire ChatgptAuthTokensLoginAccountParams
-	w := (*wire)(p)
-	w.Type = loginTypeChatgptAuthTokens
+	if p == nil {
+		return nil, errNilLoginAccountParams
+	}
+	w := ChatgptAuthTokensLoginAccountParams{
+		Type:             loginTypeChatgptAuthTokens,
+		AccessToken:      p.AccessToken,
+		ChatgptAccountId: p.ChatgptAccountId,
+		ChatgptPlanType:  p.ChatgptPlanType,
+	}
 	return json.Marshal(w)
 }
 
@@ -405,11 +422,27 @@ func (s *AccountService) GetRateLimits(ctx context.Context) (GetAccountRateLimit
 
 // Login initiates an account login
 func (s *AccountService) Login(ctx context.Context, params LoginAccountParams) (LoginAccountResponse, error) {
+	if isNilLoginParams(params) {
+		return nil, errNilLoginAccountParams
+	}
 	respData, err := s.client.sendRequestRaw(ctx, methodAccountLoginStart, params)
 	if err != nil {
 		return nil, err
 	}
 	return UnmarshalLoginAccountResponse(respData)
+}
+
+func isNilLoginParams(params LoginAccountParams) bool {
+	if params == nil {
+		return true
+	}
+	rv := reflect.ValueOf(params)
+	switch rv.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return rv.IsNil()
+	default:
+		return false
+	}
 }
 
 // CancelLogin cancels an in-progress login

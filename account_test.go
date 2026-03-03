@@ -3,6 +3,7 @@ package codex_test
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go"
@@ -220,6 +221,71 @@ func TestLoginParamsHardcodeTypeDiscriminator(t *testing.T) {
 				t.Errorf("wire type = %q, want %q", envelope.Type, tt.wantType)
 			}
 		})
+	}
+}
+
+func TestLoginParamsMarshalWireDoesNotMutateCallerStruct(t *testing.T) {
+	transport := NewMockTransport()
+	client := codex.NewClient(transport)
+
+	params := &codex.ApiKeyLoginAccountParams{
+		Type:   "caller-value",
+		ApiKey: "sk-xxx",
+	}
+	_ = transport.SetResponseData("account/login/start", map[string]interface{}{
+		"type": "apiKey",
+	})
+
+	_, err := client.Account.Login(context.Background(), params)
+	if err != nil {
+		t.Fatalf("Login() error = %v", err)
+	}
+	if params.Type != "caller-value" {
+		t.Fatalf("params.Type mutated to %q", params.Type)
+	}
+
+	req := transport.GetSentRequest(0)
+	var wire struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(req.Params, &wire); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if wire.Type != "apiKey" {
+		t.Fatalf("wire type = %q, want apiKey", wire.Type)
+	}
+}
+
+func TestAccountLoginTypedNilParamsReturnsError(t *testing.T) {
+	transport := NewMockTransport()
+	client := codex.NewClient(transport)
+
+	var params *codex.ApiKeyLoginAccountParams
+	_, err := client.Account.Login(context.Background(), params)
+	if err == nil {
+		t.Fatal("expected error for typed nil login params")
+	}
+	if !strings.Contains(err.Error(), "login params cannot be nil") {
+		t.Fatalf("error = %q, want login params cannot be nil", err)
+	}
+	if got := transport.CallCount(); got != 0 {
+		t.Fatalf("transport call count = %d, want 0", got)
+	}
+}
+
+func TestAccountLoginUntypedNilParamsReturnsError(t *testing.T) {
+	transport := NewMockTransport()
+	client := codex.NewClient(transport)
+
+	_, err := client.Account.Login(context.Background(), nil)
+	if err == nil {
+		t.Fatal("expected error for untyped nil login params")
+	}
+	if !strings.Contains(err.Error(), "login params cannot be nil") {
+		t.Fatalf("error = %q, want login params cannot be nil", err)
+	}
+	if got := transport.CallCount(); got != 0 {
+		t.Fatalf("transport call count = %d, want 0", got)
 	}
 }
 
