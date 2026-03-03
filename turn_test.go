@@ -430,6 +430,66 @@ func TestTurnStartParamsApprovalPolicyMarshal(t *testing.T) {
 	}
 }
 
+func TestTurnStartParamsSandboxPolicyMarshalIncludesType(t *testing.T) {
+	networkAccess := true
+	readOnly := codex.ReadOnlyAccessWrapper{Value: codex.ReadOnlyAccessFullAccess{}}
+	var sandbox codex.SandboxPolicy = codex.SandboxPolicyWorkspaceWrite{
+		NetworkAccess:  &networkAccess,
+		ReadOnlyAccess: &readOnly,
+		WritableRoots:  []string{"/workspace"},
+	}
+
+	params := codex.TurnStartParams{
+		ThreadID:      "thread-1",
+		Input:         []codex.UserInput{&codex.TextUserInput{Text: "hi"}},
+		SandboxPolicy: &sandbox,
+	}
+
+	data, err := json.Marshal(params)
+	if err != nil {
+		t.Fatalf("Marshal error: %v", err)
+	}
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("Unmarshal marshaled payload: %v", err)
+	}
+
+	var sandboxPayload map[string]json.RawMessage
+	if err := json.Unmarshal(raw["sandboxPolicy"], &sandboxPayload); err != nil {
+		t.Fatalf("Unmarshal sandboxPolicy payload: %v", err)
+	}
+	if got := string(sandboxPayload["type"]); got != `"workspaceWrite"` {
+		t.Fatalf(`sandboxPolicy.type = %s; want "workspaceWrite"`, got)
+	}
+}
+
+func TestTurnStartParamsUnmarshalJSONUnionFields(t *testing.T) {
+	data := []byte(`{
+		"threadId": "thread-123",
+		"input": [{"type":"text","text":"hello"}],
+		"approvalPolicy": {"reject":{"mcp_elicitations":true,"rules":false,"sandbox_approval":true}},
+		"sandboxPolicy": {"type":"workspaceWrite","networkAccess":true,"writableRoots":["/workspace"]}
+	}`)
+
+	var params codex.TurnStartParams
+	if err := json.Unmarshal(data, &params); err != nil {
+		t.Fatalf("Unmarshal error: %v", err)
+	}
+	if params.ApprovalPolicy == nil {
+		t.Fatal("approvalPolicy is nil")
+	}
+	if _, ok := (*params.ApprovalPolicy).(codex.ApprovalPolicyReject); !ok {
+		t.Fatalf("approvalPolicy type = %T; want ApprovalPolicyReject", *params.ApprovalPolicy)
+	}
+	if params.SandboxPolicy == nil {
+		t.Fatal("sandboxPolicy is nil")
+	}
+	if _, ok := (*params.SandboxPolicy).(codex.SandboxPolicyWorkspaceWrite); !ok {
+		t.Fatalf("sandboxPolicy type = %T; want SandboxPolicyWorkspaceWrite", *params.SandboxPolicy)
+	}
+}
+
 // TestTurnUserInputTypes tests various UserInput type serialization
 func TestTurnUserInputTypes(t *testing.T) {
 	tests := []struct {

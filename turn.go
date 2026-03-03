@@ -17,9 +17,6 @@ func newTurnService(client *Client) *TurnService {
 // ===== Turn Start =====
 
 // TurnStartParams are the parameters for turn/start.
-// Marshal note: each UserInput implementation must provide its own MarshalJSON
-// to inject the "type" discriminator. No custom MarshalJSON is needed here
-// because the default encoder delegates to each element's MarshalJSON.
 type TurnStartParams struct {
 	ThreadID       string           `json:"threadId"`
 	Input          []UserInput      `json:"input"`
@@ -33,6 +30,43 @@ type TurnStartParams struct {
 	SandboxPolicy     *SandboxPolicy           `json:"sandboxPolicy,omitempty"`
 	Summary           *ReasoningSummaryWrapper `json:"summary,omitempty"`
 	CollaborationMode *CollaborationMode       `json:"collaborationMode,omitempty"`
+}
+
+// MarshalJSON ensures union fields use wrapper marshalers so wire payloads
+// include required discriminator fields (for example sandboxPolicy.type).
+func (p TurnStartParams) MarshalJSON() ([]byte, error) {
+	type wireTurnStartParams struct {
+		ThreadID          string                   `json:"threadId"`
+		Input             []UserInput              `json:"input"`
+		ApprovalPolicy    *AskForApprovalWrapper   `json:"approvalPolicy,omitempty"`
+		Cwd               *string                  `json:"cwd,omitempty"`
+		Effort            *ReasoningEffort         `json:"effort,omitempty"`
+		Model             *string                  `json:"model,omitempty"`
+		OutputSchema      interface{}              `json:"outputSchema,omitempty"`
+		Personality       *Personality             `json:"personality,omitempty"`
+		SandboxPolicy     *SandboxPolicyWrapper    `json:"sandboxPolicy,omitempty"`
+		Summary           *ReasoningSummaryWrapper `json:"summary,omitempty"`
+		CollaborationMode *CollaborationMode       `json:"collaborationMode,omitempty"`
+	}
+
+	wire := wireTurnStartParams{
+		ThreadID:          p.ThreadID,
+		Input:             p.Input,
+		Cwd:               p.Cwd,
+		Effort:            p.Effort,
+		Model:             p.Model,
+		OutputSchema:      p.OutputSchema,
+		Personality:       p.Personality,
+		Summary:           p.Summary,
+		CollaborationMode: p.CollaborationMode,
+	}
+	if p.ApprovalPolicy != nil {
+		wire.ApprovalPolicy = &AskForApprovalWrapper{Value: *p.ApprovalPolicy}
+	}
+	if p.SandboxPolicy != nil {
+		wire.SandboxPolicy = &SandboxPolicyWrapper{Value: *p.SandboxPolicy}
+	}
+	return json.Marshal(wire)
 }
 
 // unmarshalUserInputSlice unmarshals a slice of raw JSON messages into UserInput values.
@@ -50,26 +84,56 @@ func unmarshalUserInputSlice(raw []json.RawMessage) ([]UserInput, error) {
 
 // UnmarshalJSON implements custom unmarshaling for TurnStartParams
 func (p *TurnStartParams) UnmarshalJSON(data []byte) error {
-	type Alias TurnStartParams
-	aux := &struct {
-		Input []json.RawMessage `json:"input"`
-		*Alias
-	}{
-		Alias: (*Alias)(p),
+	type wireTurnStartParams struct {
+		ThreadID          string                   `json:"threadId"`
+		Input             []json.RawMessage        `json:"input"`
+		ApprovalPolicy    *AskForApprovalWrapper   `json:"approvalPolicy,omitempty"`
+		Cwd               *string                  `json:"cwd,omitempty"`
+		Effort            *ReasoningEffort         `json:"effort,omitempty"`
+		Model             *string                  `json:"model,omitempty"`
+		OutputSchema      interface{}              `json:"outputSchema,omitempty"`
+		Personality       *Personality             `json:"personality,omitempty"`
+		SandboxPolicy     *SandboxPolicyWrapper    `json:"sandboxPolicy,omitempty"`
+		Summary           *ReasoningSummaryWrapper `json:"summary,omitempty"`
+		CollaborationMode *CollaborationMode       `json:"collaborationMode,omitempty"`
 	}
 
-	if err := json.Unmarshal(data, &aux); err != nil {
+	wire := &wireTurnStartParams{}
+	if err := json.Unmarshal(data, wire); err != nil {
 		*p = TurnStartParams{}
 		return err
 	}
 
-	inputs, err := unmarshalUserInputSlice(aux.Input)
+	inputs, err := unmarshalUserInputSlice(wire.Input)
 	if err != nil {
 		*p = TurnStartParams{}
 		return err
 	}
-	p.Input = inputs
 
+	var approvalPolicy *AskForApproval
+	if wire.ApprovalPolicy != nil {
+		value := wire.ApprovalPolicy.Value
+		approvalPolicy = &value
+	}
+	var sandboxPolicy *SandboxPolicy
+	if wire.SandboxPolicy != nil {
+		value := wire.SandboxPolicy.Value
+		sandboxPolicy = &value
+	}
+
+	*p = TurnStartParams{
+		ThreadID:          wire.ThreadID,
+		Input:             inputs,
+		ApprovalPolicy:    approvalPolicy,
+		Cwd:               wire.Cwd,
+		Effort:            wire.Effort,
+		Model:             wire.Model,
+		OutputSchema:      wire.OutputSchema,
+		Personality:       wire.Personality,
+		SandboxPolicy:     sandboxPolicy,
+		Summary:           wire.Summary,
+		CollaborationMode: wire.CollaborationMode,
+	}
 	return nil
 }
 
