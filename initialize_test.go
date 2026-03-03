@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/dominicnunez/codex-sdk-go"
@@ -255,6 +256,27 @@ func TestClientInitializeError(t *testing.T) {
 	}
 	if rpcErr.Code() != -32600 {
 		t.Errorf("error code = %d, want %d", rpcErr.Code(), -32600)
+	}
+}
+
+func TestClientInitializeIncludesMethodInTransportError(t *testing.T) {
+	mock := NewMockTransport()
+	mock.SetSendError(errors.New("network disconnected"))
+	client := codex.NewClient(mock)
+
+	params := codex.InitializeParams{
+		ClientInfo: codex.ClientInfo{
+			Name:    "test-client",
+			Version: "1.0.0",
+		},
+	}
+
+	_, err := client.Initialize(context.Background(), params)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "initialize") {
+		t.Fatalf("error = %q; want method context", err.Error())
 	}
 }
 

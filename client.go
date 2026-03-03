@@ -439,7 +439,7 @@ func (c *Client) sendRequest(ctx context.Context, method string, params interfac
 	// Send request
 	resp, err := c.Send(ctx, req)
 	if err != nil {
-		return err
+		return fmt.Errorf("%s: %w", method, err)
 	}
 
 	// Unmarshal result if caller expects one
@@ -475,7 +475,7 @@ func (c *Client) sendRequestRaw(ctx context.Context, method string, params inter
 	// Send request
 	resp, err := c.Send(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: %w", method, err)
 	}
 
 	if resp.Result == nil {
