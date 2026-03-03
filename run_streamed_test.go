@@ -12,6 +12,27 @@ import (
 	codex "github.com/dominicnunez/codex-sdk-go"
 )
 
+const runStreamedReadyTimeout = 2 * time.Second
+
+func waitForRunStreamedReady(t *testing.T, mock *MockTransport) {
+	t.Helper()
+	waitForMethodCallCount(t, mock, "turn/start", 1)
+}
+
+func waitForMethodCallCount(t *testing.T, mock *MockTransport, method string, minCalls int) {
+	t.Helper()
+	deadline := time.Now().Add(runStreamedReadyTimeout)
+	for {
+		if mock.MethodCallCount(method) >= minCalls {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("timeout waiting for method %q to reach %d calls", method, minCalls)
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
 func TestRunStreamedSuccess(t *testing.T) {
 	proc, mock := mockProcess(t)
 
@@ -20,8 +41,8 @@ func TestRunStreamedSuccess(t *testing.T) {
 
 	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "Say hello"})
 
-	// Give the lifecycle goroutine time to register listeners and send requests.
-	time.Sleep(50 * time.Millisecond)
+	// Wait until lifecycle setup has started the turn.
+	waitForRunStreamedReady(t, mock)
 
 	// Inject deltas then completion.
 	mock.InjectServerNotification(ctx, codex.Notification{
@@ -156,7 +177,7 @@ func TestRunStreamedTurnError(t *testing.T) {
 
 	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "This will fail"})
 
-	time.Sleep(50 * time.Millisecond)
+	waitForRunStreamedReady(t, mock)
 
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
@@ -209,7 +230,7 @@ func TestRunStreamedNoClobbering(t *testing.T) {
 
 	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "hello"})
 
-	time.Sleep(50 * time.Millisecond)
+	waitForRunStreamedReady(t, mock)
 
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
@@ -248,7 +269,7 @@ func TestRunStreamedMultipleEventTypes(t *testing.T) {
 
 	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "complex task"})
 
-	time.Sleep(50 * time.Millisecond)
+	waitForRunStreamedReady(t, mock)
 
 	// Mix different event types.
 	mock.InjectServerNotification(ctx, codex.Notification{
@@ -321,7 +342,7 @@ func TestRunStreamedResultBeforeIteration(t *testing.T) {
 		resultCh <- resultOut{r}
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitForRunStreamedReady(t, mock)
 
 	// Drain the events iterator in another goroutine so the channel doesn't block.
 	go func() {
@@ -329,7 +350,7 @@ func TestRunStreamedResultBeforeIteration(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitForRunStreamedReady(t, mock)
 
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
@@ -468,7 +489,7 @@ func TestRunStreamedAllDeltaTypes(t *testing.T) {
 
 	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "all deltas"})
 
-	time.Sleep(50 * time.Millisecond)
+	waitForRunStreamedReady(t, mock)
 
 	// Inject turn/started.
 	mock.InjectServerNotification(ctx, codex.Notification{
@@ -535,7 +556,7 @@ func TestRunStreamedEarlyBreak(t *testing.T) {
 
 	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "hello"})
 
-	time.Sleep(50 * time.Millisecond)
+	waitForRunStreamedReady(t, mock)
 
 	// Inject a delta then completion.
 	mock.InjectServerNotification(ctx, codex.Notification{
@@ -582,7 +603,7 @@ func TestRunStreamedCollabEvents(t *testing.T) {
 
 	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "use agents"})
 
-	time.Sleep(50 * time.Millisecond)
+	waitForRunStreamedReady(t, mock)
 
 	// Inject a collab item/started notification (spawnAgent).
 	mock.InjectServerNotification(ctx, codex.Notification{
@@ -745,7 +766,7 @@ func TestRunStreamedInitRetry(t *testing.T) {
 
 	stream2 := proc.RunStreamed(ctx2, codex.RunOptions{Prompt: "retry"})
 
-	time.Sleep(50 * time.Millisecond)
+	waitForRunStreamedReady(t, mock)
 
 	mock.InjectServerNotification(ctx2, codex.Notification{
 		JSONRPC: "2.0",
@@ -781,7 +802,7 @@ func TestRunStreamedTurnCompletedUnmarshalFailure(t *testing.T) {
 
 	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "malformed completion"})
 
-	time.Sleep(50 * time.Millisecond)
+	waitForRunStreamedReady(t, mock)
 
 	// Inject a turn/completed notification where the turn field is malformed.
 	// The threadId carrier unmarshal succeeds, but the full TurnCompletedNotification
@@ -827,7 +848,7 @@ func TestRunStreamedApprovalFlowDuringTurn(t *testing.T) {
 
 	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "run a command"})
 
-	time.Sleep(50 * time.Millisecond)
+	waitForRunStreamedReady(t, mock)
 
 	// Inject a server→client approval request mid-turn.
 	approvalParams, _ := json.Marshal(codex.CommandExecutionRequestApprovalParams{
@@ -888,7 +909,7 @@ func TestRunStreamedEventsSingleUse(t *testing.T) {
 
 	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "hello"})
 
-	time.Sleep(50 * time.Millisecond)
+	waitForRunStreamedReady(t, mock)
 
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
@@ -931,7 +952,7 @@ func TestRunStreamedIgnoresCrossThreadNotifications(t *testing.T) {
 
 	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "Say hello"})
 
-	time.Sleep(50 * time.Millisecond)
+	waitForRunStreamedReady(t, mock)
 
 	// Inject notifications for a different thread — these should be ignored.
 	mock.InjectServerNotification(ctx, codex.Notification{
@@ -949,9 +970,6 @@ func TestRunStreamedIgnoresCrossThreadNotifications(t *testing.T) {
 		Method:  "turn/completed",
 		Params:  json.RawMessage(`{"threadId":"thread-OTHER","turn":{"id":"turn-1","status":"completed","items":[]}}`),
 	})
-
-	// Give time for the cross-thread notifications to be dispatched and filtered.
-	time.Sleep(50 * time.Millisecond)
 
 	// Now inject the correct notifications for thread-1.
 	mock.InjectServerNotification(ctx, codex.Notification{
@@ -1017,7 +1035,7 @@ func TestStreamEventsConsumedOnSecondCall(t *testing.T) {
 
 	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "hello"})
 
-	time.Sleep(50 * time.Millisecond)
+	waitForRunStreamedReady(t, mock)
 
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
@@ -1053,7 +1071,7 @@ func TestRunStreamedBackpressure_SlowConsumerCompletesUnderOverflow(t *testing.T
 
 	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "burst"})
 
-	time.Sleep(50 * time.Millisecond)
+	waitForRunStreamedReady(t, mock)
 
 	// Inject more events than the channel buffer to force overflow.
 	const totalDeltas = 100
@@ -1110,11 +1128,12 @@ func TestRunStreamedBackpressure_ContextCancellationUnblocksSender(t *testing.T)
 
 	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "cancel me"})
 
-	time.Sleep(50 * time.Millisecond)
+	waitForRunStreamedReady(t, mock)
 
 	// Inject notifications from a goroutine to fill the buffer. Once the
 	// buffer is full, streamSendEvent blocks. Cancelling the context must
 	// unblock it, preventing goroutine leaks.
+	var injected atomic.Int32
 	go func() {
 		for i := 0; i < 200; i++ {
 			mock.InjectServerNotification(ctx, codex.Notification{
@@ -1122,11 +1141,11 @@ func TestRunStreamedBackpressure_ContextCancellationUnblocksSender(t *testing.T)
 				Method:  "item/agentMessage/delta",
 				Params:  json.RawMessage(`{"delta":"x","itemId":"item-1","threadId":"thread-1","turnId":"turn-1"}`),
 			})
+			injected.Add(1)
 		}
 	}()
 
-	// Let some notifications queue up, then cancel without consuming.
-	time.Sleep(50 * time.Millisecond)
+	waitForCounterAtLeast(t, &injected, 10)
 	cancel()
 
 	// The lifecycle goroutine must not hang. Result() should return promptly.
@@ -1143,6 +1162,20 @@ func TestRunStreamedBackpressure_ContextCancellationUnblocksSender(t *testing.T)
 	}
 }
 
+func waitForCounterAtLeast(t *testing.T, counter *atomic.Int32, target int32) {
+	t.Helper()
+	deadline := time.Now().Add(runStreamedReadyTimeout)
+	for {
+		if counter.Load() >= target {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("timeout waiting for counter to reach %d", target)
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
 func TestStreamEventsConcurrentConsumption(t *testing.T) {
 	proc, mock := mockProcess(t)
 
@@ -1151,7 +1184,7 @@ func TestStreamEventsConcurrentConsumption(t *testing.T) {
 
 	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "concurrent"})
 
-	time.Sleep(50 * time.Millisecond)
+	waitForRunStreamedReady(t, mock)
 
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",

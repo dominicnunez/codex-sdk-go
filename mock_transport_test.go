@@ -201,6 +201,13 @@ func (m *MockTransport) CallCount() int {
 	return len(m.SentRequests)
 }
 
+// MethodCallCount returns how many times Send/Notify were called for method.
+func (m *MockTransport) MethodCallCount(method string) int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.actualCalls[method]
+}
+
 // GetSentNotification returns the nth sent notification (0-indexed), or nil if not found.
 func (m *MockTransport) GetSentNotification(index int) *codex.Notification {
 	m.mu.Lock()
