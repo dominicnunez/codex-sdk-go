@@ -173,10 +173,13 @@ func StartProcess(ctx context.Context, opts *ProcessOptions) (*Process, error) {
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
+		_ = stdin.Close()
 		return nil, fmt.Errorf("stdout pipe: %w", err)
 	}
 
 	if err := cmd.Start(); err != nil {
+		_ = stdout.Close()
+		_ = stdin.Close()
 		return nil, fmt.Errorf("start codex: %w", err)
 	}
 

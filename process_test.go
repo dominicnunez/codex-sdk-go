@@ -181,6 +181,37 @@ func TestStartProcessBadBinary(t *testing.T) {
 	}
 }
 
+func TestStartProcessBadBinaryDoesNotLeakFileDescriptors(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("fd-leak check requires /proc/self/fd on linux")
+	}
+
+	startFDs, err := countOpenFDs()
+	if err != nil {
+		t.Skipf("failed to count starting file descriptors: %v", err)
+	}
+
+	const attempts = 64
+	for i := 0; i < attempts; i++ {
+		_, startErr := codex.StartProcess(context.Background(), &codex.ProcessOptions{
+			BinaryPath: "/nonexistent/codex-binary-that-does-not-exist",
+		})
+		if startErr == nil {
+			t.Fatal("expected error for nonexistent binary")
+		}
+	}
+
+	endFDs, err := countOpenFDs()
+	if err != nil {
+		t.Fatalf("count ending file descriptors: %v", err)
+	}
+
+	const maxAllowedFDGrowth = 3
+	if growth := endFDs - startFDs; growth > maxAllowedFDGrowth {
+		t.Fatalf("file descriptor growth = %d after %d failed starts; want <= %d", growth, attempts, maxAllowedFDGrowth)
+	}
+}
+
 // TestStartProcessExecArgsWithEndOfOptions verifies that StartProcess rejects
 // ExecArgs containing "--" (end-of-options marker), which would bypass typed flag safety.
 func TestStartProcessExecArgsWithEndOfOptions(t *testing.T) {
@@ -714,4 +745,12 @@ func TestRunAfterTransportClose(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error from Run after transport close, got nil")
 	}
+}
+
+func countOpenFDs() (int, error) {
+	entries, err := os.ReadDir("/proc/self/fd")
+	if err != nil {
+		return 0, err
+	}
+	return len(entries), nil
 }
