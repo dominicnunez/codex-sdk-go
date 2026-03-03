@@ -9,6 +9,8 @@ import (
 const (
 	streamCollectorErrorHistoryLimit       = 256
 	streamCollectorOutputDeltaHistoryLimit = 512
+	streamCollectorRawOutputChunkLimit     = 512
+	streamCollectorRawOutputBytesLimit     = 256 * 1024
 )
 
 // NormalizedStreamError is a helper view that normalizes stream- and
@@ -94,6 +96,7 @@ type StreamCollector struct {
 
 	commandExecutions   map[string]CommandExecutionLifecycle
 	commandOutputChunks map[string][]string
+	commandOutputBytes  map[string]int
 	mcpToolCalls        map[string]McpToolCallLifecycle
 	webSearches         map[string]WebSearchLifecycle
 	fileChanges         map[string]FileChangeLifecycle
@@ -104,6 +107,7 @@ func NewStreamCollector() *StreamCollector {
 	return &StreamCollector{
 		commandExecutions:   make(map[string]CommandExecutionLifecycle),
 		commandOutputChunks: make(map[string][]string),
+		commandOutputBytes:  make(map[string]int),
 		mcpToolCalls:        make(map[string]McpToolCallLifecycle),
 		webSearches:         make(map[string]WebSearchLifecycle),
 		fileChanges:         make(map[string]FileChangeLifecycle),
@@ -197,7 +201,16 @@ func (c *StreamCollector) processCommandExecutionOutputDelta(n CommandExecutionO
 		lc.DroppedOutputDeltas,
 		streamCollectorOutputDeltaHistoryLimit,
 	)
-	c.commandOutputChunks[n.ItemID] = append(c.commandOutputChunks[n.ItemID], n.Delta)
+	chunks := append(c.commandOutputChunks[n.ItemID], n.Delta)
+	bytes := c.commandOutputBytes[n.ItemID] + len(n.Delta)
+	chunks, bytes = trimBoundedStringHistory(
+		chunks,
+		bytes,
+		streamCollectorRawOutputChunkLimit,
+		streamCollectorRawOutputBytesLimit,
+	)
+	c.commandOutputChunks[n.ItemID] = chunks
+	c.commandOutputBytes[n.ItemID] = bytes
 	c.commandExecutions[n.ItemID] = lc
 }
 
@@ -306,8 +319,11 @@ func (c *StreamCollector) ingestCompletedItemLocked(item ThreadItem) {
 		lc.CompletedItem = cloneCommandExecutionItem(v)
 		if v.AggregatedOutput != nil {
 			lc.AggregatedOutput = *v.AggregatedOutput
-			c.commandOutputChunks[v.ID] = nil
+		} else if chunks := c.commandOutputChunks[v.ID]; len(chunks) > 0 {
+			lc.AggregatedOutput = strings.Join(chunks, "")
 		}
+		delete(c.commandOutputChunks, v.ID)
+		delete(c.commandOutputBytes, v.ID)
 		c.commandExecutions[v.ID] = lc
 	case *McpToolCallThreadItem:
 		lc := c.mcpToolCalls[v.ID]
@@ -479,4 +495,20 @@ func appendBoundedHistory[T any](history []T, next T, dropped int, limit int) ([
 	copy(history, history[1:])
 	history[len(history)-1] = next
 	return history, dropped + 1
+}
+
+func trimBoundedStringHistory(history []string, totalBytes int, maxChunks int, maxBytes int) ([]string, int) {
+	if maxChunks > 0 {
+		for len(history) > maxChunks {
+			totalBytes -= len(history[0])
+			history = history[1:]
+		}
+	}
+	if maxBytes > 0 {
+		for len(history) > 0 && totalBytes > maxBytes {
+			totalBytes -= len(history[0])
+			history = history[1:]
+		}
+	}
+	return history, totalBytes
 }

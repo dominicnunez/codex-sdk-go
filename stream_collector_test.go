@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -307,5 +308,69 @@ func TestStreamCollectorBoundsOutputDeltaHistory(t *testing.T) {
 	}
 	if cmd.DroppedOutputDeltas == 0 {
 		t.Fatal("expected dropped output delta count to be tracked")
+	}
+}
+
+func TestStreamCollectorBoundsRawOutputChunksAndFinalizesOnCompletion(t *testing.T) {
+	proc, mock := mockProcess(t)
+	collector := codex.NewStreamCollector()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	stream := proc.RunStreamedWithCollector(ctx, codex.RunOptions{Prompt: "collect raw chunks"}, collector)
+	time.Sleep(50 * time.Millisecond)
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/started",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"commandExecution","id":"cmd-raw","command":"echo","commandActions":[],"cwd":"/tmp","status":"inProgress"}}`),
+	})
+
+	const totalChunks = 2000
+	chunk := strings.Repeat("x", 1024)
+	for i := 0; i < totalChunks; i++ {
+		mock.InjectServerNotification(ctx, codex.Notification{
+			JSONRPC: "2.0",
+			Method:  "item/commandExecution/outputDelta",
+			Params: json.RawMessage(fmt.Sprintf(
+				`{"threadId":"thread-1","turnId":"turn-1","itemId":"cmd-raw","delta":"%s"}`,
+				chunk,
+			)),
+		})
+	}
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"commandExecution","id":"cmd-raw","command":"echo","commandActions":[],"cwd":"/tmp","status":"completed"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	for _, err := range stream.Events() {
+		if err != nil {
+			t.Fatalf("unexpected stream error: %v", err)
+		}
+	}
+
+	summary := collector.Summary()
+	cmd, ok := summary.CommandExecutions["cmd-raw"]
+	if !ok {
+		t.Fatal("expected command execution lifecycle for cmd-raw")
+	}
+	if !cmd.Completed {
+		t.Fatal("expected command execution lifecycle to be completed")
+	}
+	if cmd.AggregatedOutput == "" {
+		t.Fatal("expected bounded aggregated output to be retained after completion")
+	}
+
+	fullLength := totalChunks * len(chunk)
+	if len(cmd.AggregatedOutput) >= fullLength {
+		t.Fatalf("aggregated output length = %d; want bounded length smaller than %d", len(cmd.AggregatedOutput), fullLength)
 	}
 }
