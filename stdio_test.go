@@ -166,7 +166,7 @@ func TestStdioResponseRequestIDMatching(t *testing.T) {
 	defer func() { _ = transport.Close() }()
 
 	// Read requests on the server side
-	sentRequests := make(chan codex.Request, 4)
+	sentRequests := make(chan codex.Request, 5)
 	go func() {
 		scanner := bufio.NewScanner(serverReader)
 		for scanner.Scan() {
@@ -185,7 +185,7 @@ func TestStdioResponseRequestIDMatching(t *testing.T) {
 		result json.RawMessage
 		err    error
 	}
-	results := make(chan result, 4)
+	results := make(chan result, 5)
 
 	// String ID
 	go func() {
@@ -231,11 +231,22 @@ func TestStdioResponseRequestIDMatching(t *testing.T) {
 		results <- result{id: uint64(9007199254740993), result: resp.Result, err: err}
 	}()
 
+	// Equivalent numeric IDs in scientific and decimal forms must match.
+	go func() {
+		req := codex.Request{
+			JSONRPC: "2.0",
+			ID:      codex.RequestID{Value: float64(1e-6)},
+			Method:  "test/method5",
+		}
+		resp, err := transport.Send(ctx, req)
+		results <- result{id: float64(1e-6), result: resp.Result, err: err}
+	}()
+
 	// Wait for all requests to be sent and collect them
 	time.Sleep(50 * time.Millisecond)
 
-	requests := make([]codex.Request, 0, 4)
-	for i := 0; i < 4; i++ {
+	requests := make([]codex.Request, 0, 5)
+	for i := 0; i < 5; i++ {
 		select {
 		case req := <-sentRequests:
 			requests = append(requests, req)
@@ -266,7 +277,7 @@ func TestStdioResponseRequestIDMatching(t *testing.T) {
 	}
 
 	// Verify each request got the response that was sent for its specific ID
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 5; i++ {
 		select {
 		case res := <-results:
 			if res.err != nil {

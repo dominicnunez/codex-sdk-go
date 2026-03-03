@@ -143,6 +143,64 @@ func TestNormalizeIDPreservesLargeExponentIntegers(t *testing.T) {
 	}
 }
 
+func TestNormalizeIDCanonicalizesEquivalentFloatAndJSONNumber(t *testing.T) {
+	tests := []struct {
+		name    string
+		floatID float64
+		rawID   json.Number
+		want    string
+	}{
+		{
+			name:    "fractional scientific notation",
+			floatID: 1e-6,
+			rawID:   json.Number("0.000001"),
+			want:    "0.000001",
+		},
+		{
+			name:    "integer scientific notation",
+			floatID: 1e3,
+			rawID:   json.Number("1000"),
+			want:    "1000",
+		},
+		{
+			name:    "negative scientific notation",
+			floatID: -2.5e-4,
+			rawID:   json.Number("-0.00025"),
+			want:    "-0.00025",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotFloat, err := normalizeID(tt.floatID)
+			if err != nil {
+				t.Fatalf("normalizeID(float %v) returned error: %v", tt.floatID, err)
+			}
+			gotRaw, err := normalizeID(tt.rawID)
+			if err != nil {
+				t.Fatalf("normalizeID(raw %q) returned error: %v", tt.rawID, err)
+			}
+			if gotFloat != tt.want {
+				t.Fatalf("normalizeID(float %v) = %q; want %q", tt.floatID, gotFloat, tt.want)
+			}
+			if gotRaw != tt.want {
+				t.Fatalf("normalizeID(raw %q) = %q; want %q", tt.rawID, gotRaw, tt.want)
+			}
+		})
+	}
+}
+
+func TestRequestIDEqualMatchesEquivalentScientificAndDecimalForms(t *testing.T) {
+	a := RequestID{Value: float64(1e-6)}
+	b := RequestID{Value: json.Number("0.000001")}
+	if !a.Equal(b) {
+		t.Fatalf("RequestID(%v).Equal(%v) = false; want true", a.Value, b.Value)
+	}
+	if !b.Equal(a) {
+		t.Fatalf("RequestID(%v).Equal(%v) = false; want true", b.Value, a.Value)
+	}
+}
+
 func TestNormalizePendingRequestIDDoesNotCollideLargeExponentIntegers(t *testing.T) {
 	a, err := normalizePendingRequestID(json.Number("9.007199254740992e15"))
 	if err != nil {

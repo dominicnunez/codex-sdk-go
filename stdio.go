@@ -45,6 +45,8 @@ const (
 	errInvalidResponseJSONRPC = `invalid response: jsonrpc must be "2.0"`
 	requestIDKeyPrefixNumber  = "n:"
 	requestIDKeyPrefixString  = "s:"
+	maxJSONRPCIDExponentAbs   = 4096
+	maxJSONRPCIDLength        = 8192
 )
 
 type writeEnvelope struct {
@@ -106,18 +108,7 @@ func normalizeID(id interface{}) (string, error) {
 	case nil:
 		return "", errNullID
 	case float64:
-		if v >= 0 {
-			u := uint64(v)
-			if v == float64(u) {
-				return fmt.Sprintf("%d", u), nil
-			}
-		} else {
-			i := int64(v)
-			if v == float64(i) {
-				return fmt.Sprintf("%d", i), nil
-			}
-		}
-		return fmt.Sprintf("%v", v), nil
+		return normalizeJSONNumberString(strconv.FormatFloat(v, 'g', -1, 64))
 	case json.Number:
 		return normalizeJSONNumberString(v.String())
 	case int64:
@@ -524,10 +515,21 @@ func (t *StdioTransport) readLoop() {
 
 		// Response: has ID but no method
 		if hasID && frame.Method == "" {
-			resp, err := frame.toResponse()
+			id, err := parseRequestID(frame.ID)
 			if err != nil {
 				t.handleMalformedResponse(line)
 				continue
+			}
+			rpcErr, err := parseResponseError(frame.Error)
+			if err != nil {
+				t.handleMalformedResponse(line)
+				continue
+			}
+			resp := Response{
+				JSONRPC: frame.JSONRPC,
+				ID:      id,
+				Result:  frame.Result,
+				Error:   rpcErr,
 			}
 			t.handleResponse(resp)
 			continue
@@ -535,10 +537,16 @@ func (t *StdioTransport) readLoop() {
 
 		// Request: has both ID and method
 		if hasID && frame.Method != "" {
-			req, err := frame.toRequest()
+			id, err := parseRequestID(frame.ID)
 			if err != nil {
 				t.handleMalformedRequest(line)
 				continue
+			}
+			req := Request{
+				JSONRPC: frame.JSONRPC,
+				ID:      id,
+				Method:  frame.Method,
+				Params:  frame.Params,
 			}
 			t.enqueueRequest(req)
 			continue
@@ -789,38 +797,16 @@ func parseRequestID(data json.RawMessage) (RequestID, error) {
 	return id, nil
 }
 
-func (f inboundFrame) toResponse() (Response, error) {
-	id, err := parseRequestID(f.ID)
-	if err != nil {
-		return Response{}, err
-	}
+func parseResponseError(data json.RawMessage) (*Error, error) {
 	var rpcErr *Error
-	if len(f.Error) > 0 && string(f.Error) != "null" {
+	if len(data) > 0 && string(data) != "null" {
 		var parsed Error
-		if err := json.Unmarshal(f.Error, &parsed); err != nil {
-			return Response{}, err
+		if err := json.Unmarshal(data, &parsed); err != nil {
+			return nil, err
 		}
 		rpcErr = &parsed
 	}
-	return Response{
-		JSONRPC: f.JSONRPC,
-		ID:      id,
-		Result:  f.Result,
-		Error:   rpcErr,
-	}, nil
-}
-
-func (f inboundFrame) toRequest() (Request, error) {
-	id, err := parseRequestID(f.ID)
-	if err != nil {
-		return Request{}, err
-	}
-	return Request{
-		JSONRPC: f.JSONRPC,
-		ID:      id,
-		Method:  f.Method,
-		Params:  f.Params,
-	}, nil
+	return rpcErr, nil
 }
 
 func (f inboundFrame) toNotification() Notification {
@@ -910,6 +896,9 @@ func normalizeJSONNumberString(raw string) (string, error) {
 	if parts.isZero {
 		return "0", nil
 	}
+	if !isNormalizedJSONNumberSizeAllowed(parts) {
+		return "", fmt.Errorf("%w: %q", errUnexpectedIDType, raw)
+	}
 
 	significandLen := len(parts.significand)
 	if parts.exponent >= 0 {
@@ -932,6 +921,38 @@ func normalizeJSONNumberString(raw string) (string, error) {
 		return "0", nil
 	}
 	return parts.sign + "0." + fracPart, nil
+}
+
+func isNormalizedJSONNumberSizeAllowed(parts numberParts) bool {
+	if parts.exponent > maxJSONRPCIDExponentAbs || parts.exponent < -maxJSONRPCIDExponentAbs {
+		return false
+	}
+	normalizedLen := normalizedJSONNumberLength(parts)
+	return normalizedLen > 0 && normalizedLen <= maxJSONRPCIDLength
+}
+
+func normalizedJSONNumberLength(parts numberParts) int {
+	signLen := len(parts.sign)
+	significandLen := len(parts.significand)
+	if parts.exponent >= 0 {
+		return signLen + significandLen + parts.exponent
+	}
+
+	decimalPos := significandLen + parts.exponent
+	if decimalPos > 0 {
+		fracLen := len(strings.TrimRight(parts.significand[decimalPos:], "0"))
+		if fracLen == 0 {
+			return signLen + decimalPos
+		}
+		return signLen + decimalPos + 1 + fracLen
+	}
+
+	trailingZeros := significandLen - len(strings.TrimRight(parts.significand, "0"))
+	fracLen := -decimalPos + significandLen - trailingZeros
+	if fracLen <= 0 {
+		return 1
+	}
+	return signLen + 2 + fracLen
 }
 
 func allDigitsAreZero(raw string) bool {
