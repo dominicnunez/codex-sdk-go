@@ -203,10 +203,26 @@ func (c *Client) Send(ctx context.Context, req Request) (Response, error) {
 
 	// Check if the response contains an error
 	if resp.Error != nil {
+		if isTransportClosedResponse(resp.Error) {
+			return Response{}, NewTransportError("failed to send request", errTransportClosed)
+		}
 		return Response{}, NewRPCError(resp.Error)
 	}
 
 	return resp, nil
+}
+
+func isTransportClosedResponse(errResp *Error) bool {
+	if errResp == nil {
+		return false
+	}
+	if errResp.Code != ErrCodeInternalError {
+		return false
+	}
+	if errResp.Message != errTransportClosed.Error() {
+		return false
+	}
+	return string(errResp.Data) == transportClosedErrorData
 }
 
 // OnNotification registers a listener for incoming notifications with the given method.

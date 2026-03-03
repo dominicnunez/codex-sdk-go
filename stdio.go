@@ -47,6 +47,7 @@ const (
 	requestIDKeyPrefixString  = "s:"
 	maxJSONRPCIDExponentAbs   = 4096
 	maxJSONRPCIDLength        = 8192
+	transportClosedErrorData  = `{"transport":"closed","origin":"client"}`
 )
 
 type writeEnvelope struct {
@@ -94,6 +95,7 @@ type StdioTransport struct {
 // errUnexpectedIDType is returned when normalizeID encounters an ID value
 // that is not a supported JSON-RPC ID type (string, number).
 var errUnexpectedIDType = errors.New("unexpected ID type")
+var errTransportClosed = errors.New("transport closed")
 
 // errNullID is returned when normalizeID encounters a nil (JSON null) ID.
 // JSON-RPC 2.0 responses with "id": null indicate the server could not
@@ -194,7 +196,7 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 	t.mu.Lock()
 	if t.closed {
 		t.mu.Unlock()
-		return Response{}, NewTransportError("send failed", errors.New("transport closed"))
+		return Response{}, NewTransportError("send failed", errTransportClosed)
 	}
 
 	// Create response channel and store with normalized ID for matching
@@ -249,7 +251,7 @@ func (t *StdioTransport) Notify(ctx context.Context, notif Notification) error {
 	t.mu.Lock()
 	if t.closed {
 		t.mu.Unlock()
-		return NewTransportError("notify failed", errors.New("transport closed"))
+		return NewTransportError("notify failed", errTransportClosed)
 	}
 	t.mu.Unlock()
 
@@ -303,7 +305,8 @@ func (t *StdioTransport) Close() error {
 			ID:      pending.id,
 			Error: &Error{
 				Code:    ErrCodeInternalError,
-				Message: "transport closed",
+				Message: errTransportClosed.Error(),
+				Data:    json.RawMessage(transportClosedErrorData),
 			},
 		}
 		// Defensive: default branch guards against a handleResponse
@@ -380,7 +383,7 @@ func (t *StdioTransport) enqueueWrite(ctx context.Context, msg interface{}, op s
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-t.ctx.Done():
-		return NewTransportError(op, errors.New("transport closed"))
+		return NewTransportError(op, errTransportClosed)
 	case <-t.readerStopped:
 		if watchReaderStop {
 			return NewTransportError(op, errors.New("transport reader stopped"))
@@ -397,7 +400,7 @@ func (t *StdioTransport) enqueueWrite(ctx context.Context, msg interface{}, op s
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-t.ctx.Done():
-		return NewTransportError(op, errors.New("transport closed"))
+		return NewTransportError(op, errTransportClosed)
 	case <-t.readerStopped:
 		if watchReaderStop {
 			return NewTransportError(op, errors.New("transport reader stopped"))

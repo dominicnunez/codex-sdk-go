@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -190,6 +191,65 @@ func TestClientSendRejectsNilContext(t *testing.T) {
 	_, err := client.Send(nil, req)
 	if !errors.Is(err, codex.ErrNilContext) {
 		t.Fatalf("Send(nil, req) error = %v; want ErrNilContext", err)
+	}
+}
+
+func TestClientSendTransportCloseReturnsTransportError(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	client := codex.NewClient(transport)
+	defer func() { _ = transport.Close() }()
+
+	// Drain outbound requests so Send can block waiting on a response.
+	go func() {
+		dec := json.NewDecoder(serverReader)
+		for {
+			var req codex.Request
+			if err := dec.Decode(&req); err != nil {
+				return
+			}
+		}
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	errCh := make(chan error, 1)
+	go func() {
+		_, err := client.Send(ctx, codex.Request{
+			JSONRPC: "2.0",
+			ID:      codex.RequestID{Value: "close-race"},
+			Method:  "test/close",
+		})
+		errCh <- err
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	if err := transport.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	select {
+	case err := <-errCh:
+		if err == nil {
+			t.Fatal("expected error from Send after transport close")
+		}
+		var transportErr *codex.TransportError
+		if !errors.As(err, &transportErr) {
+			t.Fatalf("expected TransportError, got %T: %v", err, err)
+		}
+		var rpcErr *codex.RPCError
+		if errors.As(err, &rpcErr) {
+			t.Fatalf("expected no RPCError wrapping for transport close, got %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for Send to return")
 	}
 }
 
