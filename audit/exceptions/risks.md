@@ -155,6 +155,17 @@ large file diffs, which are infrequent relative to total message volume.
 it ensures no partial state leaks on error. The note that future modifications must include
 the reset is accurate but not actionable as a code change.
 
+### A reader that cannot be closed cannot be force-unblocked during transport shutdown
+
+**Location:** `stdio.go:106-112`, `stdio.go:210-214`, `stdio.go:333-380` — reader close path and scanner loop
+**Date:** 2026-03-02
+
+**Reason:** `StdioTransport.Close` now closes inbound readers that implement `io.Closer`, which stops
+the scanner goroutine in common cases (`io.PipeReader`, files, sockets). For a true `io.Reader` that
+does not expose close/deadline controls, Go's stdlib provides no generic way to interrupt a blocked
+read. Solving that fully would require changing transport construction contracts to mandate an
+interruptible reader abstraction, which is disproportionate to this medium-severity lifecycle concern.
+
 ### handleApproval includes server-controlled method name in internal error strings
 
 **Location:** `client.go:274,279,284` — error wrapping in handleApproval
