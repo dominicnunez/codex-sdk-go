@@ -40,6 +40,8 @@ const (
 	errNilTransportReader        = "stdio transport reader must not be nil"
 	errNilTransportWriter        = "stdio transport writer must not be nil"
 	errNonClosableTransportInput = "stdio transport reader must implement io.ReadCloser"
+	errInvalidJSONRPCVersion     = `invalid request: jsonrpc must be "2.0"`
+	errInvalidResponseJSONRPC    = `invalid response: jsonrpc must be "2.0"`
 )
 
 type writeEnvelope struct {
@@ -467,7 +469,12 @@ func (t *StdioTransport) readLoop() {
 			continue
 		}
 
-		hasID := len(frame.ID) > 0 && string(frame.ID) != "null"
+		hasID := frameHasID(frame.ID)
+
+		if frame.JSONRPC != jsonrpcVersion {
+			t.handleInvalidJSONRPCVersion(frame, hasID)
+			continue
+		}
 
 		// Response: has ID but no method
 		if hasID && frame.Method == "" {
@@ -498,6 +505,72 @@ func (t *StdioTransport) readLoop() {
 		}
 
 		// Unknown message type - skip it
+	}
+}
+
+func frameHasID(raw json.RawMessage) bool {
+	return len(raw) > 0 && string(raw) != "null"
+}
+
+func (t *StdioTransport) handleInvalidJSONRPCVersion(frame inboundFrame, hasID bool) {
+	// Request with invalid protocol version: reject with JSON-RPC invalid request.
+	if hasID && frame.Method != "" {
+		t.rejectInvalidProtocolVersion(frame.ID)
+		return
+	}
+
+	// Response with invalid protocol version: fail matching pending request so
+	// callers do not wait for context timeout.
+	if hasID && frame.Method == "" {
+		t.failPendingWithInvalidProtocolVersion(frame.ID)
+	}
+}
+
+func (t *StdioTransport) rejectInvalidProtocolVersion(rawID json.RawMessage) {
+	id := RequestID{Value: nil}
+	if parsed, err := parseRequestID(rawID); err == nil {
+		id = parsed
+	}
+	_ = t.writeMessage(Response{
+		JSONRPC: jsonrpcVersion,
+		ID:      id,
+		Error: &Error{
+			Code:    ErrCodeInvalidRequest,
+			Message: errInvalidJSONRPCVersion,
+		},
+	})
+}
+
+func (t *StdioTransport) failPendingWithInvalidProtocolVersion(rawID json.RawMessage) {
+	id, err := parseRequestID(rawID)
+	if err != nil {
+		return
+	}
+	normalizedID, err := normalizeID(id.Value)
+	if err != nil {
+		return
+	}
+
+	t.mu.Lock()
+	if t.closed {
+		t.mu.Unlock()
+		return
+	}
+	pending, ok := t.pendingReqs[normalizedID]
+	if ok {
+		delete(t.pendingReqs, normalizedID)
+	}
+	t.mu.Unlock()
+
+	if ok {
+		pending.ch <- Response{
+			JSONRPC: jsonrpcVersion,
+			ID:      pending.id,
+			Error: &Error{
+				Code:    ErrCodeInvalidRequest,
+				Message: errInvalidResponseJSONRPC,
+			},
+		}
 	}
 }
 
@@ -616,7 +689,12 @@ func (t *StdioTransport) enqueueCriticalNotification(notif Notification) {
 }
 
 func isCriticalNotificationMethod(method string) bool {
-	return method == notifyTurnCompleted || method == notifyItemCompleted
+	switch method {
+	case notifyTurnCompleted, notifyItemCompleted, notifyError, notifyRealtimeError:
+		return true
+	default:
+		return false
+	}
 }
 
 func (t *StdioTransport) rejectRequestForOverload(req Request) {
@@ -895,7 +973,7 @@ func extractTopLevelIDAndMethod(data []byte) (RequestID, bool, bool) {
 				id = RequestID{Value: v}
 				hasID = true
 			case json.Number:
-				id = RequestID{Value: v.String()}
+				id = RequestID{Value: v}
 				hasID = true
 			case float64:
 				id = RequestID{Value: v}
