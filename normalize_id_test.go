@@ -156,3 +156,58 @@ func TestNormalizePendingRequestIDDoesNotCollideLargeExponentIntegers(t *testing
 		t.Fatalf("normalized IDs collided: %q == %q", a, b)
 	}
 }
+
+func TestNormalizePendingRequestIDRejectsOversizedPositiveExponent(t *testing.T) {
+	_, err := normalizePendingRequestID(json.Number("1e5000"))
+	if err == nil {
+		t.Fatal("normalizePendingRequestID should reject oversized positive exponent")
+	}
+	if !errors.Is(err, errUnexpectedIDType) {
+		t.Fatalf("normalizePendingRequestID error = %v; want errUnexpectedIDType", err)
+	}
+}
+
+func TestNormalizePendingRequestIDRejectsOversizedNegativeExponent(t *testing.T) {
+	_, err := normalizePendingRequestID(json.Number("1e-5000"))
+	if err == nil {
+		t.Fatal("normalizePendingRequestID should reject oversized negative exponent")
+	}
+	if !errors.Is(err, errUnexpectedIDType) {
+		t.Fatalf("normalizePendingRequestID error = %v; want errUnexpectedIDType", err)
+	}
+}
+
+func TestRequestIDEqualRejectsOversizedNumericIDs(t *testing.T) {
+	tests := []struct {
+		name string
+		a    RequestID
+		b    RequestID
+	}{
+		{
+			name: "distinct oversized positive exponents are not equal",
+			a:    RequestID{Value: json.Number("1e5000")},
+			b:    RequestID{Value: json.Number("2e5000")},
+		},
+		{
+			name: "distinct oversized negative exponents are not equal",
+			a:    RequestID{Value: json.Number("1e-5000")},
+			b:    RequestID{Value: json.Number("2e-5000")},
+		},
+		{
+			name: "oversized positive and negative exponents are not equal",
+			a:    RequestID{Value: json.Number("1e5000")},
+			b:    RequestID{Value: json.Number("1e-5000")},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.a.Equal(tt.b) {
+				t.Fatalf("RequestID(%v).Equal(%v) = true; want false", tt.a.Value, tt.b.Value)
+			}
+			if tt.b.Equal(tt.a) {
+				t.Fatalf("RequestID(%v).Equal(%v) = true; want false", tt.b.Value, tt.a.Value)
+			}
+		})
+	}
+}
