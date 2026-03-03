@@ -9,6 +9,17 @@
 > **Date:** YYYY-MM-DD
 > **Reason:** Explanation (can be multiple lines)
 
+### Formatting nil login parameter pointers does not panic in fmt paths
+
+**Location:** `account.go:215`, `account.go:285` — `String` methods used by `Format`
+**Date:** 2026-03-03
+
+**Reason:** The finding says formatting a nil pointer (for example `%v`) will panic and crash.
+That behavior does not occur in Go's `fmt` package for nil pointers that implement formatter/stringer:
+`fmt.Sprintf("%v", (*ApiKeyLoginAccountParams)(nil))` and
+`fmt.Sprintf("%v", (*ChatgptAuthTokensLoginAccountParams)(nil))` both render `<nil>`.
+So the specific reported crash path via formatting is a misread.
+
 ### Close cannot race with handleResponse to double-send on pending channel
 
 **Location:** `stdio.go:197-213` — Close() pending request cleanup loop
@@ -263,6 +274,27 @@ the precision guard the audit suggests adding. For values above 2^53 where the f
 represent the integer exactly, `v == float64(u)` will be false, and the code falls through to
 `fmt.Sprintf("%v", v)`. The suggested fix ("only use the integer fast-path when
 `v == float64(uint64(v))` is exact") is already implemented.
+
+### Internal writes do not deadlock when readerStopped is already closed
+
+**Location:** `stdio.go:376-397` — enqueueWrite `readerStopped` handling
+**Date:** 2026-03-03
+
+**Reason:** The finding claims `enqueueWrite(..., watchReaderStop=false)` can take the
+`readerStopped` branch before enqueueing and then block forever waiting on `env.done`.
+That behavior does not occur. In the second `select`, `readerStopped` is selected again and,
+when `watchReaderStop` is false, the function returns `nil` immediately at line 397 instead
+of waiting on `env.done`. No deadlock is possible on this path.
+
+### Claimed missing EOF test coverage is based on a non-existent deadlock path
+
+**Location:** `stdio_test.go:2020` — spontaneous reader EOF coverage claim
+**Date:** 2026-03-03
+
+**Reason:** The reported test gap is tied to the assertion that `enqueueWrite(..., watchReaderStop=false)`
+has a deadlock path after `readerStopped` closes. That deadlock path does not exist because
+`enqueueWrite` returns immediately on `readerStopped` when `watchReaderStop` is false. The finding
+therefore misclassifies coverage as missing for behavior that does not occur.
 
 ### Close and handleResponse race claimed but audit concludes code is safe
 
