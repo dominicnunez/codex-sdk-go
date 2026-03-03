@@ -16,6 +16,22 @@ type pendingReq struct {
 	id RequestID
 }
 
+// inbound/outbound queue sizing. These are intentionally conservative defaults:
+// large enough for normal bursts, bounded to prevent untrusted-peer DoS via
+// unbounded goroutine or memory growth.
+const (
+	inboundRequestWorkers      = 8
+	inboundRequestQueueSize    = 64
+	inboundNotificationWorkers = 8
+	inboundNotifQueueSize      = 128
+	outboundWriteQueueSize     = 256
+)
+
+type writeEnvelope struct {
+	payload []byte
+	done    chan error
+}
+
 // StdioTransport implements the Transport interface using stdin/stdout with newline-delimited JSON.
 // It supports bidirectional JSON-RPC 2.0 communication:
 // - Client→Server: Send requests and notifications
@@ -26,10 +42,12 @@ type StdioTransport struct {
 
 	mu            sync.Mutex
 	closed        bool
-	writeMu       sync.Mutex // separate mutex for write operations
 	pendingReqs   map[string]pendingReq
 	reqHandler    RequestHandler
 	notifHandler  NotificationHandler
+	requestQueue  chan []byte
+	notifQueue    chan []byte
+	writeQueue    chan writeEnvelope
 	readerStopped chan struct{}
 	once          sync.Once
 	scanErr       error // set by readLoop when scanner fails
@@ -89,10 +107,20 @@ func NewStdioTransport(reader io.Reader, writer io.Writer) *StdioTransport {
 		reader:        reader,
 		writer:        writer,
 		pendingReqs:   make(map[string]pendingReq),
+		requestQueue:  make(chan []byte, inboundRequestQueueSize),
+		notifQueue:    make(chan []byte, inboundNotifQueueSize),
+		writeQueue:    make(chan writeEnvelope, outboundWriteQueueSize),
 		readerStopped: make(chan struct{}),
 		ctx:           ctx,
 		cancelCtx:     cancel,
 	}
+	for range inboundRequestWorkers {
+		go t.requestWorker()
+	}
+	for range inboundNotificationWorkers {
+		go t.notificationWorker()
+	}
+	go t.writeLoop()
 	go t.readLoop()
 	return t
 }
@@ -127,22 +155,8 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 		t.mu.Unlock()
 	}()
 
-	// Send request in a goroutine so we can respect context cancellation
-	writeDone := make(chan error, 1)
-	go func() {
-		writeDone <- t.writeMessage(req)
-	}()
-
-	// Wait for write to complete or context cancellation
-	select {
-	case err := <-writeDone:
-		if err != nil {
-			return Response{}, err
-		}
-	case <-ctx.Done():
-		return Response{}, ctx.Err()
-	case <-t.readerStopped:
-		return Response{}, NewTransportError("send failed", errors.New("transport reader stopped"))
+	if err := t.enqueueWrite(ctx, req, "send failed", true); err != nil {
+		return Response{}, err
 	}
 
 	// Wait for response or context cancellation
@@ -165,19 +179,7 @@ func (t *StdioTransport) Notify(ctx context.Context, notif Notification) error {
 	}
 	t.mu.Unlock()
 
-	writeDone := make(chan error, 1)
-	go func() {
-		writeDone <- t.writeMessage(notif)
-	}()
-
-	select {
-	case err := <-writeDone:
-		return err
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-t.readerStopped:
-		return NewTransportError("notify failed", errors.New("transport reader stopped"))
-	}
+	return t.enqueueWrite(ctx, notif, "notify failed", true)
 }
 
 // OnRequest registers a handler for incoming JSON-RPC requests from the server.
@@ -247,33 +249,8 @@ func (t *StdioTransport) ScanErr() error {
 	return t.scanErr
 }
 
-// writeMessage writes a JSON-RPC message as newline-delimited JSON.
-// It checks the transport context before acquiring the write lock so
-// that goroutines dispatched before Close() do not write to a
-// potentially invalid writer after the transport has shut down.
-func (t *StdioTransport) writeMessage(msg interface{}) error {
-	select {
-	case <-t.ctx.Done():
-		return NewTransportError("write message", errors.New("transport closed"))
-	default:
-	}
-
-	data, err := json.Marshal(msg)
-	if err != nil {
-		return NewTransportError("marshal message", err)
-	}
-
-	t.writeMu.Lock()
-	defer t.writeMu.Unlock()
-
-	// Re-check after acquiring the lock: Close() may have been called
-	// while we were waiting on writeMu.
-	select {
-	case <-t.ctx.Done():
-		return NewTransportError("write message", errors.New("transport closed"))
-	default:
-	}
-
+// writeRawMessage writes a pre-marshaled JSON-RPC message and trailing newline.
+func (t *StdioTransport) writeRawMessage(data []byte) error {
 	// Write message then newline delimiter, handling short writes.
 	// The newline is written separately to avoid copying the entire
 	// payload just to append one byte.
@@ -303,6 +280,89 @@ func (t *StdioTransport) writeMessage(msg interface{}) error {
 	return nil
 }
 
+func (t *StdioTransport) enqueueWrite(ctx context.Context, msg interface{}, op string, watchReaderStop bool) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return NewTransportError("marshal message", err)
+	}
+	env := writeEnvelope{
+		payload: data,
+		done:    make(chan error, 1),
+	}
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.ctx.Done():
+		return NewTransportError(op, errors.New("transport closed"))
+	case <-t.readerStopped:
+		if watchReaderStop {
+			return NewTransportError(op, errors.New("transport reader stopped"))
+		}
+	case t.writeQueue <- env:
+	}
+
+	select {
+	case err := <-env.done:
+		if err != nil {
+			return err
+		}
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.ctx.Done():
+		return NewTransportError(op, errors.New("transport closed"))
+	case <-t.readerStopped:
+		if watchReaderStop {
+			return NewTransportError(op, errors.New("transport reader stopped"))
+		}
+		return nil
+	}
+}
+
+// writeMessage enqueues a JSON-RPC message for serialized writer-loop delivery.
+func (t *StdioTransport) writeMessage(msg interface{}) error {
+	return t.enqueueWrite(t.ctx, msg, "write message", false)
+}
+
+func (t *StdioTransport) writeLoop() {
+	for {
+		select {
+		case <-t.ctx.Done():
+			return
+		case env := <-t.writeQueue:
+			err := t.writeRawMessage(env.payload)
+			env.done <- err
+		}
+	}
+}
+
+func (t *StdioTransport) requestWorker() {
+	for {
+		select {
+		case <-t.ctx.Done():
+			return
+		case data := <-t.requestQueue:
+			t.handleRequest(data)
+		}
+	}
+}
+
+func (t *StdioTransport) notificationWorker() {
+	for {
+		select {
+		case <-t.ctx.Done():
+			return
+		case data := <-t.notifQueue:
+			t.handleNotification(data)
+		}
+	}
+}
+
 // readLoop continuously reads newline-delimited JSON messages from the reader
 func (t *StdioTransport) readLoop() {
 	defer t.once.Do(func() { close(t.readerStopped) })
@@ -312,7 +372,7 @@ func (t *StdioTransport) readLoop() {
 	scanner := bufio.NewScanner(t.reader)
 	scanner.Buffer(make([]byte, 0, initialBufferSize), maxMessageSize)
 	for scanner.Scan() {
-		line := scanner.Bytes()
+		line := append([]byte(nil), scanner.Bytes()...)
 
 		// Parse the message to determine its type
 		var msg struct {
@@ -336,13 +396,13 @@ func (t *StdioTransport) readLoop() {
 
 		// Request: has both ID and method
 		if hasID && msg.Method != "" {
-			t.handleRequest(line)
+			t.enqueueRequest(line)
 			continue
 		}
 
 		// Notification: has method but no ID
 		if msg.Method != "" {
-			t.handleNotification(line)
+			t.enqueueNotification(line)
 			continue
 		}
 
@@ -357,6 +417,44 @@ func (t *StdioTransport) readLoop() {
 		t.scanErr = err
 		t.mu.Unlock()
 	}
+}
+
+func (t *StdioTransport) enqueueRequest(data []byte) {
+	select {
+	case <-t.ctx.Done():
+		return
+	case t.requestQueue <- data:
+		return
+	default:
+		t.rejectRequestForOverload(data)
+	}
+}
+
+func (t *StdioTransport) enqueueNotification(data []byte) {
+	select {
+	case <-t.ctx.Done():
+		return
+	case t.notifQueue <- data:
+	default:
+		// Notifications are fire-and-forget. If the queue is full we drop to
+		// preserve process liveness and bound memory use under abuse.
+	}
+}
+
+func (t *StdioTransport) rejectRequestForOverload(data []byte) {
+	var req Request
+	if err := json.Unmarshal(data, &req); err != nil {
+		t.handleMalformedRequest(data)
+		return
+	}
+	_ = t.writeMessage(Response{
+		JSONRPC: jsonrpcVersion,
+		ID:      req.ID,
+		Error: &Error{
+			Code:    ErrCodeInternalError,
+			Message: "too many pending inbound requests",
+		},
+	})
 }
 
 // handleResponse routes an incoming response to the pending request channel.
@@ -456,68 +554,71 @@ func (t *StdioTransport) handleRequest(data []byte) {
 		return
 	}
 
-	// Dispatch to handler in goroutine with transport-scoped context
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				errorResp := Response{
-					JSONRPC: jsonrpcVersion,
-					ID:      req.ID,
-					Error: &Error{
-						Code:    ErrCodeInternalError,
-						Message: "internal handler error",
-					},
-				}
-				_ = t.writeMessage(errorResp)
-				if panicFn != nil {
-					panicFn(r)
-				}
-			}
-		}()
-
-		resp, err := handler(t.ctx, req)
-		if err != nil {
-			// Handler returned error - use generic message to avoid leaking
-			// internal details across the trust boundary
-			code := ErrCodeInternalError
-			msg := "internal handler error"
-			if errors.Is(err, errInvalidParams) {
-				code = ErrCodeInvalidParams
-				msg = "invalid params"
-			}
+	defer func() {
+		if r := recover(); r != nil {
 			errorResp := Response{
 				JSONRPC: jsonrpcVersion,
 				ID:      req.ID,
 				Error: &Error{
-					Code:    code,
-					Message: msg,
+					Code:    ErrCodeInternalError,
+					Message: "internal handler error",
 				},
 			}
-			_ = t.writeMessage(errorResp) // Error writing error response - nothing more we can do
-			return
+			_ = t.writeMessage(errorResp)
+			if panicFn != nil {
+				panicFn(r)
+			}
 		}
-
-		// Ensure response has correct ID and version
-		resp.JSONRPC = jsonrpcVersion
-		resp.ID = req.ID
-		_ = t.writeMessage(resp) // Error writing response - nothing more we can do (already in goroutine)
 	}()
+
+	resp, err := handler(t.ctx, req)
+	if err != nil {
+		// Handler returned error - use generic message to avoid leaking
+		// internal details across the trust boundary
+		code := ErrCodeInternalError
+		msg := "internal handler error"
+		if errors.Is(err, errInvalidParams) {
+			code = ErrCodeInvalidParams
+			msg = "invalid params"
+		}
+		errorResp := Response{
+			JSONRPC: jsonrpcVersion,
+			ID:      req.ID,
+			Error: &Error{
+				Code:    code,
+				Message: msg,
+			},
+		}
+		_ = t.writeMessage(errorResp) // Error writing error response - nothing more we can do
+		return
+	}
+
+	// Ensure response has correct ID and version
+	resp.JSONRPC = jsonrpcVersion
+	resp.ID = req.ID
+	_ = t.writeMessage(resp) // Error writing response - nothing more we can do
 }
 
 // handleMalformedRequest attempts to extract the ID from a request that
 // failed full unmarshal, and sends back a parse error response so the
 // server knows the request failed instead of hanging indefinitely.
 func (t *StdioTransport) handleMalformedRequest(data []byte) {
+	id := RequestID{Value: nil}
 	var idOnly struct {
-		ID RequestID `json:"id"`
+		ID json.RawMessage `json:"id"`
 	}
-	if json.Unmarshal(data, &idOnly) != nil {
-		return
+	if json.Unmarshal(data, &idOnly) == nil && len(idOnly.ID) > 0 {
+		var candidate RequestID
+		if json.Unmarshal(idOnly.ID, &candidate) == nil {
+			if _, err := normalizeID(candidate.Value); err == nil {
+				id = candidate
+			}
+		}
 	}
 
 	errorResp := Response{
 		JSONRPC: jsonrpcVersion,
-		ID:      idOnly.ID,
+		ID:      id,
 		Error: &Error{
 			Code:    ErrCodeParseError,
 			Message: "failed to parse server request",
@@ -542,15 +643,12 @@ func (t *StdioTransport) handleNotification(data []byte) {
 		return
 	}
 
-	// Dispatch to handler in goroutine with transport-scoped context
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				if panicFn != nil {
-					panicFn(r)
-				}
+	defer func() {
+		if r := recover(); r != nil {
+			if panicFn != nil {
+				panicFn(r)
 			}
-		}()
-		handler(t.ctx, notif)
+		}
 	}()
+	handler(t.ctx, notif)
 }
