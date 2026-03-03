@@ -2,7 +2,7 @@
 
 Idiomatic Go SDK for the [OpenAI Codex CLI](https://github.com/openai/codex) JSON-RPC 2.0 protocol. Stdlib only, zero external dependencies.
 
-Built against the [protocol schemas](specs/) extracted from the Codex TypeScript source — full coverage of all 38 request methods, 40+ notification types, and 9 server→client approval flows.
+Built against the [protocol schemas](specs/) extracted from the Codex TypeScript source — full coverage of all current request methods, 40+ notification types, and 9 server→client approval flows.
 
 ## Installation
 
