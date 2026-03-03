@@ -256,6 +256,8 @@ func TestStartProcessExecArgsWithTypedFlags(t *testing.T) {
 		"--experimental-json",
 		"--ask-for-approval",
 		"--full-auto",
+		"--dangerously-bypass-approvals-and-sandbox",
+		"-dangerously-bypass-approvals-and-sandbox",
 	}
 
 	for _, flag := range rejectedFlags {
@@ -278,7 +280,14 @@ func TestStartProcessExecArgsWithTypedFlags(t *testing.T) {
 // TestStartProcessExecArgsWithTypedFlagsCombinedForm verifies that
 // --flag=value combined forms are also rejected.
 func TestStartProcessExecArgsWithTypedFlagsCombinedForm(t *testing.T) {
-	rejectedFlags := []string{"--model", "--sandbox", "--config", "--experimental-json"}
+	rejectedFlags := []string{
+		"--model",
+		"--sandbox",
+		"--config",
+		"--experimental-json",
+		"--dangerously-bypass-approvals-and-sandbox",
+		"-dangerously-bypass-approvals-and-sandbox",
+	}
 
 	for _, flag := range rejectedFlags {
 		t.Run(flag+"=value", func(t *testing.T) {
