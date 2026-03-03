@@ -310,6 +310,146 @@ func TestConversationTurnStreamedIgnoresStaleTurnNotifications(t *testing.T) {
 	}
 }
 
+func TestConversationTurnIgnoresStaleFailedTurnNotifications(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+
+	firstDone := make(chan error, 1)
+	go func() {
+		_, err := conv.Turn(ctx, codex.TurnOptions{Prompt: "first"})
+		firstDone <- err
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+	if err := <-firstDone; err != nil {
+		t.Fatalf("first turn error: %v", err)
+	}
+
+	type turnResult struct {
+		result *codex.RunResult
+		err    error
+	}
+	secondDone := make(chan turnResult, 1)
+	go func() {
+		r, err := conv.Turn(ctx, codex.TurnOptions{Prompt: "second"})
+		secondDone <- turnResult{result: r, err: err}
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-stale","status":"failed","items":[],"error":{"message":"stale failure"}}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-2","text":"fresh"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	second := <-secondDone
+	if second.err != nil {
+		t.Fatalf("second turn error: %v", second.err)
+	}
+	if second.result == nil {
+		t.Fatal("second turn result is nil")
+	}
+	if second.result.Response != "fresh" {
+		t.Fatalf("second turn response = %q, want fresh", second.result.Response)
+	}
+}
+
+func TestConversationTurnStreamedIgnoresStaleFailedTurnNotifications(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+
+	firstDone := make(chan error, 1)
+	go func() {
+		_, err := conv.Turn(ctx, codex.TurnOptions{Prompt: "first"})
+		firstDone <- err
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+	if err := <-firstDone; err != nil {
+		t.Fatalf("first turn error: %v", err)
+	}
+
+	stream := conv.TurnStreamed(ctx, codex.TurnOptions{Prompt: "second"})
+	time.Sleep(50 * time.Millisecond)
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-stale","status":"failed","items":[],"error":{"message":"stale failure"}}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/agentMessage/delta",
+		Params:  json.RawMessage(`{"delta":"fresh","itemId":"item-2","threadId":"thread-1","turnId":"turn-1"}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-2","text":"fresh"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	var deltas []string
+	for event, err := range stream.Events() {
+		if err != nil {
+			t.Fatalf("unexpected stream error: %v", err)
+		}
+		if delta, ok := event.(*codex.TextDelta); ok {
+			deltas = append(deltas, delta.Delta)
+		}
+	}
+
+	if strings.Join(deltas, "") != "fresh" {
+		t.Fatalf("stream deltas = %v, want [fresh]", deltas)
+	}
+
+	result := stream.Result()
+	if result == nil {
+		t.Fatal("Result() returned nil")
+	}
+	if result.Response != "fresh" {
+		t.Fatalf("result response = %q, want fresh", result.Response)
+	}
+}
+
 func TestConversationEmptyPrompt(t *testing.T) {
 	proc, _ := mockProcess(t)
 
