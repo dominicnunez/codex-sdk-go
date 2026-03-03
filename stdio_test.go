@@ -405,6 +405,86 @@ func TestStdioRequestIDTypeFamiliesDoNotCollide(t *testing.T) {
 	}
 }
 
+func TestStdioAllowsReusingRequestIDAfterResponse(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	requests := make(chan codex.Request, 2)
+	go func() {
+		scanner := bufio.NewScanner(serverReader)
+		for scanner.Scan() {
+			var req codex.Request
+			if err := json.Unmarshal(scanner.Bytes(), &req); err != nil {
+				continue
+			}
+			requests <- req
+		}
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	roundTrip := func(method, payload string) codex.Response {
+		respCh := make(chan codex.Response, 1)
+		errCh := make(chan error, 1)
+
+		go func() {
+			resp, err := transport.Send(ctx, codex.Request{
+				JSONRPC: "2.0",
+				ID:      codex.RequestID{Value: "reused-id"},
+				Method:  method,
+			})
+			if err != nil {
+				errCh <- err
+				return
+			}
+			respCh <- resp
+		}()
+
+		var req codex.Request
+		select {
+		case req = <-requests:
+		case <-time.After(500 * time.Millisecond):
+			t.Fatalf("timeout waiting for request %q", method)
+		}
+
+		resp := codex.Response{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Result:  json.RawMessage(payload),
+		}
+		respJSON, _ := json.Marshal(resp)
+		_, _ = serverWriter.Write(append(respJSON, '\n'))
+
+		select {
+		case err := <-errCh:
+			t.Fatalf("send %q returned error: %v", method, err)
+		case out := <-respCh:
+			return out
+		case <-time.After(500 * time.Millisecond):
+			t.Fatalf("timeout waiting for response %q", method)
+		}
+		return codex.Response{}
+	}
+
+	first := roundTrip("test/first", `{"n":1}`)
+	if string(first.Result) != `{"n":1}` {
+		t.Fatalf("first response = %s; want %s", first.Result, `{"n":1}`)
+	}
+
+	second := roundTrip("test/second", `{"n":2}`)
+	if string(second.Result) != `{"n":2}` {
+		t.Fatalf("second response = %s; want %s", second.Result, `{"n":2}`)
+	}
+}
+
 // TestStdioNotificationDispatch verifies notifications are dispatched to the handler
 func TestStdioNotificationDispatch(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()

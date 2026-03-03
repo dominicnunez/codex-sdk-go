@@ -59,11 +59,74 @@ type writeEnvelope struct {
 
 type inboundFrame struct {
 	JSONRPC string          `json:"jsonrpc"`
-	ID      json.RawMessage `json:"id"`
+	ID      inboundID       `json:"id"`
 	Method  string          `json:"method"`
 	Params  json.RawMessage `json:"params,omitempty"`
 	Result  json.RawMessage `json:"result,omitempty"`
-	Error   json.RawMessage `json:"error,omitempty"`
+	Error   inboundError    `json:"error,omitempty"`
+}
+
+type inboundID struct {
+	present bool
+	isNull  bool
+	value   RequestID
+	invalid bool
+}
+
+func (i *inboundID) UnmarshalJSON(data []byte) error {
+	i.present = true
+	i.isNull = bytes.Equal(data, []byte("null"))
+	if i.isNull {
+		i.value = RequestID{}
+		i.invalid = false
+		return nil
+	}
+
+	var parsed RequestID
+	if json.Unmarshal(data, &parsed) != nil {
+		i.invalid = true
+		return nil //nolint:nilerr // Preserve frame routing; invalid ID is handled as malformed request/response.
+	}
+	i.value = parsed
+	i.invalid = false
+	return nil
+}
+
+func (i inboundID) hasValue() bool {
+	return i.present && !i.isNull
+}
+
+func (i inboundID) requestID() (RequestID, bool) {
+	if !i.hasValue() || i.invalid {
+		return RequestID{}, false
+	}
+	return i.value, true
+}
+
+type inboundError struct {
+	present bool
+	isNull  bool
+	value   *Error
+	invalid bool
+}
+
+func (e *inboundError) UnmarshalJSON(data []byte) error {
+	e.present = true
+	e.isNull = bytes.Equal(data, []byte("null"))
+	if e.isNull {
+		e.value = nil
+		e.invalid = false
+		return nil
+	}
+
+	var parsed Error
+	if json.Unmarshal(data, &parsed) != nil {
+		e.invalid = true
+		return nil //nolint:nilerr // Preserve frame routing; invalid error payload is handled as malformed response.
+	}
+	e.value = &parsed
+	e.invalid = false
+	return nil
 }
 
 // StdioTransport implements the Transport interface using stdin/stdout with newline-delimited JSON.
@@ -111,38 +174,66 @@ var errNullID = errors.New("null request ID")
 // JSON unmarshals all numbers as float64, so we format integer-valued
 // floats without decimals for consistent lookups.
 func normalizeID(id interface{}) (string, error) {
-	switch v := id.(type) {
-	case nil:
-		return "", errNullID
-	case float64:
-		return normalizeJSONNumberString(strconv.FormatFloat(v, 'g', -1, 64))
-	case json.Number:
-		return normalizeJSONNumberString(v.String())
-	case int64:
-		return fmt.Sprintf("%d", v), nil
-	case int:
-		return fmt.Sprintf("%d", v), nil
-	case uint64:
-		return fmt.Sprintf("%d", v), nil
-	case string:
-		return v, nil
-	default:
-		return "", fmt.Errorf("%w: %T", errUnexpectedIDType, id)
-	}
+	normalizedID, _, err := normalizeRequestID(id)
+	return normalizedID, err
 }
 
 func normalizePendingRequestID(id interface{}) (string, error) {
-	normalizedID, err := normalizeID(id)
+	normalizedID, familyPrefix, err := normalizeRequestID(id)
 	if err != nil {
 		return "", err
 	}
-	switch id.(type) {
-	case float64, json.Number, int64, int, uint64:
-		return requestIDKeyPrefixNumber + normalizedID, nil
+	return familyPrefix + normalizedID, nil
+}
+
+func normalizeRequestID(id interface{}) (string, string, error) {
+	switch v := id.(type) {
+	case nil:
+		return "", "", errNullID
 	case string:
-		return requestIDKeyPrefixString + normalizedID, nil
+		return v, requestIDKeyPrefixString, nil
+	}
+
+	normalizedID, isNumeric, err := normalizeNumericID(id)
+	if err != nil {
+		return "", "", err
+	}
+	if !isNumeric {
+		return "", "", fmt.Errorf("%w: %T", errUnexpectedIDType, id)
+	}
+	return normalizedID, requestIDKeyPrefixNumber, nil
+}
+
+func normalizeNumericID(id interface{}) (string, bool, error) {
+	switch v := id.(type) {
+	case float64:
+		normalized, err := normalizeJSONNumberString(strconv.FormatFloat(v, 'g', -1, 64))
+		return normalized, true, err
+	case json.Number:
+		normalized, err := normalizeJSONNumberString(v.String())
+		return normalized, true, err
+	case int:
+		return strconv.FormatInt(int64(v), 10), true, nil
+	case int8:
+		return strconv.FormatInt(int64(v), 10), true, nil
+	case int16:
+		return strconv.FormatInt(int64(v), 10), true, nil
+	case int32:
+		return strconv.FormatInt(int64(v), 10), true, nil
+	case int64:
+		return strconv.FormatInt(v, 10), true, nil
+	case uint:
+		return strconv.FormatUint(uint64(v), 10), true, nil
+	case uint8:
+		return strconv.FormatUint(uint64(v), 10), true, nil
+	case uint16:
+		return strconv.FormatUint(uint64(v), 10), true, nil
+	case uint32:
+		return strconv.FormatUint(uint64(v), 10), true, nil
+	case uint64:
+		return strconv.FormatUint(v, 10), true, nil
 	default:
-		return "", fmt.Errorf("%w: %T", errUnexpectedIDType, id)
+		return "", false, nil
 	}
 }
 
@@ -150,8 +241,7 @@ func normalizePendingRequestID(id interface{}) (string, error) {
 // reader is required to be an io.ReadCloser so Close can always unblock the read loop.
 // Typically, reader is os.Stdin and writer is os.Stdout.
 // The transport starts background goroutines for write and inbound dispatch.
-// The read loop starts lazily when inbound handling is first configured or
-// when outbound traffic begins.
+// The read loop starts eagerly before this constructor returns.
 // It panics if reader/writer are invalid.
 func NewStdioTransport(reader io.ReadCloser, writer io.Writer) *StdioTransport {
 	if reader == nil {
@@ -221,14 +311,13 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 		return Response{}, NewTransportError("send failed", fmt.Errorf("duplicate request ID: %v", req.ID.Value))
 	}
 	respChan := make(chan Response, 1)
-	t.pendingReqs[normalizedID] = pendingReq{ch: respChan, id: req.ID}
+	pending := pendingReq{ch: respChan, id: req.ID}
+	t.pendingReqs[normalizedID] = pending
 	t.mu.Unlock()
 
 	// Cleanup on exit
 	defer func() {
-		t.mu.Lock()
-		delete(t.pendingReqs, normalizedID)
-		t.mu.Unlock()
+		t.cleanupPendingReq(normalizedID, pending)
 	}()
 
 	if err := t.enqueueWrite(ctx, req, "send failed", true); err != nil {
@@ -571,7 +660,7 @@ func (t *StdioTransport) processInboundLine(line []byte) {
 		return
 	}
 
-	hasID := frameHasID(frame.ID)
+	hasID := frame.ID.hasValue()
 	if frame.JSONRPC != jsonrpcVersion {
 		t.handleInvalidJSONRPCVersion(frame, hasID)
 		return
@@ -579,13 +668,8 @@ func (t *StdioTransport) processInboundLine(line []byte) {
 
 	// Response: has ID but no method.
 	if hasID && frame.Method == "" {
-		id, err := parseRequestID(frame.ID)
-		if err != nil {
-			t.handleMalformedResponse(line)
-			return
-		}
-		rpcErr, err := parseResponseError(frame.Error)
-		if err != nil {
+		id, ok := frame.ID.requestID()
+		if !ok || frame.Error.invalid {
 			t.handleMalformedResponse(line)
 			return
 		}
@@ -593,7 +677,7 @@ func (t *StdioTransport) processInboundLine(line []byte) {
 			JSONRPC: frame.JSONRPC,
 			ID:      id,
 			Result:  frame.Result,
-			Error:   rpcErr,
+			Error:   frame.Error.value,
 		}
 		t.handleResponse(resp)
 		return
@@ -601,8 +685,8 @@ func (t *StdioTransport) processInboundLine(line []byte) {
 
 	// Request: has both ID and method.
 	if hasID && frame.Method != "" {
-		id, err := parseRequestID(frame.ID)
-		if err != nil {
+		id, ok := frame.ID.requestID()
+		if !ok {
 			t.handleMalformedRequest(line)
 			return
 		}
@@ -622,10 +706,6 @@ func (t *StdioTransport) processInboundLine(line []byte) {
 	}
 }
 
-func frameHasID(raw json.RawMessage) bool {
-	return len(raw) > 0 && string(raw) != "null"
-}
-
 func (t *StdioTransport) handleInvalidJSONRPCVersion(frame inboundFrame, hasID bool) {
 	// Request with invalid protocol version: reject with JSON-RPC invalid request.
 	if hasID && frame.Method != "" {
@@ -640,9 +720,9 @@ func (t *StdioTransport) handleInvalidJSONRPCVersion(frame inboundFrame, hasID b
 	}
 }
 
-func (t *StdioTransport) rejectInvalidProtocolVersion(rawID json.RawMessage) {
+func (t *StdioTransport) rejectInvalidProtocolVersion(idField inboundID) {
 	id := RequestID{Value: nil}
-	if parsed, err := parseRequestID(rawID); err == nil {
+	if parsed, ok := idField.requestID(); ok {
 		id = parsed
 	}
 	if err := t.writeMessage(Response{
@@ -657,9 +737,9 @@ func (t *StdioTransport) rejectInvalidProtocolVersion(rawID json.RawMessage) {
 	}
 }
 
-func (t *StdioTransport) failPendingWithInvalidProtocolVersion(rawID json.RawMessage) {
-	id, err := parseRequestID(rawID)
-	if err != nil {
+func (t *StdioTransport) failPendingWithInvalidProtocolVersion(idField inboundID) {
+	id, ok := idField.requestID()
+	if !ok {
 		return
 	}
 	normalizedID, err := normalizePendingRequestID(id.Value)
@@ -861,18 +941,6 @@ func parseRequestID(data json.RawMessage) (RequestID, error) {
 	return id, nil
 }
 
-func parseResponseError(data json.RawMessage) (*Error, error) {
-	var rpcErr *Error
-	if len(data) > 0 && string(data) != "null" {
-		var parsed Error
-		if err := json.Unmarshal(data, &parsed); err != nil {
-			return nil, err
-		}
-		rpcErr = &parsed
-	}
-	return rpcErr, nil
-}
-
 func (f inboundFrame) toNotification() Notification {
 	return Notification{
 		JSONRPC: f.JSONRPC,
@@ -906,6 +974,20 @@ func (t *StdioTransport) handleResponse(resp Response) {
 	if ok {
 		pending.ch <- resp // safe: buffer 1, only one sender claims via delete
 	}
+}
+
+func (t *StdioTransport) cleanupPendingReq(normalizedID string, pending pendingReq) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	current, ok := t.pendingReqs[normalizedID]
+	if !ok {
+		return
+	}
+	if current.ch != pending.ch {
+		return
+	}
+	delete(t.pendingReqs, normalizedID)
 }
 
 func (t *StdioTransport) handleMalformedFrame(data []byte) {

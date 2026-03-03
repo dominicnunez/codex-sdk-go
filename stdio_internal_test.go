@@ -202,6 +202,50 @@ func TestNotifyCanceledContextDoesNotAttemptWrite(t *testing.T) {
 	}
 }
 
+func TestCleanupPendingReqDeletesMatchingEntry(t *testing.T) {
+	transport := &StdioTransport{
+		pendingReqs: make(map[string]pendingReq),
+	}
+	normalizedID := "s:req-1"
+	pending := pendingReq{
+		ch: make(chan Response, 1),
+		id: RequestID{Value: "req-1"},
+	}
+	transport.pendingReqs[normalizedID] = pending
+
+	transport.cleanupPendingReq(normalizedID, pending)
+
+	if _, ok := transport.pendingReqs[normalizedID]; ok {
+		t.Fatal("pending request was not removed")
+	}
+}
+
+func TestCleanupPendingReqSkipsReusedIDEntry(t *testing.T) {
+	transport := &StdioTransport{
+		pendingReqs: make(map[string]pendingReq),
+	}
+	normalizedID := "s:req-1"
+	first := pendingReq{
+		ch: make(chan Response, 1),
+		id: RequestID{Value: "req-1"},
+	}
+	second := pendingReq{
+		ch: make(chan Response, 1),
+		id: RequestID{Value: "req-1"},
+	}
+	transport.pendingReqs[normalizedID] = second
+
+	transport.cleanupPendingReq(normalizedID, first)
+
+	current, ok := transport.pendingReqs[normalizedID]
+	if !ok {
+		t.Fatal("cleanup removed a newer pending request for the same ID")
+	}
+	if current.ch != second.ch {
+		t.Fatal("cleanup replaced pending request unexpectedly")
+	}
+}
+
 func TestStdioNotificationFloodStillDeliversTurnCompleted(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	defer func() { _ = clientReader.Close() }()
@@ -359,16 +403,6 @@ func TestNewStdioTransportPanicsOnNilWriter(t *testing.T) {
 	}()
 
 	NewStdioTransport(reader, nil)
-}
-
-func TestNewStdioTransportPanicsOnNonClosableReader(t *testing.T) {
-	defer func() {
-		if got := recover(); got != errNonClosableTransportInput {
-			t.Fatalf("panic = %v; want %q", got, errNonClosableTransportInput)
-		}
-	}()
-
-	NewStdioTransport(strings.NewReader(""), &safeBuffer{})
 }
 
 // safeBuffer is a concurrency-safe bytes.Buffer for testing.
