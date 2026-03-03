@@ -126,13 +126,13 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, g *guardedC
 		if p.collector != nil {
 			p.collector.Process(event, nil)
 		}
-		streamSendEvent(ctx, g, event)
+		streamSendEvent(g, event)
 	}
 	emitErr := func(err error) {
 		if p.collector != nil {
 			p.collector.Process(nil, err)
 		}
-		streamSendErr(ctx, g, err)
+		streamSendErr(g, err)
 	}
 	onEvent := func(event Event) {
 		if p.collector != nil {
@@ -142,7 +142,7 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, g *guardedC
 
 	turnDone := make(chan TurnCompletedNotification, 1)
 
-	registerStreamDeltaListeners(ctx, p, g, on, onEvent)
+	registerStreamDeltaListeners(p, g, on, onEvent)
 	registerItemListeners(ctx, p, on, emit, &items, &itemsMu)
 	registerTurnCompletedListener(p, on, turnDone)
 	registerCollectorListeners(p, on)
@@ -180,33 +180,33 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, g *guardedC
 	}
 }
 
-func registerStreamDeltaListeners(ctx context.Context, p turnLifecycleParams, g *guardedChan, on func(string, NotificationHandler), onEvent func(Event)) {
-	streamListen(ctx, on, notifyTurnStarted, g, p.threadID, p.client.reportHandlerError, onEvent, func(n TurnStartedNotification) string {
+func registerStreamDeltaListeners(p turnLifecycleParams, g *guardedChan, on func(string, NotificationHandler), onEvent func(Event)) {
+	streamListen(on, notifyTurnStarted, g, p.threadID, p.client.reportHandlerError, onEvent, func(n TurnStartedNotification) string {
 		return n.ThreadID
 	}, func(n TurnStartedNotification) Event {
 		return &TurnStarted{Turn: n.Turn, ThreadID: n.ThreadID}
 	})
-	streamListen(ctx, on, notifyAgentMessageDelta, g, p.threadID, p.client.reportHandlerError, onEvent, func(n AgentMessageDeltaNotification) string {
+	streamListen(on, notifyAgentMessageDelta, g, p.threadID, p.client.reportHandlerError, onEvent, func(n AgentMessageDeltaNotification) string {
 		return n.ThreadID
 	}, func(n AgentMessageDeltaNotification) Event {
 		return &TextDelta{Delta: n.Delta, ItemID: n.ItemID}
 	})
-	streamListen(ctx, on, notifyReasoningTextDelta, g, p.threadID, p.client.reportHandlerError, onEvent, func(n ReasoningTextDeltaNotification) string {
+	streamListen(on, notifyReasoningTextDelta, g, p.threadID, p.client.reportHandlerError, onEvent, func(n ReasoningTextDeltaNotification) string {
 		return n.ThreadID
 	}, func(n ReasoningTextDeltaNotification) Event {
 		return &ReasoningDelta{Delta: n.Delta, ItemID: n.ItemID, ContentIndex: n.ContentIndex}
 	})
-	streamListen(ctx, on, notifyReasoningSummaryTextDelta, g, p.threadID, p.client.reportHandlerError, onEvent, func(n ReasoningSummaryTextDeltaNotification) string {
+	streamListen(on, notifyReasoningSummaryTextDelta, g, p.threadID, p.client.reportHandlerError, onEvent, func(n ReasoningSummaryTextDeltaNotification) string {
 		return n.ThreadID
 	}, func(n ReasoningSummaryTextDeltaNotification) Event {
 		return &ReasoningSummaryDelta{Delta: n.Delta, ItemID: n.ItemID, SummaryIndex: n.SummaryIndex}
 	})
-	streamListen(ctx, on, notifyPlanDelta, g, p.threadID, p.client.reportHandlerError, onEvent, func(n PlanDeltaNotification) string {
+	streamListen(on, notifyPlanDelta, g, p.threadID, p.client.reportHandlerError, onEvent, func(n PlanDeltaNotification) string {
 		return n.ThreadID
 	}, func(n PlanDeltaNotification) Event {
 		return &PlanDelta{Delta: n.Delta, ItemID: n.ItemID}
 	})
-	streamListen(ctx, on, notifyFileChangeOutputDelta, g, p.threadID, p.client.reportHandlerError, onEvent, func(n FileChangeOutputDeltaNotification) string {
+	streamListen(on, notifyFileChangeOutputDelta, g, p.threadID, p.client.reportHandlerError, onEvent, func(n FileChangeOutputDeltaNotification) string {
 		return n.ThreadID
 	}, func(n FileChangeOutputDeltaNotification) Event {
 		return &FileChangeDelta{Delta: n.Delta, ItemID: n.ItemID}

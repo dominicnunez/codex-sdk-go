@@ -259,19 +259,19 @@ func (c *Conversation) turnStreamedLifecycle(ctx context.Context, opts TurnOptio
 	defer close(s.done)
 
 	if opts.Prompt == "" {
-		streamSendErr(ctx, g, errors.New("prompt is required"))
+		streamSendErr(g, errors.New("prompt is required"))
 		return
 	}
 
 	if err := c.process.ensureInit(ctx); err != nil {
-		streamSendErr(ctx, g, err)
+		streamSendErr(g, err)
 		return
 	}
 
 	c.mu.Lock()
 	if c.activeTurn {
 		c.mu.Unlock()
-		streamSendErr(ctx, g, errTurnInProgress)
+		streamSendErr(g, errTurnInProgress)
 		return
 	}
 	c.activeTurn = true

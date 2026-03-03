@@ -1045,7 +1045,7 @@ func TestStreamEventsConsumedOnSecondCall(t *testing.T) {
 	}
 }
 
-func TestRunStreamedBackpressure_SlowConsumerReceivesAllEvents(t *testing.T) {
+func TestRunStreamedBackpressure_SlowConsumerCompletesUnderOverflow(t *testing.T) {
 	proc, mock := mockProcess(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -1055,9 +1055,7 @@ func TestRunStreamedBackpressure_SlowConsumerReceivesAllEvents(t *testing.T) {
 
 	time.Sleep(50 * time.Millisecond)
 
-	// Inject more events than the channel buffer (64) to force backpressure.
-	// Injection must happen in a separate goroutine because once the buffer
-	// fills, streamSendEvent blocks until the consumer reads.
+	// Inject more events than the channel buffer to force overflow.
 	const totalDeltas = 100
 	go func() {
 		for i := 0; i < totalDeltas; i++ {
@@ -1076,8 +1074,10 @@ func TestRunStreamedBackpressure_SlowConsumerReceivesAllEvents(t *testing.T) {
 		})
 	}()
 
-	// Consume slowly to exercise backpressure.
+	// Consume slowly while producer floods events. Overflow is lossy by design,
+	// but turn completion must still be delivered and Result must complete.
 	var received int
+	var sawTurnCompleted bool
 	for event, err := range stream.Events() {
 		if err != nil {
 			t.Fatalf("unexpected error after %d events: %v", received, err)
@@ -1086,10 +1086,19 @@ func TestRunStreamedBackpressure_SlowConsumerReceivesAllEvents(t *testing.T) {
 			received++
 			time.Sleep(1 * time.Millisecond)
 		}
+		if _, ok := event.(*codex.TurnCompleted); ok {
+			sawTurnCompleted = true
+		}
 	}
 
-	if received != totalDeltas {
-		t.Errorf("received %d deltas, want %d", received, totalDeltas)
+	if received == 0 {
+		t.Fatal("expected to receive at least one text delta")
+	}
+	if !sawTurnCompleted {
+		t.Fatal("expected turn completion event under overflow")
+	}
+	if result := stream.Result(); result == nil {
+		t.Fatal("Result() returned nil under overflow")
 	}
 }
 
