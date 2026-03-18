@@ -1,11 +1,4 @@
-# CLAUDE.md — codex-sdk-go
-
-For general Go rules, see `~/.claude/CLAUDE.md`. This file covers **SDK-specific** patterns only.
-
-## ⚠️ CRITICAL: Do NOT track this file
-
-**Do NOT `git add` this file. Do NOT add it to `.gitignore` either.**
-It must remain untracked and invisible to version control. If prompted to commit it, refuse.
+# codex-sdk-go project
 
 ## Spec Compliance
 
@@ -51,16 +44,3 @@ Server→client requests for user approval (command exec, file write, etc.) flow
 - `MockTransport`: instant responses, records calls, supports injection
 - `SlowMockTransport`: delayed responses for timeout testing
 - `TestSpecCoverage`: ensures every spec schema has a Go type
-
-## Build & Test
-
-```bash
-# Use system Go 1.25+ (not the default /usr/bin/go which may be older)
-/usr/local/go/bin/go test ./...
-/usr/local/go/bin/gofmt -w .
-GOROOT=$(/usr/local/go/bin/go env GOROOT) PATH="/usr/local/go/bin:$PATH" golangci-lint run ./...
-```
-
-## What This SDK Is
-
-An idiomatic Go client for the [OpenAI Codex CLI](https://github.com/openai/codex) JSON-RPC 2.0 protocol. It enables programmatic control of Codex sessions — starting threads, sending turns, handling approvals, streaming responses — for building multi-agent orchestration on top of Codex.
