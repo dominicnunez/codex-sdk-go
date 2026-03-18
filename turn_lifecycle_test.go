@@ -105,6 +105,15 @@ func TestRunNotificationBeforeTurnStartResponse(t *testing.T) {
 	if len(result.Items) != 1 {
 		t.Errorf("len(Items) = %d, want 1", len(result.Items))
 	}
+	if len(result.Turn.Items) != 1 {
+		t.Errorf("len(Turn.Items) = %d, want 1", len(result.Turn.Items))
+	}
+	if len(result.Thread.Turns) != 1 {
+		t.Fatalf("len(Thread.Turns) = %d, want 1", len(result.Thread.Turns))
+	}
+	if len(result.Thread.Turns[0].Items) != 1 {
+		t.Errorf("len(Thread.Turns[0].Items) = %d, want 1", len(result.Thread.Turns[0].Items))
+	}
 	if result.Turn.ID != "turn-1" {
 		t.Errorf("Turn.ID = %q, want %q", result.Turn.ID, "turn-1")
 	}

@@ -107,6 +107,12 @@ func TestRunSuccess(t *testing.T) {
 	if len(result.result.Turn.Items) != 1 {
 		t.Errorf("len(Turn.Items) = %d, want 1", len(result.result.Turn.Items))
 	}
+	if len(result.result.Thread.Turns) != 1 {
+		t.Fatalf("len(Thread.Turns) = %d, want 1", len(result.result.Thread.Turns))
+	}
+	if len(result.result.Thread.Turns[0].Items) != 1 {
+		t.Errorf("len(Thread.Turns[0].Items) = %d, want 1", len(result.result.Thread.Turns[0].Items))
+	}
 
 	if result.result.Turn.ID != "turn-1" {
 		t.Errorf("Turn.ID = %q, want %q", result.result.Turn.ID, "turn-1")

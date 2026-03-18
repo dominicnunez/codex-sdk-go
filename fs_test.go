@@ -50,6 +50,20 @@ func TestFsReadFile(t *testing.T) {
 		}
 	})
 
+	t.Run("null result", func(t *testing.T) {
+		transport := NewMockTransport()
+		client := codex.NewClient(transport)
+		transport.SetResponse("fs/readFile", codex.Response{
+			JSONRPC: "2.0",
+			Result:  json.RawMessage(`null`),
+		})
+
+		_, err := client.Fs.ReadFile(context.Background(), codex.FsReadFileParams{Path: "/tmp/file.txt"})
+		if !errors.Is(err, codex.ErrEmptyResult) {
+			t.Fatalf("error = %v; want ErrEmptyResult", err)
+		}
+	})
+
 	t.Run("malformed result", func(t *testing.T) {
 		transport := NewMockTransport()
 		client := codex.NewClient(transport)
