@@ -182,7 +182,8 @@ func cloneThreadItemWrapper(w ThreadItemWrapper) ThreadItemWrapper {
 		cp.Raw = append(json.RawMessage(nil), v.Raw...)
 		return ThreadItemWrapper{Value: &cp}
 	default:
-		// Unknown future variants must preserve data; JSON fallback keeps parity.
+		// Best-effort fallback for unexpected in-memory variants. If the JSON roundtrip
+		// cannot clone the value, the fallback returns a zero wrapper instead of preserving it.
 		return cloneThreadItemWrapperFallback(w)
 	}
 }

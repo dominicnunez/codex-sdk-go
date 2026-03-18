@@ -1238,3 +1238,37 @@ The `Events()` method uses `consumed.CompareAndSwap(false, true)` — the first 
 returns the events iterator; the second call fails the CAS and returns `ErrStreamConsumed`. The
 `consumed` guard works identically for `newErrorStream` and `newStream`. The `events` field is
 unexported, so callers cannot access the iterator except through `Events()`.
+
+### Thread response methods return zero-value threads when required fields are missing
+
+**Location:** `thread.go:40` — `Thread.UnmarshalJSON` and thread response validation
+
+**Reason:** This behavior does not occur in the current worktree. `Thread.UnmarshalJSON`
+rejects missing required thread fields such as `id`, `cliVersion`, `cwd`, `status`, and
+`ephemeral`, and `Thread.Read`, `Thread.Resume`, `Thread.MetadataUpdate`, and
+`Thread.Unarchive` all validate their decoded responses before returning success. In
+addition, `client.sendRequest` now performs typed required-field validation on object
+results before unmarshaling. A payload like `{"thread":{}}` does not deserialize into a
+successful zero-value thread.
+
+### Plugin read/install responses succeed with missing required fields
+
+**Location:** `plugin.go:291` — plugin response decoding and validation
+
+**Reason:** The report is stale against the current code. `PluginDetail`,
+`PluginSummary`, `PluginSource`, `AppSummary`, and `SkillSummary` now reject missing
+required fields during JSON unmarshaling, and `Plugin.Read` / `Plugin.Install` both
+run explicit response validation before returning. `client.sendRequest` also performs
+typed result validation before unmarshaling. The described zero-value success path for
+missing `plugin`, `appsNeedingAuth`, or `authPolicy` fields no longer occurs.
+
+### Oversized response recovery does not depend on top-level id appearing early in the frame
+
+**Location:** `stdio.go:781` — oversized frame parsing
+
+**Reason:** The current oversized-frame path does not rely on a retained prefix. It
+streams the discarded frame through `extractTopLevelIDAndMethodFromReader` via
+`newOversizedFrameReader`, so top-level routing metadata can still be found after a
+large `result` field. A regression test now covers a valid oversized response where
+`result` appears before `id`, and `Send` resolves with the expected parse error
+instead of timing out.
