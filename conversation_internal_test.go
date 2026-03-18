@@ -285,6 +285,57 @@ func TestThreadCloneNestedItemIsolation(t *testing.T) {
 	}
 }
 
+func TestThreadCloneCollabToolCallPointerIsolation(t *testing.T) {
+	model := "gpt-5"
+	effort := ReasoningEffortHigh
+	prompt := "delegate this"
+	conv := &Conversation{
+		thread: Thread{
+			Turns: []Turn{{
+				ID:     "t1",
+				Status: TurnStatusCompleted,
+				Items: []ThreadItemWrapper{{
+					Value: &CollabAgentToolCallThreadItem{
+						ID:                "collab-1",
+						Tool:              CollabAgentToolSpawnAgent,
+						Status:            CollabAgentToolCallStatusCompleted,
+						AgentsStates:      map[string]CollabAgentState{"worker": {Status: CollabAgentStatusCompleted}},
+						Model:             &model,
+						ReceiverThreadIds: []string{"thread-2"},
+						ReasoningEffort:   &effort,
+						SenderThreadId:    "thread-1",
+						Prompt:            &prompt,
+					},
+				}},
+			}},
+		},
+	}
+
+	snap := conv.Thread()
+	item, ok := snap.Turns[0].Items[0].Value.(*CollabAgentToolCallThreadItem)
+	if !ok {
+		t.Fatal("expected CollabAgentToolCallThreadItem")
+	}
+
+	*item.Model = "gpt-5-mini"
+	*item.ReasoningEffort = ReasoningEffortLow
+	*item.Prompt = "mutated"
+
+	orig, ok := conv.thread.Turns[0].Items[0].Value.(*CollabAgentToolCallThreadItem)
+	if !ok {
+		t.Fatal("expected original CollabAgentToolCallThreadItem")
+	}
+	if got := *orig.Model; got != "gpt-5" {
+		t.Fatalf("model mutation leaked: got %q, want %q", got, "gpt-5")
+	}
+	if got := *orig.ReasoningEffort; got != ReasoningEffortHigh {
+		t.Fatalf("reasoning effort mutation leaked: got %q, want %q", got, ReasoningEffortHigh)
+	}
+	if got := *orig.Prompt; got != "delegate this" {
+		t.Fatalf("prompt mutation leaked: got %q, want %q", got, "delegate this")
+	}
+}
+
 func TestThreadCloneDoesNotPanicOnUnmarshalableDynamicArguments(t *testing.T) {
 	conv := &Conversation{
 		thread: Thread{

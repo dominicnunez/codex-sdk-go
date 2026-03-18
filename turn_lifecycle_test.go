@@ -44,7 +44,7 @@ func (t *notifyDuringSendTransport) Send(ctx context.Context, req codex.Request)
 		t.notifHandler(ctx, codex.Notification{
 			JSONRPC: "2.0",
 			Method:  "turn/completed",
-			Params:  json.RawMessage(`{"threadId":"` + t.threadID + `","turn":{"id":"turn-1","status":"completed","items":[{"type":"agentMessage","id":"item-early","text":"early bird"}]}}`),
+			Params:  json.RawMessage(`{"threadId":"` + t.threadID + `","turn":{"id":"turn-1","status":"completed","items":[]}}`),
 		})
 	}
 

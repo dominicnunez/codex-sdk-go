@@ -286,11 +286,13 @@ func executeTurn(ctx context.Context, p turnLifecycleParams) (*RunResult, error)
 	copy(collectedItems, items)
 	itemsMu.Unlock()
 
+	completedTurn := turnWithItems(completed.Turn, collectedItems)
+
 	if p.onComplete != nil {
-		p.onComplete(completed.Turn)
+		p.onComplete(completedTurn)
 	}
 
-	return buildRunResult(p.thread, completed.Turn, collectedItems), nil
+	return buildRunResult(p.thread, completedTurn, collectedItems), nil
 }
 
 // executeStreamedTurn runs the streaming lifecycle: registers filtered listeners,
@@ -428,12 +430,14 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, g *guardedC
 		copy(collectedItems, items)
 		itemsMu.Unlock()
 
+		completedTurn := turnWithItems(completed.Turn, collectedItems)
+
 		if p.onComplete != nil {
-			p.onComplete(completed.Turn)
+			p.onComplete(completedTurn)
 		}
 
 		s.mu.Lock()
-		s.result = buildRunResult(p.thread, completed.Turn, collectedItems)
+		s.result = buildRunResult(p.thread, completedTurn, collectedItems)
 		s.mu.Unlock()
 
 	case <-ctx.Done():

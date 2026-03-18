@@ -85,19 +85,30 @@ func buildTurnParams(opts RunOptions, threadID string) TurnStartParams {
 
 // buildRunResult assembles a RunResult from collected items and turn data.
 func buildRunResult(thread Thread, turn Turn, items []ThreadItemWrapper) *RunResult {
+	resultThread := cloneThreadState(thread)
+	resultTurn := turnWithItems(turn, items)
+	resultItems := cloneThreadItems(items)
+	resultThread.Turns = append(resultThread.Turns, cloneTurn(resultTurn))
+
 	result := &RunResult{
-		Thread: thread,
-		Turn:   turn,
-		Items:  items,
+		Thread: resultThread,
+		Turn:   resultTurn,
+		Items:  resultItems,
 	}
 	// Extract response text from the last agentMessage item.
-	for i := len(items) - 1; i >= 0; i-- {
-		if msg, ok := items[i].Value.(*AgentMessageThreadItem); ok {
+	for i := len(resultItems) - 1; i >= 0; i-- {
+		if msg, ok := resultItems[i].Value.(*AgentMessageThreadItem); ok {
 			result.Response = msg.Text
 			break
 		}
 	}
 	return result
+}
+
+func turnWithItems(turn Turn, items []ThreadItemWrapper) Turn {
+	cp := cloneTurn(turn)
+	cp.Items = cloneThreadItems(items)
+	return cp
 }
 
 // Run executes a single-turn conversation: creates a thread, starts a turn

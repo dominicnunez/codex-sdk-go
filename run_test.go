@@ -89,7 +89,7 @@ func TestRunSuccess(t *testing.T) {
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "turn/completed",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[{"type":"agentMessage","id":"item-1","text":"Hello there!"}]}}`),
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
 	})
 
 	result := <-ch
@@ -104,6 +104,9 @@ func TestRunSuccess(t *testing.T) {
 	if len(result.result.Items) != 1 {
 		t.Errorf("len(Items) = %d, want 1", len(result.result.Items))
 	}
+	if len(result.result.Turn.Items) != 1 {
+		t.Errorf("len(Turn.Items) = %d, want 1", len(result.result.Turn.Items))
+	}
 
 	if result.result.Turn.ID != "turn-1" {
 		t.Errorf("Turn.ID = %q, want %q", result.result.Turn.ID, "turn-1")
@@ -111,6 +114,12 @@ func TestRunSuccess(t *testing.T) {
 
 	if result.result.Thread.ID != "thread-1" {
 		t.Errorf("Thread.ID = %q, want %q", result.result.Thread.ID, "thread-1")
+	}
+	if len(result.result.Thread.Turns) != 1 {
+		t.Errorf("len(Thread.Turns) = %d, want 1", len(result.result.Thread.Turns))
+	}
+	if len(result.result.Thread.Turns) == 1 && len(result.result.Thread.Turns[0].Items) != 1 {
+		t.Errorf("len(Thread.Turns[0].Items) = %d, want 1", len(result.result.Thread.Turns[0].Items))
 	}
 }
 

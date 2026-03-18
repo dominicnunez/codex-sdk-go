@@ -50,35 +50,57 @@ func (c *Conversation) ThreadID() string {
 func (c *Conversation) Thread() Thread {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	t := c.thread
-	t.Name = cloneStringPtr(c.thread.Name)
-	t.AgentNickname = cloneStringPtr(c.thread.AgentNickname)
-	t.AgentRole = cloneStringPtr(c.thread.AgentRole)
-	t.Path = cloneStringPtr(c.thread.Path)
-	if c.thread.GitInfo != nil {
-		g := *c.thread.GitInfo
+	return cloneThreadState(c.thread)
+}
+
+func cloneThreadState(thread Thread) Thread {
+	t := thread
+	t.Name = cloneStringPtr(thread.Name)
+	t.AgentNickname = cloneStringPtr(thread.AgentNickname)
+	t.AgentRole = cloneStringPtr(thread.AgentRole)
+	t.Path = cloneStringPtr(thread.Path)
+	if thread.GitInfo != nil {
+		g := *thread.GitInfo
 		g.Branch = cloneStringPtr(g.Branch)
 		g.OriginURL = cloneStringPtr(g.OriginURL)
 		g.SHA = cloneStringPtr(g.SHA)
 		t.GitInfo = &g
 	}
-	t.Source = cloneSessionSourceWrapper(c.thread.Source)
-	t.Status = cloneThreadStatusWrapper(c.thread.Status)
-	t.Turns = make([]Turn, len(c.thread.Turns))
-	copy(t.Turns, c.thread.Turns)
-	for i, turn := range t.Turns {
-		t.Turns[i].Items = make([]ThreadItemWrapper, len(turn.Items))
-		for j, item := range turn.Items {
-			t.Turns[i].Items[j] = cloneThreadItemWrapper(item)
-		}
-		if turn.Error != nil {
-			e := *turn.Error
-			e.CodexErrorInfo = append(json.RawMessage(nil), turn.Error.CodexErrorInfo...)
-			e.AdditionalDetails = cloneStringPtr(turn.Error.AdditionalDetails)
-			t.Turns[i].Error = &e
-		}
+	t.Source = cloneSessionSourceWrapper(thread.Source)
+	t.Status = cloneThreadStatusWrapper(thread.Status)
+	t.Turns = make([]Turn, len(thread.Turns))
+	for i, turn := range thread.Turns {
+		t.Turns[i] = cloneTurn(turn)
 	}
 	return t
+}
+
+func cloneTurn(turn Turn) Turn {
+	cp := turn
+	cp.Items = cloneThreadItems(turn.Items)
+	cp.Error = cloneTurnError(turn.Error)
+	return cp
+}
+
+func cloneThreadItems(items []ThreadItemWrapper) []ThreadItemWrapper {
+	if items == nil {
+		return nil
+	}
+	out := make([]ThreadItemWrapper, len(items))
+	for i, item := range items {
+		out[i] = cloneThreadItemWrapper(item)
+	}
+	return out
+}
+
+func cloneTurnError(err *TurnError) *TurnError {
+	if err == nil {
+		return nil
+	}
+	cp := *err
+	cp.CodexErrorInfo = append(json.RawMessage(nil), err.CodexErrorInfo...)
+	cp.AdditionalDetails = cloneStringPtr(err.AdditionalDetails)
+	return &cp
 }
 
 func cloneThreadItemWrapper(w ThreadItemWrapper) ThreadItemWrapper {
@@ -131,7 +153,9 @@ func cloneThreadItemWrapper(w ThreadItemWrapper) ThreadItemWrapper {
 	case *CollabAgentToolCallThreadItem:
 		cp := *v
 		cp.AgentsStates = cloneCollabAgentStates(v.AgentsStates)
+		cp.Model = cloneStringPtr(v.Model)
 		cp.ReceiverThreadIds = append([]string(nil), v.ReceiverThreadIds...)
+		cp.ReasoningEffort = cloneReasoningEffortPtr(v.ReasoningEffort)
 		cp.Prompt = cloneStringPtr(v.Prompt)
 		return ThreadItemWrapper{Value: &cp}
 	case *WebSearchThreadItem:
@@ -526,6 +550,14 @@ func cloneJSONValue(in interface{}) interface{} {
 }
 
 func cloneMessagePhasePtr(in *MessagePhase) *MessagePhase {
+	if in == nil {
+		return nil
+	}
+	v := *in
+	return &v
+}
+
+func cloneReasoningEffortPtr(in *ReasoningEffort) *ReasoningEffort {
 	if in == nil {
 		return nil
 	}

@@ -1181,7 +1181,7 @@ func TestConversationThreadDeepCopyIsolation(t *testing.T) {
 	}
 }
 
-func TestConversationThreadDeepCopyItemValueIsolation(t *testing.T) {
+func TestConversationThreadDeepCopyRetainsItemsFromItemCompleted(t *testing.T) {
 	proc, mock := mockProcess(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -1209,7 +1209,7 @@ func TestConversationThreadDeepCopyItemValueIsolation(t *testing.T) {
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "turn/completed",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[{"type":"agentMessage","id":"item-1","text":"original"}]}}`),
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
 	})
 
 	if err := <-turnDone; err != nil {
@@ -1221,9 +1221,15 @@ func TestConversationThreadDeepCopyItemValueIsolation(t *testing.T) {
 	if len(snap1.Turns) == 0 || len(snap1.Turns[0].Items) == 0 {
 		t.Fatal("expected at least one turn with one item")
 	}
+	if got := len(snap1.Turns[0].Items); got != 1 {
+		t.Fatalf("snapshot turn item count = %d, want 1", got)
+	}
 	msg, ok := snap1.Turns[0].Items[0].Value.(*codex.AgentMessageThreadItem)
 	if !ok {
 		t.Fatal("expected AgentMessageThreadItem")
+	}
+	if msg.Text != "original" {
+		t.Fatalf("snapshot item text = %q, want %q", msg.Text, "original")
 	}
 	msg.Text = "mutated"
 
