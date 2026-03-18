@@ -239,6 +239,84 @@ func TestCommandExecutionRequestApprovalRoundTrip(t *testing.T) {
 	}
 }
 
+func TestApprovalDecisionWrappersMarshalPointerBackedVariants(t *testing.T) {
+	t.Run("review decision wrapper", func(t *testing.T) {
+		tests := []struct {
+			name  string
+			value interface{}
+			want  string
+		}{
+			{
+				name: "approved execpolicy amendment pointer",
+				value: &codex.ApprovedExecpolicyAmendmentDecision{
+					ProposedExecpolicyAmendment: []string{"allow read"},
+				},
+				want: `{"approved_execpolicy_amendment":{"proposed_execpolicy_amendment":["allow read"]}}`,
+			},
+			{
+				name: "network policy amendment pointer",
+				value: &codex.NetworkPolicyAmendmentDecision{
+					NetworkPolicyAmendment: codex.NetworkPolicyAmendment{
+						Action: codex.NetworkPolicyRuleActionAllow,
+						Host:   "example.com",
+					},
+				},
+				want: `{"network_policy_amendment":{"network_policy_amendment":{"action":"allow","host":"example.com"}}}`,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				data, err := json.Marshal(codex.ReviewDecisionWrapper{Value: tt.value})
+				if err != nil {
+					t.Fatalf("MarshalJSON() error = %v", err)
+				}
+				if got := string(data); got != tt.want {
+					t.Fatalf("MarshalJSON() = %s; want %s", got, tt.want)
+				}
+			})
+		}
+	})
+
+	t.Run("command execution approval decision wrapper", func(t *testing.T) {
+		tests := []struct {
+			name  string
+			value interface{}
+			want  string
+		}{
+			{
+				name: "accept with execpolicy amendment pointer",
+				value: &codex.AcceptWithExecpolicyAmendmentDecision{
+					ExecpolicyAmendment: []string{"allow git status"},
+				},
+				want: `{"acceptWithExecpolicyAmendment":{"execpolicy_amendment":["allow git status"]}}`,
+			},
+			{
+				name: "apply network policy amendment pointer",
+				value: &codex.ApplyNetworkPolicyAmendmentDecision{
+					NetworkPolicyAmendment: codex.NetworkPolicyAmendment{
+						Action: codex.NetworkPolicyRuleActionDeny,
+						Host:   "blocked.example.com",
+					},
+				},
+				want: `{"applyNetworkPolicyAmendment":{"network_policy_amendment":{"action":"deny","host":"blocked.example.com"}}}`,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				data, err := json.Marshal(codex.CommandExecutionApprovalDecisionWrapper{Value: tt.value})
+				if err != nil {
+					t.Fatalf("MarshalJSON() error = %v", err)
+				}
+				if got := string(data); got != tt.want {
+					t.Fatalf("MarshalJSON() = %s; want %s", got, tt.want)
+				}
+			})
+		}
+	})
+}
+
 // TestApprovalHandlerDispatch tests that approval handlers are called when server sends requests
 func TestApprovalHandlerDispatch(t *testing.T) {
 	mock := NewMockTransport()
@@ -250,8 +328,10 @@ func TestApprovalHandlerDispatch(t *testing.T) {
 	var execCommandCalled bool
 	var fileChangeCalled bool
 	var toolCallCalled bool
+	var permissionsCalled bool
 	var userInputCalled bool
 	var authRefreshCalled bool
+	var mcpElicitationCalled bool
 
 	handlers := codex.ApprovalHandlers{
 		OnApplyPatchApproval: func(ctx context.Context, params codex.ApplyPatchApprovalParams) (codex.ApplyPatchApprovalResponse, error) {
@@ -287,6 +367,16 @@ func TestApprovalHandlerDispatch(t *testing.T) {
 				},
 			}, nil
 		},
+		OnPermissionsRequestApproval: func(ctx context.Context, params codex.PermissionsRequestApprovalParams) (codex.PermissionsRequestApprovalResponse, error) {
+			permissionsCalled = true
+			scope := codex.PermissionGrantScopeSession
+			return codex.PermissionsRequestApprovalResponse{
+				Permissions: codex.GrantedPermissionProfile{
+					Network: &codex.AdditionalNetworkPermissions{Enabled: ptr(true)},
+				},
+				Scope: &scope,
+			}, nil
+		},
 		OnToolRequestUserInput: func(ctx context.Context, params codex.ToolRequestUserInputParams) (codex.ToolRequestUserInputResponse, error) {
 			userInputCalled = true
 			return codex.ToolRequestUserInputResponse{
@@ -301,6 +391,13 @@ func TestApprovalHandlerDispatch(t *testing.T) {
 				AccessToken:      "new-token",
 				ChatgptAccountID: "account-123",
 				ChatgptPlanType:  ptr("plus"),
+			}, nil
+		},
+		OnMcpServerElicitationRequest: func(ctx context.Context, params codex.McpServerElicitationRequestParams) (codex.McpServerElicitationRequestResponse, error) {
+			mcpElicitationCalled = true
+			return codex.McpServerElicitationRequestResponse{
+				Action:  codex.McpServerElicitationActionAccept,
+				Content: map[string]interface{}{"token": "abc123"},
 			}, nil
 		},
 	}
@@ -358,12 +455,28 @@ func TestApprovalHandlerDispatch(t *testing.T) {
 		Params:  json.RawMessage(`{"itemId":"i1","threadId":"t1","turnId":"tu1","questions":[{"id":"q1","header":"H","question":"Q"}]}`),
 	})
 
-	// 7. ChatgptAuthTokensRefresh
+	// 7. PermissionsRequestApproval
 	_, _ = mock.InjectServerRequest(ctx, codex.Request{
 		JSONRPC: "2.0",
 		ID:      codex.RequestID{Value: 7},
+		Method:  "item/permissions/requestApproval",
+		Params:  json.RawMessage(`{"itemId":"i1","threadId":"t1","turnId":"tu1","permissions":{"network":{"enabled":true}}}`),
+	})
+
+	// 8. ChatgptAuthTokensRefresh
+	_, _ = mock.InjectServerRequest(ctx, codex.Request{
+		JSONRPC: "2.0",
+		ID:      codex.RequestID{Value: 8},
 		Method:  "account/chatgptAuthTokens/refresh",
 		Params:  json.RawMessage(`{"reason":"unauthorized"}`),
+	})
+
+	// 9. McpServerElicitationRequest
+	_, _ = mock.InjectServerRequest(ctx, codex.Request{
+		JSONRPC: "2.0",
+		ID:      codex.RequestID{Value: 9},
+		Method:  "mcpServer/elicitation/request",
+		Params:  json.RawMessage(`{"serverName":"demo","threadId":"t1","message":"Need input","mode":"url","url":"https://example.com"}`),
 	})
 
 	// Verify all handlers were called
@@ -382,11 +495,17 @@ func TestApprovalHandlerDispatch(t *testing.T) {
 	if !toolCallCalled {
 		t.Error("DynamicToolCall handler not called")
 	}
+	if !permissionsCalled {
+		t.Error("PermissionsRequestApproval handler not called")
+	}
 	if !userInputCalled {
 		t.Error("ToolRequestUserInput handler not called")
 	}
 	if !authRefreshCalled {
 		t.Error("ChatgptAuthTokensRefresh handler not called")
+	}
+	if !mcpElicitationCalled {
+		t.Error("McpServerElicitationRequest handler not called")
 	}
 }
 
@@ -479,4 +598,110 @@ func TestApprovalEndToEnd(t *testing.T) {
 	if result.Decision.Value != "accept" {
 		t.Errorf("Expected decision=accept, got %v", result.Decision.Value)
 	}
+}
+
+func TestAdditionalApprovalEndToEnd(t *testing.T) {
+	t.Run("permissions request approval", func(t *testing.T) {
+		mock := NewMockTransport()
+		client := codex.NewClient(mock)
+
+		client.SetApprovalHandlers(codex.ApprovalHandlers{
+			OnPermissionsRequestApproval: func(ctx context.Context, params codex.PermissionsRequestApprovalParams) (codex.PermissionsRequestApprovalResponse, error) {
+				if params.ItemID != "item-abc" {
+					t.Fatalf("Expected itemId=item-abc, got %s", params.ItemID)
+				}
+				if params.Permissions.Network == nil || params.Permissions.Network.Enabled == nil || !*params.Permissions.Network.Enabled {
+					t.Fatalf("Expected requested network permission to be enabled, got %#v", params.Permissions.Network)
+				}
+
+				scope := codex.PermissionGrantScopeTurn
+				return codex.PermissionsRequestApprovalResponse{
+					Permissions: codex.GrantedPermissionProfile{
+						FileSystem: &codex.AdditionalFileSystemPermissions{
+							Read: []string{"/tmp/project"},
+						},
+					},
+					Scope: &scope,
+				}, nil
+			},
+		})
+
+		resp, err := mock.InjectServerRequest(context.Background(), codex.Request{
+			JSONRPC: "2.0",
+			ID:      codex.RequestID{Value: 101},
+			Method:  "item/permissions/requestApproval",
+			Params:  json.RawMessage(`{"itemId":"item-abc","threadId":"t1","turnId":"tu1","permissions":{"network":{"enabled":true}}}`),
+		})
+		if err != nil {
+			t.Fatalf("InjectServerRequest() error = %v", err)
+		}
+		if resp.Error != nil {
+			t.Fatalf("Unexpected error response: %+v", resp.Error)
+		}
+
+		var result codex.PermissionsRequestApprovalResponse
+		if err := json.Unmarshal(resp.Result, &result); err != nil {
+			t.Fatalf("Unmarshal permissions response: %v", err)
+		}
+		if result.Scope == nil || *result.Scope != codex.PermissionGrantScopeTurn {
+			t.Fatalf("Scope = %#v; want %q", result.Scope, codex.PermissionGrantScopeTurn)
+		}
+		if result.Permissions.FileSystem == nil || len(result.Permissions.FileSystem.Read) != 1 || result.Permissions.FileSystem.Read[0] != "/tmp/project" {
+			t.Fatalf("Permissions = %#v; want granted read path", result.Permissions)
+		}
+	})
+
+	t.Run("mcp server elicitation request", func(t *testing.T) {
+		mock := NewMockTransport()
+		client := codex.NewClient(mock)
+
+		client.SetApprovalHandlers(codex.ApprovalHandlers{
+			OnMcpServerElicitationRequest: func(ctx context.Context, params codex.McpServerElicitationRequestParams) (codex.McpServerElicitationRequestResponse, error) {
+				if params.ServerName != "demo-server" {
+					t.Fatalf("Expected serverName=demo-server, got %s", params.ServerName)
+				}
+				if params.Mode != codex.McpServerElicitationModeForm {
+					t.Fatalf("Expected mode=form, got %q", params.Mode)
+				}
+
+				return codex.McpServerElicitationRequestResponse{
+					Action: codex.McpServerElicitationActionAccept,
+					Content: map[string]interface{}{
+						"apiKey": "secret-token",
+					},
+				}, nil
+			},
+		})
+
+		resp, err := mock.InjectServerRequest(context.Background(), codex.Request{
+			JSONRPC: "2.0",
+			ID:      codex.RequestID{Value: 102},
+			Method:  "mcpServer/elicitation/request",
+			Params: json.RawMessage(
+				`{"serverName":"demo-server","threadId":"t1","message":"Enter credentials","mode":"form","requestedSchema":{"type":"object","properties":{"apiKey":{"type":"string"}},"required":["apiKey"]}}`,
+			),
+		})
+		if err != nil {
+			t.Fatalf("InjectServerRequest() error = %v", err)
+		}
+		if resp.Error != nil {
+			t.Fatalf("Unexpected error response: %+v", resp.Error)
+		}
+
+		var result codex.McpServerElicitationRequestResponse
+		if err := json.Unmarshal(resp.Result, &result); err != nil {
+			t.Fatalf("Unmarshal MCP elicitation response: %v", err)
+		}
+		if result.Action != codex.McpServerElicitationActionAccept {
+			t.Fatalf("Action = %q; want %q", result.Action, codex.McpServerElicitationActionAccept)
+		}
+
+		content, ok := result.Content.(map[string]interface{})
+		if !ok {
+			t.Fatalf("Content type = %T; want map[string]interface{}", result.Content)
+		}
+		if got := content["apiKey"]; got != "secret-token" {
+			t.Fatalf("Content[apiKey] = %#v; want %q", got, "secret-token")
+		}
+	})
 }

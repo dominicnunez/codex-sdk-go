@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go"
@@ -168,6 +169,87 @@ func TestCommandExecutionOutputDeltaNotification(t *testing.T) {
 	}
 	if received.Delta != "output line\n" {
 		t.Errorf("expected delta 'output line\\n', got %q", received.Delta)
+	}
+}
+
+func TestCommandExecOutputDeltaNotification(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+
+	var received *codex.CommandExecOutputDeltaNotification
+	client.OnCommandExecOutputDelta(func(notif codex.CommandExecOutputDeltaNotification) {
+		received = &notif
+	})
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "command/exec/outputDelta",
+		Params: json.RawMessage(`{
+			"capReached": false,
+			"deltaBase64": "aGVsbG8=",
+			"processId": "proc-123",
+			"stream": "stdout"
+		}`),
+	})
+
+	if received == nil {
+		t.Fatal("notification not received")
+	}
+	if received.ProcessID != "proc-123" {
+		t.Fatalf("ProcessID = %q; want %q", received.ProcessID, "proc-123")
+	}
+	if received.DeltaBase64 != "aGVsbG8=" {
+		t.Fatalf("DeltaBase64 = %q; want %q", received.DeltaBase64, "aGVsbG8=")
+	}
+	if received.Stream != codex.CommandExecOutputStreamStdout {
+		t.Fatalf("Stream = %q; want %q", received.Stream, codex.CommandExecOutputStreamStdout)
+	}
+
+	client.OnCommandExecOutputDelta(nil)
+	received = nil
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "command/exec/outputDelta",
+		Params:  json.RawMessage(`{"capReached":true,"deltaBase64":"bW9yZQ==","processId":"proc-123","stream":"stderr"}`),
+	})
+
+	if received != nil {
+		t.Fatal("notification handler should have been removed")
+	}
+}
+
+func TestCommandExecOutputDeltaMalformedNotificationReportsHandlerError(t *testing.T) {
+	mock := NewMockTransport()
+
+	var (
+		gotMethod string
+		gotErr    error
+	)
+	client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+		gotMethod = method
+		gotErr = err
+	}))
+
+	var called bool
+	client.OnCommandExecOutputDelta(func(codex.CommandExecOutputDeltaNotification) {
+		called = true
+	})
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "command/exec/outputDelta",
+		Params:  json.RawMessage(`{"capReached":true,"deltaBase64":123,"processId":"proc-123","stream":"stdout"}`),
+	})
+
+	if called {
+		t.Fatal("handler should not be called for malformed payload")
+	}
+	if gotMethod != "command/exec/outputDelta" {
+		t.Fatalf("handler error method = %q; want %q", gotMethod, "command/exec/outputDelta")
+	}
+	if gotErr == nil || !strings.Contains(gotErr.Error(), "unmarshal command/exec/outputDelta") {
+		t.Fatalf("handler error = %v; want unmarshal failure", gotErr)
 	}
 }
 
