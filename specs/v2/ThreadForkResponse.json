@@ -5,6 +5,14 @@
       "description": "A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).\n\nIMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.",
       "type": "string"
     },
+    "ApprovalsReviewer": {
+      "description": "Configures who approval requests are routed to for review. Examples include sandbox escapes, blocked network access, MCP approval prompts, and ARC escalations. Defaults to `user`. `guardian_subagent` uses a carefully prompted subagent to gather relevant context and apply a risk-based decision framework before approving or denying the request.",
+      "enum": [
+        "user",
+        "guardian_subagent"
+      ],
+      "type": "string"
+    },
     "AskForApproval": {
       "oneOf": [
         {
@@ -19,15 +27,23 @@
         {
           "additionalProperties": false,
           "properties": {
-            "reject": {
+            "granular": {
               "properties": {
                 "mcp_elicitations": {
+                  "type": "boolean"
+                },
+                "request_permissions": {
+                  "default": false,
                   "type": "boolean"
                 },
                 "rules": {
                   "type": "boolean"
                 },
                 "sandbox_approval": {
+                  "type": "boolean"
+                },
+                "skill_approval": {
+                  "default": false,
                   "type": "boolean"
                 }
               },
@@ -40,9 +56,9 @@
             }
           },
           "required": [
-            "reject"
+            "granular"
           ],
-          "title": "RejectAskForApproval",
+          "title": "GranularAskForApproval",
           "type": "object"
         }
       ]
@@ -201,6 +217,7 @@
       "enum": [
         "pendingInit",
         "running",
+        "interrupted",
         "completed",
         "errored",
         "shutdown",
@@ -653,6 +670,10 @@
                 "type": "fullAccess"
               }
             },
+            "networkAccess": {
+              "default": false,
+              "type": "boolean"
+            },
             "type": {
               "enum": [
                 "readOnly"
@@ -737,6 +758,13 @@
           "type": "object"
         }
       ]
+    },
+    "ServiceTier": {
+      "enum": [
+        "fast",
+        "flex"
+      ],
+      "type": "string"
     },
     "SessionSource": {
       "oneOf": [
@@ -1330,12 +1358,30 @@
               "description": "Unique identifier for this collab tool call.",
               "type": "string"
             },
+            "model": {
+              "description": "Model requested for the spawned agent, when applicable.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "prompt": {
               "description": "Prompt text sent as part of the collab tool call, when available.",
               "type": [
                 "string",
                 "null"
               ]
+            },
+            "reasoningEffort": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/ReasoningEffort"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Reasoning effort requested for the spawned agent, when applicable."
             },
             "receiverThreadIds": {
               "description": "Thread ID of the receiving agent, when applicable. In case of spawn operation, this corresponds to the newly spawned agent.",
@@ -1440,6 +1486,40 @@
             "type"
           ],
           "title": "ImageViewThreadItem",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "result": {
+              "type": "string"
+            },
+            "revisedPrompt": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "status": {
+              "type": "string"
+            },
+            "type": {
+              "enum": [
+                "imageGeneration"
+              ],
+              "title": "ImageGenerationThreadItemType",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "result",
+            "status",
+            "type"
+          ],
+          "title": "ImageGenerationThreadItem",
           "type": "object"
         },
         {
@@ -1884,6 +1964,14 @@
     "approvalPolicy": {
       "$ref": "#/definitions/AskForApproval"
     },
+    "approvalsReviewer": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/ApprovalsReviewer"
+        }
+      ],
+      "description": "Reviewer currently used for approval requests on this thread."
+    },
     "cwd": {
       "type": "string"
     },
@@ -1906,12 +1994,23 @@
     "sandbox": {
       "$ref": "#/definitions/SandboxPolicy"
     },
+    "serviceTier": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/ServiceTier"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "thread": {
       "$ref": "#/definitions/Thread"
     }
   },
   "required": [
     "approvalPolicy",
+    "approvalsReviewer",
     "cwd",
     "model",
     "modelProvider",
