@@ -5,6 +5,60 @@ import (
 	"testing"
 )
 
+type uncloneableThreadItem struct {
+	Fn func()
+}
+
+func (*uncloneableThreadItem) threadItem() {}
+
+type uncloneableSessionSource struct {
+	Fn func()
+}
+
+func (uncloneableSessionSource) isSessionSource() {}
+
+type uncloneableThreadStatus struct {
+	Fn func()
+}
+
+func (uncloneableThreadStatus) isThreadStatus() {}
+
+type uncloneableSubAgentSource struct {
+	Fn func()
+}
+
+func (uncloneableSubAgentSource) isSubAgentSource() {}
+
+type uncloneableUserInput struct {
+	Fn func()
+}
+
+func (*uncloneableUserInput) userInput() {}
+
+type uncloneableCommandAction struct {
+	Fn func()
+}
+
+func (*uncloneableCommandAction) commandAction() {}
+
+type uncloneablePatchChangeKind struct {
+	Fn func()
+}
+
+func (uncloneablePatchChangeKind) patchChangeKind() {}
+
+type uncloneableDynamicToolCallOutputContentItem struct {
+	Fn func()
+}
+
+func (*uncloneableDynamicToolCallOutputContentItem) dynamicToolCallOutputContentItem() {}
+
+type uncloneableWebSearchAction struct {
+	Fn func()
+}
+
+func (uncloneableWebSearchAction) webSearchAction() {}
+
 func TestThreadCloneAdditionalDetails(t *testing.T) {
 	details := "retry after 30s"
 	conv := &Conversation{
@@ -260,5 +314,67 @@ func TestThreadCloneDoesNotPanicOnUnmarshalableDynamicArguments(t *testing.T) {
 	snap := conv.Thread()
 	if snap.Turns[0].Items[0].Value == nil {
 		t.Fatal("expected cloned item")
+	}
+	item := snap.Turns[0].Items[0].Value.(*DynamicToolCallThreadItem)
+	if item.Arguments != nil {
+		t.Fatalf("Arguments = %#v, want nil for uncloneable data", item.Arguments)
+	}
+}
+
+func TestCloneFallbacksDropUncloneableValues(t *testing.T) {
+	if got := cloneThreadItemWrapperFallback(ThreadItemWrapper{Value: &uncloneableThreadItem{}}); got.Value != nil {
+		t.Fatalf("thread item fallback = %#v, want nil Value", got.Value)
+	}
+	if got := cloneSessionSourceWrapperFallback(SessionSourceWrapper{Value: uncloneableSessionSource{}}); got.Value != nil {
+		t.Fatalf("session source fallback = %#v, want nil Value", got.Value)
+	}
+	if got := cloneThreadStatusWrapperFallback(ThreadStatusWrapper{Value: uncloneableThreadStatus{}}); got.Value != nil {
+		t.Fatalf("thread status fallback = %#v, want nil Value", got.Value)
+	}
+	if got := cloneSubAgentSourceFallback(uncloneableSubAgentSource{}); got != nil {
+		t.Fatalf("sub-agent source fallback = %#v, want nil", got)
+	}
+	if got := cloneUserInputFallback(&uncloneableUserInput{}); got != nil {
+		t.Fatalf("user input fallback = %#v, want nil", got)
+	}
+	if got := cloneCommandActionWrapperFallback(CommandActionWrapper{Value: &uncloneableCommandAction{}}); got.Value != nil {
+		t.Fatalf("command action fallback = %#v, want nil Value", got.Value)
+	}
+	if got := clonePatchChangeKindWrapperFallback(PatchChangeKindWrapper{Value: uncloneablePatchChangeKind{}}); got.Value != nil {
+		t.Fatalf("patch change fallback = %#v, want nil Value", got.Value)
+	}
+	if got := cloneDynamicToolCallOutputContentItemWrapperFallback(DynamicToolCallOutputContentItemWrapper{Value: &uncloneableDynamicToolCallOutputContentItem{}}); got.Value != nil {
+		t.Fatalf("dynamic output fallback = %#v, want nil Value", got.Value)
+	}
+	if got := cloneWebSearchActionWrapperFallback(WebSearchActionWrapper{Value: uncloneableWebSearchAction{}}); got.Value != nil {
+		t.Fatalf("web search action fallback = %#v, want nil Value", got.Value)
+	}
+	if got := cloneJSONValue(map[string]interface{}{"bad": func() {}}); got != nil {
+		t.Fatalf("cloneJSONValue returned %#v, want nil for uncloneable input", got)
+	}
+
+	conv := &Conversation{
+		thread: Thread{
+			Source: SessionSourceWrapper{Value: uncloneableSessionSource{}},
+			Status: ThreadStatusWrapper{Value: uncloneableThreadStatus{}},
+			Turns: []Turn{{
+				ID:     "turn-1",
+				Status: TurnStatusCompleted,
+				Items: []ThreadItemWrapper{
+					{Value: &uncloneableThreadItem{}},
+				},
+			}},
+		},
+	}
+
+	snap := conv.Thread()
+	if snap.Source.Value != nil {
+		t.Fatalf("snapshot source = %#v, want nil Value", snap.Source.Value)
+	}
+	if snap.Status.Value != nil {
+		t.Fatalf("snapshot status = %#v, want nil Value", snap.Status.Value)
+	}
+	if snap.Turns[0].Items[0].Value != nil {
+		t.Fatalf("snapshot item = %#v, want nil Value", snap.Turns[0].Items[0].Value)
 	}
 }

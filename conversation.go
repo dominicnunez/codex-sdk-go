@@ -439,7 +439,7 @@ func cloneThreadItemWrapperFallback(w ThreadItemWrapper) ThreadItemWrapper {
 	if cloneViaJSON(w, &clone) {
 		return clone
 	}
-	return w
+	return ThreadItemWrapper{}
 }
 
 func cloneSessionSourceWrapperFallback(w SessionSourceWrapper) SessionSourceWrapper {
@@ -447,7 +447,7 @@ func cloneSessionSourceWrapperFallback(w SessionSourceWrapper) SessionSourceWrap
 	if cloneViaJSON(w, &clone) {
 		return clone
 	}
-	return w
+	return SessionSourceWrapper{}
 }
 
 func cloneThreadStatusWrapperFallback(w ThreadStatusWrapper) ThreadStatusWrapper {
@@ -455,7 +455,7 @@ func cloneThreadStatusWrapperFallback(w ThreadStatusWrapper) ThreadStatusWrapper
 	if cloneViaJSON(w, &clone) {
 		return clone
 	}
-	return w
+	return ThreadStatusWrapper{}
 }
 
 func cloneSubAgentSourceFallback(src SubAgentSource) SubAgentSource {
@@ -463,7 +463,7 @@ func cloneSubAgentSourceFallback(src SubAgentSource) SubAgentSource {
 	if cloneViaJSON(src, &clone) {
 		return clone
 	}
-	return src
+	return nil
 }
 
 func cloneUserInputFallback(input UserInput) UserInput {
@@ -471,7 +471,7 @@ func cloneUserInputFallback(input UserInput) UserInput {
 	if cloneViaJSON(input, &clone) {
 		return clone
 	}
-	return input
+	return nil
 }
 
 func cloneCommandActionWrapperFallback(w CommandActionWrapper) CommandActionWrapper {
@@ -479,7 +479,7 @@ func cloneCommandActionWrapperFallback(w CommandActionWrapper) CommandActionWrap
 	if cloneViaJSON(w, &clone) {
 		return clone
 	}
-	return w
+	return CommandActionWrapper{}
 }
 
 func clonePatchChangeKindWrapperFallback(w PatchChangeKindWrapper) PatchChangeKindWrapper {
@@ -487,7 +487,7 @@ func clonePatchChangeKindWrapperFallback(w PatchChangeKindWrapper) PatchChangeKi
 	if cloneViaJSON(w, &clone) {
 		return clone
 	}
-	return w
+	return PatchChangeKindWrapper{}
 }
 
 func cloneDynamicToolCallOutputContentItemWrapperFallback(w DynamicToolCallOutputContentItemWrapper) DynamicToolCallOutputContentItemWrapper {
@@ -495,7 +495,7 @@ func cloneDynamicToolCallOutputContentItemWrapperFallback(w DynamicToolCallOutpu
 	if cloneViaJSON(w, &clone) {
 		return clone
 	}
-	return w
+	return DynamicToolCallOutputContentItemWrapper{}
 }
 
 func cloneWebSearchActionWrapperFallback(w WebSearchActionWrapper) WebSearchActionWrapper {
@@ -503,7 +503,7 @@ func cloneWebSearchActionWrapperFallback(w WebSearchActionWrapper) WebSearchActi
 	if cloneViaJSON(w, &clone) {
 		return clone
 	}
-	return w
+	return WebSearchActionWrapper{}
 }
 
 func cloneViaJSON(in, out interface{}) bool {
@@ -522,7 +522,7 @@ func cloneJSONValue(in interface{}) interface{} {
 	if cloneViaJSON(in, &out) {
 		return out
 	}
-	return in
+	return nil
 }
 
 func cloneMessagePhasePtr(in *MessagePhase) *MessagePhase {
