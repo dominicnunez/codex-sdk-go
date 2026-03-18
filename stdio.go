@@ -8,8 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -205,36 +203,7 @@ func normalizeRequestID(id interface{}) (string, string, error) {
 }
 
 func normalizeNumericID(id interface{}) (string, bool, error) {
-	switch v := id.(type) {
-	case float64:
-		normalized, err := normalizeJSONNumberString(strconv.FormatFloat(v, 'g', -1, 64))
-		return normalized, true, err
-	case json.Number:
-		normalized, err := normalizeJSONNumberString(v.String())
-		return normalized, true, err
-	case int:
-		return strconv.FormatInt(int64(v), 10), true, nil
-	case int8:
-		return strconv.FormatInt(int64(v), 10), true, nil
-	case int16:
-		return strconv.FormatInt(int64(v), 10), true, nil
-	case int32:
-		return strconv.FormatInt(int64(v), 10), true, nil
-	case int64:
-		return strconv.FormatInt(v, 10), true, nil
-	case uint:
-		return strconv.FormatUint(uint64(v), 10), true, nil
-	case uint8:
-		return strconv.FormatUint(uint64(v), 10), true, nil
-	case uint16:
-		return strconv.FormatUint(uint64(v), 10), true, nil
-	case uint32:
-		return strconv.FormatUint(uint64(v), 10), true, nil
-	case uint64:
-		return strconv.FormatUint(v, 10), true, nil
-	default:
-		return "", false, nil
-	}
+	return canonicalNumericRequestIDString(id)
 }
 
 // NewStdioTransport creates a new stdio transport using the provided reader and writer.
@@ -1070,163 +1039,6 @@ func (t *StdioTransport) handleMalformedResponse(data []byte) {
 			},
 		}
 	}
-}
-
-func normalizeJSONNumberString(raw string) (string, error) {
-	parts, err := parseNumberParts(raw)
-	if err != nil {
-		return "", err
-	}
-	if parts.isZero {
-		return "0", nil
-	}
-	if !isNormalizedJSONNumberSizeAllowed(parts) {
-		return "", fmt.Errorf("%w: %q", errUnexpectedIDType, raw)
-	}
-
-	significandLen := len(parts.significand)
-	if parts.exponent >= 0 {
-		return parts.sign + parts.significand + strings.Repeat("0", parts.exponent), nil
-	}
-
-	decimalPos := significandLen + parts.exponent
-	if decimalPos > 0 {
-		intPart := parts.significand[:decimalPos]
-		fracPart := strings.TrimRight(parts.significand[decimalPos:], "0")
-		if fracPart == "" {
-			return parts.sign + intPart, nil
-		}
-		return parts.sign + intPart + "." + fracPart, nil
-	}
-
-	fracPart := strings.Repeat("0", -decimalPos) + parts.significand
-	fracPart = strings.TrimRight(fracPart, "0")
-	if fracPart == "" {
-		return "0", nil
-	}
-	return parts.sign + "0." + fracPart, nil
-}
-
-func isNormalizedJSONNumberSizeAllowed(parts numberParts) bool {
-	if parts.exponent > maxJSONRPCIDExponentAbs || parts.exponent < -maxJSONRPCIDExponentAbs {
-		return false
-	}
-	normalizedLen := normalizedJSONNumberLength(parts)
-	return normalizedLen > 0 && normalizedLen <= maxJSONRPCIDLength
-}
-
-func normalizedJSONNumberLength(parts numberParts) int {
-	signLen := len(parts.sign)
-	significandLen := len(parts.significand)
-	if parts.exponent >= 0 {
-		return signLen + significandLen + parts.exponent
-	}
-
-	decimalPos := significandLen + parts.exponent
-	if decimalPos > 0 {
-		fracLen := len(strings.TrimRight(parts.significand[decimalPos:], "0"))
-		if fracLen == 0 {
-			return signLen + decimalPos
-		}
-		return signLen + decimalPos + 1 + fracLen
-	}
-
-	trailingZeros := significandLen - len(strings.TrimRight(parts.significand, "0"))
-	fracLen := -decimalPos + significandLen - trailingZeros
-	if fracLen <= 0 {
-		return 1
-	}
-	return signLen + 2 + fracLen
-}
-
-func allDigitsAreZero(raw string) bool {
-	if raw == "" {
-		return false
-	}
-	for _, ch := range raw {
-		if ch != '0' {
-			return false
-		}
-	}
-	return true
-}
-
-type numberParts struct {
-	sign        string
-	significand string
-	exponent    int
-	isZero      bool
-}
-
-func parseNumberParts(raw string) (numberParts, error) {
-	parts := numberParts{}
-	rest := raw
-	if strings.HasPrefix(rest, "-") {
-		parts.sign = "-"
-		rest = rest[1:]
-	}
-	if rest == "" || strings.HasPrefix(rest, "+") {
-		return numberParts{}, fmt.Errorf("%w: %q", errUnexpectedIDType, raw)
-	}
-
-	mantissa := rest
-	exponent := 0
-	if idx := strings.IndexAny(rest, "eE"); idx >= 0 {
-		mantissa = rest[:idx]
-		exponentText := rest[idx+1:]
-		parsedExponent, err := strconv.Atoi(exponentText)
-		if err != nil {
-			return numberParts{}, fmt.Errorf("%w: %q", errUnexpectedIDType, raw)
-		}
-		exponent = parsedExponent
-	}
-	if mantissa == "" {
-		return numberParts{}, fmt.Errorf("%w: %q", errUnexpectedIDType, raw)
-	}
-
-	intPart := mantissa
-	fracPart := ""
-	if dot := strings.IndexByte(mantissa, '.'); dot >= 0 {
-		if strings.IndexByte(mantissa[dot+1:], '.') >= 0 {
-			return numberParts{}, fmt.Errorf("%w: %q", errUnexpectedIDType, raw)
-		}
-		intPart = mantissa[:dot]
-		fracPart = mantissa[dot+1:]
-	}
-	if intPart == "" || !allDigits(intPart) || !allDigitsOrEmpty(fracPart) {
-		return numberParts{}, fmt.Errorf("%w: %q", errUnexpectedIDType, raw)
-	}
-	digits := intPart + fracPart
-	if !allDigits(digits) {
-		return numberParts{}, fmt.Errorf("%w: %q", errUnexpectedIDType, raw)
-	}
-	if allDigitsAreZero(digits) {
-		return numberParts{isZero: true}, nil
-	}
-
-	significand := strings.TrimLeft(digits, "0")
-	parts.significand = significand
-	parts.exponent = exponent - len(fracPart)
-	return parts, nil
-}
-
-func allDigits(raw string) bool {
-	if raw == "" {
-		return false
-	}
-	for _, ch := range raw {
-		if ch < '0' || ch > '9' {
-			return false
-		}
-	}
-	return true
-}
-
-func allDigitsOrEmpty(raw string) bool {
-	if raw == "" {
-		return true
-	}
-	return allDigits(raw)
 }
 
 func (t *StdioTransport) handleOversizedFrame(data []byte) {

@@ -209,7 +209,7 @@ func TestStdioResponseRequestIDMatching(t *testing.T) {
 		results <- result{id: int64(123), result: resp.Result, err: err}
 	}()
 
-	// Float64 ID (JSON unmarshals numbers as float64)
+	// Whole-number float64 is canonicalized to an integer request ID.
 	go func() {
 		req := codex.Request{
 			JSONRPC: "2.0",
@@ -231,15 +231,15 @@ func TestStdioResponseRequestIDMatching(t *testing.T) {
 		results <- result{id: uint64(9007199254740993), result: resp.Result, err: err}
 	}()
 
-	// Equivalent numeric IDs in scientific and decimal forms must match.
+	// Additional integer-kind IDs should also match exactly.
 	go func() {
 		req := codex.Request{
 			JSONRPC: "2.0",
-			ID:      codex.RequestID{Value: float64(1e-6)},
+			ID:      codex.RequestID{Value: uint16(789)},
 			Method:  "test/method5",
 		}
 		resp, err := transport.Send(ctx, req)
-		results <- result{id: float64(1e-6), result: resp.Result, err: err}
+		results <- result{id: uint16(789), result: resp.Result, err: err}
 	}()
 
 	// Wait for all requests to be sent and collect them
@@ -1152,26 +1152,31 @@ func TestStdioOversizeResponseUnblocksPendingSend(t *testing.T) {
 		name      string
 		requestID interface{}
 		response  string
+		wantMatch bool
 	}{
 		{
 			name:      "string id",
 			requestID: "oversize-response",
 			response:  `"oversize-response"`,
+			wantMatch: true,
 		},
 		{
 			name:      "numeric id integer literal",
 			requestID: float64(1),
 			response:  `1`,
+			wantMatch: true,
 		},
 		{
 			name:      "numeric id decimal literal",
 			requestID: float64(1),
 			response:  `1.0`,
+			wantMatch: false,
 		},
 		{
 			name:      "numeric id exponent literal",
 			requestID: float64(1000),
 			response:  `1e3`,
+			wantMatch: false,
 		},
 	}
 
@@ -1198,20 +1203,28 @@ func TestStdioOversizeResponseUnblocksPendingSend(t *testing.T) {
 					Method:  "test/method",
 				}
 				resp, err := transport.Send(ctx, req)
-				if err != nil {
-					errCh <- fmt.Errorf("Send returned unexpected error: %w", err)
+				if tt.wantMatch {
+					if err != nil {
+						errCh <- fmt.Errorf("Send returned unexpected error: %w", err)
+						return
+					}
+					if resp.Error == nil {
+						errCh <- fmt.Errorf("Send returned nil response error")
+						return
+					}
+					if resp.Error.Code != codex.ErrCodeParseError {
+						errCh <- fmt.Errorf("response error code = %d; want %d", resp.Error.Code, codex.ErrCodeParseError)
+						return
+					}
+					if !strings.Contains(resp.Error.Message, "oversized") {
+						errCh <- fmt.Errorf("response error message = %q; want to contain oversized", resp.Error.Message)
+						return
+					}
+					errCh <- nil
 					return
 				}
-				if resp.Error == nil {
-					errCh <- fmt.Errorf("Send returned nil response error")
-					return
-				}
-				if resp.Error.Code != codex.ErrCodeParseError {
-					errCh <- fmt.Errorf("response error code = %d; want %d", resp.Error.Code, codex.ErrCodeParseError)
-					return
-				}
-				if !strings.Contains(resp.Error.Message, "oversized") {
-					errCh <- fmt.Errorf("response error message = %q; want to contain oversized", resp.Error.Message)
+				if !errors.Is(err, context.DeadlineExceeded) {
+					errCh <- fmt.Errorf("Send error = %v; want context deadline exceeded", err)
 					return
 				}
 				errCh <- nil
@@ -1235,7 +1248,7 @@ func TestStdioOversizeResponseUnblocksPendingSend(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-			case <-time.After(2 * time.Second):
+			case <-time.After(3 * time.Second):
 				t.Fatal("timeout waiting for oversized response handling")
 			}
 		})
@@ -1644,7 +1657,6 @@ func TestStdioTurnCompletedDeliveredWhenCriticalQueueIsSaturated(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("expected turn/completed to be delivered under critical queue pressure")
 	}
-
 	close(blockCritical)
 }
 

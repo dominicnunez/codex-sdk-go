@@ -265,7 +265,7 @@ func TestRequestIDStringInt64Union(t *testing.T) {
 		{
 			name:     "numeric id",
 			json:     `{"jsonrpc":"2.0","id":42,"method":"test"}`,
-			wantType: "number",
+			wantType: "int64",
 			wantVal:  "42",
 		},
 		{
@@ -288,9 +288,9 @@ func TestRequestIDStringInt64Union(t *testing.T) {
 				if s, ok := req.ID.Value.(string); !ok || s != tt.wantVal {
 					t.Errorf("Expected string ID %q, got %v (type %T)", tt.wantVal, req.ID.Value, req.ID.Value)
 				}
-			case "number":
-				if n, ok := req.ID.Value.(json.Number); !ok || n.String() != tt.wantVal {
-					t.Errorf("Expected json.Number ID %q, got %v (type %T)", tt.wantVal, req.ID.Value, req.ID.Value)
+			case "int64":
+				if n, ok := req.ID.Value.(int64); !ok || n != 42 {
+					t.Errorf("Expected int64 ID %q, got %v (type %T)", tt.wantVal, req.ID.Value, req.ID.Value)
 				}
 			case "nil":
 				if req.ID.Value != nil {
@@ -308,12 +308,12 @@ func TestRequestIDUnmarshalPreservesLargeNumericPrecision(t *testing.T) {
 		t.Fatalf("Unmarshal failed: %v", err)
 	}
 
-	id, ok := req.ID.Value.(json.Number)
+	id, ok := req.ID.Value.(int64)
 	if !ok {
-		t.Fatalf("ID type = %T, want json.Number", req.ID.Value)
+		t.Fatalf("ID type = %T, want int64", req.ID.Value)
 	}
-	if id.String() != "9007199254740993" {
-		t.Fatalf("ID value = %q, want 9007199254740993", id.String())
+	if id != 9007199254740993 {
+		t.Fatalf("ID value = %d, want 9007199254740993", id)
 	}
 }
 
@@ -325,6 +325,10 @@ func TestRequestIDUnmarshalRejectsInvalidTypes(t *testing.T) {
 		{name: "object id", raw: `{"jsonrpc":"2.0","id":{},"method":"test"}`},
 		{name: "array id", raw: `{"jsonrpc":"2.0","id":[],"method":"test"}`},
 		{name: "boolean id", raw: `{"jsonrpc":"2.0","id":true,"method":"test"}`},
+		{name: "decimal number id", raw: `{"jsonrpc":"2.0","id":1.0,"method":"test"}`},
+		{name: "fractional number id", raw: `{"jsonrpc":"2.0","id":2.5,"method":"test"}`},
+		{name: "scientific number id", raw: `{"jsonrpc":"2.0","id":1e3,"method":"test"}`},
+		{name: "out of range number id", raw: `{"jsonrpc":"2.0","id":9223372036854775808,"method":"test"}`},
 	}
 
 	for _, tt := range tests {

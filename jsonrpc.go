@@ -49,20 +49,19 @@ type Error struct {
 	Data    json.RawMessage `json:"data,omitempty"`
 }
 
-// RequestID is a union type that can be a string, number, or null.
-// JSON-RPC 2.0 spec allows id to be string | number | null.
+// RequestID is a protocol request ID.
 //
-// Numeric values decoded from wire are preserved as json.Number to avoid
-// precision loss for IDs larger than 2^53.
+// Protocol requests and responses use string IDs or 64-bit signed integer IDs.
+// A nil value is reserved for JSON-RPC parse/invalid-request error handling.
 // Use [RequestID.Equal] instead of == to compare IDs across type boundaries.
 type RequestID struct {
-	Value interface{} // string | json.Number | float64 | any Go integer kind | nil
+	Value interface{} // string | int64 | compatible Go integer forms | nil
 }
 
 // Equal reports whether r and other represent the same logical request ID,
-// normalizing across numeric types. For example, uint64(1) and float64(1)
-// are considered equal. String IDs and numeric IDs are never equal, even
-// if they have the same textual representation.
+// normalizing compatible integer-valued Go numeric types to int64. String IDs
+// and numeric IDs are never equal, even if they have the same textual
+// representation.
 func (r RequestID) Equal(other RequestID) bool {
 	if r.Value == nil && other.Value == nil {
 		return true
@@ -96,7 +95,11 @@ func isNumericID(v interface{}) (string, bool) {
 
 // MarshalJSON implements json.Marshaler for RequestID.
 func (r RequestID) MarshalJSON() ([]byte, error) {
-	return json.Marshal(r.Value)
+	value, err := canonicalRequestIDValue(r.Value, true)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(value)
 }
 
 // UnmarshalJSON implements json.Unmarshaler for RequestID.
@@ -117,11 +120,10 @@ func (r *RequestID) UnmarshalJSON(data []byte) error {
 	if err := dec.Decode(&trailing); !errors.Is(err, io.EOF) {
 		return errors.New("invalid request id")
 	}
-	switch v := v.(type) {
-	case string, json.Number, nil:
-		r.Value = v
-		return nil
-	default:
-		return errors.New("invalid request id type")
+	value, err := canonicalRequestIDValue(v, true)
+	if err != nil {
+		return err
 	}
+	r.Value = value
+	return nil
 }
