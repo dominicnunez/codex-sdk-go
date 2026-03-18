@@ -104,6 +104,7 @@ func TestSecurityStreamIgnoresTurnCompletedMissingThreadID(t *testing.T) {
 	result := stream.Result()
 	if result == nil {
 		t.Fatal("expected result after valid turn completion")
+		return
 	}
 	if result.Turn.ID != "turn-1" {
 		t.Fatalf("Turn.ID = %q, want %q", result.Turn.ID, "turn-1")
@@ -264,6 +265,7 @@ func TestSecurityMalformedTurnCompletedIsIsolatedAcrossConcurrentStreams(t *test
 		result := stream.Result()
 		if result == nil {
 			t.Fatalf("%s stream result is nil", name)
+			return
 		}
 		if result.Turn.Error != nil {
 			t.Fatalf("%s stream failed with turn error: %v", name, result.Turn.Error)

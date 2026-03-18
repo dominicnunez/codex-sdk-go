@@ -104,6 +104,7 @@ func TestTurnStartWireInputFormat(t *testing.T) {
 	req := mockTransport.GetSentRequest(0)
 	if req == nil {
 		t.Fatal("no request sent")
+		return
 	}
 
 	var wireParams struct {

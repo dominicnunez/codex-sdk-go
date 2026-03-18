@@ -67,6 +67,7 @@ func TestFeedbackUpload(t *testing.T) {
 			req := mock.GetSentRequest(0)
 			if req == nil {
 				t.Fatal("no request sent")
+				return
 			}
 			if req.Method != "feedback/upload" {
 				t.Errorf("got method %q, want %q", req.Method, "feedback/upload")

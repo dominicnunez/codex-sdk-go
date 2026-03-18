@@ -97,6 +97,7 @@ func TestRunStreamedSuccess(t *testing.T) {
 	result := stream.Result()
 	if result == nil {
 		t.Fatal("Result() returned nil")
+		return
 	}
 	if result.Response != "Hello!" {
 		t.Errorf("Response = %q, want %q", result.Response, "Hello!")
@@ -876,6 +877,7 @@ func TestRunStreamedItemCompletedUnmarshalFailureStillEmitsFallbackItem(t *testi
 	result := stream.Result()
 	if result == nil {
 		t.Fatal("Result() returned nil")
+		return
 	}
 	if len(result.Items) != 1 {
 		t.Fatalf("len(Items) = %d, want 1", len(result.Items))
@@ -951,6 +953,7 @@ func TestRunStreamedApprovalFlowDuringTurn(t *testing.T) {
 	result := stream.Result()
 	if result == nil {
 		t.Fatal("Result() returned nil")
+		return
 	}
 	if result.Response != "Done" {
 		t.Errorf("Response = %q, want 'Done'", result.Response)
@@ -1074,6 +1077,7 @@ func TestRunStreamedIgnoresCrossThreadNotifications(t *testing.T) {
 	result := stream.Result()
 	if result == nil {
 		t.Fatal("Result() returned nil")
+		return
 	}
 	if result.Response != "Correct thread" {
 		t.Errorf("Response = %q, want %q", result.Response, "Correct thread")

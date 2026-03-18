@@ -135,6 +135,7 @@ func TestLoginWireSerialization_ApiKey_SendsUnredactedCredentials(t *testing.T) 
 	req := transport.GetSentRequest(0)
 	if req == nil {
 		t.Fatal("no request was sent")
+		return
 	}
 	if req.Method != "account/login/start" {
 		t.Fatalf("method = %q, want account/login/start", req.Method)
@@ -171,6 +172,7 @@ func TestLoginWireSerialization_ChatgptAuthTokens_SendsUnredactedCredentials(t *
 	req := transport.GetSentRequest(0)
 	if req == nil {
 		t.Fatal("no request was sent")
+		return
 	}
 	if req.Method != "account/login/start" {
 		t.Fatalf("method = %q, want account/login/start", req.Method)

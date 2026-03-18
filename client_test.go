@@ -52,6 +52,7 @@ func TestClientSendRequest(t *testing.T) {
 	sentReq := mock.GetSentRequest(0)
 	if sentReq == nil {
 		t.Fatal("no request was sent")
+		return
 	}
 	if sentReq.Method != "test.method" {
 		t.Errorf("expected method=test.method, got %s", sentReq.Method)

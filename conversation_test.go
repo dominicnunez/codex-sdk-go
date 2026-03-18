@@ -141,6 +141,7 @@ func TestConversationTurnStreamed(t *testing.T) {
 	result := stream.Result()
 	if result == nil {
 		t.Fatal("Result() returned nil")
+		return
 	}
 	if result.Response != "Hi" {
 		t.Errorf("Response = %q, want 'Hi'", result.Response)
@@ -304,6 +305,7 @@ func TestConversationTurnStreamedIgnoresStaleTurnNotifications(t *testing.T) {
 	result := stream.Result()
 	if result == nil {
 		t.Fatal("Result() returned nil")
+		return
 	}
 	if result.Response != "fresh" {
 		t.Fatalf("result response = %q, want fresh", result.Response)
@@ -444,6 +446,7 @@ func TestConversationTurnStreamedIgnoresStaleFailedTurnNotifications(t *testing.
 	result := stream.Result()
 	if result == nil {
 		t.Fatal("Result() returned nil")
+		return
 	}
 	if result.Response != "fresh" {
 		t.Fatalf("result response = %q, want fresh", result.Response)
@@ -515,6 +518,7 @@ func TestConversationStartWithAllOptions(t *testing.T) {
 	}
 	if threadReq == nil {
 		t.Fatal("thread/start request not found")
+		return
 	}
 
 	var params map[string]interface{}
@@ -569,6 +573,7 @@ func TestConversationTurnWithAllOptions(t *testing.T) {
 	}
 	if turnReq == nil {
 		t.Fatal("turn/start request not found")
+		return
 	}
 
 	var params map[string]interface{}
@@ -754,6 +759,7 @@ func TestConversationWithCollaborationMode(t *testing.T) {
 	}
 	if turnReq == nil {
 		t.Fatal("turn/start request not found")
+		return
 	}
 
 	var turnParams map[string]interface{}

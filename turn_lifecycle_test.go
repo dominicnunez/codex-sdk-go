@@ -188,6 +188,7 @@ func TestRunStreamedNotificationBeforeTurnStartResponse(t *testing.T) {
 	result := stream.Result()
 	if result == nil {
 		t.Fatal("Result() returned nil")
+		return
 	}
 	if result.Response != "early bird" {
 		t.Errorf("Response = %q, want %q", result.Response, "early bird")

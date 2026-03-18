@@ -61,6 +61,7 @@ func TestThreadStart(t *testing.T) {
 		req := transport.GetSentRequest(0)
 		if req == nil {
 			t.Fatal("expected request to be sent")
+			return
 		}
 		if req.Method != "thread/start" {
 			t.Errorf("expected method 'thread/start', got %q", req.Method)
@@ -165,6 +166,7 @@ func TestThreadRead(t *testing.T) {
 		req := transport.GetSentRequest(0)
 		if req == nil {
 			t.Fatal("expected request to be sent")
+			return
 		}
 		if req.Method != "thread/read" {
 			t.Errorf("expected method 'thread/read', got %q", req.Method)

@@ -154,6 +154,7 @@ func TestAppsList(t *testing.T) {
 		req := mock.GetSentRequest(0)
 		if req == nil {
 			t.Fatal("expected request to be sent")
+			return
 		}
 		if req.Method != "app/list" {
 			t.Errorf("expected method app/list, got %s", req.Method)

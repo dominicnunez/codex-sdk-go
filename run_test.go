@@ -367,6 +367,7 @@ func TestRunWithAllOptions(t *testing.T) {
 	}
 	if threadReq == nil {
 		t.Fatal("thread/start request not found")
+		return
 	}
 
 	var threadParams map[string]interface{}
@@ -398,6 +399,7 @@ func TestRunWithAllOptions(t *testing.T) {
 	}
 	if turnReq == nil {
 		t.Fatal("turn/start request not found")
+		return
 	}
 
 	var turnParams map[string]interface{}

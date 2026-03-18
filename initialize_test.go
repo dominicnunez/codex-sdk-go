@@ -198,6 +198,7 @@ func TestClientInitialize(t *testing.T) {
 	sentReq := mock.GetSentRequest(0)
 	if sentReq == nil {
 		t.Fatal("no request was sent")
+		return
 	}
 	if sentReq.Method != "initialize" {
 		t.Errorf("request method = %q, want %q", sentReq.Method, "initialize")

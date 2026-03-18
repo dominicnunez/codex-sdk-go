@@ -113,6 +113,7 @@ func TestCommandExec(t *testing.T) {
 			req := mock.GetSentRequest(0)
 			if req == nil {
 				t.Fatal("no request sent")
+				return
 			}
 			if req.Method != "command/exec" {
 				t.Errorf("expected method 'command/exec', got %q", req.Method)
