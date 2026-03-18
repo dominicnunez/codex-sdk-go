@@ -448,11 +448,11 @@ because `exec.Command` eliminates the actual attack vector.
 **Location:** `stdio.go:192-225` — Close() and readLoop interaction
 **Date:** 2026-03-01
 
-**Reason:** The audit suggests waiting for `<-t.readerStopped` at the end of `Close()`. This would
-deadlock because the readLoop is blocked on `scanner.Scan()` which cannot be interrupted without
-closing the underlying reader. This is the same root cause as the known exception "StdioTransport.Close
-does not stop the reader goroutine" — you can't usefully wait for something you can't stop. The
-suggested fix would make `Close()` hang indefinitely on a stuck reader.
+**Reason:** The report assumes the transport cannot interrupt the read loop. That is no longer true
+in the current code: `NewStdioTransport` requires an `io.ReadCloser`, stores it as `readerCloser`,
+and `closeWithFailure` closes that reader during `Close()`. Waiting for `<-t.readerStopped` is not
+the missing remediation here, and the claimed "unstoppable reader" bug does not describe the
+transport API that actually exists in this repo.
 
 ### Write goroutine leak on context cancellation described as a new finding
 
@@ -789,11 +789,10 @@ documentation enhancement, not a code defect.
 **Location:** `stdio.go:207-240` — Close() and readLoop interaction
 **Date:** 2026-03-01
 
-**Reason:** This is a duplicate of the known exception "StdioTransport.Close does not stop the
-reader goroutine." The suggested fix (wait for `<-t.readerStopped` with a timeout) would deadlock
-because the readLoop is blocked on `scanner.Scan()` which cannot be interrupted without closing the
-underlying reader. The known exception documents that fixing this requires changing the public API
-from `io.Reader` to `io.ReadCloser` — the same root cause and the same disproportionate fix.
+**Reason:** This finding is stale against the current transport implementation. `NewStdioTransport`
+already requires an `io.ReadCloser`, and `closeWithFailure` closes that reader on shutdown. The
+report's rationale depends on an older `io.Reader`-only API that no longer exists, so the described
+shutdown deadlock is not an accurate reading of the current code.
 
 ### writeMessage goroutines can leak on context cancellation described as a new bug
 
@@ -853,9 +852,9 @@ disproportionate to the threat model (local subprocess over stdio).
 **Location:** `stdio.go:36-37, 290` — readLoop and Close interaction
 **Date:** 2026-03-01
 
-**Reason:** This is a duplicate of the known exception "StdioTransport.Close does not stop the
-reader goroutine" which documents that fixing this requires changing the public API from
-`io.Reader` to `io.ReadCloser`, a breaking change for all callers.
+**Reason:** This claim no longer matches the code. The transport constructor already requires an
+`io.ReadCloser`, keeps it in `readerCloser`, and closes it during shutdown. The older explanation
+about needing a breaking API change from `io.Reader` to `io.ReadCloser` is obsolete.
 
 ### Invalid JSON from server silently skipped described as new finding
 
@@ -1245,11 +1244,8 @@ unexported, so callers cannot access the iterator except through `Events()`.
 
 **Reason:** This behavior does not occur in the current worktree. `Thread.UnmarshalJSON`
 rejects missing required thread fields such as `id`, `cliVersion`, `cwd`, `status`, and
-`ephemeral`, and `Thread.Read`, `Thread.Resume`, `Thread.MetadataUpdate`, and
-`Thread.Unarchive` all validate their decoded responses before returning success. In
-addition, `client.sendRequest` now performs typed required-field validation on object
-results before unmarshaling. A payload like `{"thread":{}}` does not deserialize into a
-successful zero-value thread.
+`ephemeral`, and the thread response methods validate their decoded responses before returning
+success. A payload like `{"thread":{}}` does not deserialize into a successful zero-value thread.
 
 ### Plugin read/install responses succeed with missing required fields
 
@@ -1258,8 +1254,7 @@ successful zero-value thread.
 **Reason:** The report is stale against the current code. `PluginDetail`,
 `PluginSummary`, `PluginSource`, `AppSummary`, and `SkillSummary` now reject missing
 required fields during JSON unmarshaling, and `Plugin.Read` / `Plugin.Install` both
-run explicit response validation before returning. `client.sendRequest` also performs
-typed result validation before unmarshaling. The described zero-value success path for
+run explicit response validation before returning. The described zero-value success path for
 missing `plugin`, `appsNeedingAuth`, or `authPolicy` fields no longer occurs.
 
 ### Oversized response recovery does not depend on top-level id appearing early in the frame

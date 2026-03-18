@@ -83,6 +83,8 @@ func (t *Thread) UnmarshalJSON(data []byte) error {
 		return errors.New("missing thread.turns")
 	case wire.UpdatedAt == nil:
 		return errors.New("missing thread.updatedAt")
+	case wire.Ephemeral == nil:
+		return errors.New("missing thread.ephemeral")
 	}
 
 	t.ID = *wire.ID
@@ -95,9 +97,7 @@ func (t *Thread) UnmarshalJSON(data []byte) error {
 	t.Status = *wire.Status
 	t.Turns = *wire.Turns
 	t.UpdatedAt = *wire.UpdatedAt
-	if wire.Ephemeral != nil {
-		t.Ephemeral = *wire.Ephemeral
-	}
+	t.Ephemeral = *wire.Ephemeral
 	t.AgentNickname = wire.AgentNickname
 	t.AgentRole = wire.AgentRole
 	t.GitInfo = wire.GitInfo

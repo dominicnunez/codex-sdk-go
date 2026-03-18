@@ -606,13 +606,13 @@ func TestEnsureInitRetryAfterFailure(t *testing.T) {
 			"cliVersion":    "1.0.0",
 			"createdAt":     1700000000,
 			"cwd":           "/tmp",
+			"ephemeral":     true,
 			"modelProvider": "openai",
 			"preview":       "",
 			"source":        "exec",
 			"status":        map[string]interface{}{"type": "idle"},
 			"turns":         []interface{}{},
 			"updatedAt":     1700000000,
-			"ephemeral":     true,
 		},
 	})
 
@@ -957,6 +957,7 @@ func TestRunAfterTransportClose(t *testing.T) {
 			"status":        map[string]interface{}{"type": "idle"},
 			"turns":         []interface{}{},
 			"updatedAt":     1700000000,
+			"ephemeral":     false,
 		},
 	})
 
