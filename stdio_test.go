@@ -1079,9 +1079,9 @@ func TestStdioApprovalHandlerErrorReturnsErrorCode(t *testing.T) {
 	}
 }
 
-// TestStdioOversizeInboundLineIsSkipped verifies that oversized inbound frames
-// are dropped without terminating the reader goroutine.
-func TestStdioOversizeInboundLineIsSkipped(t *testing.T) {
+// TestStdioOversizeInboundLineStopsTransport verifies that oversized inbound
+// frames terminate the transport instead of pinning the read loop in recovery.
+func TestStdioOversizeInboundLineStopsTransport(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()
 	defer func() { _ = clientReader.Close() }()
@@ -1106,8 +1106,8 @@ func TestStdioOversizeInboundLineIsSkipped(t *testing.T) {
 	oversizeLine[len(oversizeLine)-1] = '\n'
 	_, _ = serverWriter.Write(oversizeLine)
 
-	// Follow with a valid notification. If reader survived the oversized frame,
-	// this should still be dispatched.
+	// Follow with a valid notification. The transport should have already shut
+	// down, so this must not be dispatched.
 	validNotif := codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "test/after-oversize",
@@ -1117,15 +1117,34 @@ func TestStdioOversizeInboundLineIsSkipped(t *testing.T) {
 
 	select {
 	case method := <-received:
-		if method != "test/after-oversize" {
-			t.Fatalf("received method = %s; want test/after-oversize", method)
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("timeout waiting for notification after oversized frame")
+		t.Fatalf("received notification %q after oversized frame shutdown", method)
+	case <-time.After(200 * time.Millisecond):
 	}
 
-	if err := transport.ScanErr(); err != nil {
-		t.Fatalf("ScanErr = %v; want nil after oversize frame recovery", err)
+	deadline := time.After(2 * time.Second)
+	for {
+		err := transport.ScanErr()
+		if err != nil {
+			if !strings.Contains(err.Error(), "oversized inbound frame") {
+				t.Fatalf("ScanErr = %v; want oversized inbound frame error", err)
+			}
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatal("timeout waiting for oversized frame shutdown")
+		default:
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+
+	if err := transport.Notify(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "test/after-stop",
+	}); err == nil {
+		t.Fatal("Notify succeeded after oversized frame shutdown")
+	} else {
+		assertTransportFailure(t, err)
 	}
 }
 
@@ -1145,46 +1164,58 @@ func waitForOutboundRequest(t *testing.T, serverReader io.Reader) {
 	}
 }
 
+type sendResult struct {
+	resp codex.Response
+	err  error
+}
+
+const (
+	incompleteOversizedFrameBytes = 11 * 1024 * 1024
+)
+
+func buildOversizedFrame(t *testing.T, totalSize int, prefix, suffix string) string {
+	t.Helper()
+
+	payloadSize := totalSize - len(prefix) - len(suffix)
+	if payloadSize <= 0 {
+		t.Fatal("invalid oversized payload size")
+	}
+
+	return prefix + strings.Repeat("x", payloadSize) + suffix
+}
+
+func assertTransportFailure(t *testing.T, err error) {
+	t.Helper()
+
+	var transportErr *codex.TransportError
+	if !errors.As(err, &transportErr) {
+		t.Fatalf("error = %v; want TransportError", err)
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("error = %v; want transport failure, not context deadline", err)
+	}
+	if !strings.Contains(err.Error(), "transport closed") && !strings.Contains(err.Error(), "transport reader stopped") {
+		t.Fatalf("error = %v; want transport closed or reader stopped", err)
+	}
+}
+
 // TestStdioOversizeResponseUnblocksPendingSend verifies that an oversized frame
-// carrying a pending response ID resolves Send with a deterministic parse error.
+// with an early-routable response ID resolves Send with a deterministic parse error.
 func TestStdioOversizeResponseUnblocksPendingSend(t *testing.T) {
 	tests := []struct {
 		name      string
 		requestID interface{}
 		response  string
-		lateID    bool
-		wantMatch bool
 	}{
 		{
 			name:      "string id",
 			requestID: "oversize-response",
 			response:  `"oversize-response"`,
-			wantMatch: true,
-		},
-		{
-			name:      "string id after oversized result",
-			requestID: "oversize-response-late-id",
-			response:  `"oversize-response-late-id"`,
-			lateID:    true,
-			wantMatch: true,
 		},
 		{
 			name:      "numeric id integer literal",
 			requestID: float64(1),
 			response:  `1`,
-			wantMatch: true,
-		},
-		{
-			name:      "numeric id decimal literal",
-			requestID: float64(1),
-			response:  `1.0`,
-			wantMatch: false,
-		},
-		{
-			name:      "numeric id exponent literal",
-			requestID: float64(1000),
-			response:  `1e3`,
-			wantMatch: false,
 		},
 	}
 
@@ -1211,28 +1242,20 @@ func TestStdioOversizeResponseUnblocksPendingSend(t *testing.T) {
 					Method:  "test/method",
 				}
 				resp, err := transport.Send(ctx, req)
-				if tt.wantMatch {
-					if err != nil {
-						errCh <- fmt.Errorf("Send returned unexpected error: %w", err)
-						return
-					}
-					if resp.Error == nil {
-						errCh <- fmt.Errorf("Send returned nil response error")
-						return
-					}
-					if resp.Error.Code != codex.ErrCodeParseError {
-						errCh <- fmt.Errorf("response error code = %d; want %d", resp.Error.Code, codex.ErrCodeParseError)
-						return
-					}
-					if !strings.Contains(resp.Error.Message, "oversized") {
-						errCh <- fmt.Errorf("response error message = %q; want to contain oversized", resp.Error.Message)
-						return
-					}
-					errCh <- nil
+				if err != nil {
+					errCh <- fmt.Errorf("Send returned unexpected error: %w", err)
 					return
 				}
-				if !errors.Is(err, context.DeadlineExceeded) {
-					errCh <- fmt.Errorf("Send error = %v; want context deadline exceeded", err)
+				if resp.Error == nil {
+					errCh <- fmt.Errorf("Send returned nil response error")
+					return
+				}
+				if resp.Error.Code != codex.ErrCodeParseError {
+					errCh <- fmt.Errorf("response error code = %d; want %d", resp.Error.Code, codex.ErrCodeParseError)
+					return
+				}
+				if !strings.Contains(resp.Error.Message, "oversized") {
+					errCh <- fmt.Errorf("response error message = %q; want to contain oversized", resp.Error.Message)
 					return
 				}
 				errCh <- nil
@@ -1241,18 +1264,9 @@ func TestStdioOversizeResponseUnblocksPendingSend(t *testing.T) {
 			waitForOutboundRequest(t, serverReader)
 
 			// Send an oversized response frame with a matching ID.
-			const overSize = 11 * 1024 * 1024
 			responsePrefix := `{"jsonrpc":"2.0","id":` + tt.response + `,"result":"`
 			responseSuffix := "\"}\n"
-			if tt.lateID {
-				responsePrefix = `{"jsonrpc":"2.0","result":"`
-				responseSuffix = `","id":` + tt.response + "}\n"
-			}
-			payloadSize := overSize - len(responsePrefix) - len(responseSuffix)
-			if payloadSize <= 0 {
-				t.Fatal("invalid oversized payload size")
-			}
-			oversized := responsePrefix + strings.Repeat("x", payloadSize) + responseSuffix
+			oversized := buildOversizedFrame(t, incompleteOversizedFrameBytes, responsePrefix, responseSuffix)
 			_, _ = serverWriter.Write([]byte(oversized))
 
 			select {
@@ -1267,7 +1281,74 @@ func TestStdioOversizeResponseUnblocksPendingSend(t *testing.T) {
 	}
 }
 
-func TestStdioOversizeResponseWithLateIDUnblocksPendingSend(t *testing.T) {
+func TestStdioOversizeResponseWithLateIDClosesTransport(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	type sendResult struct {
+		resp codex.Response
+		err  error
+	}
+	resultCh := make(chan sendResult, 1)
+	go func() {
+		req := codex.Request{
+			JSONRPC: "2.0",
+			ID:      codex.RequestID{Value: "late-id"},
+			Method:  "test/method",
+		}
+		resp, err := transport.Send(ctx, req)
+		resultCh <- sendResult{resp: resp, err: err}
+	}()
+
+	waitForOutboundRequest(t, serverReader)
+
+	const responsePrefix = `{"jsonrpc":"2.0","result":"`
+	const responseSuffix = `","id":"late-id"}` + "\n"
+	oversized := buildOversizedFrame(t, incompleteOversizedFrameBytes, responsePrefix, responseSuffix)
+	_, _ = serverWriter.Write([]byte(oversized))
+
+	select {
+	case result := <-resultCh:
+		if result.err != nil {
+			assertTransportFailure(t, result.err)
+			break
+		}
+		if result.resp.Error == nil {
+			t.Fatal("Send returned nil response error")
+		}
+		if result.resp.Error.Code != codex.ErrCodeInternalError {
+			t.Fatalf("response error code = %d; want %d", result.resp.Error.Code, codex.ErrCodeInternalError)
+		}
+		if !strings.Contains(result.resp.Error.Message, "oversized") {
+			t.Fatalf("response error message = %q; want oversized transport error", result.resp.Error.Message)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for oversized response handling")
+	}
+
+	if err := transport.ScanErr(); err == nil || !strings.Contains(err.Error(), "oversized") {
+		t.Fatalf("ScanErr = %v, want oversized transport error", err)
+	}
+
+	_, err := transport.Send(context.Background(), codex.Request{
+		JSONRPC: "2.0",
+		ID:      codex.RequestID{Value: "after-close"},
+		Method:  "test/after-close",
+	})
+	assertTransportFailure(t, err)
+}
+
+func TestStdioPartialOversizeResponseClosesTransportImmediately(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()
 	defer func() { _ = clientReader.Close() }()
@@ -1285,7 +1366,7 @@ func TestStdioOversizeResponseWithLateIDUnblocksPendingSend(t *testing.T) {
 	go func() {
 		req := codex.Request{
 			JSONRPC: "2.0",
-			ID:      codex.RequestID{Value: "late-id"},
+			ID:      codex.RequestID{Value: "partial-oversize"},
 			Method:  "test/method",
 		}
 		resp, err := transport.Send(ctx, req)
@@ -1302,7 +1383,7 @@ func TestStdioOversizeResponseWithLateIDUnblocksPendingSend(t *testing.T) {
 			return
 		}
 		if !strings.Contains(resp.Error.Message, "oversized") {
-			errCh <- fmt.Errorf("response error message = %q; want to contain oversized", resp.Error.Message)
+			errCh <- fmt.Errorf("response error message = %q; want oversized parse error", resp.Error.Message)
 			return
 		}
 		errCh <- nil
@@ -1310,15 +1391,8 @@ func TestStdioOversizeResponseWithLateIDUnblocksPendingSend(t *testing.T) {
 
 	waitForOutboundRequest(t, serverReader)
 
-	const overSize = 11 * 1024 * 1024
-	const responsePrefix = `{"jsonrpc":"2.0","result":"`
-	const responseSuffix = `","id":"late-id"}` + "\n"
-	payloadSize := overSize - len(responsePrefix) - len(responseSuffix)
-	if payloadSize <= 0 {
-		t.Fatal("invalid oversized payload size")
-	}
-	oversized := responsePrefix + strings.Repeat("x", payloadSize) + responseSuffix
-	_, _ = serverWriter.Write([]byte(oversized))
+	const responsePrefix = `{"jsonrpc":"2.0","id":"partial-oversize","result":"`
+	_, _ = serverWriter.Write([]byte(buildOversizedFrame(t, incompleteOversizedFrameBytes, responsePrefix, "")))
 
 	select {
 	case err := <-errCh:
@@ -1326,13 +1400,17 @@ func TestStdioOversizeResponseWithLateIDUnblocksPendingSend(t *testing.T) {
 			t.Fatal(err)
 		}
 	case <-time.After(3 * time.Second):
-		t.Fatal("timeout waiting for oversized response handling")
+		t.Fatal("timeout waiting for partial oversized response handling")
+	}
+
+	if err := transport.ScanErr(); err == nil || !strings.Contains(err.Error(), "oversized inbound frame") {
+		t.Fatalf("ScanErr = %v, want oversized inbound frame error", err)
 	}
 }
 
-// TestStdioOversizeAmbiguousFrameDoesNotFailPendingSend verifies that oversized
-// frames with no early routing keys are ignored instead of failing all pending sends.
-func TestStdioOversizeAmbiguousFrameDoesNotFailPendingSend(t *testing.T) {
+// TestStdioOversizeAmbiguousFrameStopsTransport verifies that oversized
+// non-response frames stop the transport instead of blocking pending sends.
+func TestStdioOversizeAmbiguousFrameStopsTransport(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()
 	defer func() { _ = clientReader.Close() }()
@@ -1346,7 +1424,11 @@ func TestStdioOversizeAmbiguousFrameDoesNotFailPendingSend(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	errCh := make(chan error, 1)
+	type sendResult struct {
+		resp codex.Response
+		err  error
+	}
+	resultCh := make(chan sendResult, 1)
 	go func() {
 		req := codex.Request{
 			JSONRPC: "2.0",
@@ -1354,45 +1436,37 @@ func TestStdioOversizeAmbiguousFrameDoesNotFailPendingSend(t *testing.T) {
 			Method:  "test/method",
 		}
 		resp, err := transport.Send(ctx, req)
-		if err != nil {
-			errCh <- fmt.Errorf("Send returned unexpected error: %w", err)
-			return
-		}
-		if resp.Error != nil {
-			errCh <- fmt.Errorf("Send returned unexpected response error: %v", resp.Error)
-			return
-		}
-		if string(resp.Result) != `{"ok":true}` {
-			errCh <- fmt.Errorf("response result = %s; want {\"ok\":true}", string(resp.Result))
-			return
-		}
-		errCh <- nil
+		resultCh <- sendResult{resp: resp, err: err}
 	}()
 
 	waitForOutboundRequest(t, serverReader)
 
-	const overSize = 11 * 1024 * 1024
 	const ambiguousPrefix = `{"jsonrpc":"2.0","params":{"payload":"`
 	const ambiguousSuffix = `"},"method":"thread/updated"}` + "\n"
-	payloadSize := overSize - len(ambiguousPrefix) - len(ambiguousSuffix)
-	if payloadSize <= 0 {
-		t.Fatal("invalid oversized payload size")
-	}
-	oversized := ambiguousPrefix + strings.Repeat("x", payloadSize) + ambiguousSuffix
+	oversized := buildOversizedFrame(t, incompleteOversizedFrameBytes, ambiguousPrefix, ambiguousSuffix)
 	_, _ = serverWriter.Write([]byte(oversized))
-	_, _ = serverWriter.Write([]byte(`{"jsonrpc":"2.0","id":"ambiguous-oversize","result":{"ok":true}}` + "\n"))
 
 	select {
-	case err := <-errCh:
-		if err != nil {
-			t.Fatal(err)
+	case result := <-resultCh:
+		if result.err != nil {
+			assertTransportFailure(t, result.err)
+			break
+		}
+		if result.resp.Error == nil {
+			t.Fatal("Send returned nil response error")
+		}
+		if result.resp.Error.Code != codex.ErrCodeInternalError {
+			t.Fatalf("response error code = %d; want %d", result.resp.Error.Code, codex.ErrCodeInternalError)
+		}
+		if !strings.Contains(result.resp.Error.Message, "oversized") {
+			t.Fatalf("response error message = %q; want oversized transport error", result.resp.Error.Message)
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("timeout waiting for oversized response handling")
 	}
 }
 
-func TestStdioOversizeNotificationWithLateMethodDoesNotFailPendingSend(t *testing.T) {
+func TestStdioOversizeNotificationWithLateMethodStopsTransport(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()
 	defer func() { _ = clientReader.Close() }()
@@ -1406,7 +1480,7 @@ func TestStdioOversizeNotificationWithLateMethodDoesNotFailPendingSend(t *testin
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	errCh := make(chan error, 1)
+	resultCh := make(chan sendResult, 1)
 	go func() {
 		req := codex.Request{
 			JSONRPC: "2.0",
@@ -1414,41 +1488,33 @@ func TestStdioOversizeNotificationWithLateMethodDoesNotFailPendingSend(t *testin
 			Method:  "test/method",
 		}
 		resp, err := transport.Send(ctx, req)
-		if err != nil {
-			errCh <- fmt.Errorf("Send returned unexpected error: %w", err)
-			return
-		}
-		if resp.Error != nil {
-			errCh <- fmt.Errorf("Send returned unexpected response error: %v", resp.Error)
-			return
-		}
-		if string(resp.Result) != `{"ok":true}` {
-			errCh <- fmt.Errorf("response result = %s; want {\"ok\":true}", string(resp.Result))
-			return
-		}
-		errCh <- nil
+		resultCh <- sendResult{resp: resp, err: err}
 	}()
 
 	waitForOutboundRequest(t, serverReader)
 
-	const overSize = 11 * 1024 * 1024
 	const notifPrefix = `{"jsonrpc":"2.0","params":{"payload":"`
 	const notifSuffix = `"},"method":"turn/updated"}` + "\n"
-	payloadSize := overSize - len(notifPrefix) - len(notifSuffix)
-	if payloadSize <= 0 {
-		t.Fatal("invalid oversized payload size")
-	}
-	oversized := notifPrefix + strings.Repeat("x", payloadSize) + notifSuffix
+	oversized := buildOversizedFrame(t, incompleteOversizedFrameBytes, notifPrefix, notifSuffix)
 	_, _ = serverWriter.Write([]byte(oversized))
-	_, _ = serverWriter.Write([]byte(`{"jsonrpc":"2.0","id":"late-method","result":{"ok":true}}` + "\n"))
 
 	select {
-	case err := <-errCh:
-		if err != nil {
-			t.Fatal(err)
+	case result := <-resultCh:
+		if result.err != nil {
+			assertTransportFailure(t, result.err)
+			break
+		}
+		if result.resp.Error == nil {
+			t.Fatal("Send returned nil response error")
+		}
+		if result.resp.Error.Code != codex.ErrCodeInternalError {
+			t.Fatalf("response error code = %d; want %d", result.resp.Error.Code, codex.ErrCodeInternalError)
+		}
+		if !strings.Contains(result.resp.Error.Message, "oversized") {
+			t.Fatalf("response error message = %q; want oversized transport error", result.resp.Error.Message)
 		}
 	case <-time.After(2 * time.Second):
-		t.Fatal("timeout waiting for pending send after oversized notification")
+		t.Fatal("timeout waiting for oversized notification shutdown")
 	}
 }
 
@@ -1496,14 +1562,9 @@ func TestStdioOversizeResponseAtEOFFailsPendingSend(t *testing.T) {
 
 	waitForOutboundRequest(t, serverReader)
 
-	const overSize = 11 * 1024 * 1024
 	const responsePrefix = `{"jsonrpc":"2.0","id":"oversize-at-eof","result":"`
 	const responseSuffix = `"}`
-	payloadSize := overSize - len(responsePrefix) - len(responseSuffix)
-	if payloadSize <= 0 {
-		t.Fatal("invalid oversized payload size")
-	}
-	oversized := responsePrefix + strings.Repeat("x", payloadSize) + responseSuffix
+	oversized := buildOversizedFrame(t, incompleteOversizedFrameBytes, responsePrefix, responseSuffix)
 	_, _ = serverWriter.Write([]byte(oversized))
 	_ = serverWriter.Close()
 
