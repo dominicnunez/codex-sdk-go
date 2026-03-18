@@ -242,7 +242,7 @@ func StartProcess(ctx context.Context, opts *ProcessOptions) (*Process, error) {
 		return nil, err
 	}
 
-	cmd := exec.Command(binary, args...)
+	cmd := exec.CommandContext(context.WithoutCancel(ctx), binary, args...)
 	cmd.Env = resolveProcessEnv(opts)
 	cmd.Dir = opts.Dir
 
