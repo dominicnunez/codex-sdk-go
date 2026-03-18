@@ -82,3 +82,26 @@ Built from 150+ JSON schemas extracted from the [OpenAI Codex CLI](https://githu
 ## Contributing
 
 Issues and PRs welcome on GitHub.
+
+### Local Hooks
+
+This repo uses `lefthook` for shared local Git hooks.
+
+Install hooks once after cloning:
+
+```bash
+./scripts/setup-hooks.sh
+```
+
+Or, if you are already in the dev shell:
+
+```bash
+lefthook install
+```
+
+Hook behavior:
+
+- `pre-commit`: runs `gofmt` on staged Go files, re-stages them, then runs `golangci-lint run --new`
+- `pre-push`: runs `go test ./...`, `golangci-lint run ./...`, and `go mod tidy -diff`
+
+To bypass hooks intentionally for a one-off operation, use Git's standard `--no-verify` flag.
