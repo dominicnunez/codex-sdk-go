@@ -11,11 +11,13 @@ import (
 	"testing"
 )
 
+const golangciLintVersion = "v2.11.3"
+
 // TestGolangciLint verifies that golangci-lint passes with no issues.
 //
 // To run golangci-lint manually:
 //
-//	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+//	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.3
 //	golangci-lint run ./...
 func TestGolangciLint(t *testing.T) {
 	lintBin := "golangci-lint"
@@ -27,7 +29,7 @@ func TestGolangciLint(t *testing.T) {
 		}
 		candidate := filepath.Join(gopath, "bin", "golangci-lint")
 		if _, err := exec.LookPath(candidate); err != nil {
-			t.Skip("golangci-lint not found - install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest")
+			t.Skip("golangci-lint not found - install with: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@" + golangciLintVersion)
 		}
 		lintBin = candidate
 	}
