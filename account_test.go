@@ -393,8 +393,8 @@ func TestAccountLoginRejectsNullResult(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for null login result")
 	}
-	if !strings.Contains(err.Error(), "non-null object") {
-		t.Fatalf("error = %v; want non-null object context", err)
+	if !errors.Is(err, codex.ErrEmptyResult) {
+		t.Fatalf("error = %v; want ErrEmptyResult", err)
 	}
 }
 

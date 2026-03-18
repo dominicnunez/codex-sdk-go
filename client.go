@@ -1,6 +1,7 @@
 package codex
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -14,7 +15,7 @@ import (
 var errInvalidParams = errors.New("invalid params")
 
 // ErrEmptyResult indicates the server returned a successful response with a
-// null result where the caller expected a value.
+// missing or null result where the caller expected a value.
 var ErrEmptyResult = errors.New("server returned empty result")
 
 // wireMarshaler is implemented by types whose MarshalJSON is redacted for safety.
@@ -46,6 +47,10 @@ func isNilWireMarshaler(wm wireMarshaler) bool {
 	default:
 		return false
 	}
+}
+
+func isEmptyResponseResult(result json.RawMessage) bool {
+	return len(result) == 0 || bytes.Equal(bytes.TrimSpace(result), []byte("null"))
 }
 
 // internalListener is a notification handler registered via addNotificationListener.
@@ -496,7 +501,7 @@ func (c *Client) sendRequest(ctx context.Context, method string, params interfac
 
 	// Unmarshal result if caller expects one
 	if result != nil {
-		if resp.Result == nil {
+		if isEmptyResponseResult(resp.Result) {
 			return fmt.Errorf("%s: %w", method, ErrEmptyResult)
 		}
 		if err := json.Unmarshal(resp.Result, result); err != nil {
@@ -530,7 +535,7 @@ func (c *Client) sendRequestRaw(ctx context.Context, method string, params inter
 		return nil, fmt.Errorf("%s: %w", method, err)
 	}
 
-	if resp.Result == nil {
+	if isEmptyResponseResult(resp.Result) {
 		return nil, fmt.Errorf("%s: %w", method, ErrEmptyResult)
 	}
 
