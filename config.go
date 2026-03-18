@@ -302,7 +302,7 @@ func (w ConfigLayerSourceWrapper) MarshalJSON() ([]byte, error) {
 	return json.Marshal(w.Value)
 }
 
-// ConfigRequirementsReadResponse represents response from config/requirements/read request
+// ConfigRequirementsReadResponse represents response from configRequirements/read request.
 type ConfigRequirementsReadResponse struct {
 	Requirements *ConfigRequirements `json:"requirements,omitempty"`
 }
@@ -324,7 +324,7 @@ type ConfigValueWriteParams struct {
 	ExpectedVersion *string         `json:"expectedVersion,omitempty"`
 }
 
-// ConfigBatchWriteParams represents parameters for config/batch/write request
+// ConfigBatchWriteParams represents parameters for config/batchWrite request.
 type ConfigBatchWriteParams struct {
 	Edits            []ConfigEdit `json:"edits"`
 	FilePath         *string      `json:"filePath,omitempty"`

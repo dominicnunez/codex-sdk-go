@@ -9,12 +9,12 @@ import (
 	"reflect"
 )
 
-// GetAccountParams are parameters for the account/get method
+// GetAccountParams are parameters for the account/read method.
 type GetAccountParams struct {
 	RefreshToken *bool `json:"refreshToken,omitempty"`
 }
 
-// GetAccountResponse is the response from account/get
+// GetAccountResponse is the response from account/read.
 type GetAccountResponse struct {
 	Account            *AccountWrapper `json:"account"`
 	RequiresOpenaiAuth bool            `json:"requiresOpenaiAuth"`
@@ -136,7 +136,7 @@ func (a *AccountWrapper) MarshalJSON() ([]byte, error) {
 	return json.Marshal(a.Value)
 }
 
-// GetAccountRateLimitsResponse is the response from account/getRateLimits
+// GetAccountRateLimitsResponse is the response from account/rateLimits/read.
 type GetAccountRateLimitsResponse struct {
 	RateLimits          RateLimitSnapshot             `json:"rateLimits"`
 	RateLimitsByLimitId map[string]*RateLimitSnapshot `json:"rateLimitsByLimitId,omitempty"`

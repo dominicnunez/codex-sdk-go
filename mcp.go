@@ -60,31 +60,31 @@ type McpServerStatus struct {
 	Tools             map[string]Tool    `json:"tools"`
 }
 
-// ListMcpServerStatusParams are parameters for the mcp/listServerStatus request.
+// ListMcpServerStatusParams are parameters for the mcpServerStatus/list request.
 type ListMcpServerStatusParams struct {
 	Cursor *string `json:"cursor,omitempty"`
 	Limit  *uint32 `json:"limit,omitempty"`
 }
 
-// ListMcpServerStatusResponse is the response from mcp/listServerStatus.
+// ListMcpServerStatusResponse is the response from mcpServerStatus/list.
 type ListMcpServerStatusResponse struct {
 	Data       []McpServerStatus `json:"data"`
 	NextCursor *string           `json:"nextCursor,omitempty"`
 }
 
-// McpServerOauthLoginParams are parameters for the mcp/server/oauthLogin request.
+// McpServerOauthLoginParams are parameters for the mcpServer/oauth/login request.
 type McpServerOauthLoginParams struct {
 	Name        string    `json:"name"`
 	Scopes      *[]string `json:"scopes,omitempty"`
 	TimeoutSecs *int64    `json:"timeoutSecs,omitempty"`
 }
 
-// McpServerOauthLoginResponse is the response from mcp/server/oauthLogin.
+// McpServerOauthLoginResponse is the response from mcpServer/oauth/login.
 type McpServerOauthLoginResponse struct {
 	AuthorizationUrl string `json:"authorizationUrl"`
 }
 
-// McpServerRefreshResponse is the response from mcp/server/refresh.
+// McpServerRefreshResponse is the response from config/mcpServer/reload.
 type McpServerRefreshResponse struct{}
 
 // McpServerOauthLoginCompletedNotification is sent when OAuth login completes.
