@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -267,5 +269,37 @@ func TestEnsureInitFailureAllowsRetry(t *testing.T) {
 	}
 	if got := transport.calls(); got != 2 {
 		t.Fatalf("initialize call count = %d, want 2", got)
+	}
+}
+
+func TestProcessCloseNoSignalModeSkipsLongGraceWait(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("process test requires unix shell script")
+	}
+
+	dir := t.TempDir()
+	fakeBinary := filepath.Join(dir, "fake-codex")
+
+	script := `#!/bin/sh
+while true; do sleep 1; done
+`
+	if err := os.WriteFile(fakeBinary, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake binary: %v", err)
+	}
+
+	proc, err := StartProcess(context.Background(), &ProcessOptions{
+		BinaryPath: fakeBinary,
+	})
+	if err != nil {
+		t.Fatalf("StartProcess: %v", err)
+	}
+	proc.shutdownMode = processShutdownModeNoSignal
+
+	start := time.Now()
+	if err := proc.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if elapsed := time.Since(start); elapsed >= time.Second {
+		t.Fatalf("Close took %v; want no-signal shutdown to skip the long grace wait", elapsed)
 	}
 }

@@ -2,50 +2,37 @@ package codex
 
 import (
 	"errors"
-	"sync"
 	"testing"
 )
 
-func TestGuardedChanRetainsTerminalErrorUnderBackpressure(t *testing.T) {
-	const iterations = 200
-	wantErr := errors.New("terminal failure")
+func TestGuardedChanOverflowFailsStream(t *testing.T) {
+	g := newGuardedChan(1)
 
-	for i := range iterations {
-		g := newGuardedChan(1)
-		streamSendEvent(g, &TextDelta{Delta: "seed", ItemID: "seed"})
+	streamSendEvent(g, &TextDelta{Delta: "seed", ItemID: "seed"})
+	streamSendEvent(g, &TextDelta{Delta: "overflow", ItemID: "overflow"})
+	streamSendErr(g, errors.New("later error"))
 
-		stop := make(chan struct{})
-		var wg sync.WaitGroup
-		const producers = 6
-		wg.Add(producers)
-		for range producers {
-			go func() {
-				defer wg.Done()
-				for {
-					select {
-					case <-stop:
-						return
-					default:
-						streamSendEvent(g, &TextDelta{Delta: "noise", ItemID: "n"})
-					}
-				}
-			}()
+	var (
+		events []Event
+		gotErr error
+	)
+	for event, err := range streamIterator(g) {
+		if event != nil {
+			events = append(events, event)
 		}
-
-		streamSendErr(g, wantErr)
-		close(stop)
-		wg.Wait()
-		g.closeOnce()
-
-		var gotErr error
-		for _, err := range streamIterator(g) {
-			if err != nil {
-				gotErr = err
-			}
+		if err != nil {
+			gotErr = err
 		}
-		if !errors.Is(gotErr, wantErr) {
-			t.Fatalf("iteration %d: got terminal err %v, want %v", i, gotErr, wantErr)
-		}
+	}
+
+	if len(events) != 1 {
+		t.Fatalf("event count = %d; want 1", len(events))
+	}
+	if delta, ok := events[0].(*TextDelta); !ok || delta.Delta != "seed" {
+		t.Fatalf("first event = %#v; want seed TextDelta", events[0])
+	}
+	if !errors.Is(gotErr, ErrStreamOverflow) {
+		t.Fatalf("terminal err = %v; want %v", gotErr, ErrStreamOverflow)
 	}
 }
 

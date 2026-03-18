@@ -12,14 +12,18 @@ import (
 
 // streamChannelBuffer is the capacity of the event channel between the
 // lifecycle goroutine and the Events() iterator. 64 is large enough to
-// absorb bursts of rapid notifications (e.g. streaming text deltas)
-// without blocking the notification dispatcher, while small enough to
-// keep per-stream memory overhead negligible.
+// absorb short bursts of rapid notifications (e.g. streaming text deltas)
+// before the stream fails fast with [ErrStreamOverflow]. The buffer stays
+// bounded so a stalled consumer cannot grow memory without limit.
 const streamChannelBuffer = 64
 
 // ErrStreamConsumed is returned when Events() is called on a Stream whose
 // events have already been consumed by a prior iteration.
 var ErrStreamConsumed = errors.New("stream events already consumed")
+
+// ErrStreamOverflow is returned when a streamed event producer outpaces the
+// Events() consumer and the bounded stream buffer fills up.
+var ErrStreamOverflow = errors.New("stream event buffer overflow")
 
 // guardedChan wraps a channel with an RWMutex so that sends and close are
 // mutually exclusive. Senders hold a read lock (concurrent sends are fine);
@@ -41,42 +45,48 @@ func newGuardedChan(size int) *guardedChan {
 // the consumer draining Events().
 func (g *guardedChan) send(eoe eventOrErr) {
 	g.mu.RLock()
-	defer g.mu.RUnlock()
 	if g.closed {
+		g.mu.RUnlock()
 		return
 	}
 	select {
 	case g.ch <- eoe:
+		g.mu.RUnlock()
 		return
 	default:
 	}
+	g.mu.RUnlock()
 
-	// Buffer is full: evict one queued event and retry once. If a concurrent
-	// sender filled the slot before this retry, we intentionally drop the new
-	// event to keep delivery non-blocking.
-	select {
-	case <-g.ch:
-	default:
-	}
-	select {
-	case g.ch <- eoe:
-	default:
-	}
+	g.fail(ErrStreamOverflow)
 }
 
 // setTerminalError records the terminal stream error exactly once.
-// It is stored out-of-band from the lossy event buffer so it cannot be dropped
-// when producers are contending on a full channel.
 func (g *guardedChan) setTerminalError(err error) {
 	if err == nil {
 		return
 	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	if g.closed || g.terminalErr != nil {
+	if g.terminalErr != nil {
 		return
 	}
 	g.terminalErr = err
+}
+
+func (g *guardedChan) fail(err error) {
+	if err == nil {
+		return
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.terminalErr == nil {
+		g.terminalErr = err
+	}
+	if g.closed {
+		return
+	}
+	g.closed = true
+	close(g.ch)
 }
 
 func (g *guardedChan) terminalError() error {
@@ -194,7 +204,8 @@ func streamIterator(g *guardedChan) iter.Seq2[Event, error] {
 	}
 }
 
-// streamSendEvent sends an event on g using bounded-loss semantics.
+// streamSendEvent sends an event on g and fails the stream if the bounded
+// buffer overflows.
 func streamSendEvent(g *guardedChan, event Event) {
 	g.send(eventOrErr{event: event})
 }

@@ -704,6 +704,40 @@ while true; do sleep 1; done
 	}
 }
 
+func TestProcessCloseClosesChildStdin(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("process test requires unix shell script")
+	}
+
+	dir := t.TempDir()
+	fakeBinary := filepath.Join(dir, "fake-codex")
+
+	// Ignore SIGINT so the process only exits when Close delivers stdin EOF.
+	script := `#!/bin/sh
+trap '' INT
+cat >/dev/null
+exit 0
+`
+	if err := os.WriteFile(fakeBinary, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake binary: %v", err)
+	}
+
+	proc, err := codex.StartProcess(context.Background(), &codex.ProcessOptions{
+		BinaryPath: fakeBinary,
+	})
+	if err != nil {
+		t.Fatalf("StartProcess: %v", err)
+	}
+
+	start := time.Now()
+	if err := proc.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if elapsed := time.Since(start); elapsed >= 1500*time.Millisecond {
+		t.Fatalf("Close took %v; want stdin EOF shutdown well before forced kill", elapsed)
+	}
+}
+
 // TestStartProcessCustomStderr verifies stderr redirection.
 func TestStartProcessCustomStderr(t *testing.T) {
 	if runtime.GOOS == "windows" {

@@ -1197,28 +1197,27 @@ func TestRunStreamedBackpressure_SlowConsumerCompletesUnderOverflow(t *testing.T
 		})
 	}()
 
-	// Consume slowly while producer floods events. Overflow is lossy by design,
-	// but turn completion must still be delivered and Result must complete.
+	// Consume slowly while producer floods events. Once the bounded buffer
+	// fills, the stream must fail explicitly instead of silently dropping
+	// queued events.
 	var received int
-	var sawTurnCompleted bool
+	var gotErr error
 	for event, err := range stream.Events() {
 		if err != nil {
-			t.Fatalf("unexpected error after %d events: %v", received, err)
+			gotErr = err
+			continue
 		}
 		if _, ok := event.(*codex.TextDelta); ok {
 			received++
 			time.Sleep(1 * time.Millisecond)
-		}
-		if _, ok := event.(*codex.TurnCompleted); ok {
-			sawTurnCompleted = true
 		}
 	}
 
 	if received == 0 {
 		t.Fatal("expected to receive at least one text delta")
 	}
-	if !sawTurnCompleted {
-		t.Fatal("expected turn completion event under overflow")
+	if !errors.Is(gotErr, codex.ErrStreamOverflow) {
+		t.Fatalf("terminal error = %v; want %v", gotErr, codex.ErrStreamOverflow)
 	}
 	if result := stream.Result(); result == nil {
 		t.Fatal("Result() returned nil under overflow")
@@ -1235,9 +1234,9 @@ func TestRunStreamedBackpressure_ContextCancellationUnblocksSender(t *testing.T)
 
 	waitForRunStreamedReady(t, mock)
 
-	// Inject notifications from a goroutine to fill the buffer. Once the
-	// buffer is full, streamSendEvent blocks. Cancelling the context must
-	// unblock it, preventing goroutine leaks.
+	// Inject notifications from a goroutine to overflow the bounded buffer.
+	// Even after the stream fails fast, cancelling the context must let the
+	// lifecycle finish promptly.
 	var injected atomic.Int32
 	go func() {
 		for i := 0; i < 200; i++ {

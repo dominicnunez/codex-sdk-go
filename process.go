@@ -21,10 +21,21 @@ const (
 	// sending SIGKILL. 3 seconds balances fast shutdown against giving
 	// the CLI time to flush pending writes and release resources.
 	processGracePeriod = 3 * time.Second
+	// processEOFGracePeriod gives a child a brief chance to exit after stdin
+	// closes on platforms where the SDK cannot send a graceful interrupt.
+	processEOFGracePeriod = 100 * time.Millisecond
 
 	// sdkVersion is sent to the server during initialization.
 	// Update this value when cutting a new release.
 	sdkVersion = "0.2.0"
+)
+
+type processShutdownMode uint8
+
+const (
+	processShutdownModeUnset processShutdownMode = iota
+	processShutdownModeGraceful
+	processShutdownModeNoSignal
 )
 
 // ProcessOptions configures how the Codex CLI process is spawned.
@@ -72,16 +83,18 @@ type ProcessOptions struct {
 
 // Process wraps a running Codex CLI child process and its connected Client.
 type Process struct {
-	Client    *Client
-	cmd       *exec.Cmd
-	transport *StdioTransport
-	closeOnce sync.Once
-	waitOnce  sync.Once
-	waitErr   error
-	waitDone  chan struct{}
-	initMu    sync.Mutex
-	initDone  bool
-	initWait  chan struct{}
+	Client       *Client
+	cmd          *exec.Cmd
+	transport    *StdioTransport
+	stdin        io.Closer
+	closeOnce    sync.Once
+	waitOnce     sync.Once
+	waitErr      error
+	waitDone     chan struct{}
+	initMu       sync.Mutex
+	initDone     bool
+	initWait     chan struct{}
+	shutdownMode processShutdownMode
 }
 
 // errEndOfOptionsInExecArgs is returned when ExecArgs contains "--", which
@@ -280,10 +293,12 @@ func StartProcess(ctx context.Context, opts *ProcessOptions) (*Process, error) {
 	client := NewClient(transport, opts.ClientOptions...)
 
 	return &Process{
-		Client:    client,
-		cmd:       cmd,
-		transport: transport,
-		waitDone:  make(chan struct{}),
+		Client:       client,
+		cmd:          cmd,
+		transport:    transport,
+		stdin:        stdin,
+		waitDone:     make(chan struct{}),
+		shutdownMode: defaultProcessShutdownMode(),
 	}, nil
 }
 
@@ -330,38 +345,88 @@ func stopStartedCommand(cmd *exec.Cmd) {
 func (p *Process) Close() error {
 	var closeErr error
 	p.closeOnce.Do(func() {
-		// Close transport first to unblock any pending reads.
-		if p.transport != nil {
-			if err := p.transport.Close(); err != nil {
-				closeErr = err
-			}
-		}
-
-		// Try graceful interrupt, then force kill after grace period.
-		if p.cmd != nil && p.cmd.Process != nil {
-			if err := requestProcessShutdown(p.cmd.Process); err != nil && !isExpectedProcessStopError(err) {
-				closeErr = errors.Join(closeErr, fmt.Errorf("signal process: %w", err))
-			}
-
-			go p.doWait()
-
-			select {
-			case <-p.waitDone:
-			case <-time.After(processGracePeriod):
-				if err := p.cmd.Process.Kill(); err != nil && !isExpectedProcessStopError(err) {
-					closeErr = errors.Join(closeErr, fmt.Errorf("kill process: %w", err))
-				}
-				<-p.waitDone
-			}
-
-			// Surface the process exit error unless it was caused by
-			// our own interrupt/kill signal (expected during shutdown).
-			if p.waitErr != nil && !isSignalError(p.waitErr) {
-				closeErr = errors.Join(closeErr, p.waitErr)
-			}
-		}
+		closeErr = errors.Join(closeErr, p.closeStdin())
+		closeErr = errors.Join(closeErr, p.closeTransport())
+		closeErr = errors.Join(closeErr, p.closeChildProcess())
 	})
 	return closeErr
+}
+
+func (p *Process) closeStdin() error {
+	if p.stdin == nil {
+		return nil
+	}
+	if err := p.stdin.Close(); err != nil {
+		return fmt.Errorf("close stdin: %w", err)
+	}
+	return nil
+}
+
+func (p *Process) closeTransport() error {
+	if p.transport == nil {
+		return nil
+	}
+	return p.transport.Close()
+}
+
+func (p *Process) closeChildProcess() error {
+	if p.cmd == nil || p.cmd.Process == nil {
+		return nil
+	}
+
+	process := p.cmd.Process
+	shutdownMode := p.effectiveShutdownMode()
+
+	go p.doWait()
+
+	var closeErr error
+	if shutdownMode == processShutdownModeGraceful {
+		closeErr = errors.Join(closeErr, p.signalProcessShutdown(process))
+	}
+	closeErr = errors.Join(closeErr, p.waitForProcessExit(process, shutdownMode))
+	return errors.Join(closeErr, p.processExitError())
+}
+
+func (p *Process) effectiveShutdownMode() processShutdownMode {
+	if p.shutdownMode != processShutdownModeUnset {
+		return p.shutdownMode
+	}
+	return defaultProcessShutdownMode()
+}
+
+func (p *Process) signalProcessShutdown(process *os.Process) error {
+	if err := requestProcessShutdown(process); err != nil && !isExpectedProcessStopError(err) {
+		return fmt.Errorf("signal process: %w", err)
+	}
+	return nil
+}
+
+func (p *Process) waitForProcessExit(process *os.Process, shutdownMode processShutdownMode) error {
+	gracePeriod := processEOFGracePeriod
+	if shutdownMode == processShutdownModeGraceful {
+		gracePeriod = processGracePeriod
+	}
+
+	select {
+	case <-p.waitDone:
+		return nil
+	case <-time.After(gracePeriod):
+	}
+
+	if err := process.Kill(); err != nil && !isExpectedProcessStopError(err) {
+		return fmt.Errorf("kill process: %w", err)
+	}
+	<-p.waitDone
+	return nil
+}
+
+func (p *Process) processExitError() error {
+	// Surface the process exit error unless it was caused by
+	// our own interrupt/kill signal (expected during shutdown).
+	if p.waitErr != nil && !isSignalError(p.waitErr) {
+		return p.waitErr
+	}
+	return nil
 }
 
 // ensureInit runs the idempotent initialize handshake. On success the result is
