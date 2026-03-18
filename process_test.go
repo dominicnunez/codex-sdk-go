@@ -380,9 +380,10 @@ func TestStartProcessExecArgsAllowsNonSafetyFlags(t *testing.T) {
 	}
 }
 
-// TestStartProcessContextCancellation verifies that canceling the context
-// causes the process to terminate.
-func TestStartProcessContextCancellation(t *testing.T) {
+// TestStartProcessStartupContextCancellationDoesNotTerminateChild verifies
+// that the startup context only gates StartProcess itself, not the lifetime
+// of a successfully started child process.
+func TestStartProcessStartupContextCancellationDoesNotTerminateChild(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("process test requires unix shell script")
 	}
@@ -406,17 +407,28 @@ while true; do sleep 1; done
 		t.Fatalf("StartProcess: %v", err)
 	}
 
-	// Cancel the context — this should cause the process to be killed
-	// (via exec.CommandContext).
+	// Cancel the startup context after the child has been returned.
 	cancel()
 
-	// Wait for the process to exit before calling Close.
-	_ = proc.Wait()
+	waitErrCh := make(chan error, 1)
+	go func() {
+		waitErrCh <- proc.Wait()
+	}()
+
+	select {
+	case err := <-waitErrCh:
+		t.Fatalf("process exited after startup context cancellation: %v", err)
+	case <-time.After(200 * time.Millisecond):
+	}
 
 	if err := proc.Close(); err != nil {
-		// Close may return an error since the process was already killed,
-		// which is acceptable behavior.
-		t.Logf("Close after cancel: %v (expected)", err)
+		t.Fatalf("Close: %v", err)
+	}
+
+	select {
+	case <-waitErrCh:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for process exit after Close")
 	}
 }
 

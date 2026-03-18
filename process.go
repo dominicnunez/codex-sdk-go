@@ -224,6 +224,9 @@ func StartProcess(ctx context.Context, opts *ProcessOptions) (*Process, error) {
 	if ctx == nil {
 		return nil, ErrNilContext
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 
 	if opts == nil {
 		opts = &ProcessOptions{}
@@ -239,7 +242,7 @@ func StartProcess(ctx context.Context, opts *ProcessOptions) (*Process, error) {
 		return nil, err
 	}
 
-	cmd := exec.CommandContext(ctx, binary, args...)
+	cmd := exec.Command(binary, args...)
 	cmd.Env = resolveProcessEnv(opts)
 	cmd.Dir = opts.Dir
 
@@ -264,6 +267,12 @@ func StartProcess(ctx context.Context, opts *ProcessOptions) (*Process, error) {
 		_ = stdout.Close()
 		_ = stdin.Close()
 		return nil, fmt.Errorf("start codex: %w", err)
+	}
+	if err := ctx.Err(); err != nil {
+		_ = stdout.Close()
+		_ = stdin.Close()
+		stopStartedCommand(cmd)
+		return nil, err
 	}
 
 	// Process stdout is transport's reader; process stdin is transport's writer.
@@ -308,6 +317,14 @@ func minimalChildEnv() []string {
 	return env
 }
 
+func stopStartedCommand(cmd *exec.Cmd) {
+	if cmd == nil || cmd.Process == nil {
+		return
+	}
+	_ = cmd.Process.Kill()
+	_ = cmd.Wait()
+}
+
 // Close stops the child process and closes the transport.
 // Safe to call multiple times. No-op when created via NewProcessFromClient.
 func (p *Process) Close() error {
@@ -322,7 +339,7 @@ func (p *Process) Close() error {
 
 		// Try graceful interrupt, then force kill after grace period.
 		if p.cmd != nil && p.cmd.Process != nil {
-			if err := p.cmd.Process.Signal(os.Interrupt); err != nil && !isExpectedProcessStopError(err) {
+			if err := requestProcessShutdown(p.cmd.Process); err != nil && !isExpectedProcessStopError(err) {
 				closeErr = errors.Join(closeErr, fmt.Errorf("signal process: %w", err))
 			}
 
