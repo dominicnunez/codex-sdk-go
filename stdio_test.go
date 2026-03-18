@@ -1686,6 +1686,82 @@ func TestStdioRejectsInvalidJSONRPCRequestVersion(t *testing.T) {
 	}
 }
 
+func TestStdioRejectsRequestWithInvalidIDType(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	responseChan := make(chan codex.Response, 1)
+	go func() {
+		scanner := bufio.NewScanner(serverReader)
+		for scanner.Scan() {
+			var resp codex.Response
+			if json.Unmarshal(scanner.Bytes(), &resp) == nil && resp.Error != nil {
+				responseChan <- resp
+				return
+			}
+		}
+	}()
+
+	_, _ = serverWriter.Write([]byte(`{"jsonrpc":"2.0","id":{"unexpected":"shape"},"method":"applyPatchApproval","params":{}}` + "\n"))
+
+	select {
+	case resp := <-responseChan:
+		if resp.Error.Code != codex.ErrCodeInvalidRequest {
+			t.Fatalf("error code = %d; want %d", resp.Error.Code, codex.ErrCodeInvalidRequest)
+		}
+		if resp.ID.Value != nil {
+			t.Fatalf("response ID = %v; want nil", resp.ID.Value)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for invalid-id request rejection")
+	}
+}
+
+func TestStdioRejectsRequestWithInvalidMethodType(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	responseChan := make(chan codex.Response, 1)
+	go func() {
+		scanner := bufio.NewScanner(serverReader)
+		for scanner.Scan() {
+			var resp codex.Response
+			if json.Unmarshal(scanner.Bytes(), &resp) == nil && resp.Error != nil {
+				responseChan <- resp
+				return
+			}
+		}
+	}()
+
+	_, _ = serverWriter.Write([]byte(`{"jsonrpc":"2.0","id":"bad-method","method":123,"params":{}}` + "\n"))
+
+	select {
+	case resp := <-responseChan:
+		if resp.Error.Code != codex.ErrCodeInvalidRequest {
+			t.Fatalf("error code = %d; want %d", resp.Error.Code, codex.ErrCodeInvalidRequest)
+		}
+		if resp.ID.Value != "bad-method" {
+			t.Fatalf("response ID = %v; want bad-method", resp.ID.Value)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for invalid-method request rejection")
+	}
+}
+
 func TestStdioInvalidJSONRPCResponseVersionFailsPending(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()

@@ -85,7 +85,7 @@ func (i *inboundID) UnmarshalJSON(data []byte) error {
 	var parsed RequestID
 	if json.Unmarshal(data, &parsed) != nil {
 		i.invalid = true
-		return nil //nolint:nilerr // Preserve frame routing; invalid ID is handled as malformed request/response.
+		return nil //nolint:nilerr // Preserve frame routing; invalid ID is handled after frame classification.
 	}
 	i.value = parsed
 	i.invalid = false
@@ -656,6 +656,9 @@ func (t *StdioTransport) readLoop() {
 func (t *StdioTransport) processInboundLine(line []byte) {
 	frame, err := decodeInboundFrame(line)
 	if err != nil {
+		if json.Valid(line) && t.handleInvalidRequestObject(line) {
+			return
+		}
 		t.handleMalformedFrame(line)
 		return
 	}
@@ -687,7 +690,7 @@ func (t *StdioTransport) processInboundLine(line []byte) {
 	if hasID && frame.Method != "" {
 		id, ok := frame.ID.requestID()
 		if !ok {
-			t.handleMalformedRequest(line)
+			t.handleInvalidRequestObject(line)
 			return
 		}
 		req := Request{
@@ -1462,6 +1465,59 @@ func (t *StdioTransport) handleMalformedRequest(data []byte) {
 	if err := t.writeMessage(errorResp); err != nil {
 		t.handleWriteFailure(err)
 	}
+}
+
+// handleInvalidRequestObject sends an invalid-request response for a structurally
+// invalid inbound request object. It returns true when the frame looked like a
+// request (had a top-level method field), in which case the caller should stop
+// further processing.
+func (t *StdioTransport) handleInvalidRequestObject(data []byte) bool {
+	id, hasValidID, isRequest := extractInboundRequestObjectID(data)
+	if !isRequest {
+		return false
+	}
+
+	if !hasValidID {
+		id = RequestID{Value: nil}
+	}
+
+	errorResp := Response{
+		JSONRPC: jsonrpcVersion,
+		ID:      id,
+		Error: &Error{
+			Code:    ErrCodeInvalidRequest,
+			Message: "invalid server request",
+		},
+	}
+	if err := t.writeMessage(errorResp); err != nil {
+		t.handleWriteFailure(err)
+	}
+	return true
+}
+
+func extractInboundRequestObjectID(data []byte) (RequestID, bool, bool) {
+	var topLevel map[string]json.RawMessage
+	if json.Unmarshal(data, &topLevel) != nil {
+		return RequestID{}, false, false
+	}
+
+	if _, hasMethod := topLevel["method"]; !hasMethod {
+		return RequestID{}, false, false
+	}
+
+	rawID, hasID := topLevel["id"]
+	if !hasID {
+		return RequestID{}, false, true
+	}
+
+	id, err := parseRequestID(rawID)
+	if err != nil {
+		return RequestID{}, false, true
+	}
+	if _, err := normalizeID(id.Value); err != nil {
+		return RequestID{}, false, true
+	}
+	return id, true, true
 }
 
 // handleNotification dispatches an incoming server→client notification to the handler

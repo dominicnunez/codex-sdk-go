@@ -63,7 +63,7 @@ func TestHandleMalformedRequestSendsParseError(t *testing.T) {
 	}
 }
 
-func TestHandleMalformedRequestInvalidIDUsesNullID(t *testing.T) {
+func TestHandleInvalidRequestObjectInvalidIDUsesNullID(t *testing.T) {
 	var buf safeBuffer
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -78,24 +78,63 @@ func TestHandleMalformedRequestInvalidIDUsesNullID(t *testing.T) {
 	}
 	go transport.writeLoop()
 
-	// JSON-RPC parse error responses must use id:null when the id cannot be parsed.
+	// JSON-RPC invalid request responses must use id:null when the id cannot be parsed.
 	data := []byte(`{"id":{"unexpected":"shape"},"method":"test"}`)
-	transport.handleMalformedRequest(data)
+	if handled := transport.handleInvalidRequestObject(data); !handled {
+		t.Fatal("expected invalid request object to be handled")
+	}
 
 	output := strings.TrimSpace(buf.String())
 	if output == "" {
-		t.Fatal("expected parse error response to be written")
+		t.Fatal("expected invalid request response to be written")
 	}
 
 	var resp Response
 	if err := json.Unmarshal([]byte(output), &resp); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
-	if resp.Error == nil || resp.Error.Code != ErrCodeParseError {
-		t.Fatalf("expected parse error response, got %+v", resp.Error)
+	if resp.Error == nil || resp.Error.Code != ErrCodeInvalidRequest {
+		t.Fatalf("expected invalid request response, got %+v", resp.Error)
 	}
 	if resp.ID.Value != nil {
 		t.Fatalf("response ID = %v; want nil", resp.ID.Value)
+	}
+}
+
+func TestHandleInvalidRequestObjectValidIDPreservesID(t *testing.T) {
+	var buf safeBuffer
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	transport := &StdioTransport{
+		reader:        strings.NewReader(""),
+		writer:        &buf,
+		pendingReqs:   make(map[string]pendingReq),
+		writeQueue:    make(chan writeEnvelope, outboundWriteQueueSize),
+		readerStopped: make(chan struct{}),
+		ctx:           ctx,
+		cancelCtx:     cancel,
+	}
+	go transport.writeLoop()
+
+	data := []byte(`{"jsonrpc":"2.0","id":"req-1","method":123}`)
+	if handled := transport.handleInvalidRequestObject(data); !handled {
+		t.Fatal("expected invalid request object to be handled")
+	}
+
+	output := strings.TrimSpace(buf.String())
+	if output == "" {
+		t.Fatal("expected invalid request response to be written")
+	}
+
+	var resp Response
+	if err := json.Unmarshal([]byte(output), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if resp.Error == nil || resp.Error.Code != ErrCodeInvalidRequest {
+		t.Fatalf("expected invalid request response, got %+v", resp.Error)
+	}
+	if resp.ID.Value != "req-1" {
+		t.Fatalf("response ID = %v; want req-1", resp.ID.Value)
 	}
 }
 
