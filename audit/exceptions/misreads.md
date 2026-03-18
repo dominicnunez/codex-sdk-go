@@ -9,6 +9,35 @@
 > **Date:** YYYY-MM-DD
 > **Reason:** Explanation (can be multiple lines)
 
+### RunResult.Response is not missing a fallback from turn/completed items
+
+**Location:** `run.go:87` — `buildRunResult`
+
+**Reason:** The finding depends on `turn/completed` carrying a populated `Turn.Items` list with the
+final agent message. That behavior does not occur in this protocol. The source-of-truth schema at
+`specs/v2/TurnCompletedNotification.json:1132-1145` says that for notifications returning a `Turn`,
+`items` is an empty list; populated `Turn.Items` is only for `thread/resume` or `thread/fork`
+responses. `buildRunResult` therefore is not overlooking a real fallback source in
+`turn/completed`; the audit misread the protocol shape.
+
+### The StartProcess integration test does not use the obsolete initialize payload described in the audit
+
+**Location:** `process_test.go:32` — `TestStartProcess` fake process response
+
+**Reason:** The audited payload is no longer present. The checked-in fake process now returns
+`platformFamily`, `platformOs`, and `userAgent` in the initialize result at `process_test.go:32`,
+which satisfies the current validation logic. A fresh `go test ./...` passes in this checkout, so
+the reported suite-breaking failure is stale and does not reflect the current code.
+
+### The malformed-request test is not exercising dead code
+
+**Location:** `stdio_internal_test.go:17` — invalid request object handling
+
+**Reason:** The report names a different test/helper than what exists in the file, and it misstates
+production reachability. The actual tests at `stdio_internal_test.go:17` and `stdio_internal_test.go:55`
+exercise `handleInvalidRequestObject`, which is called by the real transport path in
+`stdio.go:628-629` and `stdio.go:662`. This is not dead code and not an unreachable-only test.
+
 ### Formatting nil login parameter pointers does not panic in fmt paths
 
 **Location:** `account.go:215`, `account.go:285` — `String` methods used by `Format`
