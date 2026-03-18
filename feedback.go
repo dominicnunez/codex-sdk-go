@@ -1,6 +1,9 @@
 package codex
 
-import "context"
+import (
+	"context"
+	"encoding/json"
+)
 
 // FeedbackUploadParams represents parameters for uploading feedback.
 type FeedbackUploadParams struct {
@@ -20,6 +23,19 @@ type FeedbackUploadParams struct {
 type FeedbackUploadResponse struct {
 	// ThreadID is the ID of the thread created for this feedback.
 	ThreadID string `json:"threadId"`
+}
+
+func (r *FeedbackUploadResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "threadId"); err != nil {
+		return err
+	}
+	type wire FeedbackUploadResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = FeedbackUploadResponse(decoded)
+	return nil
 }
 
 // FeedbackService provides methods for submitting user feedback.

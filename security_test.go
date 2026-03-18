@@ -39,8 +39,8 @@ func TestSecurityRejectsTurnCompletedMissingTurnID(t *testing.T) {
 	if result.err == nil {
 		t.Fatal("expected error from missing turn.id")
 	}
-	if !strings.Contains(result.err.Error(), "invalid turn/completed notification") {
-		t.Errorf("error = %q, want invalid turn/completed notification", result.err)
+	if !strings.Contains(result.err.Error(), "missing required field") {
+		t.Errorf("error = %q, want missing required field validation", result.err)
 	}
 }
 

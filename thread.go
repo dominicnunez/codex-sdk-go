@@ -252,6 +252,19 @@ type Turn struct {
 	Error  *TurnError          `json:"error,omitempty"`
 }
 
+func (t *Turn) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "id", "status", "items"); err != nil {
+		return err
+	}
+	type wire Turn
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*t = Turn(decoded)
+	return nil
+}
+
 // TurnError represents an error in a turn.
 // It implements the error interface so callers can use errors.As to inspect
 // structured fields (CodexErrorInfo, AdditionalDetails).
@@ -1209,6 +1222,19 @@ type ThreadUnsubscribeParams struct {
 // ThreadUnsubscribeResponse is the response from unsubscribing from a thread
 type ThreadUnsubscribeResponse struct {
 	Status ThreadUnsubscribeStatus `json:"status"`
+}
+
+func (r *ThreadUnsubscribeResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "status"); err != nil {
+		return err
+	}
+	type wire ThreadUnsubscribeResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = ThreadUnsubscribeResponse(decoded)
+	return nil
 }
 
 // Unsubscribe unsubscribes from a thread

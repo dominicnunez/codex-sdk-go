@@ -27,6 +27,19 @@ type WindowsSandboxSetupStartResponse struct {
 	Started bool `json:"started"`
 }
 
+func (r *WindowsSandboxSetupStartResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "started"); err != nil {
+		return err
+	}
+	type wire WindowsSandboxSetupStartResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = WindowsSandboxSetupStartResponse(decoded)
+	return nil
+}
+
 // --- Server→Client Notification Types ---
 
 // WindowsSandboxSetupCompletedNotification is sent when sandbox setup completes

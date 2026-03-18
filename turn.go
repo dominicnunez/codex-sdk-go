@@ -152,6 +152,19 @@ type TurnStartResponse struct {
 	Turn Turn `json:"turn"`
 }
 
+func (r *TurnStartResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "turn"); err != nil {
+		return err
+	}
+	type wire TurnStartResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = TurnStartResponse(decoded)
+	return nil
+}
+
 // Start starts a new turn in a thread
 func (s *TurnService) Start(ctx context.Context, params TurnStartParams) (TurnStartResponse, error) {
 	var resp TurnStartResponse
@@ -217,6 +230,19 @@ func (p *TurnSteerParams) UnmarshalJSON(data []byte) error {
 // TurnSteerResponse is the response from turn/steer
 type TurnSteerResponse struct {
 	TurnID string `json:"turnId"`
+}
+
+func (r *TurnSteerResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "turnId"); err != nil {
+		return err
+	}
+	type wire TurnSteerResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = TurnSteerResponse(decoded)
+	return nil
 }
 
 // Steer steers an active turn with new input

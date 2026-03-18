@@ -1,6 +1,9 @@
 package codex
 
-import "context"
+import (
+	"context"
+	"encoding/json"
+)
 
 // ExperimentalFeatureStage represents the lifecycle stage of an experimental feature flag
 type ExperimentalFeatureStage string
@@ -37,6 +40,19 @@ type ExperimentalFeature struct {
 	Announcement *string `json:"announcement,omitempty"`
 }
 
+func (f *ExperimentalFeature) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "name", "defaultEnabled", "enabled", "stage"); err != nil {
+		return err
+	}
+	type wire ExperimentalFeature
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*f = ExperimentalFeature(decoded)
+	return nil
+}
+
 // ExperimentalFeatureListParams contains parameters for listing experimental features
 type ExperimentalFeatureListParams struct {
 	// Opaque pagination cursor returned by a previous call
@@ -53,6 +69,19 @@ type ExperimentalFeatureListResponse struct {
 
 	// Opaque cursor to pass to the next call to continue after the last item (null if no more items)
 	NextCursor *string `json:"nextCursor,omitempty"`
+}
+
+func (r *ExperimentalFeatureListResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "data"); err != nil {
+		return err
+	}
+	type wire ExperimentalFeatureListResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = ExperimentalFeatureListResponse(decoded)
+	return nil
 }
 
 // ExperimentalService provides methods for managing experimental features

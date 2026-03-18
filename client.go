@@ -39,6 +39,10 @@ type wireMarshaler interface {
 var errNilWireMarshaler = errors.New("nil wire marshaler")
 var errNilResponseTarget = errors.New("response target must not be nil")
 
+type responseValidator interface {
+	validate() error
+}
+
 // marshalForWire marshals v for wire-protocol use. If v implements wireMarshaler
 // (because its MarshalJSON redacts sensitive fields), the unredacted wire
 // representation is returned instead.
@@ -100,6 +104,14 @@ func validateRequiredObjectFields(data []byte, requiredFields ...string) error {
 	}
 
 	return nil
+}
+
+func validateDecodedResponse(result interface{}) error {
+	validator, ok := result.(responseValidator)
+	if !ok {
+		return nil
+	}
+	return validator.validate()
 }
 
 // internalListener is a notification handler registered via addNotificationListener.
@@ -567,6 +579,9 @@ func (c *Client) sendRequest(ctx context.Context, method string, params interfac
 	}
 	if err := json.Unmarshal(resp.Result, result); err != nil {
 		return fmt.Errorf("unmarshal response result for %s: %w", method, err)
+	}
+	if err := validateDecodedResponse(result); err != nil {
+		return fmt.Errorf("%s: %w", method, err)
 	}
 
 	return nil

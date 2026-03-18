@@ -18,6 +18,19 @@ type FuzzyFileSearchResponse struct {
 	Files []FuzzyFileSearchResult `json:"files"`
 }
 
+func (r *FuzzyFileSearchResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "files"); err != nil {
+		return err
+	}
+	type wire FuzzyFileSearchResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = FuzzyFileSearchResponse(decoded)
+	return nil
+}
+
 // FuzzyFileSearchResult represents a single file search result.
 type FuzzyFileSearchResult struct {
 	Path     string    `json:"path"`
@@ -25,6 +38,19 @@ type FuzzyFileSearchResult struct {
 	Root     string    `json:"root"`
 	Score    uint32    `json:"score"`
 	Indices  *[]uint32 `json:"indices,omitempty"`
+}
+
+func (r *FuzzyFileSearchResult) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "path", "file_name", "root", "score"); err != nil {
+		return err
+	}
+	type wire FuzzyFileSearchResult
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = FuzzyFileSearchResult(decoded)
+	return nil
 }
 
 // FuzzyFileSearchSessionCompletedNotification is sent when a fuzzy file search session completes.

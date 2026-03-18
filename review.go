@@ -156,6 +156,19 @@ type ReviewStartResponse struct {
 	Turn           Turn   `json:"turn"`
 }
 
+func (r *ReviewStartResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "reviewThreadId", "turn"); err != nil {
+		return err
+	}
+	type wire ReviewStartResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = ReviewStartResponse(decoded)
+	return nil
+}
+
 // ReviewService provides methods for code review operations.
 type ReviewService struct {
 	client *Client
