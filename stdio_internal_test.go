@@ -14,55 +14,6 @@ import (
 	"time"
 )
 
-// TestHandleMalformedRequestSendsParseError directly tests the defense-in-depth
-// path where handleRequest's unmarshal fails and handleMalformedRequest sends
-// a parse error response. With current types this path is unreachable via the
-// normal readLoop because Request accepts any valid JSON, but the test verifies
-// the error response format for future-proofing.
-func TestHandleMalformedRequestSendsParseError(t *testing.T) {
-	var buf safeBuffer
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	transport := &StdioTransport{
-		reader:        strings.NewReader(""),
-		writer:        &buf,
-		pendingReqs:   make(map[string]pendingReq),
-		writeQueue:    make(chan writeEnvelope, outboundWriteQueueSize),
-		readerStopped: make(chan struct{}),
-		ctx:           ctx,
-		cancelCtx:     cancel,
-	}
-	go transport.writeLoop()
-
-	// Call handleMalformedRequest with data containing a valid ID
-	data := []byte(`{"id":"malformed-req","method":"test"}`)
-	transport.handleMalformedRequest(data)
-
-	// Verify the response written to the writer
-	output := buf.String()
-	if output == "" {
-		t.Fatal("expected error response to be written")
-	}
-
-	var resp Response
-	if err := json.Unmarshal([]byte(strings.TrimSpace(output)), &resp); err != nil {
-		t.Fatalf("unmarshal response: %v", err)
-	}
-
-	if resp.Error == nil {
-		t.Fatal("expected error in response")
-	}
-	if resp.Error.Code != ErrCodeParseError {
-		t.Errorf("error code = %d; want %d", resp.Error.Code, ErrCodeParseError)
-	}
-	if resp.ID.Value != "malformed-req" {
-		t.Errorf("response ID = %v; want malformed-req", resp.ID.Value)
-	}
-	if resp.Error.Data != nil {
-		t.Errorf("error Data should be nil to avoid leaking internal details, got %s", resp.Error.Data)
-	}
-}
-
 func TestHandleInvalidRequestObjectInvalidIDUsesNullID(t *testing.T) {
 	var buf safeBuffer
 	ctx, cancel := context.WithCancel(context.Background())

@@ -1249,36 +1249,6 @@ func (t *StdioTransport) resolveRequestHandler(req Request) (RequestHandler, fun
 	return nil, nil, true
 }
 
-// handleMalformedRequest attempts to extract the ID from a request that
-// failed full unmarshal, and sends back a parse error response so the
-// server knows the request failed instead of hanging indefinitely.
-func (t *StdioTransport) handleMalformedRequest(data []byte) {
-	id := RequestID{Value: nil}
-	var idOnly struct {
-		ID json.RawMessage `json:"id"`
-	}
-	if json.Unmarshal(data, &idOnly) == nil && len(idOnly.ID) > 0 {
-		var candidate RequestID
-		if json.Unmarshal(idOnly.ID, &candidate) == nil {
-			if _, err := normalizeID(candidate.Value); err == nil {
-				id = candidate
-			}
-		}
-	}
-
-	errorResp := Response{
-		JSONRPC: jsonrpcVersion,
-		ID:      id,
-		Error: &Error{
-			Code:    ErrCodeParseError,
-			Message: "failed to parse server request",
-		},
-	}
-	if err := t.writeMessage(errorResp); err != nil {
-		t.handleWriteFailure(err)
-	}
-}
-
 // handleInvalidRequestObject sends an invalid-request response for a structurally
 // invalid inbound request object. It returns true when the frame looked like a
 // request (had a top-level method field), in which case the caller should stop
