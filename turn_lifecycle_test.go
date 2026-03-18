@@ -3,6 +3,7 @@ package codex_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -20,7 +21,19 @@ type notifyDuringSendTransport struct {
 	threadID     string
 }
 
+type staleMalformedTurnCompletedTransport struct {
+	*MockTransport
+	notifHandler codex.NotificationHandler
+	threadID     string
+	turnStarts   int
+}
+
 func (t *notifyDuringSendTransport) OnNotify(handler codex.NotificationHandler) {
+	t.notifHandler = handler
+	t.MockTransport.OnNotify(handler)
+}
+
+func (t *staleMalformedTurnCompletedTransport) OnNotify(handler codex.NotificationHandler) {
 	t.notifHandler = handler
 	t.MockTransport.OnNotify(handler)
 }
@@ -45,6 +58,52 @@ func (t *notifyDuringSendTransport) Send(ctx context.Context, req codex.Request)
 			JSONRPC: "2.0",
 			Method:  "turn/completed",
 			Params:  json.RawMessage(`{"threadId":"` + t.threadID + `","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+		})
+	}
+
+	return resp, nil
+}
+
+func (t *staleMalformedTurnCompletedTransport) Send(ctx context.Context, req codex.Request) (codex.Response, error) {
+	if req.Method == "turn/start" {
+		t.turnStarts++
+		turnID := fmt.Sprintf("turn-%d", t.turnStarts)
+		if err := t.SetResponseData("turn/start", map[string]interface{}{
+			"turn": map[string]interface{}{
+				"id":     turnID,
+				"status": "inProgress",
+				"items":  []interface{}{},
+			},
+		}); err != nil {
+			return codex.Response{}, err
+		}
+	}
+
+	resp, err := t.MockTransport.Send(ctx, req)
+	if err != nil {
+		return resp, err
+	}
+
+	if req.Method == "turn/start" && t.notifHandler != nil {
+		turnID := fmt.Sprintf("turn-%d", t.turnStarts)
+		if t.turnStarts == 2 {
+			t.notifHandler(ctx, codex.Notification{
+				JSONRPC: "2.0",
+				Method:  "turn/completed",
+				Params:  json.RawMessage(`{"threadId":"` + t.threadID + `","turn":{}}`),
+			})
+		}
+		t.notifHandler(ctx, codex.Notification{
+			JSONRPC: "2.0",
+			Method:  "item/completed",
+			Params: json.RawMessage(
+				`{"threadId":"` + t.threadID + `","turnId":"` + turnID + `","item":{"type":"agentMessage","id":"item-` + turnID + `","text":"response for ` + turnID + `"}}`,
+			),
+		})
+		t.notifHandler(ctx, codex.Notification{
+			JSONRPC: "2.0",
+			Method:  "turn/completed",
+			Params:  json.RawMessage(`{"threadId":"` + t.threadID + `","turn":{"id":"` + turnID + `","status":"completed","items":[]}}`),
 		})
 	}
 
@@ -200,5 +259,137 @@ func TestRunStreamedNotificationBeforeTurnStartResponse(t *testing.T) {
 	}
 	if len(result.Items) != 1 {
 		t.Errorf("len(Items) = %d, want 1", len(result.Items))
+	}
+}
+
+func TestConversationTurnIgnoresUnattributableMalformedCompletionOnReusedThread(t *testing.T) {
+	base := NewMockTransport()
+
+	_ = base.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
+	_ = base.SetResponseData("thread/start", map[string]interface{}{
+		"approvalPolicy": "never",
+		"cwd":            "/tmp",
+		"model":          "o3",
+		"modelProvider":  "openai",
+		"sandbox":        map[string]interface{}{"type": "readOnly"},
+		"thread": map[string]interface{}{
+			"id":            "thread-1",
+			"cliVersion":    "1.0.0",
+			"createdAt":     1700000000,
+			"cwd":           "/tmp",
+			"modelProvider": "openai",
+			"preview":       "",
+			"source":        "exec",
+			"status":        map[string]interface{}{"type": "idle"},
+			"turns":         []interface{}{},
+			"updatedAt":     1700000000,
+			"ephemeral":     true,
+		},
+	})
+
+	transport := &staleMalformedTurnCompletedTransport{
+		MockTransport: base,
+		threadID:      "thread-1",
+	}
+
+	client := codex.NewClient(transport, codex.WithRequestTimeout(5*time.Second))
+	proc := codex.NewProcessFromClient(client)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation() error = %v", err)
+	}
+
+	first, err := conv.Turn(ctx, codex.TurnOptions{Prompt: "first"})
+	if err != nil {
+		t.Fatalf("Turn 1 error = %v", err)
+	}
+	if first.Turn.ID != "turn-1" {
+		t.Fatalf("Turn 1 ID = %q; want %q", first.Turn.ID, "turn-1")
+	}
+
+	second, err := conv.Turn(ctx, codex.TurnOptions{Prompt: "second"})
+	if err != nil {
+		t.Fatalf("Turn 2 error = %v", err)
+	}
+	if second.Turn.ID != "turn-2" {
+		t.Fatalf("Turn 2 ID = %q; want %q", second.Turn.ID, "turn-2")
+	}
+	if second.Response != "response for turn-2" {
+		t.Fatalf("Turn 2 response = %q; want %q", second.Response, "response for turn-2")
+	}
+}
+
+func TestConversationTurnStreamedIgnoresUnattributableMalformedCompletionOnReusedThread(t *testing.T) {
+	base := NewMockTransport()
+
+	_ = base.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
+	_ = base.SetResponseData("thread/start", map[string]interface{}{
+		"approvalPolicy": "never",
+		"cwd":            "/tmp",
+		"model":          "o3",
+		"modelProvider":  "openai",
+		"sandbox":        map[string]interface{}{"type": "readOnly"},
+		"thread": map[string]interface{}{
+			"id":            "thread-1",
+			"cliVersion":    "1.0.0",
+			"createdAt":     1700000000,
+			"cwd":           "/tmp",
+			"modelProvider": "openai",
+			"preview":       "",
+			"source":        "exec",
+			"status":        map[string]interface{}{"type": "idle"},
+			"turns":         []interface{}{},
+			"updatedAt":     1700000000,
+			"ephemeral":     true,
+		},
+	})
+
+	transport := &staleMalformedTurnCompletedTransport{
+		MockTransport: base,
+		threadID:      "thread-1",
+	}
+
+	client := codex.NewClient(transport, codex.WithRequestTimeout(5*time.Second))
+	proc := codex.NewProcessFromClient(client)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation() error = %v", err)
+	}
+
+	first := conv.TurnStreamed(ctx, codex.TurnOptions{Prompt: "first"})
+	for _, err := range first.Events() {
+		if err != nil {
+			t.Fatalf("Turn 1 streamed error = %v", err)
+		}
+	}
+	if first.Result() == nil || first.Result().Turn.ID != "turn-1" {
+		t.Fatalf("Turn 1 streamed result = %#v; want turn-1", first.Result())
+	}
+
+	second := conv.TurnStreamed(ctx, codex.TurnOptions{Prompt: "second"})
+	for _, err := range second.Events() {
+		if err != nil {
+			t.Fatalf("Turn 2 streamed error = %v", err)
+		}
+	}
+
+	result := second.Result()
+	if result == nil {
+		t.Fatal("Turn 2 streamed result is nil")
+		return
+	}
+	if result.Turn.ID != "turn-2" {
+		t.Fatalf("Turn 2 streamed ID = %q; want %q", result.Turn.ID, "turn-2")
+	}
+	if result.Response != "response for turn-2" {
+		t.Fatalf("Turn 2 streamed response = %q; want %q", result.Response, "response for turn-2")
 	}
 }
