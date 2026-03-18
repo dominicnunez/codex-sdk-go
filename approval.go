@@ -257,7 +257,9 @@ func (w *ReviewDecisionWrapper) UnmarshalJSON(data []byte) error {
 //     {"approved_execpolicy_amendment": {"proposed_execpolicy_amendment": [...]}}
 //   - Both specs define {"network_policy_amendment": {"network_policy_amendment": {...}}}
 func (w ReviewDecisionWrapper) MarshalJSON() ([]byte, error) {
-	switch v := w.Value.(type) {
+	switch v := normalizeReviewDecisionValue(w.Value).(type) {
+	case nil:
+		return []byte("null"), nil
 	case string:
 		return json.Marshal(v)
 	case ApprovedExecpolicyAmendmentDecision:
@@ -288,6 +290,35 @@ func (w ReviewDecisionWrapper) MarshalJSON() ([]byte, error) {
 		return v.MarshalJSON()
 	default:
 		return nil, fmt.Errorf("unknown decision type: %T", v)
+	}
+}
+
+func normalizeReviewDecisionValue(value interface{}) interface{} {
+	switch v := value.(type) {
+	case nil:
+		return nil
+	case *string:
+		if v == nil {
+			return nil
+		}
+		return *v
+	case *ApprovedExecpolicyAmendmentDecision:
+		if v == nil {
+			return nil
+		}
+		return *v
+	case *NetworkPolicyAmendmentDecision:
+		if v == nil {
+			return nil
+		}
+		return *v
+	case *UnknownReviewDecision:
+		if v == nil {
+			return nil
+		}
+		return *v
+	default:
+		return value
 	}
 }
 
@@ -536,7 +567,9 @@ func (w *CommandExecutionApprovalDecisionWrapper) UnmarshalJSON(data []byte) err
 
 // MarshalJSON implements custom marshaling for CommandExecutionApprovalDecisionWrapper.
 func (w CommandExecutionApprovalDecisionWrapper) MarshalJSON() ([]byte, error) {
-	switch v := w.Value.(type) {
+	switch v := normalizeCommandExecutionApprovalDecisionValue(w.Value).(type) {
+	case nil:
+		return []byte("null"), nil
 	case string:
 		return json.Marshal(v)
 	case AcceptWithExecpolicyAmendmentDecision:
@@ -567,6 +600,35 @@ func (w CommandExecutionApprovalDecisionWrapper) MarshalJSON() ([]byte, error) {
 		return v.MarshalJSON()
 	default:
 		return nil, fmt.Errorf("unknown decision type: %T", v)
+	}
+}
+
+func normalizeCommandExecutionApprovalDecisionValue(value interface{}) interface{} {
+	switch v := value.(type) {
+	case nil:
+		return nil
+	case *string:
+		if v == nil {
+			return nil
+		}
+		return *v
+	case *AcceptWithExecpolicyAmendmentDecision:
+		if v == nil {
+			return nil
+		}
+		return *v
+	case *ApplyNetworkPolicyAmendmentDecision:
+		if v == nil {
+			return nil
+		}
+		return *v
+	case *UnknownCommandExecutionApprovalDecision:
+		if v == nil {
+			return nil
+		}
+		return *v
+	default:
+		return value
 	}
 }
 
