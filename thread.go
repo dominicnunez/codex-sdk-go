@@ -422,10 +422,11 @@ func (a *AskForApprovalWrapper) UnmarshalJSON(data []byte) error {
 
 // MarshalJSON for AskForApprovalWrapper
 func (a AskForApprovalWrapper) MarshalJSON() ([]byte, error) {
-	if a.Value == nil {
+	value := normalizeAskForApproval(a.Value)
+	if value == nil {
 		return []byte("null"), nil
 	}
-	switch v := a.Value.(type) {
+	switch v := value.(type) {
 	case approvalPolicyLiteral:
 		return json.Marshal(string(v))
 	case ApprovalPolicyGranular:
@@ -434,6 +435,30 @@ func (a AskForApprovalWrapper) MarshalJSON() ([]byte, error) {
 		return v.MarshalJSON()
 	default:
 		return nil, fmt.Errorf("unknown AskForApproval type: %T", v)
+	}
+}
+
+func normalizeAskForApproval(value AskForApproval) AskForApproval {
+	switch v := value.(type) {
+	case nil:
+		return nil
+	case *approvalPolicyLiteral:
+		if v == nil {
+			return nil
+		}
+		return *v
+	case *ApprovalPolicyGranular:
+		if v == nil {
+			return nil
+		}
+		return *v
+	case *UnknownAskForApproval:
+		if v == nil {
+			return nil
+		}
+		return *v
+	default:
+		return value
 	}
 }
 
@@ -553,10 +578,11 @@ func (w *ReadOnlyAccessWrapper) UnmarshalJSON(data []byte) error {
 // so that client-constructed values marshal correctly without requiring callers
 // to manually set the Type field.
 func (w ReadOnlyAccessWrapper) MarshalJSON() ([]byte, error) {
-	if w.Value == nil {
+	value := normalizeReadOnlyAccess(w.Value)
+	if value == nil {
 		return []byte("null"), nil
 	}
-	switch v := w.Value.(type) {
+	switch v := value.(type) {
 	case ReadOnlyAccessRestricted:
 		return json.Marshal(struct {
 			Type string `json:"type"`
@@ -570,6 +596,30 @@ func (w ReadOnlyAccessWrapper) MarshalJSON() ([]byte, error) {
 		return v.MarshalJSON()
 	default:
 		return nil, fmt.Errorf("unknown ReadOnlyAccess type: %T", v)
+	}
+}
+
+func normalizeReadOnlyAccess(value ReadOnlyAccess) ReadOnlyAccess {
+	switch v := value.(type) {
+	case nil:
+		return nil
+	case *ReadOnlyAccessRestricted:
+		if v == nil {
+			return nil
+		}
+		return *v
+	case *ReadOnlyAccessFullAccess:
+		if v == nil {
+			return nil
+		}
+		return *v
+	case *UnknownReadOnlyAccess:
+		if v == nil {
+			return nil
+		}
+		return *v
+	default:
+		return value
 	}
 }
 
@@ -627,10 +677,11 @@ func (s *SandboxPolicyWrapper) UnmarshalJSON(data []byte) error {
 // so that client-constructed values marshal correctly without requiring callers
 // to manually set the Type field.
 func (s SandboxPolicyWrapper) MarshalJSON() ([]byte, error) {
-	if s.Value == nil {
+	value := normalizeSandboxPolicy(s.Value)
+	if value == nil {
 		return []byte("null"), nil
 	}
-	switch v := s.Value.(type) {
+	switch v := value.(type) {
 	case SandboxPolicyDangerFullAccess:
 		return json.Marshal(struct {
 			Type string `json:"type"`
@@ -654,6 +705,40 @@ func (s SandboxPolicyWrapper) MarshalJSON() ([]byte, error) {
 		return v.MarshalJSON()
 	default:
 		return nil, fmt.Errorf("unknown SandboxPolicy type: %T", v)
+	}
+}
+
+func normalizeSandboxPolicy(value SandboxPolicy) SandboxPolicy {
+	switch v := value.(type) {
+	case nil:
+		return nil
+	case *SandboxPolicyDangerFullAccess:
+		if v == nil {
+			return nil
+		}
+		return *v
+	case *SandboxPolicyReadOnly:
+		if v == nil {
+			return nil
+		}
+		return *v
+	case *SandboxPolicyExternalSandbox:
+		if v == nil {
+			return nil
+		}
+		return *v
+	case *SandboxPolicyWorkspaceWrite:
+		if v == nil {
+			return nil
+		}
+		return *v
+	case *UnknownSandboxPolicy:
+		if v == nil {
+			return nil
+		}
+		return *v
+	default:
+		return value
 	}
 }
 

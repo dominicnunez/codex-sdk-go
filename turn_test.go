@@ -465,6 +465,150 @@ func TestTurnStartParamsSandboxPolicyMarshalIncludesType(t *testing.T) {
 	}
 }
 
+func TestTurnStartParamsMarshalPointerBackedUnionFields(t *testing.T) {
+	requestPermissions := true
+	approvalValue := &codex.ApprovalPolicyGranular{}
+	approvalValue.Granular.MCPElicitations = true
+	approvalValue.Granular.RequestPermissions = &requestPermissions
+	approvalValue.Granular.Rules = true
+	approvalValue.Granular.SandboxApproval = false
+
+	readOnlyAccess := &codex.ReadOnlyAccessFullAccess{}
+	sandboxValue := &codex.SandboxPolicyWorkspaceWrite{
+		NetworkAccess:  ptr(true),
+		ReadOnlyAccess: &codex.ReadOnlyAccessWrapper{Value: readOnlyAccess},
+		WritableRoots:  []string{"/workspace"},
+	}
+
+	var approvalPolicy codex.AskForApproval = approvalValue
+	var sandboxPolicy codex.SandboxPolicy = sandboxValue
+	params := codex.TurnStartParams{
+		ThreadID:       "thread-1",
+		Input:          []codex.UserInput{&codex.TextUserInput{Text: "hi"}},
+		ApprovalPolicy: &approvalPolicy,
+		SandboxPolicy:  &sandboxPolicy,
+	}
+
+	data, err := json.Marshal(params)
+	if err != nil {
+		t.Fatalf("Marshal error: %v", err)
+	}
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("Unmarshal error: %v", err)
+	}
+	if got := string(raw["approvalPolicy"]); got != `{"granular":{"mcp_elicitations":true,"request_permissions":true,"rules":true,"sandbox_approval":false}}` {
+		t.Fatalf("approvalPolicy = %s; want granular payload", got)
+	}
+	if got := string(raw["sandboxPolicy"]); got != `{"type":"workspaceWrite","networkAccess":true,"readOnlyAccess":{"type":"fullAccess"},"writableRoots":["/workspace"]}` {
+		t.Fatalf("sandboxPolicy = %s; want workspaceWrite payload", got)
+	}
+}
+
+func TestPolicyWrappersMarshalPointerBackedVariants(t *testing.T) {
+	t.Run("approval policy", func(t *testing.T) {
+		skillApproval := false
+		value := &codex.ApprovalPolicyGranular{}
+		value.Granular.MCPElicitations = true
+		value.Granular.Rules = false
+		value.Granular.SandboxApproval = true
+		value.Granular.SkillApproval = &skillApproval
+
+		data, err := json.Marshal(codex.AskForApprovalWrapper{Value: value})
+		if err != nil {
+			t.Fatalf("MarshalJSON() error = %v", err)
+		}
+		if got := string(data); got != `{"granular":{"mcp_elicitations":true,"rules":false,"sandbox_approval":true,"skill_approval":false}}` {
+			t.Fatalf("MarshalJSON() = %s; want granular payload", got)
+		}
+	})
+
+	t.Run("read only access", func(t *testing.T) {
+		tests := []struct {
+			name  string
+			value codex.ReadOnlyAccess
+			want  string
+		}{
+			{
+				name:  "full access pointer",
+				value: &codex.ReadOnlyAccessFullAccess{},
+				want:  `{"type":"fullAccess"}`,
+			},
+			{
+				name: "restricted pointer",
+				value: &codex.ReadOnlyAccessRestricted{
+					IncludePlatformDefaults: ptr(true),
+					ReadableRoots:           []string{"/tmp"},
+				},
+				want: `{"type":"restricted","includePlatformDefaults":true,"readableRoots":["/tmp"]}`,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				data, err := json.Marshal(codex.ReadOnlyAccessWrapper{Value: tt.value})
+				if err != nil {
+					t.Fatalf("MarshalJSON() error = %v", err)
+				}
+				if got := string(data); got != tt.want {
+					t.Fatalf("MarshalJSON() = %s; want %s", got, tt.want)
+				}
+			})
+		}
+	})
+
+	t.Run("sandbox policy", func(t *testing.T) {
+		networkAccess := codex.NetworkAccessEnabled
+		tests := []struct {
+			name  string
+			value codex.SandboxPolicy
+			want  string
+		}{
+			{
+				name:  "danger full access pointer",
+				value: &codex.SandboxPolicyDangerFullAccess{},
+				want:  `{"type":"dangerFullAccess"}`,
+			},
+			{
+				name: "read only pointer",
+				value: &codex.SandboxPolicyReadOnly{
+					Access: &codex.ReadOnlyAccessWrapper{Value: &codex.ReadOnlyAccessFullAccess{}},
+				},
+				want: `{"type":"readOnly","access":{"type":"fullAccess"}}`,
+			},
+			{
+				name: "external sandbox pointer",
+				value: &codex.SandboxPolicyExternalSandbox{
+					NetworkAccess: &networkAccess,
+				},
+				want: `{"type":"externalSandbox","networkAccess":"enabled"}`,
+			},
+			{
+				name: "workspace write pointer",
+				value: &codex.SandboxPolicyWorkspaceWrite{
+					NetworkAccess:  ptr(true),
+					ReadOnlyAccess: &codex.ReadOnlyAccessWrapper{Value: &codex.ReadOnlyAccessFullAccess{}},
+					WritableRoots:  []string{"/workspace"},
+				},
+				want: `{"type":"workspaceWrite","networkAccess":true,"readOnlyAccess":{"type":"fullAccess"},"writableRoots":["/workspace"]}`,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				data, err := json.Marshal(codex.SandboxPolicyWrapper{Value: tt.value})
+				if err != nil {
+					t.Fatalf("MarshalJSON() error = %v", err)
+				}
+				if got := string(data); got != tt.want {
+					t.Fatalf("MarshalJSON() = %s; want %s", got, tt.want)
+				}
+			})
+		}
+	})
+}
+
 func TestTurnStartParamsUnmarshalJSONUnionFields(t *testing.T) {
 	data := []byte(`{
 		"threadId": "thread-123",
