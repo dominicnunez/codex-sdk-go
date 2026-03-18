@@ -2,6 +2,8 @@ package codex
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 )
 
 // SkillScope defines the scope of a skill (user, repo, system, admin)
@@ -12,26 +14,6 @@ const (
 	SkillScopeRepo   SkillScope = "repo"
 	SkillScopeSystem SkillScope = "system"
 	SkillScopeAdmin  SkillScope = "admin"
-)
-
-// HazelnutScope defines the scope for remote skill queries
-type HazelnutScope string
-
-const (
-	HazelnutScopeExample         HazelnutScope = "example"
-	HazelnutScopeWorkspaceShared HazelnutScope = "workspace-shared"
-	HazelnutScopeAllShared       HazelnutScope = "all-shared"
-	HazelnutScopePersonal        HazelnutScope = "personal"
-)
-
-// ProductSurface defines the product surface for remote skills
-type ProductSurface string
-
-const (
-	ProductSurfaceChatGPT ProductSurface = "chatgpt"
-	ProductSurfaceCodex   ProductSurface = "codex"
-	ProductSurfaceAPI     ProductSurface = "api"
-	ProductSurfaceAtlas   ProductSurface = "atlas"
 )
 
 // SkillInterface defines optional UI metadata for a skill
@@ -113,36 +95,6 @@ type SkillsConfigWriteResponse struct {
 	EffectiveEnabled bool `json:"effectiveEnabled"`
 }
 
-// SkillsRemoteReadParams defines parameters for reading remote skills
-type SkillsRemoteReadParams struct {
-	Enabled        *bool           `json:"enabled,omitempty"`
-	HazelnutScope  *HazelnutScope  `json:"hazelnutScope,omitempty"`
-	ProductSurface *ProductSurface `json:"productSurface,omitempty"`
-}
-
-// RemoteSkillSummary represents a remote skill available for installation
-type RemoteSkillSummary struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-}
-
-// SkillsRemoteReadResponse contains the list of remote skills
-type SkillsRemoteReadResponse struct {
-	Data []RemoteSkillSummary `json:"data"`
-}
-
-// SkillsRemoteWriteParams defines parameters for installing a remote skill
-type SkillsRemoteWriteParams struct {
-	HazelnutID string `json:"hazelnutId"`
-}
-
-// SkillsRemoteWriteResponse contains the installed skill's local ID and path
-type SkillsRemoteWriteResponse struct {
-	ID   string `json:"id"`
-	Path string `json:"path"`
-}
-
 // SkillsService provides access to skills-related operations
 type SkillsService struct {
 	client *Client
@@ -170,20 +122,21 @@ func (s *SkillsService) ConfigWrite(ctx context.Context, params SkillsConfigWrit
 	return resp, nil
 }
 
-// RemoteRead retrieves available remote skills from the skill library
-func (s *SkillsService) RemoteRead(ctx context.Context, params SkillsRemoteReadParams) (SkillsRemoteReadResponse, error) {
-	var resp SkillsRemoteReadResponse
-	if err := s.client.sendRequest(ctx, methodSkillsRemoteList, params, &resp); err != nil {
-		return SkillsRemoteReadResponse{}, err
-	}
-	return resp, nil
-}
+// SkillsChangedNotification is emitted when local skill files change.
+type SkillsChangedNotification struct{}
 
-// RemoteWrite installs a remote skill to the local system
-func (s *SkillsService) RemoteWrite(ctx context.Context, params SkillsRemoteWriteParams) (SkillsRemoteWriteResponse, error) {
-	var resp SkillsRemoteWriteResponse
-	if err := s.client.sendRequest(ctx, methodSkillsRemoteExport, params, &resp); err != nil {
-		return SkillsRemoteWriteResponse{}, err
+// OnSkillsChanged registers a listener for skills invalidation notifications.
+func (c *Client) OnSkillsChanged(handler func(SkillsChangedNotification)) {
+	if handler == nil {
+		c.OnNotification(notifySkillsChanged, nil)
+		return
 	}
-	return resp, nil
+	c.OnNotification(notifySkillsChanged, func(ctx context.Context, notif Notification) {
+		var params SkillsChangedNotification
+		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifySkillsChanged, fmt.Errorf("unmarshal %s: %w", notifySkillsChanged, err))
+			return
+		}
+		handler(params)
+	})
 }

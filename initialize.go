@@ -29,7 +29,9 @@ type InitializeParams struct {
 
 // InitializeResponse is the response from the initialize request.
 type InitializeResponse struct {
-	UserAgent string `json:"userAgent"`
+	PlatformFamily string `json:"platformFamily"`
+	PlatformOS     string `json:"platformOs"`
+	UserAgent      string `json:"userAgent"`
 }
 
 // Initialize sends an initialize request to the server.

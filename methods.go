@@ -6,9 +6,11 @@ const (
 	methodCommandExecutionRequestApproval = "item/commandExecution/requestApproval"
 	methodExecCommandApproval             = "execCommandApproval"
 	methodFileChangeRequestApproval       = "item/fileChange/requestApproval"
+	methodPermissionsRequestApproval      = "item/permissions/requestApproval"
 	methodDynamicToolCall                 = "item/tool/call"
 	methodToolRequestUserInput            = "item/tool/requestUserInput"
 	methodChatgptAuthTokensRefresh        = "account/chatgptAuthTokens/refresh"
+	methodMcpServerElicitationRequest     = "mcpServer/elicitation/request"
 )
 
 // Notification method names for server→client event dispatch.
@@ -74,12 +76,24 @@ const (
 
 	// Command notifications
 	notifyCommandExecutionOutputDelta = "item/commandExecution/outputDelta"
+	notifyCommandExecOutputDelta      = "command/exec/outputDelta"
 
 	// App notifications
 	notifyAppListUpdated = "app/list/updated"
 
 	// Config notifications
 	notifyConfigWarning = "configWarning"
+
+	// Skills notifications
+	notifySkillsChanged = "skills/changed"
+
+	// Hook notifications
+	notifyHookStarted   = "hook/started"
+	notifyHookCompleted = "hook/completed"
+
+	// Guardian review notifications
+	notifyItemGuardianApprovalReviewStarted   = "item/autoApprovalReview/started"
+	notifyItemGuardianApprovalReviewCompleted = "item/autoApprovalReview/completed"
 )
 
 // Client→server request method names.
@@ -106,6 +120,9 @@ const (
 	methodTurnInterrupt             = "turn/interrupt"
 	methodTurnSteer                 = "turn/steer"
 	methodCommandExec               = "command/exec"
+	methodCommandExecWrite          = "command/exec/write"
+	methodCommandExecTerminate      = "command/exec/terminate"
+	methodCommandExecResize         = "command/exec/resize"
 	methodModelList                 = "model/list"
 	methodConfigRead                = "config/read"
 	methodConfigRequirementsRead    = "configRequirements/read"
@@ -123,7 +140,17 @@ const (
 	methodExternalAgentConfigImport = "externalAgentConfig/import"
 	methodSkillsList                = "skills/list"
 	methodSkillsConfigWrite         = "skills/config/write"
-	methodSkillsRemoteList          = "skills/remote/list"
-	methodSkillsRemoteExport        = "skills/remote/export"
+	methodPluginList                = "plugin/list"
+	methodPluginRead                = "plugin/read"
+	methodPluginInstall             = "plugin/install"
+	methodPluginUninstall           = "plugin/uninstall"
+	methodFsReadFile                = "fs/readFile"
+	methodFsWriteFile               = "fs/writeFile"
+	methodFsCreateDirectory         = "fs/createDirectory"
+	methodFsGetMetadata             = "fs/getMetadata"
+	methodFsReadDirectory           = "fs/readDirectory"
+	methodFsRemove                  = "fs/remove"
+	methodFsCopy                    = "fs/copy"
+	methodThreadMetadataUpdate      = "thread/metadata/update"
 	methodFuzzyFileSearch           = "fuzzyFileSearch"
 )

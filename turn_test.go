@@ -468,7 +468,7 @@ func TestTurnStartParamsUnmarshalJSONUnionFields(t *testing.T) {
 	data := []byte(`{
 		"threadId": "thread-123",
 		"input": [{"type":"text","text":"hello"}],
-		"approvalPolicy": {"reject":{"mcp_elicitations":true,"rules":false,"sandbox_approval":true}},
+		"approvalPolicy": {"granular":{"mcp_elicitations":true,"rules":false,"sandbox_approval":true}},
 		"sandboxPolicy": {"type":"workspaceWrite","networkAccess":true,"writableRoots":["/workspace"]}
 	}`)
 
@@ -479,8 +479,8 @@ func TestTurnStartParamsUnmarshalJSONUnionFields(t *testing.T) {
 	if params.ApprovalPolicy == nil {
 		t.Fatal("approvalPolicy is nil")
 	}
-	if _, ok := (*params.ApprovalPolicy).(codex.ApprovalPolicyReject); !ok {
-		t.Fatalf("approvalPolicy type = %T; want ApprovalPolicyReject", *params.ApprovalPolicy)
+	if _, ok := (*params.ApprovalPolicy).(codex.ApprovalPolicyGranular); !ok {
+		t.Fatalf("approvalPolicy type = %T; want ApprovalPolicyGranular", *params.ApprovalPolicy)
 	}
 	if params.SandboxPolicy == nil {
 		t.Fatal("sandboxPolicy is nil")

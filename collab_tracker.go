@@ -17,7 +17,7 @@ type AgentInfo struct {
 // isTerminal returns true if the agent has reached a final status.
 func (a *AgentInfo) isTerminal() bool {
 	switch a.Status {
-	case CollabAgentStatusCompleted, CollabAgentStatusErrored,
+	case CollabAgentStatusInterrupted, CollabAgentStatusCompleted, CollabAgentStatusErrored,
 		CollabAgentStatusShutdown, CollabAgentStatusNotFound:
 		return true
 	}

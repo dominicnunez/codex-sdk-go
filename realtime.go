@@ -6,11 +6,20 @@ import (
 	"fmt"
 )
 
+// RealtimeConversationVersion identifies the realtime protocol version.
+type RealtimeConversationVersion string
+
+const (
+	RealtimeConversationVersionV1 RealtimeConversationVersion = "v1"
+	RealtimeConversationVersionV2 RealtimeConversationVersion = "v2"
+)
+
 // ThreadRealtimeStartedNotification is sent when a realtime connection starts for a thread.
 // Method: thread/realtime/started
 type ThreadRealtimeStartedNotification struct {
-	ThreadID  string  `json:"threadId"`
-	SessionID *string `json:"sessionId,omitempty"`
+	ThreadID  string                      `json:"threadId"`
+	SessionID *string                     `json:"sessionId,omitempty"`
+	Version   RealtimeConversationVersion `json:"version"`
 }
 
 // ThreadRealtimeClosedNotification is sent when a realtime connection closes for a thread.

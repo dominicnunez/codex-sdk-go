@@ -18,6 +18,7 @@ const (
 
 // WindowsSandboxSetupStartParams are the parameters for windowsSandbox/setupStart request
 type WindowsSandboxSetupStartParams struct {
+	Cwd  *string                 `json:"cwd,omitempty"`
 	Mode WindowsSandboxSetupMode `json:"mode"`
 }
 

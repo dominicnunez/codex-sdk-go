@@ -14,9 +14,11 @@ type ApprovalHandlers struct {
 	OnCommandExecutionRequestApproval func(context.Context, CommandExecutionRequestApprovalParams) (CommandExecutionRequestApprovalResponse, error)
 	OnExecCommandApproval             func(context.Context, ExecCommandApprovalParams) (ExecCommandApprovalResponse, error)
 	OnFileChangeRequestApproval       func(context.Context, FileChangeRequestApprovalParams) (FileChangeRequestApprovalResponse, error)
+	OnPermissionsRequestApproval      func(context.Context, PermissionsRequestApprovalParams) (PermissionsRequestApprovalResponse, error)
 	OnDynamicToolCall                 func(context.Context, DynamicToolCallParams) (DynamicToolCallResponse, error)
 	OnToolRequestUserInput            func(context.Context, ToolRequestUserInputParams) (ToolRequestUserInputResponse, error)
 	OnChatgptAuthTokensRefresh        func(context.Context, ChatgptAuthTokensRefreshParams) (ChatgptAuthTokensRefreshResponse, error)
+	OnMcpServerElicitationRequest     func(context.Context, McpServerElicitationRequestParams) (McpServerElicitationRequestResponse, error)
 }
 
 // SetApprovalHandlers registers approval handlers on the client for server→client requests.

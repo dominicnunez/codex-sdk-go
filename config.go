@@ -326,9 +326,10 @@ type ConfigValueWriteParams struct {
 
 // ConfigBatchWriteParams represents parameters for config/batch/write request
 type ConfigBatchWriteParams struct {
-	Edits           []ConfigEdit `json:"edits"`
-	FilePath        *string      `json:"filePath,omitempty"`
-	ExpectedVersion *string      `json:"expectedVersion,omitempty"`
+	Edits            []ConfigEdit `json:"edits"`
+	FilePath         *string      `json:"filePath,omitempty"`
+	ExpectedVersion  *string      `json:"expectedVersion,omitempty"`
+	ReloadUserConfig *bool        `json:"reloadUserConfig,omitempty"`
 }
 
 // ConfigEdit represents a single edit in a batch write

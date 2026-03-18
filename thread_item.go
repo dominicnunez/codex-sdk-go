@@ -202,7 +202,9 @@ type CollabAgentToolCallThreadItem struct {
 	Tool              CollabAgentTool             `json:"tool"`
 	Status            CollabAgentToolCallStatus   `json:"status"`
 	AgentsStates      map[string]CollabAgentState `json:"agentsStates"`
+	Model             *string                     `json:"model,omitempty"`
 	ReceiverThreadIds []string                    `json:"receiverThreadIds"`
+	ReasoningEffort   *ReasoningEffort            `json:"reasoningEffort,omitempty"`
 	SenderThreadId    string                      `json:"senderThreadId"`
 	Prompt            *string                     `json:"prompt,omitempty"`
 }

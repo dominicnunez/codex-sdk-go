@@ -212,6 +212,10 @@ func testStructFields(t *testing.T) {
 		{"specs/FileChangeRequestApprovalResponse.json", reflect.TypeOf(FileChangeRequestApprovalResponse{})},
 		{"specs/FuzzyFileSearchParams.json", reflect.TypeOf(FuzzyFileSearchParams{})},
 		{"specs/FuzzyFileSearchResponse.json", reflect.TypeOf(FuzzyFileSearchResponse{})},
+		{"specs/McpServerElicitationRequestParams.json", reflect.TypeOf(McpServerElicitationRequestParams{})},
+		{"specs/McpServerElicitationRequestResponse.json", reflect.TypeOf(McpServerElicitationRequestResponse{})},
+		{"specs/PermissionsRequestApprovalParams.json", reflect.TypeOf(PermissionsRequestApprovalParams{})},
+		{"specs/PermissionsRequestApprovalResponse.json", reflect.TypeOf(PermissionsRequestApprovalResponse{})},
 		{"specs/FuzzyFileSearchSessionCompletedNotification.json", reflect.TypeOf(FuzzyFileSearchSessionCompletedNotification{})},
 		{"specs/FuzzyFileSearchSessionUpdatedNotification.json", reflect.TypeOf(FuzzyFileSearchSessionUpdatedNotification{})},
 		{"specs/ToolRequestUserInputParams.json", reflect.TypeOf(ToolRequestUserInputParams{})},
@@ -241,6 +245,13 @@ func testStructFields(t *testing.T) {
 		// v2 command
 		{"specs/v2/CommandExecParams.json", reflect.TypeOf(CommandExecParams{})},
 		{"specs/v2/CommandExecResponse.json", reflect.TypeOf(CommandExecResponse{})},
+		{"specs/v2/CommandExecWriteParams.json", reflect.TypeOf(CommandExecWriteParams{})},
+		{"specs/v2/CommandExecWriteResponse.json", reflect.TypeOf(CommandExecWriteResponse{})},
+		{"specs/v2/CommandExecTerminateParams.json", reflect.TypeOf(CommandExecTerminateParams{})},
+		{"specs/v2/CommandExecTerminateResponse.json", reflect.TypeOf(CommandExecTerminateResponse{})},
+		{"specs/v2/CommandExecResizeParams.json", reflect.TypeOf(CommandExecResizeParams{})},
+		{"specs/v2/CommandExecResizeResponse.json", reflect.TypeOf(CommandExecResizeResponse{})},
+		{"specs/v2/CommandExecOutputDeltaNotification.json", reflect.TypeOf(CommandExecOutputDeltaNotification{})},
 		{"specs/v2/CommandExecutionOutputDeltaNotification.json", reflect.TypeOf(CommandExecutionOutputDeltaNotification{})},
 
 		// v2 config
@@ -264,6 +275,22 @@ func testStructFields(t *testing.T) {
 		// v2 feedback
 		{"specs/v2/FeedbackUploadParams.json", reflect.TypeOf(FeedbackUploadParams{})},
 		{"specs/v2/FeedbackUploadResponse.json", reflect.TypeOf(FeedbackUploadResponse{})},
+
+		// v2 filesystem
+		{"specs/v2/FsReadFileParams.json", reflect.TypeOf(FsReadFileParams{})},
+		{"specs/v2/FsReadFileResponse.json", reflect.TypeOf(FsReadFileResponse{})},
+		{"specs/v2/FsWriteFileParams.json", reflect.TypeOf(FsWriteFileParams{})},
+		{"specs/v2/FsWriteFileResponse.json", reflect.TypeOf(FsWriteFileResponse{})},
+		{"specs/v2/FsCreateDirectoryParams.json", reflect.TypeOf(FsCreateDirectoryParams{})},
+		{"specs/v2/FsCreateDirectoryResponse.json", reflect.TypeOf(FsCreateDirectoryResponse{})},
+		{"specs/v2/FsGetMetadataParams.json", reflect.TypeOf(FsGetMetadataParams{})},
+		{"specs/v2/FsGetMetadataResponse.json", reflect.TypeOf(FsGetMetadataResponse{})},
+		{"specs/v2/FsReadDirectoryParams.json", reflect.TypeOf(FsReadDirectoryParams{})},
+		{"specs/v2/FsReadDirectoryResponse.json", reflect.TypeOf(FsReadDirectoryResponse{})},
+		{"specs/v2/FsRemoveParams.json", reflect.TypeOf(FsRemoveParams{})},
+		{"specs/v2/FsRemoveResponse.json", reflect.TypeOf(FsRemoveResponse{})},
+		{"specs/v2/FsCopyParams.json", reflect.TypeOf(FsCopyParams{})},
+		{"specs/v2/FsCopyResponse.json", reflect.TypeOf(FsCopyResponse{})},
 
 		// v2 streaming notifications
 		{"specs/v2/AgentMessageDeltaNotification.json", reflect.TypeOf(AgentMessageDeltaNotification{})},
@@ -292,17 +319,28 @@ func testStructFields(t *testing.T) {
 		{"specs/v2/ReviewStartParams.json", reflect.TypeOf(ReviewStartParams{})},
 		{"specs/v2/ReviewStartResponse.json", reflect.TypeOf(ReviewStartResponse{})},
 
+		// v2 plugin
+		{"specs/v2/PluginListParams.json", reflect.TypeOf(PluginListParams{})},
+		{"specs/v2/PluginListResponse.json", reflect.TypeOf(PluginListResponse{})},
+		{"specs/v2/PluginReadParams.json", reflect.TypeOf(PluginReadParams{})},
+		{"specs/v2/PluginReadResponse.json", reflect.TypeOf(PluginReadResponse{})},
+		{"specs/v2/PluginInstallParams.json", reflect.TypeOf(PluginInstallParams{})},
+		{"specs/v2/PluginInstallResponse.json", reflect.TypeOf(PluginInstallResponse{})},
+		{"specs/v2/PluginUninstallParams.json", reflect.TypeOf(PluginUninstallParams{})},
+		{"specs/v2/PluginUninstallResponse.json", reflect.TypeOf(PluginUninstallResponse{})},
+
 		// v2 skills
 		{"specs/v2/SkillsListParams.json", reflect.TypeOf(SkillsListParams{})},
 		{"specs/v2/SkillsListResponse.json", reflect.TypeOf(SkillsListResponse{})},
 		{"specs/v2/SkillsConfigWriteParams.json", reflect.TypeOf(SkillsConfigWriteParams{})},
 		{"specs/v2/SkillsConfigWriteResponse.json", reflect.TypeOf(SkillsConfigWriteResponse{})},
-		{"specs/v2/SkillsRemoteReadParams.json", reflect.TypeOf(SkillsRemoteReadParams{})},
-		{"specs/v2/SkillsRemoteReadResponse.json", reflect.TypeOf(SkillsRemoteReadResponse{})},
-		{"specs/v2/SkillsRemoteWriteParams.json", reflect.TypeOf(SkillsRemoteWriteParams{})},
-		{"specs/v2/SkillsRemoteWriteResponse.json", reflect.TypeOf(SkillsRemoteWriteResponse{})},
+		{"specs/v2/SkillsChangedNotification.json", reflect.TypeOf(SkillsChangedNotification{})},
 
 		// v2 system
+		{"specs/v2/HookStartedNotification.json", reflect.TypeOf(HookStartedNotification{})},
+		{"specs/v2/HookCompletedNotification.json", reflect.TypeOf(HookCompletedNotification{})},
+		{"specs/v2/ItemGuardianApprovalReviewStartedNotification.json", reflect.TypeOf(ItemGuardianApprovalReviewStartedNotification{})},
+		{"specs/v2/ItemGuardianApprovalReviewCompletedNotification.json", reflect.TypeOf(ItemGuardianApprovalReviewCompletedNotification{})},
 		{"specs/v2/WindowsSandboxSetupStartParams.json", reflect.TypeOf(WindowsSandboxSetupStartParams{})},
 		{"specs/v2/WindowsSandboxSetupStartResponse.json", reflect.TypeOf(WindowsSandboxSetupStartResponse{})},
 		{"specs/v2/WindowsSandboxSetupCompletedNotification.json", reflect.TypeOf(WindowsSandboxSetupCompletedNotification{})},
@@ -325,6 +363,8 @@ func testStructFields(t *testing.T) {
 		{"specs/v2/ThreadResumeResponse.json", reflect.TypeOf(ThreadResumeResponse{})},
 		{"specs/v2/ThreadForkParams.json", reflect.TypeOf(ThreadForkParams{})},
 		{"specs/v2/ThreadForkResponse.json", reflect.TypeOf(ThreadForkResponse{})},
+		{"specs/v2/ThreadMetadataUpdateParams.json", reflect.TypeOf(ThreadMetadataUpdateParams{})},
+		{"specs/v2/ThreadMetadataUpdateResponse.json", reflect.TypeOf(ThreadMetadataUpdateResponse{})},
 		{"specs/v2/ThreadRollbackParams.json", reflect.TypeOf(ThreadRollbackParams{})},
 		{"specs/v2/ThreadRollbackResponse.json", reflect.TypeOf(ThreadRollbackResponse{})},
 		{"specs/v2/ThreadSetNameParams.json", reflect.TypeOf(ThreadSetNameParams{})},
@@ -695,7 +735,7 @@ func testEnumValues(t *testing.T) {
 			defName:  "CollabAgentStatus",
 			goValues: enumStrings(
 				CollabAgentStatusPendingInit, CollabAgentStatusRunning,
-				CollabAgentStatusCompleted, CollabAgentStatusErrored,
+				CollabAgentStatusInterrupted, CollabAgentStatusCompleted, CollabAgentStatusErrored,
 				CollabAgentStatusShutdown, CollabAgentStatusNotFound,
 			),
 		},
@@ -742,22 +782,6 @@ func testEnumValues(t *testing.T) {
 			),
 		},
 		{
-			specPath: "specs/v2/SkillsRemoteReadParams.json",
-			defName:  "HazelnutScope",
-			goValues: enumStrings(
-				HazelnutScopeExample, HazelnutScopeWorkspaceShared,
-				HazelnutScopeAllShared, HazelnutScopePersonal,
-			),
-		},
-		{
-			specPath: "specs/v2/SkillsRemoteReadParams.json",
-			defName:  "ProductSurface",
-			goValues: enumStrings(
-				ProductSurfaceChatGPT, ProductSurfaceCodex,
-				ProductSurfaceAPI, ProductSurfaceAtlas,
-			),
-		},
-		{
 			specPath: "specs/v2/ExperimentalFeatureListResponse.json",
 			defName:  "ExperimentalFeatureStage",
 			goValues: enumStrings(
@@ -793,6 +817,13 @@ func testEnumValues(t *testing.T) {
 			defName:  "NetworkAccess",
 			goValues: enumStrings(
 				NetworkAccessRestricted, NetworkAccessEnabled,
+			),
+		},
+		{
+			specPath: "specs/v2/CommandExecOutputDeltaNotification.json",
+			defName:  "CommandExecOutputStream",
+			goValues: enumStrings(
+				CommandExecOutputStreamStdout, CommandExecOutputStreamStderr,
 			),
 		},
 
@@ -837,37 +868,6 @@ func testEnumValues(t *testing.T) {
 			goValues: enumStrings(
 				TurnPlanStepStatusPending, TurnPlanStepStatusInProgress,
 				TurnPlanStepStatusCompleted,
-			),
-		},
-		{
-			specPath: "specs/codex_app_server_protocol.schemas.json",
-			defName:  "ExecCommandSource",
-			goValues: enumStrings(
-				ExecCommandSourceAgent, ExecCommandSourceUserShell,
-				ExecCommandSourceUnifiedExecStartup, ExecCommandSourceUnifiedExecInteraction,
-			),
-		},
-		{
-			specPath: "specs/codex_app_server_protocol.schemas.json",
-			defName:  "ExecCommandStatus",
-			goValues: enumStrings(
-				ExecCommandStatusCompleted, ExecCommandStatusFailed,
-				ExecCommandStatusDeclined,
-			),
-		},
-		{
-			specPath: "specs/codex_app_server_protocol.schemas.json",
-			defName:  "ExecOutputStream",
-			goValues: enumStrings(
-				ExecOutputStreamStdout, ExecOutputStreamStderr,
-			),
-		},
-		{
-			specPath: "specs/codex_app_server_protocol.schemas.json",
-			defName:  "TurnAbortReason",
-			goValues: enumStrings(
-				TurnAbortReasonInterrupted, TurnAbortReasonReplaced,
-				TurnAbortReasonReviewEnded,
 			),
 		},
 	}

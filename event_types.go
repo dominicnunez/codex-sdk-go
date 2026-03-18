@@ -75,6 +75,7 @@ type CollabAgentStatus string
 const (
 	CollabAgentStatusPendingInit CollabAgentStatus = "pendingInit"
 	CollabAgentStatusRunning     CollabAgentStatus = "running"
+	CollabAgentStatusInterrupted CollabAgentStatus = "interrupted"
 	CollabAgentStatusCompleted   CollabAgentStatus = "completed"
 	CollabAgentStatusErrored     CollabAgentStatus = "errored"
 	CollabAgentStatusShutdown    CollabAgentStatus = "shutdown"

@@ -13,7 +13,7 @@ import (
 // defined in specs/ClientRequest.json has a corresponding service method on the Client,
 // and that each service method sends the correct RPC method string on the wire.
 func TestAllRequestMethodsCovered(t *testing.T) {
-	// All 42 client→server request methods extracted from specs/ClientRequest.json
+	// All 55 client→server request methods extracted from specs/ClientRequest.json
 	// Format: "method/name" → description of what it does
 	requiredMethods := map[string]string{
 		// v1 handshake
@@ -29,8 +29,11 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 		// Apps service (1 method)
 		"app/list": "Client.Apps.List()",
 
-		// Command service (1 method)
-		"command/exec": "Client.Command.Exec()",
+		// Command service (4 methods)
+		"command/exec":           "Client.Command.Exec()",
+		"command/exec/write":     "Client.Command.Write()",
+		"command/exec/terminate": "Client.Command.Terminate()",
+		"command/exec/resize":    "Client.Command.Resize()",
 
 		// Config service (5 methods)
 		"config/read":             "Client.Config.Read()",
@@ -49,6 +52,15 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 		// Feedback service (1 method)
 		"feedback/upload": "Client.Feedback.Upload()",
 
+		// Filesystem service (7 methods)
+		"fs/readFile":        "Client.Fs.ReadFile()",
+		"fs/writeFile":       "Client.Fs.WriteFile()",
+		"fs/createDirectory": "Client.Fs.CreateDirectory()",
+		"fs/getMetadata":     "Client.Fs.GetMetadata()",
+		"fs/readDirectory":   "Client.Fs.ReadDirectory()",
+		"fs/remove":          "Client.Fs.Remove()",
+		"fs/copy":            "Client.Fs.Copy()",
+
 		// Fuzzy search (client→server request, not an approval flow)
 		"fuzzyFileSearch": "Client.FuzzyFileSearch.Search()",
 
@@ -62,25 +74,30 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 		// Review service (1 method)
 		"review/start": "Client.Review.Start()",
 
-		// Skills service (4 methods)
-		"skills/list":          "Client.Skills.List()",
-		"skills/config/write":  "Client.Skills.ConfigWrite()",
-		"skills/remote/list":   "Client.Skills.RemoteRead()",
-		"skills/remote/export": "Client.Skills.RemoteWrite()",
+		// Plugin service (4 methods)
+		"plugin/list":      "Client.Plugin.List()",
+		"plugin/read":      "Client.Plugin.Read()",
+		"plugin/install":   "Client.Plugin.Install()",
+		"plugin/uninstall": "Client.Plugin.Uninstall()",
 
-		// Thread service (11 methods)
-		"thread/start":         "Client.Thread.Start()",
-		"thread/read":          "Client.Thread.Read()",
-		"thread/list":          "Client.Thread.List()",
-		"thread/loaded/list":   "Client.Thread.LoadedList()",
-		"thread/resume":        "Client.Thread.Resume()",
-		"thread/fork":          "Client.Thread.Fork()",
-		"thread/rollback":      "Client.Thread.Rollback()",
-		"thread/name/set":      "Client.Thread.SetName()",
-		"thread/archive":       "Client.Thread.Archive()",
-		"thread/unarchive":     "Client.Thread.Unarchive()",
-		"thread/unsubscribe":   "Client.Thread.Unsubscribe()",
-		"thread/compact/start": "Client.Thread.CompactStart()",
+		// Skills service (2 methods)
+		"skills/list":         "Client.Skills.List()",
+		"skills/config/write": "Client.Skills.ConfigWrite()",
+
+		// Thread service (12 methods)
+		"thread/start":           "Client.Thread.Start()",
+		"thread/read":            "Client.Thread.Read()",
+		"thread/list":            "Client.Thread.List()",
+		"thread/loaded/list":     "Client.Thread.LoadedList()",
+		"thread/resume":          "Client.Thread.Resume()",
+		"thread/fork":            "Client.Thread.Fork()",
+		"thread/rollback":        "Client.Thread.Rollback()",
+		"thread/name/set":        "Client.Thread.SetName()",
+		"thread/metadata/update": "Client.Thread.MetadataUpdate()",
+		"thread/archive":         "Client.Thread.Archive()",
+		"thread/unarchive":       "Client.Thread.Unarchive()",
+		"thread/unsubscribe":     "Client.Thread.Unsubscribe()",
+		"thread/compact/start":   "Client.Thread.CompactStart()",
 
 		// Turn service (3 methods)
 		"turn/start":     "Client.Turn.Start()",
@@ -91,8 +108,8 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 		"windowsSandbox/setupStart": "Client.System.WindowsSandboxSetupStart()",
 	}
 
-	if len(requiredMethods) != 42 {
-		t.Fatalf("Expected 42 methods in test map, got %d", len(requiredMethods))
+	if len(requiredMethods) != 55 {
+		t.Fatalf("Expected 55 methods in test map, got %d", len(requiredMethods))
 	}
 
 	// Create a mock transport and client to verify service methods exist
@@ -133,6 +150,18 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 	verified["command/exec"] = verifyMethod(t, transport, "command/exec", func() {
 		_, _ = client.Command.Exec(context.Background(), codex.CommandExecParams{})
 	})
+	verified["command/exec/write"] = verifyMethod(t, transport, "command/exec/write", func() {
+		_, _ = client.Command.Write(context.Background(), codex.CommandExecWriteParams{ProcessID: "proc-1"})
+	})
+	verified["command/exec/terminate"] = verifyMethod(t, transport, "command/exec/terminate", func() {
+		_, _ = client.Command.Terminate(context.Background(), codex.CommandExecTerminateParams{ProcessID: "proc-1"})
+	})
+	verified["command/exec/resize"] = verifyMethod(t, transport, "command/exec/resize", func() {
+		_, _ = client.Command.Resize(context.Background(), codex.CommandExecResizeParams{
+			ProcessID: "proc-1",
+			Size:      codex.CommandExecTerminalSize{Cols: 80, Rows: 24},
+		})
+	})
 
 	// Verify Config service
 	verified["config/read"] = verifyMethod(t, transport, "config/read", func() {
@@ -169,6 +198,29 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 		_, _ = client.Feedback.Upload(context.Background(), codex.FeedbackUploadParams{})
 	})
 
+	// Verify Fs service
+	verified["fs/readFile"] = verifyMethod(t, transport, "fs/readFile", func() {
+		_, _ = client.Fs.ReadFile(context.Background(), codex.FsReadFileParams{Path: "/tmp/file"})
+	})
+	verified["fs/writeFile"] = verifyMethod(t, transport, "fs/writeFile", func() {
+		_, _ = client.Fs.WriteFile(context.Background(), codex.FsWriteFileParams{Path: "/tmp/file", DataBase64: "ZGF0YQ=="})
+	})
+	verified["fs/createDirectory"] = verifyMethod(t, transport, "fs/createDirectory", func() {
+		_, _ = client.Fs.CreateDirectory(context.Background(), codex.FsCreateDirectoryParams{Path: "/tmp/dir"})
+	})
+	verified["fs/getMetadata"] = verifyMethod(t, transport, "fs/getMetadata", func() {
+		_, _ = client.Fs.GetMetadata(context.Background(), codex.FsGetMetadataParams{Path: "/tmp/file"})
+	})
+	verified["fs/readDirectory"] = verifyMethod(t, transport, "fs/readDirectory", func() {
+		_, _ = client.Fs.ReadDirectory(context.Background(), codex.FsReadDirectoryParams{Path: "/tmp"})
+	})
+	verified["fs/remove"] = verifyMethod(t, transport, "fs/remove", func() {
+		_, _ = client.Fs.Remove(context.Background(), codex.FsRemoveParams{Path: "/tmp/file"})
+	})
+	verified["fs/copy"] = verifyMethod(t, transport, "fs/copy", func() {
+		_, _ = client.Fs.Copy(context.Background(), codex.FsCopyParams{SourcePath: "/tmp/src", DestinationPath: "/tmp/dst"})
+	})
+
 	// Verify FuzzyFileSearch service
 	verified["fuzzyFileSearch"] = verifyMethod(t, transport, "fuzzyFileSearch", func() {
 		_, _ = client.FuzzyFileSearch.Search(context.Background(), codex.FuzzyFileSearchParams{})
@@ -192,18 +244,26 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 		_, _ = client.Review.Start(context.Background(), codex.ReviewStartParams{})
 	})
 
+	// Verify Plugin service
+	verified["plugin/list"] = verifyMethod(t, transport, "plugin/list", func() {
+		_, _ = client.Plugin.List(context.Background(), codex.PluginListParams{})
+	})
+	verified["plugin/read"] = verifyMethod(t, transport, "plugin/read", func() {
+		_, _ = client.Plugin.Read(context.Background(), codex.PluginReadParams{MarketplacePath: "/tmp/market", PluginName: "plugin"})
+	})
+	verified["plugin/install"] = verifyMethod(t, transport, "plugin/install", func() {
+		_, _ = client.Plugin.Install(context.Background(), codex.PluginInstallParams{MarketplacePath: "/tmp/market", PluginName: "plugin"})
+	})
+	verified["plugin/uninstall"] = verifyMethod(t, transport, "plugin/uninstall", func() {
+		_, _ = client.Plugin.Uninstall(context.Background(), codex.PluginUninstallParams{PluginID: "plugin-1"})
+	})
+
 	// Verify Skills service
 	verified["skills/list"] = verifyMethod(t, transport, "skills/list", func() {
 		_, _ = client.Skills.List(context.Background(), codex.SkillsListParams{})
 	})
 	verified["skills/config/write"] = verifyMethod(t, transport, "skills/config/write", func() {
 		_, _ = client.Skills.ConfigWrite(context.Background(), codex.SkillsConfigWriteParams{})
-	})
-	verified["skills/remote/list"] = verifyMethod(t, transport, "skills/remote/list", func() {
-		_, _ = client.Skills.RemoteRead(context.Background(), codex.SkillsRemoteReadParams{})
-	})
-	verified["skills/remote/export"] = verifyMethod(t, transport, "skills/remote/export", func() {
-		_, _ = client.Skills.RemoteWrite(context.Background(), codex.SkillsRemoteWriteParams{})
 	})
 
 	// Verify Thread service
@@ -230,6 +290,9 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 	})
 	verified["thread/name/set"] = verifyMethod(t, transport, "thread/name/set", func() {
 		_, _ = client.Thread.SetName(context.Background(), codex.ThreadSetNameParams{})
+	})
+	verified["thread/metadata/update"] = verifyMethod(t, transport, "thread/metadata/update", func() {
+		_, _ = client.Thread.MetadataUpdate(context.Background(), codex.ThreadMetadataUpdateParams{ThreadID: "thread-1"})
 	})
 	verified["thread/archive"] = verifyMethod(t, transport, "thread/archive", func() {
 		_, _ = client.Thread.Archive(context.Background(), codex.ThreadArchiveParams{})

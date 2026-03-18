@@ -31,6 +31,22 @@ const (
 	PersonalityPragmatic Personality = "pragmatic"
 )
 
+// ApprovalsReviewer controls who reviews approval requests.
+type ApprovalsReviewer string
+
+const (
+	ApprovalsReviewerUser             ApprovalsReviewer = "user"
+	ApprovalsReviewerGuardianSubagent ApprovalsReviewer = "guardian_subagent"
+)
+
+// ServiceTier selects the runtime service tier.
+type ServiceTier string
+
+const (
+	ServiceTierFast ServiceTier = "fast"
+	ServiceTierFlex ServiceTier = "flex"
+)
+
 // ModeKind represents the initial collaboration mode.
 type ModeKind string
 

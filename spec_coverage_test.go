@@ -105,6 +105,7 @@ func TestSpecCoverage(t *testing.T) {
 			strings.HasPrefix(m, "ServerRequest (") || strings.HasPrefix(m, "ClientRequest (") ||
 			strings.Contains(m, "RequestId (") ||
 			strings.Contains(m, "codex_app_server_protocol.schemas") ||
+			strings.Contains(m, "codex_app_server_protocol.v2.schemas") ||
 			strings.Contains(m, "RawResponseItemCompletedNotification") {
 			implementedDifferently = append(implementedDifferently, m)
 		} else {

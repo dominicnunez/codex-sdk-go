@@ -96,6 +96,8 @@ type Client struct {
 	ExternalAgent   *ExternalAgentService
 	Experimental    *ExperimentalService
 	System          *SystemService
+	Fs              *FsService
+	Plugin          *PluginService
 	FuzzyFileSearch *FuzzyFileSearchService
 }
 
@@ -152,6 +154,8 @@ func NewClient(transport Transport, opts ...ClientOption) *Client {
 	c.ExternalAgent = newExternalAgentService(c)
 	c.Experimental = newExperimentalService(c)
 	c.System = newSystemService(c)
+	c.Fs = newFsService(c)
+	c.Plugin = newPluginService(c)
 	c.FuzzyFileSearch = newFuzzyFileSearchService(c)
 
 	// Register the transport's notification handler to route to our listeners
@@ -390,6 +394,12 @@ func (c *Client) dispatchApproval(ctx context.Context, req Request) (Response, e
 		}
 		return handleApproval(ctx, req, handlers.OnDynamicToolCall)
 
+	case methodPermissionsRequestApproval:
+		if handlers.OnPermissionsRequestApproval == nil {
+			return methodNotFoundResponse(req.ID), nil
+		}
+		return handleApproval(ctx, req, handlers.OnPermissionsRequestApproval)
+
 	case methodToolRequestUserInput:
 		if handlers.OnToolRequestUserInput == nil {
 			return methodNotFoundResponse(req.ID), nil
@@ -401,6 +411,12 @@ func (c *Client) dispatchApproval(ctx context.Context, req Request) (Response, e
 			return methodNotFoundResponse(req.ID), nil
 		}
 		return handleApproval(ctx, req, handlers.OnChatgptAuthTokensRefresh)
+
+	case methodMcpServerElicitationRequest:
+		if handlers.OnMcpServerElicitationRequest == nil {
+			return methodNotFoundResponse(req.ID), nil
+		}
+		return handleApproval(ctx, req, handlers.OnMcpServerElicitationRequest)
 
 	default:
 		// Unknown method - return method not found error

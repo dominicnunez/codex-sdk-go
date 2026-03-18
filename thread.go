@@ -359,16 +359,18 @@ const (
 	ApprovalPolicyNever     approvalPolicyLiteral = "never"
 )
 
-// ApprovalPolicyReject represents granular rejection policy
-type ApprovalPolicyReject struct {
-	Reject struct {
-		MCPElicitations bool `json:"mcp_elicitations"`
-		Rules           bool `json:"rules"`
-		SandboxApproval bool `json:"sandbox_approval"`
-	} `json:"reject"`
+// ApprovalPolicyGranular represents granular approval policy overrides.
+type ApprovalPolicyGranular struct {
+	Granular struct {
+		MCPElicitations    bool  `json:"mcp_elicitations"`
+		RequestPermissions *bool `json:"request_permissions,omitempty"`
+		Rules              bool  `json:"rules"`
+		SandboxApproval    bool  `json:"sandbox_approval"`
+		SkillApproval      *bool `json:"skill_approval,omitempty"`
+	} `json:"granular"`
 }
 
-func (ApprovalPolicyReject) isAskForApproval() {}
+func (ApprovalPolicyGranular) isAskForApproval() {}
 
 // UnknownAskForApproval represents an unrecognized approval policy shape from a newer protocol version.
 type UnknownAskForApproval struct {
@@ -398,16 +400,16 @@ func (a *AskForApprovalWrapper) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	// Try reject object — validate that the discriminating "reject" key
+	// Try granular object — validate that the discriminating "granular" key
 	// is present, otherwise any JSON object would silently match
 	var rawObj map[string]json.RawMessage
 	if err := json.Unmarshal(data, &rawObj); err == nil {
-		if _, hasKey := rawObj["reject"]; hasKey {
-			var reject ApprovalPolicyReject
-			if err := json.Unmarshal(data, &reject); err != nil {
-				return fmt.Errorf("unmarshal approval policy reject: %w", err)
+		if _, hasKey := rawObj["granular"]; hasKey {
+			var granular ApprovalPolicyGranular
+			if err := json.Unmarshal(data, &granular); err != nil {
+				return fmt.Errorf("unmarshal approval policy granular: %w", err)
 			}
-			a.Value = reject
+			a.Value = granular
 			return nil
 		}
 	}
@@ -425,7 +427,7 @@ func (a AskForApprovalWrapper) MarshalJSON() ([]byte, error) {
 	switch v := a.Value.(type) {
 	case approvalPolicyLiteral:
 		return json.Marshal(string(v))
-	case ApprovalPolicyReject:
+	case ApprovalPolicyGranular:
 		return json.Marshal(v)
 	case UnknownAskForApproval:
 		return v.MarshalJSON()
@@ -656,28 +658,32 @@ func (s SandboxPolicyWrapper) MarshalJSON() ([]byte, error) {
 
 // ThreadStartParams are parameters for starting a new thread
 type ThreadStartParams struct {
-	ApprovalPolicy        *AskForApproval `json:"approvalPolicy,omitempty"`
-	BaseInstructions      *string         `json:"baseInstructions,omitempty"`
-	Config                json.RawMessage `json:"config,omitempty"`
-	Cwd                   *string         `json:"cwd,omitempty"`
-	DeveloperInstructions *string         `json:"developerInstructions,omitempty"`
-	Ephemeral             *bool           `json:"ephemeral,omitempty"`
-	Model                 *string         `json:"model,omitempty"`
-	ModelProvider         *string         `json:"modelProvider,omitempty"`
-	Personality           *Personality    `json:"personality,omitempty"`
-	Sandbox               *SandboxMode    `json:"sandbox,omitempty"`
-	ServiceName           *string         `json:"serviceName,omitempty"`
+	ApprovalPolicy        *AskForApproval    `json:"approvalPolicy,omitempty"`
+	ApprovalsReviewer     *ApprovalsReviewer `json:"approvalsReviewer,omitempty"`
+	BaseInstructions      *string            `json:"baseInstructions,omitempty"`
+	Config                json.RawMessage    `json:"config,omitempty"`
+	Cwd                   *string            `json:"cwd,omitempty"`
+	DeveloperInstructions *string            `json:"developerInstructions,omitempty"`
+	Ephemeral             *bool              `json:"ephemeral,omitempty"`
+	Model                 *string            `json:"model,omitempty"`
+	ModelProvider         *string            `json:"modelProvider,omitempty"`
+	Personality           *Personality       `json:"personality,omitempty"`
+	Sandbox               *SandboxMode       `json:"sandbox,omitempty"`
+	ServiceName           *string            `json:"serviceName,omitempty"`
+	ServiceTier           *ServiceTier       `json:"serviceTier,omitempty"`
 }
 
 // ThreadStartResponse is the response from starting a thread
 type ThreadStartResponse struct {
-	ApprovalPolicy  AskForApprovalWrapper `json:"approvalPolicy"`
-	Cwd             string                `json:"cwd"`
-	Model           string                `json:"model"`
-	ModelProvider   string                `json:"modelProvider"`
-	ReasoningEffort *ReasoningEffort      `json:"reasoningEffort,omitempty"`
-	Sandbox         SandboxPolicyWrapper  `json:"sandbox"`
-	Thread          Thread                `json:"thread"`
+	ApprovalPolicy    AskForApprovalWrapper `json:"approvalPolicy"`
+	ApprovalsReviewer ApprovalsReviewer     `json:"approvalsReviewer"`
+	Cwd               string                `json:"cwd"`
+	Model             string                `json:"model"`
+	ModelProvider     string                `json:"modelProvider"`
+	ReasoningEffort   *ReasoningEffort      `json:"reasoningEffort,omitempty"`
+	Sandbox           SandboxPolicyWrapper  `json:"sandbox"`
+	ServiceTier       *ServiceTier          `json:"serviceTier,omitempty"`
+	Thread            Thread                `json:"thread"`
 }
 
 // Start initiates a new thread
@@ -759,27 +765,31 @@ func (s *ThreadService) LoadedList(ctx context.Context, params ThreadLoadedListP
 
 // ThreadResumeParams are parameters for resuming a thread
 type ThreadResumeParams struct {
-	ThreadID              string          `json:"threadId"`
-	ApprovalPolicy        *AskForApproval `json:"approvalPolicy,omitempty"`
-	BaseInstructions      *string         `json:"baseInstructions,omitempty"`
-	Config                json.RawMessage `json:"config,omitempty"`
-	Cwd                   *string         `json:"cwd,omitempty"`
-	DeveloperInstructions *string         `json:"developerInstructions,omitempty"`
-	Model                 *string         `json:"model,omitempty"`
-	ModelProvider         *string         `json:"modelProvider,omitempty"`
-	Personality           *Personality    `json:"personality,omitempty"`
-	Sandbox               *SandboxMode    `json:"sandbox,omitempty"`
+	ThreadID              string             `json:"threadId"`
+	ApprovalPolicy        *AskForApproval    `json:"approvalPolicy,omitempty"`
+	ApprovalsReviewer     *ApprovalsReviewer `json:"approvalsReviewer,omitempty"`
+	BaseInstructions      *string            `json:"baseInstructions,omitempty"`
+	Config                json.RawMessage    `json:"config,omitempty"`
+	Cwd                   *string            `json:"cwd,omitempty"`
+	DeveloperInstructions *string            `json:"developerInstructions,omitempty"`
+	Model                 *string            `json:"model,omitempty"`
+	ModelProvider         *string            `json:"modelProvider,omitempty"`
+	Personality           *Personality       `json:"personality,omitempty"`
+	Sandbox               *SandboxMode       `json:"sandbox,omitempty"`
+	ServiceTier           *ServiceTier       `json:"serviceTier,omitempty"`
 }
 
 // ThreadResumeResponse is the response from resuming a thread
 type ThreadResumeResponse struct {
-	ApprovalPolicy  AskForApprovalWrapper `json:"approvalPolicy"`
-	Cwd             string                `json:"cwd"`
-	Model           string                `json:"model"`
-	ModelProvider   string                `json:"modelProvider"`
-	ReasoningEffort *ReasoningEffort      `json:"reasoningEffort,omitempty"`
-	Sandbox         SandboxPolicyWrapper  `json:"sandbox"`
-	Thread          Thread                `json:"thread"`
+	ApprovalPolicy    AskForApprovalWrapper `json:"approvalPolicy"`
+	ApprovalsReviewer ApprovalsReviewer     `json:"approvalsReviewer"`
+	Cwd               string                `json:"cwd"`
+	Model             string                `json:"model"`
+	ModelProvider     string                `json:"modelProvider"`
+	ReasoningEffort   *ReasoningEffort      `json:"reasoningEffort,omitempty"`
+	Sandbox           SandboxPolicyWrapper  `json:"sandbox"`
+	ServiceTier       *ServiceTier          `json:"serviceTier,omitempty"`
+	Thread            Thread                `json:"thread"`
 }
 
 // Resume resumes an existing thread
@@ -793,26 +803,31 @@ func (s *ThreadService) Resume(ctx context.Context, params ThreadResumeParams) (
 
 // ThreadForkParams are parameters for forking a thread
 type ThreadForkParams struct {
-	ThreadID              string          `json:"threadId"`
-	ApprovalPolicy        *AskForApproval `json:"approvalPolicy,omitempty"`
-	BaseInstructions      *string         `json:"baseInstructions,omitempty"`
-	Config                json.RawMessage `json:"config,omitempty"`
-	Cwd                   *string         `json:"cwd,omitempty"`
-	DeveloperInstructions *string         `json:"developerInstructions,omitempty"`
-	Model                 *string         `json:"model,omitempty"`
-	ModelProvider         *string         `json:"modelProvider,omitempty"`
-	Sandbox               *SandboxMode    `json:"sandbox,omitempty"`
+	ThreadID              string             `json:"threadId"`
+	ApprovalPolicy        *AskForApproval    `json:"approvalPolicy,omitempty"`
+	ApprovalsReviewer     *ApprovalsReviewer `json:"approvalsReviewer,omitempty"`
+	BaseInstructions      *string            `json:"baseInstructions,omitempty"`
+	Config                json.RawMessage    `json:"config,omitempty"`
+	Cwd                   *string            `json:"cwd,omitempty"`
+	DeveloperInstructions *string            `json:"developerInstructions,omitempty"`
+	Ephemeral             *bool              `json:"ephemeral,omitempty"`
+	Model                 *string            `json:"model,omitempty"`
+	ModelProvider         *string            `json:"modelProvider,omitempty"`
+	Sandbox               *SandboxMode       `json:"sandbox,omitempty"`
+	ServiceTier           *ServiceTier       `json:"serviceTier,omitempty"`
 }
 
 // ThreadForkResponse is the response from forking a thread
 type ThreadForkResponse struct {
-	ApprovalPolicy  AskForApprovalWrapper `json:"approvalPolicy"`
-	Cwd             string                `json:"cwd"`
-	Model           string                `json:"model"`
-	ModelProvider   string                `json:"modelProvider"`
-	ReasoningEffort *ReasoningEffort      `json:"reasoningEffort,omitempty"`
-	Sandbox         SandboxPolicyWrapper  `json:"sandbox"`
-	Thread          Thread                `json:"thread"`
+	ApprovalPolicy    AskForApprovalWrapper `json:"approvalPolicy"`
+	ApprovalsReviewer ApprovalsReviewer     `json:"approvalsReviewer"`
+	Cwd               string                `json:"cwd"`
+	Model             string                `json:"model"`
+	ModelProvider     string                `json:"modelProvider"`
+	ReasoningEffort   *ReasoningEffort      `json:"reasoningEffort,omitempty"`
+	Sandbox           SandboxPolicyWrapper  `json:"sandbox"`
+	ServiceTier       *ServiceTier          `json:"serviceTier,omitempty"`
+	Thread            Thread                `json:"thread"`
 }
 
 // Fork creates a fork of a thread
@@ -861,6 +876,33 @@ func (s *ThreadService) SetName(ctx context.Context, params ThreadSetNameParams)
 		return ThreadSetNameResponse{}, err
 	}
 	return ThreadSetNameResponse{}, nil
+}
+
+// ThreadMetadataGitInfoUpdateParams patches stored Git metadata for a thread.
+type ThreadMetadataGitInfoUpdateParams struct {
+	Branch    *string `json:"branch,omitempty"`
+	OriginURL *string `json:"originUrl,omitempty"`
+	SHA       *string `json:"sha,omitempty"`
+}
+
+// ThreadMetadataUpdateParams updates thread metadata.
+type ThreadMetadataUpdateParams struct {
+	GitInfo  *ThreadMetadataGitInfoUpdateParams `json:"gitInfo,omitempty"`
+	ThreadID string                             `json:"threadId"`
+}
+
+// ThreadMetadataUpdateResponse is the response from thread/metadata/update.
+type ThreadMetadataUpdateResponse struct {
+	Thread Thread `json:"thread"`
+}
+
+// MetadataUpdate updates stored metadata for a thread.
+func (s *ThreadService) MetadataUpdate(ctx context.Context, params ThreadMetadataUpdateParams) (ThreadMetadataUpdateResponse, error) {
+	var response ThreadMetadataUpdateResponse
+	if err := s.client.sendRequest(ctx, methodThreadMetadataUpdate, params, &response); err != nil {
+		return ThreadMetadataUpdateResponse{}, err
+	}
+	return response, nil
 }
 
 // ThreadArchiveParams are parameters for archiving a thread

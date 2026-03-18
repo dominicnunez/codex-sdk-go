@@ -329,6 +329,7 @@ func TestCollabAgentStatus(t *testing.T) {
 	}{
 		{"pendingInit", `"pendingInit"`, codex.CollabAgentStatusPendingInit},
 		{"running", `"running"`, codex.CollabAgentStatusRunning},
+		{"interrupted", `"interrupted"`, codex.CollabAgentStatusInterrupted},
 		{"completed", `"completed"`, codex.CollabAgentStatusCompleted},
 		{"errored", `"errored"`, codex.CollabAgentStatusErrored},
 		{"shutdown", `"shutdown"`, codex.CollabAgentStatusShutdown},

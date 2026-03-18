@@ -18,16 +18,18 @@ func newTurnService(client *Client) *TurnService {
 
 // TurnStartParams are the parameters for turn/start.
 type TurnStartParams struct {
-	ThreadID       string           `json:"threadId"`
-	Input          []UserInput      `json:"input"`
-	ApprovalPolicy *AskForApproval  `json:"approvalPolicy,omitempty"`
-	Cwd            *string          `json:"cwd,omitempty"`
-	Effort         *ReasoningEffort `json:"effort,omitempty"`
-	Model          *string          `json:"model,omitempty"`
+	ThreadID          string             `json:"threadId"`
+	Input             []UserInput        `json:"input"`
+	ApprovalPolicy    *AskForApproval    `json:"approvalPolicy,omitempty"`
+	ApprovalsReviewer *ApprovalsReviewer `json:"approvalsReviewer,omitempty"`
+	Cwd               *string            `json:"cwd,omitempty"`
+	Effort            *ReasoningEffort   `json:"effort,omitempty"`
+	Model             *string            `json:"model,omitempty"`
 	// OutputSchema optionally constrains the model's structured output to conform to a JSON Schema.
 	OutputSchema      interface{}              `json:"outputSchema,omitempty"`
 	Personality       *Personality             `json:"personality,omitempty"`
 	SandboxPolicy     *SandboxPolicy           `json:"sandboxPolicy,omitempty"`
+	ServiceTier       *ServiceTier             `json:"serviceTier,omitempty"`
 	Summary           *ReasoningSummaryWrapper `json:"summary,omitempty"`
 	CollaborationMode *CollaborationMode       `json:"collaborationMode,omitempty"`
 }
@@ -39,12 +41,14 @@ func (p TurnStartParams) MarshalJSON() ([]byte, error) {
 		ThreadID          string                   `json:"threadId"`
 		Input             []UserInput              `json:"input"`
 		ApprovalPolicy    *AskForApprovalWrapper   `json:"approvalPolicy,omitempty"`
+		ApprovalsReviewer *ApprovalsReviewer       `json:"approvalsReviewer,omitempty"`
 		Cwd               *string                  `json:"cwd,omitempty"`
 		Effort            *ReasoningEffort         `json:"effort,omitempty"`
 		Model             *string                  `json:"model,omitempty"`
 		OutputSchema      interface{}              `json:"outputSchema,omitempty"`
 		Personality       *Personality             `json:"personality,omitempty"`
 		SandboxPolicy     *SandboxPolicyWrapper    `json:"sandboxPolicy,omitempty"`
+		ServiceTier       *ServiceTier             `json:"serviceTier,omitempty"`
 		Summary           *ReasoningSummaryWrapper `json:"summary,omitempty"`
 		CollaborationMode *CollaborationMode       `json:"collaborationMode,omitempty"`
 	}
@@ -52,11 +56,13 @@ func (p TurnStartParams) MarshalJSON() ([]byte, error) {
 	wire := wireTurnStartParams{
 		ThreadID:          p.ThreadID,
 		Input:             p.Input,
+		ApprovalsReviewer: p.ApprovalsReviewer,
 		Cwd:               p.Cwd,
 		Effort:            p.Effort,
 		Model:             p.Model,
 		OutputSchema:      p.OutputSchema,
 		Personality:       p.Personality,
+		ServiceTier:       p.ServiceTier,
 		Summary:           p.Summary,
 		CollaborationMode: p.CollaborationMode,
 	}
@@ -88,12 +94,14 @@ func (p *TurnStartParams) UnmarshalJSON(data []byte) error {
 		ThreadID          string                   `json:"threadId"`
 		Input             []json.RawMessage        `json:"input"`
 		ApprovalPolicy    *AskForApprovalWrapper   `json:"approvalPolicy,omitempty"`
+		ApprovalsReviewer *ApprovalsReviewer       `json:"approvalsReviewer,omitempty"`
 		Cwd               *string                  `json:"cwd,omitempty"`
 		Effort            *ReasoningEffort         `json:"effort,omitempty"`
 		Model             *string                  `json:"model,omitempty"`
 		OutputSchema      interface{}              `json:"outputSchema,omitempty"`
 		Personality       *Personality             `json:"personality,omitempty"`
 		SandboxPolicy     *SandboxPolicyWrapper    `json:"sandboxPolicy,omitempty"`
+		ServiceTier       *ServiceTier             `json:"serviceTier,omitempty"`
 		Summary           *ReasoningSummaryWrapper `json:"summary,omitempty"`
 		CollaborationMode *CollaborationMode       `json:"collaborationMode,omitempty"`
 	}
@@ -125,12 +133,14 @@ func (p *TurnStartParams) UnmarshalJSON(data []byte) error {
 		ThreadID:          wire.ThreadID,
 		Input:             inputs,
 		ApprovalPolicy:    approvalPolicy,
+		ApprovalsReviewer: wire.ApprovalsReviewer,
 		Cwd:               wire.Cwd,
 		Effort:            wire.Effort,
 		Model:             wire.Model,
 		OutputSchema:      wire.OutputSchema,
 		Personality:       wire.Personality,
 		SandboxPolicy:     sandboxPolicy,
+		ServiceTier:       wire.ServiceTier,
 		Summary:           wire.Summary,
 		CollaborationMode: wire.CollaborationMode,
 	}
