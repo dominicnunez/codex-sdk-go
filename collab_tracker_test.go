@@ -2,6 +2,7 @@ package codex_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
@@ -178,6 +179,16 @@ func TestAgentTrackerWaitAllDoneEmpty(t *testing.T) {
 	err := tracker.WaitAllDone(ctx)
 	if err != nil {
 		t.Fatalf("WaitAllDone on empty tracker: %v", err)
+	}
+}
+
+func TestAgentTrackerWaitAllDoneNilContext(t *testing.T) {
+	tracker := codex.NewAgentTracker()
+
+	var nilCtx context.Context
+	err := tracker.WaitAllDone(nilCtx)
+	if !errors.Is(err, codex.ErrNilContext) {
+		t.Fatalf("WaitAllDone(nil) error = %v; want ErrNilContext", err)
 	}
 }
 

@@ -1,6 +1,7 @@
 package codex
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,6 +9,13 @@ import (
 
 // ErrNilContext indicates a public API call was passed a nil context.
 var ErrNilContext = errors.New("context must not be nil")
+
+func validateContext(ctx context.Context) error {
+	if ctx == nil {
+		return ErrNilContext
+	}
+	return nil
+}
 
 // RPCError wraps a JSON-RPC error response.
 // It implements error, errors.Is, and errors.As.

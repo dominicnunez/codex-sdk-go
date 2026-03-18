@@ -117,6 +117,10 @@ func (t *AgentTracker) ActiveCount() int {
 // tracked yet. Callers should ensure at least one ProcessEvent call has
 // occurred before waiting, or use external synchronization.
 func (t *AgentTracker) WaitAllDone(ctx context.Context) error {
+	if err := validateContext(ctx); err != nil {
+		return err
+	}
+
 	for {
 		t.mu.RLock()
 		if t.allDone() {

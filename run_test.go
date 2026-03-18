@@ -130,6 +130,19 @@ func TestRunContextCancellation(t *testing.T) {
 	}
 }
 
+func TestRunNilContext(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	var nilCtx context.Context
+	_, err := proc.Run(nilCtx, codex.RunOptions{Prompt: "hello"})
+	if !errors.Is(err, codex.ErrNilContext) {
+		t.Fatalf("Run(nil, ...) error = %v; want ErrNilContext", err)
+	}
+	if got := mock.CallCount(); got != 0 {
+		t.Fatalf("mock CallCount = %d, want 0", got)
+	}
+}
+
 func TestRunEmptyPrompt(t *testing.T) {
 	proc, _ := mockProcess(t)
 	ctx := context.Background()

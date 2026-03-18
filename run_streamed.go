@@ -148,6 +148,9 @@ func (p *Process) RunStreamedWithCollector(ctx context.Context, opts RunOptions,
 }
 
 func (p *Process) runStreamedWithCollector(ctx context.Context, opts RunOptions, collector *StreamCollector) *Stream {
+	if err := validateContext(ctx); err != nil {
+		return newErrorStream(err)
+	}
 	if opts.Prompt == "" {
 		return newErrorStream(errors.New("prompt is required"))
 	}

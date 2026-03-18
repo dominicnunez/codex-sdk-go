@@ -559,6 +559,9 @@ func cloneStringPtr(s *string) *string {
 
 // StartConversation creates a thread and returns a Conversation handle.
 func (p *Process) StartConversation(ctx context.Context, opts ConversationOptions) (*Conversation, error) {
+	if err := validateContext(ctx); err != nil {
+		return nil, err
+	}
 	if err := p.ensureInit(ctx); err != nil {
 		return nil, err
 	}
@@ -612,6 +615,9 @@ func (c *Conversation) buildTurnParams(opts TurnOptions) TurnStartParams {
 // Concurrent calls to Turn or TurnStreamed on the same Conversation are not
 // supported and return an error.
 func (c *Conversation) Turn(ctx context.Context, opts TurnOptions) (*RunResult, error) {
+	if err := validateContext(ctx); err != nil {
+		return nil, err
+	}
 	if opts.Prompt == "" {
 		return nil, errors.New("prompt is required")
 	}
@@ -650,6 +656,9 @@ func (c *Conversation) Turn(ctx context.Context, opts TurnOptions) (*RunResult, 
 
 // TurnStreamed executes a streaming turn on the existing thread.
 func (c *Conversation) TurnStreamed(ctx context.Context, opts TurnOptions) *Stream {
+	if err := validateContext(ctx); err != nil {
+		return newErrorStream(err)
+	}
 	g := newGuardedChan(streamChannelBuffer)
 	s := &Stream{
 		done: make(chan struct{}),

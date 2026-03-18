@@ -3,6 +3,7 @@ package codex_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"sync/atomic"
@@ -125,6 +126,50 @@ func TestRunStreamedContextCancellation(t *testing.T) {
 
 	if gotErr == nil {
 		t.Fatal("expected error from context cancellation")
+	}
+}
+
+func TestRunStreamedNilContext(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	var nilCtx context.Context
+	stream := proc.RunStreamed(nilCtx, codex.RunOptions{Prompt: "hello"})
+
+	var gotErr error
+	for _, err := range stream.Events() {
+		if err != nil {
+			gotErr = err
+			break
+		}
+	}
+
+	if !errors.Is(gotErr, codex.ErrNilContext) {
+		t.Fatalf("RunStreamed(nil, ...) error = %v; want ErrNilContext", gotErr)
+	}
+	if got := mock.CallCount(); got != 0 {
+		t.Fatalf("mock CallCount = %d, want 0", got)
+	}
+}
+
+func TestRunStreamedWithCollectorNilContext(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	var nilCtx context.Context
+	stream := proc.RunStreamedWithCollector(nilCtx, codex.RunOptions{Prompt: "hello"}, codex.NewStreamCollector())
+
+	var gotErr error
+	for _, err := range stream.Events() {
+		if err != nil {
+			gotErr = err
+			break
+		}
+	}
+
+	if !errors.Is(gotErr, codex.ErrNilContext) {
+		t.Fatalf("RunStreamedWithCollector(nil, ...) error = %v; want ErrNilContext", gotErr)
+	}
+	if got := mock.CallCount(); got != 0 {
+		t.Fatalf("mock CallCount = %d, want 0", got)
 	}
 }
 

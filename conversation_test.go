@@ -3,6 +3,7 @@ package codex_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -145,6 +146,64 @@ func TestConversationTurnStreamed(t *testing.T) {
 	}
 	if result.Response != "Hi" {
 		t.Errorf("Response = %q, want 'Hi'", result.Response)
+	}
+}
+
+func TestStartConversationNilContext(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	var nilCtx context.Context
+	_, err := proc.StartConversation(nilCtx, codex.ConversationOptions{})
+	if !errors.Is(err, codex.ErrNilContext) {
+		t.Fatalf("StartConversation(nil, ...) error = %v; want ErrNilContext", err)
+	}
+	if got := mock.CallCount(); got != 0 {
+		t.Fatalf("mock CallCount = %d, want 0", got)
+	}
+}
+
+func TestConversationTurnNilContext(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	conv, err := proc.StartConversation(context.Background(), codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+
+	var nilCtx context.Context
+	_, err = conv.Turn(nilCtx, codex.TurnOptions{Prompt: "hello"})
+	if !errors.Is(err, codex.ErrNilContext) {
+		t.Fatalf("Turn(nil, ...) error = %v; want ErrNilContext", err)
+	}
+	if got := mock.MethodCallCount("turn/start"); got != 0 {
+		t.Fatalf("turn/start call count = %d, want 0", got)
+	}
+}
+
+func TestConversationTurnStreamedNilContext(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	conv, err := proc.StartConversation(context.Background(), codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+
+	var nilCtx context.Context
+	stream := conv.TurnStreamed(nilCtx, codex.TurnOptions{Prompt: "hello"})
+
+	var gotErr error
+	for _, err := range stream.Events() {
+		if err != nil {
+			gotErr = err
+			break
+		}
+	}
+
+	if !errors.Is(gotErr, codex.ErrNilContext) {
+		t.Fatalf("TurnStreamed(nil, ...) error = %v; want ErrNilContext", gotErr)
+	}
+	if got := mock.MethodCallCount("turn/start"); got != 0 {
+		t.Fatalf("turn/start call count = %d, want 0", got)
 	}
 }
 

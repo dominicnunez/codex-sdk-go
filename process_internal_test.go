@@ -176,6 +176,38 @@ func TestEnsureInitWaitingCallerRespectsContextCancellation(t *testing.T) {
 	}
 }
 
+func TestEnsureInitWaitingCallerRejectsNilContext(t *testing.T) {
+	transport := newBlockingInitializeTransport()
+	client := NewClient(transport, WithRequestTimeout(5*time.Second))
+	proc := NewProcessFromClient(client)
+
+	firstDone := make(chan error, 1)
+	go func() {
+		firstDone <- proc.ensureInit(context.Background())
+	}()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if transport.initCalls.Load() > 0 {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if transport.initCalls.Load() == 0 {
+		t.Fatal("initialize call did not start")
+	}
+
+	var nilCtx context.Context
+	if err := proc.ensureInit(nilCtx); !errors.Is(err, ErrNilContext) {
+		t.Fatalf("ensureInit(nil) error = %v, want ErrNilContext", err)
+	}
+
+	close(transport.unblockInit)
+	if err := <-firstDone; err != nil {
+		t.Fatalf("first ensureInit failed: %v", err)
+	}
+}
+
 type retryableInitializeTransport struct {
 	mu              sync.Mutex
 	initializeCalls int

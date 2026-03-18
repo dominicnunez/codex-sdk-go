@@ -221,8 +221,8 @@ func NewProcessFromClient(client *Client) *Process {
 // connects a StdioTransport to its stdin/stdout, and returns a ready-to-use Client.
 // The returned Process must be closed when done.
 func StartProcess(ctx context.Context, opts *ProcessOptions) (*Process, error) {
-	if ctx == nil {
-		return nil, ErrNilContext
+	if err := validateContext(ctx); err != nil {
+		return nil, err
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -368,6 +368,10 @@ func (p *Process) Close() error {
 // latched so future calls return immediately. On failure the next call retries,
 // allowing recovery from transient errors.
 func (p *Process) ensureInit(ctx context.Context) error {
+	if err := validateContext(ctx); err != nil {
+		return err
+	}
+
 	for {
 		p.initMu.Lock()
 		if p.initDone {

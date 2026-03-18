@@ -104,6 +104,9 @@ func buildRunResult(thread Thread, turn Turn, items []ThreadItemWrapper) *RunRes
 // with the given prompt, collects items until the turn completes, and returns
 // the result. This is the simplest way to get a response from the Codex CLI.
 func (p *Process) Run(ctx context.Context, opts RunOptions) (*RunResult, error) {
+	if err := validateContext(ctx); err != nil {
+		return nil, err
+	}
 	if opts.Prompt == "" {
 		return nil, errors.New("prompt is required")
 	}
