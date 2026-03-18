@@ -45,8 +45,6 @@ const (
 	errInvalidResponseJSONRPC = `invalid response: jsonrpc must be "2.0"`
 	requestIDKeyPrefixNumber  = "n:"
 	requestIDKeyPrefixString  = "s:"
-	maxJSONRPCIDExponentAbs   = 4096
-	maxJSONRPCIDLength        = 8192
 	transportClosedErrorData  = `{"transport":"closed","origin":"client"}`
 )
 
@@ -377,7 +375,8 @@ func (t *StdioTransport) ScanErr() error {
 	return t.scanErr
 }
 
-// MalformedMessageCount reports how many inbound lines were invalid JSON.
+// MalformedMessageCount reports how many inbound response frames could not be
+// routed because they were invalid JSON or carried an invalid/unusable ID.
 func (t *StdioTransport) MalformedMessageCount() uint64 {
 	return t.malformedCount.Load()
 }
@@ -486,16 +485,40 @@ func (t *StdioTransport) enqueueWrite(ctx context.Context, msg interface{}, op s
 		done:    make(chan error, 1),
 	}
 
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-t.ctx.Done():
-		return NewTransportError(op, errTransportClosed)
-	case <-t.readerStopped:
-		if watchReaderStop {
+	if watchReaderStop {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-t.ctx.Done():
+			return NewTransportError(op, errTransportClosed)
+		case <-t.readerStopped:
+			return NewTransportError(op, errors.New("transport reader stopped"))
+		case t.writeQueue <- env:
+		}
+	} else {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-t.ctx.Done():
+			return NewTransportError(op, errTransportClosed)
+		case t.writeQueue <- env:
+		}
+	}
+
+	if watchReaderStop {
+		select {
+		case err := <-env.done:
+			if err != nil {
+				return err
+			}
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-t.ctx.Done():
+			return NewTransportError(op, errTransportClosed)
+		case <-t.readerStopped:
 			return NewTransportError(op, errors.New("transport reader stopped"))
 		}
-	case t.writeQueue <- env:
 	}
 
 	select {
@@ -508,11 +531,6 @@ func (t *StdioTransport) enqueueWrite(ctx context.Context, msg interface{}, op s
 		return ctx.Err()
 	case <-t.ctx.Done():
 		return NewTransportError(op, errTransportClosed)
-	case <-t.readerStopped:
-		if watchReaderStop {
-			return NewTransportError(op, errors.New("transport reader stopped"))
-		}
-		return nil
 	}
 }
 
@@ -521,63 +539,73 @@ func (t *StdioTransport) writeMessage(msg interface{}) error {
 	return t.enqueueWrite(t.ctx, msg, "write message", false)
 }
 
+func recvWhileRunning[T any](ctx context.Context, queue <-chan T) (T, bool) {
+	var zero T
+
+	select {
+	case <-ctx.Done():
+		return zero, false
+	case value, ok := <-queue:
+		if !ok || ctx.Err() != nil {
+			return zero, false
+		}
+		return value, true
+	}
+}
+
 func (t *StdioTransport) writeLoop() {
 	for {
-		select {
-		case <-t.ctx.Done():
+		env, ok := recvWhileRunning(t.ctx, t.writeQueue)
+		if !ok {
 			return
-		case env := <-t.writeQueue:
-			err := t.writeRawMessage(env.payload)
-			env.done <- err
-			if err != nil {
-				t.handleWriteFailure(err)
-				return
-			}
+		}
+
+		err := t.writeRawMessage(env.payload)
+		env.done <- err
+		if err != nil {
+			t.handleWriteFailure(err)
+			return
 		}
 	}
 }
 
 func (t *StdioTransport) requestWorker() {
 	for {
-		select {
-		case <-t.ctx.Done():
+		req, ok := recvWhileRunning(t.ctx, t.requestQueue)
+		if !ok {
 			return
-		case req := <-t.requestQueue:
-			t.handleRequest(req)
 		}
+		t.handleRequest(req)
 	}
 }
 
 func (t *StdioTransport) notificationWorker() {
 	for {
-		select {
-		case <-t.ctx.Done():
+		notif, ok := recvWhileRunning(t.ctx, t.notifQueue)
+		if !ok {
 			return
-		case notif := <-t.notifQueue:
-			t.handleNotification(notif)
 		}
+		t.handleNotification(notif)
 	}
 }
 
 func (t *StdioTransport) criticalNotificationWorker() {
 	for {
-		select {
-		case <-t.ctx.Done():
+		notif, ok := recvWhileRunning(t.ctx, t.criticalNotifQueue)
+		if !ok {
 			return
-		case notif := <-t.criticalNotifQueue:
-			t.handleNotification(notif)
 		}
+		t.handleNotification(notif)
 	}
 }
 
 func (t *StdioTransport) terminalNotificationWorker() {
 	for {
-		select {
-		case <-t.ctx.Done():
+		notif, ok := recvWhileRunning(t.ctx, t.terminalNotifQueue)
+		if !ok {
 			return
-		case notif := <-t.terminalNotifQueue:
-			t.handleNotification(notif)
 		}
+		t.handleNotification(notif)
 	}
 }
 

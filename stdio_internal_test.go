@@ -192,6 +192,180 @@ func TestNotifyCanceledContextDoesNotAttemptWrite(t *testing.T) {
 	}
 }
 
+func TestRecvWhileRunningReturnsQueuedValue(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	queue := make(chan int, 1)
+	queue <- 7
+
+	value, ok := recvWhileRunning(ctx, queue)
+	if !ok {
+		t.Fatal("recvWhileRunning() reported queue closed while context was active")
+	}
+	if value != 7 {
+		t.Fatalf("recvWhileRunning() = %d; want 7", value)
+	}
+}
+
+func TestRecvWhileRunningDropsBufferedValueAfterCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	queue := make(chan int, 1)
+	queue <- 7
+	cancel()
+
+	value, ok := recvWhileRunning(ctx, queue)
+	if ok {
+		t.Fatalf("recvWhileRunning() reported buffered value %d after cancellation", value)
+	}
+}
+
+func TestWriteLoopSkipsBufferedWriteAfterCancellation(t *testing.T) {
+	var buf safeBuffer
+
+	ctx, cancel := context.WithCancel(context.Background())
+	transport := &StdioTransport{
+		writer:     &buf,
+		writeQueue: make(chan writeEnvelope, 1),
+		ctx:        ctx,
+		cancelCtx:  cancel,
+	}
+	transport.writeQueue <- writeEnvelope{
+		payload: []byte(`{"jsonrpc":"2.0","method":"test"}`),
+		done:    make(chan error, 1),
+	}
+
+	cancel()
+	transport.writeLoop()
+
+	if got := strings.TrimSpace(buf.String()); got != "" {
+		t.Fatalf("writeLoop wrote %q after cancellation; want no writes", got)
+	}
+}
+
+func TestEnqueueWriteReaderStoppedWithoutWatcherWaitsForActualWrite(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
+	defer cancel()
+
+	transport := &StdioTransport{
+		writeQueue:    make(chan writeEnvelope),
+		readerStopped: make(chan struct{}),
+		ctx:           context.Background(),
+	}
+	close(transport.readerStopped)
+
+	err := transport.enqueueWrite(ctx, Notification{Method: "test/notification"}, "write message", false)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("enqueueWrite() error = %v; want context deadline exceeded", err)
+	}
+}
+
+func TestEnqueueWriteReaderStoppedWithoutWatcherCanStillFlushQueuedWrite(t *testing.T) {
+	var buf safeBuffer
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	transport := &StdioTransport{
+		writer:        &buf,
+		writeQueue:    make(chan writeEnvelope, 1),
+		readerStopped: make(chan struct{}),
+		ctx:           ctx,
+		cancelCtx:     cancel,
+	}
+	go transport.writeLoop()
+	close(transport.readerStopped)
+
+	if err := transport.enqueueWrite(context.Background(), Notification{
+		JSONRPC: jsonrpcVersion,
+		Method:  "test/notification",
+	}, "write message", false); err != nil {
+		t.Fatalf("enqueueWrite() error = %v", err)
+	}
+
+	if got := strings.TrimSpace(buf.String()); got == "" {
+		t.Fatal("enqueueWrite() did not flush queued notification")
+	}
+}
+
+func TestRequestWorkerSkipsBufferedRequestAfterCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	transport := &StdioTransport{
+		requestQueue: make(chan Request, 1),
+		ctx:          ctx,
+		cancelCtx:    cancel,
+	}
+
+	var handled atomic.Int32
+	transport.OnRequest(func(_ context.Context, _ Request) (Response, error) {
+		handled.Add(1)
+		return Response{}, nil
+	})
+
+	transport.requestQueue <- Request{Method: "approval/test"}
+	cancel()
+	transport.requestWorker()
+
+	if got := handled.Load(); got != 0 {
+		t.Fatalf("requestWorker invoked handler %d times after cancellation; want 0", got)
+	}
+}
+
+func TestNotificationWorkerSkipsBufferedNotificationsAfterCancellation(t *testing.T) {
+	tests := []struct {
+		name   string
+		queue  chan Notification
+		worker func(*StdioTransport)
+	}{
+		{
+			name: "standard",
+			queue: func() chan Notification {
+				return make(chan Notification, 1)
+			}(),
+			worker: (*StdioTransport).notificationWorker,
+		},
+		{
+			name: "critical",
+			queue: func() chan Notification {
+				return make(chan Notification, 1)
+			}(),
+			worker: (*StdioTransport).criticalNotificationWorker,
+		},
+		{
+			name: "terminal",
+			queue: func() chan Notification {
+				return make(chan Notification, 1)
+			}(),
+			worker: (*StdioTransport).terminalNotificationWorker,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			transport := &StdioTransport{
+				notifQueue:         tt.queue,
+				criticalNotifQueue: tt.queue,
+				terminalNotifQueue: tt.queue,
+				ctx:                ctx,
+				cancelCtx:          cancel,
+			}
+
+			var handled atomic.Int32
+			transport.OnNotify(func(_ context.Context, _ Notification) {
+				handled.Add(1)
+			})
+
+			tt.queue <- Notification{Method: "test/notification"}
+			cancel()
+			tt.worker(transport)
+
+			if got := handled.Load(); got != 0 {
+				t.Fatalf("notification handler invoked %d times after cancellation; want 0", got)
+			}
+		})
+	}
+}
+
 func TestCleanupPendingReqDeletesMatchingEntry(t *testing.T) {
 	transport := &StdioTransport{
 		pendingReqs: make(map[string]pendingReq),
