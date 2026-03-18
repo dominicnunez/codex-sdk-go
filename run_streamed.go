@@ -40,9 +40,8 @@ func newGuardedChan(size int) *guardedChan {
 	return &guardedChan{ch: make(chan eventOrErr, size)}
 }
 
-// send writes an event/error pair to the channel. When the channel is full, the
-// oldest queued element is dropped so lifecycle completion never depends on
-// the consumer draining Events().
+// send writes an event/error pair to the channel. When the bounded buffer fills,
+// the stream fails with [ErrStreamOverflow] instead of dropping queued events.
 func (g *guardedChan) send(eoe eventOrErr) {
 	g.mu.RLock()
 	if g.closed {
