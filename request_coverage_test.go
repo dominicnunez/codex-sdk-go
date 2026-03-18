@@ -3,6 +3,8 @@ package codex_test
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"sort"
 	"strings"
 	"testing"
 
@@ -13,104 +15,7 @@ import (
 // defined in specs/ClientRequest.json has a corresponding service method on the Client,
 // and that each service method sends the correct RPC method string on the wire.
 func TestAllRequestMethodsCovered(t *testing.T) {
-	// All 55 client→server request methods extracted from specs/ClientRequest.json
-	// Format: "method/name" → description of what it does
-	requiredMethods := map[string]string{
-		// v1 handshake
-		"initialize": "Client.Initialize()",
-
-		// Account service (5 methods)
-		"account/read":            "Client.Account.Get()",
-		"account/rateLimits/read": "Client.Account.GetRateLimits()",
-		"account/login/start":     "Client.Account.Login()",
-		"account/login/cancel":    "Client.Account.CancelLogin()",
-		"account/logout":          "Client.Account.Logout()",
-
-		// Apps service (1 method)
-		"app/list": "Client.Apps.List()",
-
-		// Command service (4 methods)
-		"command/exec":           "Client.Command.Exec()",
-		"command/exec/write":     "Client.Command.Write()",
-		"command/exec/terminate": "Client.Command.Terminate()",
-		"command/exec/resize":    "Client.Command.Resize()",
-
-		// Config service (5 methods)
-		"config/read":             "Client.Config.Read()",
-		"configRequirements/read": "Client.Config.ReadRequirements()",
-		"config/value/write":      "Client.Config.Write()",
-		"config/batchWrite":       "Client.Config.BatchWrite()",
-		"config/mcpServer/reload": "Client.Mcp.Refresh()",
-
-		// Experimental service (1 method)
-		"experimentalFeature/list": "Client.Experimental.FeatureList()",
-
-		// External agent service (2 methods)
-		"externalAgentConfig/detect": "Client.ExternalAgent.ConfigDetect()",
-		"externalAgentConfig/import": "Client.ExternalAgent.ConfigImport()",
-
-		// Feedback service (1 method)
-		"feedback/upload": "Client.Feedback.Upload()",
-
-		// Filesystem service (7 methods)
-		"fs/readFile":        "Client.Fs.ReadFile()",
-		"fs/writeFile":       "Client.Fs.WriteFile()",
-		"fs/createDirectory": "Client.Fs.CreateDirectory()",
-		"fs/getMetadata":     "Client.Fs.GetMetadata()",
-		"fs/readDirectory":   "Client.Fs.ReadDirectory()",
-		"fs/remove":          "Client.Fs.Remove()",
-		"fs/copy":            "Client.Fs.Copy()",
-
-		// Fuzzy search (client→server request, not an approval flow)
-		"fuzzyFileSearch": "Client.FuzzyFileSearch.Search()",
-
-		// MCP service (2 methods)
-		"mcpServerStatus/list":  "Client.Mcp.ListServerStatus()",
-		"mcpServer/oauth/login": "Client.Mcp.OauthLogin()",
-
-		// Model service (1 method)
-		"model/list": "Client.Model.List()",
-
-		// Review service (1 method)
-		"review/start": "Client.Review.Start()",
-
-		// Plugin service (4 methods)
-		"plugin/list":      "Client.Plugin.List()",
-		"plugin/read":      "Client.Plugin.Read()",
-		"plugin/install":   "Client.Plugin.Install()",
-		"plugin/uninstall": "Client.Plugin.Uninstall()",
-
-		// Skills service (2 methods)
-		"skills/list":         "Client.Skills.List()",
-		"skills/config/write": "Client.Skills.ConfigWrite()",
-
-		// Thread service (12 methods)
-		"thread/start":           "Client.Thread.Start()",
-		"thread/read":            "Client.Thread.Read()",
-		"thread/list":            "Client.Thread.List()",
-		"thread/loaded/list":     "Client.Thread.LoadedList()",
-		"thread/resume":          "Client.Thread.Resume()",
-		"thread/fork":            "Client.Thread.Fork()",
-		"thread/rollback":        "Client.Thread.Rollback()",
-		"thread/name/set":        "Client.Thread.SetName()",
-		"thread/metadata/update": "Client.Thread.MetadataUpdate()",
-		"thread/archive":         "Client.Thread.Archive()",
-		"thread/unarchive":       "Client.Thread.Unarchive()",
-		"thread/unsubscribe":     "Client.Thread.Unsubscribe()",
-		"thread/compact/start":   "Client.Thread.CompactStart()",
-
-		// Turn service (3 methods)
-		"turn/start":     "Client.Turn.Start()",
-		"turn/interrupt": "Client.Turn.Interrupt()",
-		"turn/steer":     "Client.Turn.Steer()",
-
-		// System service (1 method)
-		"windowsSandbox/setupStart": "Client.System.WindowsSandboxSetupStart()",
-	}
-
-	if len(requiredMethods) != 55 {
-		t.Fatalf("Expected 55 methods in test map, got %d", len(requiredMethods))
-	}
+	requiredMethods := loadClientRequestMethods(t)
 
 	// Create a mock transport and client to verify service methods exist
 	transport := NewMockTransport()
@@ -330,6 +235,7 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 			missing = append(missing, method)
 		}
 	}
+	sort.Strings(missing)
 
 	if len(missing) > 0 {
 		t.Errorf("Missing service methods for the following protocol methods: %v", missing)
@@ -337,6 +243,46 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 
 	// Report summary
 	t.Logf("Verified %d/%d client→server request methods have corresponding SDK methods", len(verified), len(requiredMethods))
+}
+
+func loadClientRequestMethods(t *testing.T) map[string]bool {
+	t.Helper()
+
+	data, err := os.ReadFile("specs/ClientRequest.json")
+	if err != nil {
+		t.Fatalf("ReadFile(specs/ClientRequest.json) failed: %v", err)
+	}
+
+	var schema struct {
+		OneOf []json.RawMessage `json:"oneOf"`
+	}
+	if err := json.Unmarshal(data, &schema); err != nil {
+		t.Fatalf("Unmarshal(specs/ClientRequest.json) failed: %v", err)
+	}
+
+	methods := make(map[string]bool)
+	for _, variant := range schema.OneOf {
+		var request struct {
+			Properties struct {
+				Method struct {
+					Enum []string `json:"enum"`
+				} `json:"method"`
+			} `json:"properties"`
+		}
+		if err := json.Unmarshal(variant, &request); err != nil {
+			t.Fatalf("Unmarshal client request variant failed: %v", err)
+		}
+		if len(request.Properties.Method.Enum) != 1 {
+			t.Fatalf("client request variant has %d method values, want 1", len(request.Properties.Method.Enum))
+		}
+		methods[request.Properties.Method.Enum[0]] = true
+	}
+
+	if len(methods) == 0 {
+		t.Fatal("found 0 client request methods in specs/ClientRequest.json")
+	}
+
+	return methods
 }
 
 // verifyMethod calls the service method and asserts that the mock transport

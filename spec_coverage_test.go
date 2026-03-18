@@ -2,6 +2,9 @@ package codex
 
 import (
 	"encoding/json"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 	"strings"
@@ -39,6 +42,7 @@ func TestSpecCoverage(t *testing.T) {
 	// Track missing types
 	var missing []string
 	var found []string
+	declaredTypes := loadDeclaredTypes(t)
 
 	// For each schema, check if we have the Go type defined
 	for schemaPath, typeName := range schemaToType {
@@ -57,8 +61,7 @@ func TestSpecCoverage(t *testing.T) {
 		}
 
 		// Check if this type exists in our codebase
-		// We use a heuristic: the type should be defined somewhere in the Go files
-		typeExists := checkTypeExists(t, typeName)
+		typeExists := declaredTypes[typeName]
 
 		if typeExists {
 			found = append(found, typeName)
@@ -130,48 +133,49 @@ func TestSpecCoverage(t *testing.T) {
 	}
 }
 
-// checkTypeExists verifies if a type with the given name exists in the codebase.
-// It looks for type definitions using a simple grep-like approach.
-func checkTypeExists(t *testing.T, typeName string) bool {
-	// Common patterns where types are defined
-	patterns := []string{
-		"type " + typeName + " struct",
-		"type " + typeName + " interface",
-		"type " + typeName + " string",
-		"type " + typeName + " int",
-		"type " + typeName + " bool",
-		"type " + typeName + " []",
-		"type " + typeName + " map",
-		"type " + typeName + " =",
-	}
+func loadDeclaredTypes(t *testing.T) map[string]bool {
+	t.Helper()
 
-	// Search through all .go files (except test files)
-	found := false
+	fset := token.NewFileSet()
+	declared := make(map[string]bool)
 	goFilesSeen := false
-	_ = filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+
+	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		if !info.IsDir() && strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, "_test.go") {
-			goFilesSeen = true
-			content, err := os.ReadFile(path)
-			if err != nil {
-				return err
-			}
+		if info.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
 
-			for _, pattern := range patterns {
-				if strings.Contains(string(content), pattern) {
-					found = true
-					return filepath.SkipAll // Found it, stop searching
+		goFilesSeen = true
+		file, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
+		if err != nil {
+			return err
+		}
+
+		for _, decl := range file.Decls {
+			genDecl, ok := decl.(*ast.GenDecl)
+			if !ok || genDecl.Tok != token.TYPE {
+				continue
+			}
+			for _, spec := range genDecl.Specs {
+				typeSpec, ok := spec.(*ast.TypeSpec)
+				if !ok {
+					continue
 				}
+				declared[typeSpec.Name.Name] = true
 			}
 		}
+
 		return nil
 	})
-
+	if err != nil {
+		t.Fatalf("loadDeclaredTypes failed: %v", err)
+	}
 	if !goFilesSeen {
-		t.Fatalf("checkTypeExists found no .go files — tests must run from the package directory")
+		t.Fatal("loadDeclaredTypes found no .go files — tests must run from the package directory")
 	}
 
-	return found
+	return declared
 }

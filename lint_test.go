@@ -1,111 +1,49 @@
-package codex_test
+package codex
 
 import (
+	"reflect"
+	"strings"
 	"testing"
-
-	codex "github.com/dominicnunez/codex-sdk-go"
 )
 
-// TestNotificationListenerCoverage verifies all typed notification methods
-// have listener registration. Compile-time: if any On* method or notification
-// type is removed, this test fails to compile. Runtime: the count assertion
-// catches new methods that were added but not registered here.
+// TestNotificationListenerCoverage verifies that every typed public On* method
+// on Client registers a method-scoped notification handler.
 func TestNotificationListenerCoverage(t *testing.T) {
-	client := codex.NewClient(NewMockTransport())
+	client := NewClient(&mockInternalTransport{})
 
-	// expectedListeners must match the number of typed On* notification methods
-	// on Client (excluding OnNotification and OnCollabToolCall* helpers).
-	// Update this constant when adding or removing On* methods.
-	const expectedListeners = 42
+	methods := reflect.TypeOf(client)
+	expectedListeners := 0
 
-	registered := 0
+	for i := 0; i < methods.NumMethod(); i++ {
+		method := methods.Method(i)
+		if !isTypedNotificationMethod(method) {
+			continue
+		}
 
-	client.OnAccountLoginCompleted(func(codex.AccountLoginCompletedNotification) {})
-	registered++
-	client.OnAccountRateLimitsUpdated(func(codex.AccountRateLimitsUpdatedNotification) {})
-	registered++
-	client.OnAccountUpdated(func(codex.AccountUpdatedNotification) {})
-	registered++
-	client.OnAppListUpdated(func(codex.AppListUpdatedNotification) {})
-	registered++
-	client.OnConfigWarning(func(codex.ConfigWarningNotification) {})
-	registered++
-	client.OnDeprecationNotice(func(codex.DeprecationNoticeNotification) {})
-	registered++
-	client.OnError(func(codex.ErrorNotification) {})
-	registered++
-	client.OnFuzzyFileSearchSessionCompleted(func(codex.FuzzyFileSearchSessionCompletedNotification) {})
-	registered++
-	client.OnFuzzyFileSearchSessionUpdated(func(codex.FuzzyFileSearchSessionUpdatedNotification) {})
-	registered++
-	client.OnAgentMessageDelta(func(codex.AgentMessageDeltaNotification) {})
-	registered++
-	client.OnCommandExecutionOutputDelta(func(codex.CommandExecutionOutputDeltaNotification) {})
-	registered++
-	client.OnTerminalInteraction(func(codex.TerminalInteractionNotification) {})
-	registered++
-	client.OnItemCompleted(func(codex.ItemCompletedNotification) {})
-	registered++
-	client.OnFileChangeOutputDelta(func(codex.FileChangeOutputDeltaNotification) {})
-	registered++
-	client.OnMcpToolCallProgress(func(codex.McpToolCallProgressNotification) {})
-	registered++
-	client.OnPlanDelta(func(codex.PlanDeltaNotification) {})
-	registered++
-	client.OnReasoningSummaryPartAdded(func(codex.ReasoningSummaryPartAddedNotification) {})
-	registered++
-	client.OnReasoningSummaryTextDelta(func(codex.ReasoningSummaryTextDeltaNotification) {})
-	registered++
-	client.OnReasoningTextDelta(func(codex.ReasoningTextDeltaNotification) {})
-	registered++
-	client.OnItemStarted(func(codex.ItemStartedNotification) {})
-	registered++
-	client.OnMcpServerOauthLoginCompleted(func(codex.McpServerOauthLoginCompletedNotification) {})
-	registered++
-	client.OnModelRerouted(func(codex.ModelReroutedNotification) {})
-	registered++
-	client.OnServerRequestResolved(func(codex.ServerRequestResolvedNotification) {})
-	registered++
-	client.OnThreadArchived(func(codex.ThreadArchivedNotification) {})
-	registered++
-	client.OnThreadClosed(func(codex.ThreadClosedNotification) {})
-	registered++
-	client.OnContextCompacted(func(codex.ContextCompactedNotification) {})
-	registered++
-	client.OnThreadNameUpdated(func(codex.ThreadNameUpdatedNotification) {})
-	registered++
-	client.OnThreadRealtimeClosed(func(codex.ThreadRealtimeClosedNotification) {})
-	registered++
-	client.OnThreadRealtimeError(func(codex.ThreadRealtimeErrorNotification) {})
-	registered++
-	client.OnThreadRealtimeItemAdded(func(codex.ThreadRealtimeItemAddedNotification) {})
-	registered++
-	client.OnThreadRealtimeOutputAudioDelta(func(codex.ThreadRealtimeOutputAudioDeltaNotification) {})
-	registered++
-	client.OnThreadRealtimeStarted(func(codex.ThreadRealtimeStartedNotification) {})
-	registered++
-	client.OnThreadStarted(func(codex.ThreadStartedNotification) {})
-	registered++
-	client.OnThreadStatusChanged(func(codex.ThreadStatusChangedNotification) {})
-	registered++
-	client.OnThreadTokenUsageUpdated(func(codex.ThreadTokenUsageUpdatedNotification) {})
-	registered++
-	client.OnThreadUnarchived(func(codex.ThreadUnarchivedNotification) {})
-	registered++
-	client.OnTurnCompleted(func(codex.TurnCompletedNotification) {})
-	registered++
-	client.OnTurnDiffUpdated(func(codex.TurnDiffUpdatedNotification) {})
-	registered++
-	client.OnTurnPlanUpdated(func(codex.TurnPlanUpdatedNotification) {})
-	registered++
-	client.OnTurnStarted(func(codex.TurnStartedNotification) {})
-	registered++
-	client.OnWindowsSandboxSetupCompleted(func(codex.WindowsSandboxSetupCompletedNotification) {})
-	registered++
-	client.OnWindowsWorldWritableWarning(func(codex.WindowsWorldWritableWarningNotification) {})
-	registered++
-
-	if registered != expectedListeners {
-		t.Errorf("registered %d listeners, expected %d — update this test when adding/removing On* methods", registered, expectedListeners)
+		handlerType := method.Type.In(1)
+		handler := reflect.MakeFunc(handlerType, func(_ []reflect.Value) []reflect.Value {
+			return nil
+		})
+		method.Func.Call([]reflect.Value{reflect.ValueOf(client), handler})
+		expectedListeners++
 	}
+
+	if got := len(client.notificationListeners); got != expectedListeners {
+		t.Fatalf("registered %d listeners, want %d typed On* handlers covered", got, expectedListeners)
+	}
+}
+
+func isTypedNotificationMethod(method reflect.Method) bool {
+	if !strings.HasPrefix(method.Name, "On") {
+		return false
+	}
+	if method.Name == "OnNotification" || strings.HasPrefix(method.Name, "OnCollabToolCall") {
+		return false
+	}
+	if method.Type.NumIn() != 2 || method.Type.NumOut() != 0 {
+		return false
+	}
+
+	handlerType := method.Type.In(1)
+	return handlerType.Kind() == reflect.Func && handlerType.NumIn() == 1 && handlerType.NumOut() == 0
 }
