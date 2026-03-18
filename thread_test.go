@@ -207,6 +207,166 @@ func TestThreadRead(t *testing.T) {
 	})
 }
 
+func TestThreadResponsesRejectMissingRequiredThreadFields(t *testing.T) {
+	tests := []struct {
+		name    string
+		method  string
+		payload map[string]interface{}
+		call    func(*codex.Client) error
+		wantErr string
+	}{
+		{
+			name:   "read rejects empty thread object",
+			method: "thread/read",
+			payload: map[string]interface{}{
+				"thread": map[string]interface{}{},
+			},
+			call: func(c *codex.Client) error {
+				_, err := c.Thread.Read(context.Background(), codex.ThreadReadParams{ThreadID: "thread-123"})
+				return err
+			},
+			wantErr: "missing thread.id",
+		},
+		{
+			name:    "resume rejects empty thread object",
+			method:  "thread/resume",
+			payload: validThreadLifecycleResponse(map[string]interface{}{}),
+			call: func(c *codex.Client) error {
+				_, err := c.Thread.Resume(context.Background(), codex.ThreadResumeParams{ThreadID: "thread-123"})
+				return err
+			},
+			wantErr: "missing thread.id",
+		},
+		{
+			name:    "metadata update rejects missing thread field",
+			method:  "thread/metadata/update",
+			payload: map[string]interface{}{},
+			call: func(c *codex.Client) error {
+				_, err := c.Thread.MetadataUpdate(context.Background(), codex.ThreadMetadataUpdateParams{ThreadID: "thread-123"})
+				return err
+			},
+			wantErr: "missing thread.id",
+		},
+		{
+			name:    "unarchive rejects missing thread field",
+			method:  "thread/unarchive",
+			payload: map[string]interface{}{},
+			call: func(c *codex.Client) error {
+				_, err := c.Thread.Unarchive(context.Background(), codex.ThreadUnarchiveParams{ThreadID: "thread-123"})
+				return err
+			},
+			wantErr: "missing thread.id",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := NewMockTransport()
+			defer func() { _ = transport.Close() }()
+
+			client := codex.NewClient(transport)
+			_ = transport.SetResponseData(tt.method, tt.payload)
+
+			err := tt.call(client)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %q, want to contain %q", err.Error(), tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestThreadResponseRequiredFieldValidation(t *testing.T) {
+	tests := []struct {
+		name     string
+		method   string
+		response map[string]interface{}
+		call     func(*codex.Client) error
+		wantErr  string
+	}{
+		{
+			name:     "read rejects thread missing cliVersion",
+			method:   "thread/read",
+			response: threadResponseWithMissingField("thread", "cliVersion"),
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Read(context.Background(), codex.ThreadReadParams{ThreadID: "thread-123"})
+				return err
+			},
+			wantErr: "missing thread.cliVersion",
+		},
+		{
+			name:     "resume rejects thread missing cliVersion",
+			method:   "thread/resume",
+			response: threadLifecycleResponseWithMissingField("thread-resume", "cliVersion"),
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Resume(context.Background(), codex.ThreadResumeParams{ThreadID: "thread-resume"})
+				return err
+			},
+			wantErr: "missing thread.cliVersion",
+		},
+		{
+			name:     "fork rejects thread missing cliVersion",
+			method:   "thread/fork",
+			response: threadLifecycleResponseWithMissingField("thread-forked", "cliVersion"),
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Fork(context.Background(), codex.ThreadForkParams{ThreadID: "thread-original"})
+				return err
+			},
+			wantErr: "missing thread.cliVersion",
+		},
+		{
+			name:     "rollback rejects thread missing cliVersion",
+			method:   "thread/rollback",
+			response: threadResponseWithMissingField("thread-rollback", "cliVersion"),
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Rollback(context.Background(), codex.ThreadRollbackParams{ThreadID: "thread-rollback", NumTurns: 1})
+				return err
+			},
+			wantErr: "missing thread.cliVersion",
+		},
+		{
+			name:     "metadata update rejects thread missing cliVersion",
+			method:   "thread/metadata/update",
+			response: threadResponseWithMissingField("thread-metadata", "cliVersion"),
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.MetadataUpdate(context.Background(), codex.ThreadMetadataUpdateParams{ThreadID: "thread-metadata"})
+				return err
+			},
+			wantErr: "missing thread.cliVersion",
+		},
+		{
+			name:     "unarchive rejects thread missing cliVersion",
+			method:   "thread/unarchive",
+			response: threadResponseWithMissingField("thread-unarchived", "cliVersion"),
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Unarchive(context.Background(), codex.ThreadUnarchiveParams{ThreadID: "thread-unarchived"})
+				return err
+			},
+			wantErr: "missing thread.cliVersion",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := NewMockTransport()
+			defer func() { _ = transport.Close() }()
+
+			client := codex.NewClient(transport)
+			_ = transport.SetResponseData(tt.method, tt.response)
+
+			err := tt.call(client)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %q, want substring %q", err.Error(), tt.wantErr)
+			}
+		})
+	}
+}
+
 // TestThreadList tests the ThreadService.List method
 func TestThreadList(t *testing.T) {
 	t.Run("list all threads", func(t *testing.T) {
@@ -307,11 +467,12 @@ func TestThreadResume(t *testing.T) {
 	client := codex.NewClient(transport)
 
 	_ = transport.SetResponseData("thread/resume", map[string]interface{}{
-		"approvalPolicy": "untrusted",
-		"cwd":            "/test/dir",
-		"model":          "gpt-4",
-		"modelProvider":  "openai",
-		"sandbox":        map[string]interface{}{"type": "dangerFullAccess"},
+		"approvalPolicy":    "untrusted",
+		"approvalsReviewer": "user",
+		"cwd":               "/test/dir",
+		"model":             "gpt-4",
+		"modelProvider":     "openai",
+		"sandbox":           map[string]interface{}{"type": "dangerFullAccess"},
 		"thread": map[string]interface{}{
 			"id":            "thread-resume",
 			"cliVersion":    "1.0.0",
@@ -356,11 +517,12 @@ func TestThreadFork(t *testing.T) {
 	client := codex.NewClient(transport)
 
 	_ = transport.SetResponseData("thread/fork", map[string]interface{}{
-		"approvalPolicy": "untrusted",
-		"cwd":            "/test/dir",
-		"model":          "gpt-4",
-		"modelProvider":  "openai",
-		"sandbox":        map[string]interface{}{"type": "dangerFullAccess"},
+		"approvalPolicy":    "untrusted",
+		"approvalsReviewer": "user",
+		"cwd":               "/test/dir",
+		"model":             "gpt-4",
+		"modelProvider":     "openai",
+		"sandbox":           map[string]interface{}{"type": "dangerFullAccess"},
 		"thread": map[string]interface{}{
 			"id":            "thread-forked",
 			"cliVersion":    "1.0.0",
@@ -549,6 +711,36 @@ func TestThreadUnarchive(t *testing.T) {
 	req := transport.GetSentRequest(0)
 	if req.Method != "thread/unarchive" {
 		t.Errorf("expected method 'thread/unarchive', got %q", req.Method)
+	}
+}
+
+func threadResponseWithMissingField(threadID string, missingField string) map[string]interface{} {
+	thread := validThreadPayload(threadID)
+	delete(thread, missingField)
+	return map[string]interface{}{
+		"thread": thread,
+	}
+}
+
+func threadLifecycleResponseWithMissingField(threadID string, missingField string) map[string]interface{} {
+	response := validThreadLifecycleResponse(validThreadPayload(threadID))
+	thread := response["thread"].(map[string]interface{})
+	delete(thread, missingField)
+	return response
+}
+
+func validThreadPayload(threadID string) map[string]interface{} {
+	return map[string]interface{}{
+		"id":            threadID,
+		"cliVersion":    "1.0.0",
+		"createdAt":     int64(1234567890),
+		"cwd":           "/test/dir",
+		"modelProvider": "openai",
+		"preview":       "test preview",
+		"source":        "cli",
+		"status":        map[string]interface{}{"type": "idle"},
+		"turns":         []interface{}{},
+		"updatedAt":     int64(1234567890),
 	}
 }
 
@@ -796,6 +988,18 @@ func TestThreadReadMalformedResult(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "unmarshal") {
 		t.Errorf("expected error to mention unmarshal, got: %v", err)
+	}
+}
+
+func validThreadLifecycleResponse(thread map[string]interface{}) map[string]interface{} {
+	return map[string]interface{}{
+		"approvalPolicy":    "untrusted",
+		"approvalsReviewer": "user",
+		"cwd":               "/test/dir",
+		"model":             "gpt-4",
+		"modelProvider":     "openai",
+		"sandbox":           map[string]interface{}{"type": "dangerFullAccess"},
+		"thread":            thread,
 	}
 }
 

@@ -37,6 +37,76 @@ type Thread struct {
 	Path          *string              `json:"path,omitempty"`
 }
 
+func (t *Thread) UnmarshalJSON(data []byte) error {
+	type threadWire struct {
+		ID            *string               `json:"id"`
+		CLIVersion    *string               `json:"cliVersion"`
+		CreatedAt     *int64                `json:"createdAt"`
+		Cwd           *string               `json:"cwd"`
+		ModelProvider *string               `json:"modelProvider"`
+		Preview       *string               `json:"preview"`
+		Source        *SessionSourceWrapper `json:"source"`
+		Status        *ThreadStatusWrapper  `json:"status"`
+		Turns         *[]Turn               `json:"turns"`
+		UpdatedAt     *int64                `json:"updatedAt"`
+		Ephemeral     *bool                 `json:"ephemeral"`
+		AgentNickname *string               `json:"agentNickname"`
+		AgentRole     *string               `json:"agentRole"`
+		GitInfo       *GitInfo              `json:"gitInfo"`
+		Name          *string               `json:"name"`
+		Path          *string               `json:"path"`
+	}
+
+	var wire threadWire
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+
+	switch {
+	case wire.ID == nil:
+		return errors.New("missing thread.id")
+	case wire.CLIVersion == nil:
+		return errors.New("missing thread.cliVersion")
+	case wire.CreatedAt == nil:
+		return errors.New("missing thread.createdAt")
+	case wire.Cwd == nil:
+		return errors.New("missing thread.cwd")
+	case wire.ModelProvider == nil:
+		return errors.New("missing thread.modelProvider")
+	case wire.Preview == nil:
+		return errors.New("missing thread.preview")
+	case wire.Source == nil:
+		return errors.New("missing thread.source")
+	case wire.Status == nil:
+		return errors.New("missing thread.status")
+	case wire.Turns == nil:
+		return errors.New("missing thread.turns")
+	case wire.UpdatedAt == nil:
+		return errors.New("missing thread.updatedAt")
+	}
+
+	t.ID = *wire.ID
+	t.CLIVersion = *wire.CLIVersion
+	t.CreatedAt = *wire.CreatedAt
+	t.Cwd = *wire.Cwd
+	t.ModelProvider = *wire.ModelProvider
+	t.Preview = *wire.Preview
+	t.Source = *wire.Source
+	t.Status = *wire.Status
+	t.Turns = *wire.Turns
+	t.UpdatedAt = *wire.UpdatedAt
+	if wire.Ephemeral != nil {
+		t.Ephemeral = *wire.Ephemeral
+	}
+	t.AgentNickname = wire.AgentNickname
+	t.AgentRole = wire.AgentRole
+	t.GitInfo = wire.GitInfo
+	t.Name = wire.Name
+	t.Path = wire.Path
+
+	return nil
+}
+
 // GitInfo contains git repository information
 type GitInfo struct {
 	Branch    *string `json:"branch,omitempty"`
@@ -773,7 +843,18 @@ type ThreadStartResponse struct {
 }
 
 func (r ThreadStartResponse) validate() error {
-	if r.Thread.ID == "" {
+	switch {
+	case r.ApprovalPolicy.Value == nil:
+		return errors.New("missing approvalPolicy")
+	case r.Cwd == "":
+		return errors.New("missing cwd")
+	case r.Model == "":
+		return errors.New("missing model")
+	case r.ModelProvider == "":
+		return errors.New("missing modelProvider")
+	case r.Sandbox.Value == nil:
+		return errors.New("missing sandbox")
+	case r.Thread.ID == "":
 		return errors.New("missing thread.id")
 	}
 	return nil
@@ -802,10 +883,20 @@ type ThreadReadResponse struct {
 	Thread Thread `json:"thread"`
 }
 
+func (r ThreadReadResponse) validate() error {
+	if r.Thread.ID == "" {
+		return errors.New("missing thread.id")
+	}
+	return nil
+}
+
 // Read retrieves thread details
 func (s *ThreadService) Read(ctx context.Context, params ThreadReadParams) (ThreadReadResponse, error) {
 	var response ThreadReadResponse
 	if err := s.client.sendRequest(ctx, methodThreadRead, params, &response); err != nil {
+		return ThreadReadResponse{}, err
+	}
+	if err := response.validate(); err != nil {
 		return ThreadReadResponse{}, err
 	}
 	return response, nil
@@ -888,10 +979,31 @@ type ThreadResumeResponse struct {
 	Thread            Thread                `json:"thread"`
 }
 
+func (r ThreadResumeResponse) validate() error {
+	switch {
+	case r.ApprovalPolicy.Value == nil:
+		return errors.New("missing approvalPolicy")
+	case r.Cwd == "":
+		return errors.New("missing cwd")
+	case r.Model == "":
+		return errors.New("missing model")
+	case r.ModelProvider == "":
+		return errors.New("missing modelProvider")
+	case r.Sandbox.Value == nil:
+		return errors.New("missing sandbox")
+	case r.Thread.ID == "":
+		return errors.New("missing thread.id")
+	}
+	return nil
+}
+
 // Resume resumes an existing thread
 func (s *ThreadService) Resume(ctx context.Context, params ThreadResumeParams) (ThreadResumeResponse, error) {
 	var response ThreadResumeResponse
 	if err := s.client.sendRequest(ctx, methodThreadResume, params, &response); err != nil {
+		return ThreadResumeResponse{}, err
+	}
+	if err := response.validate(); err != nil {
 		return ThreadResumeResponse{}, err
 	}
 	return response, nil
@@ -926,10 +1038,31 @@ type ThreadForkResponse struct {
 	Thread            Thread                `json:"thread"`
 }
 
+func (r ThreadForkResponse) validate() error {
+	switch {
+	case r.ApprovalPolicy.Value == nil:
+		return errors.New("missing approvalPolicy")
+	case r.Cwd == "":
+		return errors.New("missing cwd")
+	case r.Model == "":
+		return errors.New("missing model")
+	case r.ModelProvider == "":
+		return errors.New("missing modelProvider")
+	case r.Sandbox.Value == nil:
+		return errors.New("missing sandbox")
+	case r.Thread.ID == "":
+		return errors.New("missing thread.id")
+	}
+	return nil
+}
+
 // Fork creates a fork of a thread
 func (s *ThreadService) Fork(ctx context.Context, params ThreadForkParams) (ThreadForkResponse, error) {
 	var response ThreadForkResponse
 	if err := s.client.sendRequest(ctx, methodThreadFork, params, &response); err != nil {
+		return ThreadForkResponse{}, err
+	}
+	if err := response.validate(); err != nil {
 		return ThreadForkResponse{}, err
 	}
 	return response, nil
@@ -946,10 +1079,20 @@ type ThreadRollbackResponse struct {
 	Thread Thread `json:"thread"`
 }
 
+func (r ThreadRollbackResponse) validate() error {
+	if r.Thread.ID == "" {
+		return errors.New("missing thread.id")
+	}
+	return nil
+}
+
 // Rollback rolls back a thread by N turns
 func (s *ThreadService) Rollback(ctx context.Context, params ThreadRollbackParams) (ThreadRollbackResponse, error) {
 	var response ThreadRollbackResponse
 	if err := s.client.sendRequest(ctx, methodThreadRollback, params, &response); err != nil {
+		return ThreadRollbackResponse{}, err
+	}
+	if err := response.validate(); err != nil {
 		return ThreadRollbackResponse{}, err
 	}
 	return response, nil
@@ -992,10 +1135,20 @@ type ThreadMetadataUpdateResponse struct {
 	Thread Thread `json:"thread"`
 }
 
+func (r ThreadMetadataUpdateResponse) validate() error {
+	if r.Thread.ID == "" {
+		return errors.New("missing thread.id")
+	}
+	return nil
+}
+
 // MetadataUpdate updates stored metadata for a thread.
 func (s *ThreadService) MetadataUpdate(ctx context.Context, params ThreadMetadataUpdateParams) (ThreadMetadataUpdateResponse, error) {
 	var response ThreadMetadataUpdateResponse
 	if err := s.client.sendRequest(ctx, methodThreadMetadataUpdate, params, &response); err != nil {
+		return ThreadMetadataUpdateResponse{}, err
+	}
+	if err := response.validate(); err != nil {
 		return ThreadMetadataUpdateResponse{}, err
 	}
 	return response, nil
@@ -1029,10 +1182,20 @@ type ThreadUnarchiveResponse struct {
 	Thread Thread `json:"thread"`
 }
 
+func (r ThreadUnarchiveResponse) validate() error {
+	if r.Thread.ID == "" {
+		return errors.New("missing thread.id")
+	}
+	return nil
+}
+
 // Unarchive unarchives a thread
 func (s *ThreadService) Unarchive(ctx context.Context, params ThreadUnarchiveParams) (ThreadUnarchiveResponse, error) {
 	var response ThreadUnarchiveResponse
 	if err := s.client.sendRequest(ctx, methodThreadUnarchive, params, &response); err != nil {
+		return ThreadUnarchiveResponse{}, err
+	}
+	if err := response.validate(); err != nil {
 		return ThreadUnarchiveResponse{}, err
 	}
 	return response, nil

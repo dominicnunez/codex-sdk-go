@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go"
@@ -284,6 +285,133 @@ func TestPluginInstall(t *testing.T) {
 		_, err := client.Plugin.Install(context.Background(), codex.PluginInstallParams{})
 		assertRPCErrorCode(t, err, codex.ErrCodeInternalError)
 	})
+}
+
+func TestPluginRequiredFieldValidation(t *testing.T) {
+	tests := []struct {
+		name     string
+		method   string
+		response map[string]interface{}
+		call     func(*codex.Client) error
+		wantErr  string
+	}{
+		{
+			name:   "read rejects empty plugin object",
+			method: "plugin/read",
+			response: map[string]interface{}{
+				"plugin": map[string]interface{}{},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Plugin.Read(context.Background(), codex.PluginReadParams{
+					MarketplacePath: "/plugins",
+					PluginName:      "calendar",
+				})
+				return err
+			},
+			wantErr: "missing plugin.apps",
+		},
+		{
+			name:     "read rejects plugin missing marketplacePath",
+			method:   "plugin/read",
+			response: pluginReadResponseWithMissingField("marketplacePath"),
+			call: func(client *codex.Client) error {
+				_, err := client.Plugin.Read(context.Background(), codex.PluginReadParams{
+					MarketplacePath: "/plugins",
+					PluginName:      "calendar",
+				})
+				return err
+			},
+			wantErr: "missing plugin.marketplacePath",
+		},
+		{
+			name:   "install rejects missing appsNeedingAuth",
+			method: "plugin/install",
+			response: map[string]interface{}{
+				"authPolicy": "ON_INSTALL",
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Plugin.Install(context.Background(), codex.PluginInstallParams{
+					MarketplacePath: "/plugins",
+					PluginName:      "calendar",
+				})
+				return err
+			},
+			wantErr: "missing appsNeedingAuth",
+		},
+		{
+			name:   "install rejects missing authPolicy",
+			method: "plugin/install",
+			response: map[string]interface{}{
+				"appsNeedingAuth": []interface{}{},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Plugin.Install(context.Background(), codex.PluginInstallParams{
+					MarketplacePath: "/plugins",
+					PluginName:      "calendar",
+				})
+				return err
+			},
+			wantErr: "missing authPolicy",
+		},
+		{
+			name:   "install rejects app missing id",
+			method: "plugin/install",
+			response: map[string]interface{}{
+				"appsNeedingAuth": []interface{}{
+					map[string]interface{}{"name": "Calendar"},
+				},
+				"authPolicy": "ON_INSTALL",
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Plugin.Install(context.Background(), codex.PluginInstallParams{
+					MarketplacePath: "/plugins",
+					PluginName:      "calendar",
+				})
+				return err
+			},
+			wantErr: "missing plugin.app.id",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := NewMockTransport()
+			client := codex.NewClient(transport)
+			transport.SetResponseData(tt.method, tt.response)
+
+			err := tt.call(client)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %q; want substring %q", err.Error(), tt.wantErr)
+			}
+		})
+	}
+}
+
+func pluginReadResponseWithMissingField(missingField string) map[string]interface{} {
+	plugin := map[string]interface{}{
+		"apps":            []interface{}{},
+		"marketplaceName": "official",
+		"marketplacePath": "/plugins",
+		"mcpServers":      []interface{}{"calendar"},
+		"skills":          []interface{}{},
+		"summary": map[string]interface{}{
+			"authPolicy":    "ON_USE",
+			"enabled":       true,
+			"id":            "plugin-1",
+			"installPolicy": "AVAILABLE",
+			"installed":     true,
+			"name":          "calendar",
+			"source": map[string]interface{}{
+				"path": "/plugins/calendar",
+				"type": "local",
+			},
+		},
+	}
+	delete(plugin, missingField)
+	return map[string]interface{}{"plugin": plugin}
 }
 
 func TestPluginUninstall(t *testing.T) {
