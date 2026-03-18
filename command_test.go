@@ -132,6 +132,22 @@ func TestCommandExec(t *testing.T) {
 	}
 }
 
+func TestCommandExecRejectsMissingRequiredFields(t *testing.T) {
+	transport := NewMockTransport()
+	client := codex.NewClient(transport)
+	transport.SetResponse("command/exec", codex.Response{
+		JSONRPC: "2.0",
+		Result:  json.RawMessage(`{"exitCode":0,"stdout":"ok"}`),
+	})
+
+	_, err := client.Command.Exec(context.Background(), codex.CommandExecParams{
+		Command: []string{"echo", "hello"},
+	})
+	if !errors.Is(err, codex.ErrMissingResultField) {
+		t.Fatalf("error = %v; want ErrMissingResultField", err)
+	}
+}
+
 func TestCommandExecutionOutputDeltaNotification(t *testing.T) {
 	mock := NewMockTransport()
 	client := codex.NewClient(mock)

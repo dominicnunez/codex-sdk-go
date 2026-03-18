@@ -1,6 +1,9 @@
 package codex
 
-import "context"
+import (
+	"context"
+	"encoding/json"
+)
 
 // FsReadFileParams reads a file from the host filesystem.
 type FsReadFileParams struct {
@@ -10,6 +13,19 @@ type FsReadFileParams struct {
 // FsReadFileResponse contains base64-encoded file contents.
 type FsReadFileResponse struct {
 	DataBase64 string `json:"dataBase64"`
+}
+
+func (r *FsReadFileResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "dataBase64"); err != nil {
+		return err
+	}
+	type wire FsReadFileResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = FsReadFileResponse(decoded)
+	return nil
 }
 
 // FsWriteFileParams writes a file on the host filesystem.
@@ -43,6 +59,19 @@ type FsGetMetadataResponse struct {
 	ModifiedAtMs int64 `json:"modifiedAtMs"`
 }
 
+func (r *FsGetMetadataResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "createdAtMs", "isDirectory", "isFile", "modifiedAtMs"); err != nil {
+		return err
+	}
+	type wire FsGetMetadataResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = FsGetMetadataResponse(decoded)
+	return nil
+}
+
 // FsReadDirectoryParams lists direct child names for a directory.
 type FsReadDirectoryParams struct {
 	Path string `json:"path"`
@@ -58,6 +87,19 @@ type FsReadDirectoryEntry struct {
 // FsReadDirectoryResponse contains directory entries.
 type FsReadDirectoryResponse struct {
 	Entries []FsReadDirectoryEntry `json:"entries"`
+}
+
+func (r *FsReadDirectoryResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "entries"); err != nil {
+		return err
+	}
+	type wire FsReadDirectoryResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = FsReadDirectoryResponse(decoded)
+	return nil
 }
 
 // FsRemoveParams removes a file or directory tree from the host filesystem.

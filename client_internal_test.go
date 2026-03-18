@@ -85,6 +85,48 @@ func TestValidateObjectResponseResult(t *testing.T) {
 	}
 }
 
+func TestValidateRequiredObjectFields(t *testing.T) {
+	tests := []struct {
+		name      string
+		data      []byte
+		fields    []string
+		targetErr error
+	}{
+		{
+			name:      "missing field",
+			data:      []byte(`{"exitCode":0,"stdout":"ok"}`),
+			fields:    []string{"exitCode", "stdout", "stderr"},
+			targetErr: ErrMissingResultField,
+		},
+		{
+			name:      "null field",
+			data:      []byte(`{"createdAtMs":1,"isDirectory":false,"isFile":null,"modifiedAtMs":2}`),
+			fields:    []string{"createdAtMs", "isDirectory", "isFile", "modifiedAtMs"},
+			targetErr: ErrNullResultField,
+		},
+		{
+			name:   "required fields present",
+			data:   []byte(`{"entries":[]}`),
+			fields: []string{"entries"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateRequiredObjectFields(tt.data, tt.fields...)
+			if tt.targetErr == nil {
+				if err != nil {
+					t.Fatalf("validateRequiredObjectFields() error = %v", err)
+				}
+				return
+			}
+			if !errors.Is(err, tt.targetErr) {
+				t.Fatalf("validateRequiredObjectFields() error = %v, want %v", err, tt.targetErr)
+			}
+		})
+	}
+}
+
 func TestSendRequestRejectsNilResultTarget(t *testing.T) {
 	client := NewClient(&mockInternalTransport{})
 

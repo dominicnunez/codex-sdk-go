@@ -36,6 +36,19 @@ type CommandExecResponse struct {
 	Stderr   string `json:"stderr"`
 }
 
+func (r *CommandExecResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "exitCode", "stdout", "stderr"); err != nil {
+		return err
+	}
+	type wire CommandExecResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = CommandExecResponse(decoded)
+	return nil
+}
+
 // CommandExecWriteParams writes stdin bytes to a running command/exec session.
 type CommandExecWriteParams struct {
 	ProcessID   string  `json:"processId"`

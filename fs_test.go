@@ -225,6 +225,34 @@ func TestFsGetMetadata(t *testing.T) {
 		}
 	})
 
+	t.Run("missing required field", func(t *testing.T) {
+		transport := NewMockTransport()
+		client := codex.NewClient(transport)
+		transport.SetResponse("fs/getMetadata", codex.Response{
+			JSONRPC: "2.0",
+			Result:  json.RawMessage(`{"createdAtMs":1,"isDirectory":false,"modifiedAtMs":2}`),
+		})
+
+		_, err := client.Fs.GetMetadata(context.Background(), codex.FsGetMetadataParams{Path: "/tmp/file.txt"})
+		if !errors.Is(err, codex.ErrMissingResultField) {
+			t.Fatalf("error = %v; want ErrMissingResultField", err)
+		}
+	})
+
+	t.Run("null required field", func(t *testing.T) {
+		transport := NewMockTransport()
+		client := codex.NewClient(transport)
+		transport.SetResponse("fs/getMetadata", codex.Response{
+			JSONRPC: "2.0",
+			Result:  json.RawMessage(`{"createdAtMs":1,"isDirectory":false,"isFile":null,"modifiedAtMs":2}`),
+		})
+
+		_, err := client.Fs.GetMetadata(context.Background(), codex.FsGetMetadataParams{Path: "/tmp/file.txt"})
+		if !errors.Is(err, codex.ErrNullResultField) {
+			t.Fatalf("error = %v; want ErrNullResultField", err)
+		}
+	})
+
 	t.Run("rpc error", func(t *testing.T) {
 		transport := NewMockTransport()
 		client := codex.NewClient(transport)

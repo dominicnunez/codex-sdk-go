@@ -22,6 +22,14 @@ var ErrEmptyResult = errors.New("server returned empty result")
 // result was not a JSON object where the protocol requires one.
 var ErrResultNotObject = errors.New("server returned non-object result")
 
+// ErrMissingResultField indicates the server returned a successful object
+// result that omitted a required JSON field for the target response type.
+var ErrMissingResultField = errors.New("server returned result missing required field")
+
+// ErrNullResultField indicates the server returned null for a required
+// non-nullable JSON field in the target response type.
+var ErrNullResultField = errors.New("server returned null for required result field")
+
 // wireMarshaler is implemented by types whose MarshalJSON is redacted for safety.
 // marshalForWire uses this to get the unredacted representation for protocol serialization.
 type wireMarshaler interface {
@@ -66,6 +74,29 @@ func validateObjectResponseResult(result json.RawMessage) error {
 	var payload map[string]json.RawMessage
 	if err := json.Unmarshal(result, &payload); err != nil {
 		return fmt.Errorf("%w: %w", ErrResultNotObject, err)
+	}
+
+	return nil
+}
+
+func isNullJSONValue(raw json.RawMessage) bool {
+	return bytes.Equal(bytes.TrimSpace(raw), []byte("null"))
+}
+
+func validateRequiredObjectFields(data []byte, requiredFields ...string) error {
+	var payload map[string]json.RawMessage
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return fmt.Errorf("%w: %w", ErrResultNotObject, err)
+	}
+
+	for _, field := range requiredFields {
+		raw, ok := payload[field]
+		if !ok {
+			return fmt.Errorf("%w %q", ErrMissingResultField, field)
+		}
+		if isNullJSONValue(raw) {
+			return fmt.Errorf("%w %q", ErrNullResultField, field)
+		}
 	}
 
 	return nil

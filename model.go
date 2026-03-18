@@ -25,6 +25,19 @@ type ModelListResponse struct {
 	NextCursor *string `json:"nextCursor,omitempty"`
 }
 
+func (r *ModelListResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "data"); err != nil {
+		return err
+	}
+	type wire ModelListResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = ModelListResponse(decoded)
+	return nil
+}
+
 // Model represents a language model available in Codex.
 type Model struct {
 	// Unique identifier for the model.

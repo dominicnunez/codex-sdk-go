@@ -20,6 +20,19 @@ type AppsListResponse struct {
 	NextCursor *string   `json:"nextCursor,omitempty"`
 }
 
+func (r *AppsListResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "data"); err != nil {
+		return err
+	}
+	type wire AppsListResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = AppsListResponse(decoded)
+	return nil
+}
+
 // AppInfo represents metadata for an app/connector.
 type AppInfo struct {
 	ID                  string            `json:"id"`
