@@ -179,7 +179,7 @@ func (s *PluginService) Install(ctx context.Context, params PluginInstallParams)
 
 // Uninstall removes an installed plugin.
 func (s *PluginService) Uninstall(ctx context.Context, params PluginUninstallParams) (PluginUninstallResponse, error) {
-	if err := s.client.sendRequest(ctx, methodPluginUninstall, params, nil); err != nil {
+	if err := s.client.sendEmptyObjectRequest(ctx, methodPluginUninstall, params); err != nil {
 		return PluginUninstallResponse{}, err
 	}
 	return PluginUninstallResponse{}, nil

@@ -107,7 +107,7 @@ func (s *CommandService) Exec(ctx context.Context, params CommandExecParams) (Co
 
 // Write writes stdin bytes to a running command/exec session.
 func (s *CommandService) Write(ctx context.Context, params CommandExecWriteParams) (CommandExecWriteResponse, error) {
-	if err := s.client.sendRequest(ctx, methodCommandExecWrite, params, nil); err != nil {
+	if err := s.client.sendEmptyObjectRequest(ctx, methodCommandExecWrite, params); err != nil {
 		return CommandExecWriteResponse{}, err
 	}
 	return CommandExecWriteResponse{}, nil
@@ -115,7 +115,7 @@ func (s *CommandService) Write(ctx context.Context, params CommandExecWriteParam
 
 // Terminate terminates a running command/exec session.
 func (s *CommandService) Terminate(ctx context.Context, params CommandExecTerminateParams) (CommandExecTerminateResponse, error) {
-	if err := s.client.sendRequest(ctx, methodCommandExecTerminate, params, nil); err != nil {
+	if err := s.client.sendEmptyObjectRequest(ctx, methodCommandExecTerminate, params); err != nil {
 		return CommandExecTerminateResponse{}, err
 	}
 	return CommandExecTerminateResponse{}, nil
@@ -123,7 +123,7 @@ func (s *CommandService) Terminate(ctx context.Context, params CommandExecTermin
 
 // Resize resizes a running PTY-backed command/exec session.
 func (s *CommandService) Resize(ctx context.Context, params CommandExecResizeParams) (CommandExecResizeResponse, error) {
-	if err := s.client.sendRequest(ctx, methodCommandExecResize, params, nil); err != nil {
+	if err := s.client.sendEmptyObjectRequest(ctx, methodCommandExecResize, params); err != nil {
 		return CommandExecResizeResponse{}, err
 	}
 	return CommandExecResizeResponse{}, nil

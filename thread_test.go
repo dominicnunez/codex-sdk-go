@@ -454,21 +454,7 @@ func TestThreadSetName(t *testing.T) {
 
 	client := codex.NewClient(transport)
 
-	_ = transport.SetResponseData("thread/name/set", map[string]interface{}{
-		"thread": map[string]interface{}{
-			"id":            "thread-123",
-			"cliVersion":    "1.0.0",
-			"createdAt":     int64(1234567890),
-			"cwd":           "/test/dir",
-			"modelProvider": "openai",
-			"name":          "My Custom Thread Name",
-			"preview":       "test preview",
-			"source":        "cli",
-			"status":        map[string]interface{}{"type": "idle"},
-			"turns":         []interface{}{},
-			"updatedAt":     int64(1234567891),
-		},
-	})
+	_ = transport.SetResponseData("thread/name/set", map[string]interface{}{})
 
 	params := codex.ThreadSetNameParams{
 		ThreadID: "thread-123",
@@ -499,20 +485,7 @@ func TestThreadArchive(t *testing.T) {
 
 	client := codex.NewClient(transport)
 
-	_ = transport.SetResponseData("thread/archive", map[string]interface{}{
-		"thread": map[string]interface{}{
-			"id":            "thread-archived",
-			"cliVersion":    "1.0.0",
-			"createdAt":     int64(1234567890),
-			"cwd":           "/test/dir",
-			"modelProvider": "openai",
-			"preview":       "archived thread",
-			"source":        "cli",
-			"status":        map[string]interface{}{"type": "idle"},
-			"turns":         []interface{}{},
-			"updatedAt":     int64(1234567890),
-		},
-	})
+	_ = transport.SetResponseData("thread/archive", map[string]interface{}{})
 
 	params := codex.ThreadArchiveParams{
 		ThreadID: "thread-archived",
@@ -619,9 +592,7 @@ func TestThreadCompactStart(t *testing.T) {
 
 	client := codex.NewClient(transport)
 
-	_ = transport.SetResponseData("thread/compact/start", map[string]interface{}{
-		"threadId": "compact-thread-id",
-	})
+	_ = transport.SetResponseData("thread/compact/start", map[string]interface{}{})
 
 	params := codex.ThreadCompactStartParams{
 		ThreadID: "thread-to-compact",

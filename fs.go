@@ -100,7 +100,7 @@ func (s *FsService) ReadFile(ctx context.Context, params FsReadFileParams) (FsRe
 
 // WriteFile writes a file on the host filesystem.
 func (s *FsService) WriteFile(ctx context.Context, params FsWriteFileParams) (FsWriteFileResponse, error) {
-	if err := s.client.sendRequest(ctx, methodFsWriteFile, params, nil); err != nil {
+	if err := s.client.sendEmptyObjectRequest(ctx, methodFsWriteFile, params); err != nil {
 		return FsWriteFileResponse{}, err
 	}
 	return FsWriteFileResponse{}, nil
@@ -108,7 +108,7 @@ func (s *FsService) WriteFile(ctx context.Context, params FsWriteFileParams) (Fs
 
 // CreateDirectory creates a directory on the host filesystem.
 func (s *FsService) CreateDirectory(ctx context.Context, params FsCreateDirectoryParams) (FsCreateDirectoryResponse, error) {
-	if err := s.client.sendRequest(ctx, methodFsCreateDirectory, params, nil); err != nil {
+	if err := s.client.sendEmptyObjectRequest(ctx, methodFsCreateDirectory, params); err != nil {
 		return FsCreateDirectoryResponse{}, err
 	}
 	return FsCreateDirectoryResponse{}, nil
@@ -134,7 +134,7 @@ func (s *FsService) ReadDirectory(ctx context.Context, params FsReadDirectoryPar
 
 // Remove removes a file or directory tree from the host filesystem.
 func (s *FsService) Remove(ctx context.Context, params FsRemoveParams) (FsRemoveResponse, error) {
-	if err := s.client.sendRequest(ctx, methodFsRemove, params, nil); err != nil {
+	if err := s.client.sendEmptyObjectRequest(ctx, methodFsRemove, params); err != nil {
 		return FsRemoveResponse{}, err
 	}
 	return FsRemoveResponse{}, nil
@@ -142,7 +142,7 @@ func (s *FsService) Remove(ctx context.Context, params FsRemoveParams) (FsRemove
 
 // Copy copies a file or directory tree on the host filesystem.
 func (s *FsService) Copy(ctx context.Context, params FsCopyParams) (FsCopyResponse, error) {
-	if err := s.client.sendRequest(ctx, methodFsCopy, params, nil); err != nil {
+	if err := s.client.sendEmptyObjectRequest(ctx, methodFsCopy, params); err != nil {
 		return FsCopyResponse{}, err
 	}
 	return FsCopyResponse{}, nil

@@ -968,7 +968,7 @@ type ThreadSetNameResponse struct {
 
 // SetName updates the name of a thread
 func (s *ThreadService) SetName(ctx context.Context, params ThreadSetNameParams) (ThreadSetNameResponse, error) {
-	if err := s.client.sendRequest(ctx, methodThreadNameSet, params, nil); err != nil {
+	if err := s.client.sendEmptyObjectRequest(ctx, methodThreadNameSet, params); err != nil {
 		return ThreadSetNameResponse{}, err
 	}
 	return ThreadSetNameResponse{}, nil
@@ -1013,7 +1013,7 @@ type ThreadArchiveResponse struct {
 
 // Archive archives a thread
 func (s *ThreadService) Archive(ctx context.Context, params ThreadArchiveParams) (ThreadArchiveResponse, error) {
-	if err := s.client.sendRequest(ctx, methodThreadArchive, params, nil); err != nil {
+	if err := s.client.sendEmptyObjectRequest(ctx, methodThreadArchive, params); err != nil {
 		return ThreadArchiveResponse{}, err
 	}
 	return ThreadArchiveResponse{}, nil
@@ -1069,7 +1069,7 @@ type ThreadCompactStartResponse struct {
 
 // CompactStart initiates thread compaction
 func (s *ThreadService) CompactStart(ctx context.Context, params ThreadCompactStartParams) (ThreadCompactStartResponse, error) {
-	if err := s.client.sendRequest(ctx, methodThreadCompactStart, params, nil); err != nil {
+	if err := s.client.sendEmptyObjectRequest(ctx, methodThreadCompactStart, params); err != nil {
 		return ThreadCompactStartResponse{}, err
 	}
 	return ThreadCompactStartResponse{}, nil

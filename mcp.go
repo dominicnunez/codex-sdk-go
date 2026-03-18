@@ -131,7 +131,7 @@ func (s *McpService) OauthLogin(ctx context.Context, params McpServerOauthLoginP
 
 // Refresh refreshes MCP server connections.
 func (s *McpService) Refresh(ctx context.Context) (McpServerRefreshResponse, error) {
-	if err := s.client.sendRequest(ctx, methodConfigMcpServerReload, nil, nil); err != nil {
+	if err := s.client.sendEmptyObjectRequest(ctx, methodConfigMcpServerReload, nil); err != nil {
 		return McpServerRefreshResponse{}, err
 	}
 	return McpServerRefreshResponse{}, nil

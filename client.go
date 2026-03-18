@@ -18,6 +18,10 @@ var errInvalidParams = errors.New("invalid params")
 // missing or null result where the caller expected a value.
 var ErrEmptyResult = errors.New("server returned empty result")
 
+// ErrResultNotObject indicates the server returned a successful response whose
+// result was not a JSON object where the protocol requires one.
+var ErrResultNotObject = errors.New("server returned non-object result")
+
 // wireMarshaler is implemented by types whose MarshalJSON is redacted for safety.
 // marshalForWire uses this to get the unredacted representation for protocol serialization.
 type wireMarshaler interface {
@@ -25,6 +29,7 @@ type wireMarshaler interface {
 }
 
 var errNilWireMarshaler = errors.New("nil wire marshaler")
+var errNilResponseTarget = errors.New("response target must not be nil")
 
 // marshalForWire marshals v for wire-protocol use. If v implements wireMarshaler
 // (because its MarshalJSON redacts sensitive fields), the unredacted wire
@@ -51,6 +56,19 @@ func isNilWireMarshaler(wm wireMarshaler) bool {
 
 func isEmptyResponseResult(result json.RawMessage) bool {
 	return len(result) == 0 || bytes.Equal(bytes.TrimSpace(result), []byte("null"))
+}
+
+func validateObjectResponseResult(result json.RawMessage) error {
+	if isEmptyResponseResult(result) {
+		return ErrEmptyResult
+	}
+
+	var payload map[string]json.RawMessage
+	if err := json.Unmarshal(result, &payload); err != nil {
+		return fmt.Errorf("%w: %v", ErrResultNotObject, err)
+	}
+
+	return nil
 }
 
 // internalListener is a notification handler registered via addNotificationListener.
@@ -477,12 +495,12 @@ func (c *Client) nextRequestID() uint64 {
 	return c.requestIDCounter.Add(1)
 }
 
-// sendRequest is a helper that sends a typed request and unmarshals the response.
-func (c *Client) sendRequest(ctx context.Context, method string, params interface{}, result interface{}) error {
+// sendResponse is a helper that sends a typed request and returns the raw response.
+func (c *Client) sendResponse(ctx context.Context, method string, params interface{}) (Response, error) {
 	// Marshal params to JSON
 	paramsJSON, err := marshalForWire(params)
 	if err != nil {
-		return fmt.Errorf("marshal request params for %s: %w", method, err)
+		return Response{}, fmt.Errorf("marshal request params for %s: %w", method, err)
 	}
 
 	// Create request
@@ -496,17 +514,44 @@ func (c *Client) sendRequest(ctx context.Context, method string, params interfac
 	// Send request
 	resp, err := c.Send(ctx, req)
 	if err != nil {
-		return fmt.Errorf("%s: %w", method, err)
+		return Response{}, fmt.Errorf("%s: %w", method, err)
 	}
 
-	// Unmarshal result if caller expects one
-	if result != nil {
-		if isEmptyResponseResult(resp.Result) {
-			return fmt.Errorf("%s: %w", method, ErrEmptyResult)
-		}
-		if err := json.Unmarshal(resp.Result, result); err != nil {
-			return fmt.Errorf("unmarshal response result for %s: %w", method, err)
-		}
+	return resp, nil
+}
+
+// sendRequest is a helper that sends a typed request and unmarshals the response.
+func (c *Client) sendRequest(ctx context.Context, method string, params interface{}, result interface{}) error {
+	if result == nil {
+		return fmt.Errorf("%s: %w", method, errNilResponseTarget)
+	}
+
+	resp, err := c.sendResponse(ctx, method, params)
+	if err != nil {
+		return err
+	}
+
+	if isEmptyResponseResult(resp.Result) {
+		return fmt.Errorf("%s: %w", method, ErrEmptyResult)
+	}
+	if err := json.Unmarshal(resp.Result, result); err != nil {
+		return fmt.Errorf("unmarshal response result for %s: %w", method, err)
+	}
+
+	return nil
+}
+
+// sendEmptyObjectRequest is a helper for methods whose successful result schema
+// is an object with no required fields. It rejects missing, null, and non-object
+// results so protocol violations are surfaced instead of being treated as success.
+func (c *Client) sendEmptyObjectRequest(ctx context.Context, method string, params interface{}) error {
+	resp, err := c.sendResponse(ctx, method, params)
+	if err != nil {
+		return err
+	}
+
+	if err := validateObjectResponseResult(resp.Result); err != nil {
+		return fmt.Errorf("%s: %w", method, err)
 	}
 
 	return nil
@@ -515,24 +560,9 @@ func (c *Client) sendRequest(ctx context.Context, method string, params interfac
 // sendRequestRaw is a helper that sends a typed request and returns the raw response result.
 // This is useful for union types where the result needs custom unmarshaling.
 func (c *Client) sendRequestRaw(ctx context.Context, method string, params interface{}) (json.RawMessage, error) {
-	// Marshal params to JSON
-	paramsJSON, err := marshalForWire(params)
+	resp, err := c.sendResponse(ctx, method, params)
 	if err != nil {
-		return nil, fmt.Errorf("marshal request params for %s: %w", method, err)
-	}
-
-	// Create request
-	req := Request{
-		JSONRPC: jsonrpcVersion,
-		Method:  method,
-		Params:  paramsJSON,
-		ID:      RequestID{Value: c.nextRequestID()},
-	}
-
-	// Send request
-	resp, err := c.Send(ctx, req)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", method, err)
+		return nil, err
 	}
 
 	if isEmptyResponseResult(resp.Result) {

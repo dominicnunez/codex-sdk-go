@@ -174,7 +174,7 @@ type TurnInterruptResponse struct{}
 
 // Interrupt interrupts an active turn
 func (s *TurnService) Interrupt(ctx context.Context, params TurnInterruptParams) (TurnInterruptResponse, error) {
-	if err := s.client.sendRequest(ctx, methodTurnInterrupt, params, nil); err != nil {
+	if err := s.client.sendEmptyObjectRequest(ctx, methodTurnInterrupt, params); err != nil {
 		return TurnInterruptResponse{}, err
 	}
 	return TurnInterruptResponse{}, nil
