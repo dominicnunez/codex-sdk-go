@@ -1152,12 +1152,20 @@ func TestStdioOversizeResponseUnblocksPendingSend(t *testing.T) {
 		name      string
 		requestID interface{}
 		response  string
+		lateID    bool
 		wantMatch bool
 	}{
 		{
 			name:      "string id",
 			requestID: "oversize-response",
 			response:  `"oversize-response"`,
+			wantMatch: true,
+		},
+		{
+			name:      "string id after oversized result",
+			requestID: "oversize-response-late-id",
+			response:  `"oversize-response-late-id"`,
+			lateID:    true,
 			wantMatch: true,
 		},
 		{
@@ -1235,7 +1243,11 @@ func TestStdioOversizeResponseUnblocksPendingSend(t *testing.T) {
 			// Send an oversized response frame with a matching ID.
 			const overSize = 11 * 1024 * 1024
 			responsePrefix := `{"jsonrpc":"2.0","id":` + tt.response + `,"result":"`
-			const responseSuffix = "\"}\n"
+			responseSuffix := "\"}\n"
+			if tt.lateID {
+				responsePrefix = `{"jsonrpc":"2.0","result":"`
+				responseSuffix = `","id":` + tt.response + "}\n"
+			}
 			payloadSize := overSize - len(responsePrefix) - len(responseSuffix)
 			if payloadSize <= 0 {
 				t.Fatal("invalid oversized payload size")
@@ -1252,6 +1264,69 @@ func TestStdioOversizeResponseUnblocksPendingSend(t *testing.T) {
 				t.Fatal("timeout waiting for oversized response handling")
 			}
 		})
+	}
+}
+
+func TestStdioOversizeResponseWithLateIDUnblocksPendingSend(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	errCh := make(chan error, 1)
+	go func() {
+		req := codex.Request{
+			JSONRPC: "2.0",
+			ID:      codex.RequestID{Value: "late-id"},
+			Method:  "test/method",
+		}
+		resp, err := transport.Send(ctx, req)
+		if err != nil {
+			errCh <- fmt.Errorf("Send returned unexpected error: %w", err)
+			return
+		}
+		if resp.Error == nil {
+			errCh <- fmt.Errorf("Send returned nil response error")
+			return
+		}
+		if resp.Error.Code != codex.ErrCodeParseError {
+			errCh <- fmt.Errorf("response error code = %d; want %d", resp.Error.Code, codex.ErrCodeParseError)
+			return
+		}
+		if !strings.Contains(resp.Error.Message, "oversized") {
+			errCh <- fmt.Errorf("response error message = %q; want to contain oversized", resp.Error.Message)
+			return
+		}
+		errCh <- nil
+	}()
+
+	waitForOutboundRequest(t, serverReader)
+
+	const overSize = 11 * 1024 * 1024
+	const responsePrefix = `{"jsonrpc":"2.0","result":"`
+	const responseSuffix = `","id":"late-id"}` + "\n"
+	payloadSize := overSize - len(responsePrefix) - len(responseSuffix)
+	if payloadSize <= 0 {
+		t.Fatal("invalid oversized payload size")
+	}
+	oversized := responsePrefix + strings.Repeat("x", payloadSize) + responseSuffix
+	_, _ = serverWriter.Write([]byte(oversized))
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for oversized response handling")
 	}
 }
 

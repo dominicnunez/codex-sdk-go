@@ -34,7 +34,6 @@ const (
 	outboundWriteQueueSize      = 256
 	readBufferSizeBytes         = 64 * 1024
 	maxInboundMessageSizeBytes  = 10 * 1024 * 1024
-	oversizeMetadataBytes       = 64 * 1024
 	defaultSendTimeout          = 5 * time.Minute
 )
 
@@ -104,6 +103,12 @@ type inboundError struct {
 	isNull  bool
 	value   *Error
 	invalid bool
+}
+
+type oversizedFrameInfo struct {
+	id        RequestID
+	hasID     bool
+	hasMethod bool
 }
 
 func (e *inboundError) UnmarshalJSON(data []byte) error {
@@ -615,11 +620,11 @@ func (t *StdioTransport) readLoop() {
 
 	reader := bufio.NewReaderSize(t.reader, readBufferSizeBytes)
 	for {
-		line, overLimit, err := readLimitedLine(reader, maxInboundMessageSizeBytes)
-		if overLimit {
+		line, oversize, err := readLimitedLine(reader, maxInboundMessageSizeBytes)
+		if oversize != nil {
 			// Best-effort: fail matching pending responses so Send callers do not
 			// block waiting on a frame we intentionally discarded.
-			t.handleOversizedFrame(line)
+			t.handleOversizedFrame(*oversize)
 			if errors.Is(err, io.EOF) {
 				return
 			}
@@ -773,7 +778,7 @@ func (t *StdioTransport) failPendingWithInvalidProtocolVersion(idField inboundID
 // readLimitedLine reads one newline-delimited frame and enforces an upper size
 // bound. If a frame exceeds max bytes, it is fully discarded and overLimit=true
 // is returned so callers can skip just that message and continue.
-func readLimitedLine(r *bufio.Reader, limit int) ([]byte, bool, error) {
+func readLimitedLine(r *bufio.Reader, limit int) ([]byte, *oversizedFrameInfo, error) {
 	var line []byte
 	total := 0
 
@@ -786,52 +791,31 @@ func readLimitedLine(r *bufio.Reader, limit int) ([]byte, bool, error) {
 		}
 		switch {
 		case err == nil:
-			return bytes.TrimSuffix(line, []byte{'\n'}), false, nil
+			return bytes.TrimSuffix(line, []byte{'\n'}), nil, nil
 		case errors.Is(err, bufio.ErrBufferFull):
 			continue
 		case errors.Is(err, io.EOF):
 			if len(line) == 0 {
-				return nil, false, io.EOF
+				return nil, nil, io.EOF
 			}
-			return line, false, nil
+			return line, nil, nil
 		default:
-			return nil, false, err
+			return nil, nil, err
 		}
 	}
 }
 
-func handleOversizedLine(r *bufio.Reader, readErr error, line []byte) ([]byte, bool, error) {
-	prefix := capSlice(line, oversizeMetadataBytes)
+func handleOversizedLine(r *bufio.Reader, readErr error, line []byte) ([]byte, *oversizedFrameInfo, error) {
+	info := extractOversizedFrameInfo(line, r, readErr)
 	switch {
 	case readErr == nil:
-		return prefix, true, nil
+		return nil, &info, nil
 	case errors.Is(readErr, io.EOF):
-		return prefix, true, io.EOF
+		return nil, &info, io.EOF
 	case !errors.Is(readErr, bufio.ErrBufferFull):
-		return nil, false, readErr
+		return nil, &info, readErr
 	}
-
-	if err := discardUntilNewline(r); err != nil {
-		if errors.Is(err, io.EOF) {
-			return prefix, true, io.EOF
-		}
-		return nil, false, err
-	}
-	return prefix, true, nil
-}
-
-func discardUntilNewline(r *bufio.Reader) error {
-	for {
-		_, err := r.ReadSlice('\n')
-		switch {
-		case err == nil:
-			return nil
-		case errors.Is(err, bufio.ErrBufferFull):
-			continue
-		default:
-			return err
-		}
-	}
+	return nil, &info, nil
 }
 
 func (t *StdioTransport) enqueueRequest(req Request) {
@@ -1069,13 +1053,12 @@ func (t *StdioTransport) handleMalformedResponse(data []byte) {
 	}
 }
 
-func (t *StdioTransport) handleOversizedFrame(data []byte) {
-	id, hasID, hasMethod := extractTopLevelIDAndMethod(data)
-	if hasMethod || !hasID {
+func (t *StdioTransport) handleOversizedFrame(info oversizedFrameInfo) {
+	if info.hasMethod || !info.hasID {
 		return
 	}
 
-	normalizedID, err := normalizePendingRequestID(id.Value)
+	normalizedID, err := normalizePendingRequestID(info.id.Value)
 	if err != nil {
 		return
 	}
@@ -1104,17 +1087,22 @@ func (t *StdioTransport) handleOversizedFrame(data []byte) {
 }
 
 func extractTopLevelIDAndMethod(data []byte) (RequestID, bool, bool) {
+	id, hasID, hasMethod, _ := extractTopLevelIDAndMethodFromReader(bytes.NewReader(data))
+	return id, hasID, hasMethod
+}
+
+func extractTopLevelIDAndMethodFromReader(reader io.Reader) (RequestID, bool, bool, error) {
 	var id RequestID
-	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder := json.NewDecoder(reader)
 	decoder.UseNumber()
 
 	start, err := decoder.Token()
 	if err != nil {
-		return id, false, false
+		return id, false, false, err
 	}
 	delim, ok := start.(json.Delim)
 	if !ok || delim != '{' {
-		return id, false, false
+		return id, false, false, nil
 	}
 
 	var hasID bool
@@ -1122,16 +1110,16 @@ func extractTopLevelIDAndMethod(data []byte) (RequestID, bool, bool) {
 	for decoder.More() {
 		keyTok, err := decoder.Token()
 		if err != nil {
-			return id, hasID, hasMethod
+			return id, hasID, hasMethod, err
 		}
 		key, ok := keyTok.(string)
 		if !ok {
-			return id, hasID, hasMethod
+			return id, hasID, hasMethod, nil
 		}
 
 		valueTok, err := decoder.Token()
 		if err != nil {
-			return id, hasID, hasMethod
+			return id, hasID, hasMethod, err
 		}
 
 		switch key {
@@ -1155,12 +1143,81 @@ func extractTopLevelIDAndMethod(data []byte) (RequestID, bool, bool) {
 
 		if valueDelim, ok := valueTok.(json.Delim); ok && (valueDelim == '{' || valueDelim == '[') {
 			if err := consumeNestedJSONValue(decoder); err != nil {
-				return id, hasID, hasMethod
+				return id, hasID, hasMethod, err
 			}
 		}
 	}
 
-	return id, hasID, hasMethod
+	return id, hasID, hasMethod, nil
+}
+
+func extractOversizedFrameInfo(line []byte, r *bufio.Reader, readErr error) oversizedFrameInfo {
+	stream := newOversizedFrameReader(line, r, readErr)
+	id, hasID, hasMethod, _ := extractTopLevelIDAndMethodFromReader(stream)
+	_, _ = io.Copy(io.Discard, stream)
+	return oversizedFrameInfo{
+		id:        id,
+		hasID:     hasID,
+		hasMethod: hasMethod,
+	}
+}
+
+func newOversizedFrameReader(prefix []byte, r *bufio.Reader, readErr error) io.Reader {
+	if !errors.Is(readErr, bufio.ErrBufferFull) {
+		return bytes.NewReader(prefix)
+	}
+	return io.MultiReader(
+		bytes.NewReader(prefix),
+		&oversizedFrameReader{reader: r, readErr: readErr},
+	)
+}
+
+type oversizedFrameReader struct {
+	reader  *bufio.Reader
+	pending []byte
+	readErr error
+	done    bool
+}
+
+func (r *oversizedFrameReader) Read(p []byte) (int, error) {
+	for {
+		if len(r.pending) > 0 {
+			n := copy(p, r.pending)
+			r.pending = r.pending[n:]
+			return n, nil
+		}
+		if r.done {
+			return 0, io.EOF
+		}
+
+		switch {
+		case r.readErr == nil || errors.Is(r.readErr, io.EOF):
+			r.done = true
+			return 0, io.EOF
+		case !errors.Is(r.readErr, bufio.ErrBufferFull):
+			err := r.readErr
+			r.done = true
+			return 0, err
+		}
+
+		frag, err := r.reader.ReadSlice('\n')
+		r.pending = frag
+		r.readErr = err
+		if len(r.pending) == 0 {
+			if err == nil {
+				continue
+			}
+			if errors.Is(err, io.EOF) {
+				r.done = true
+				return 0, io.EOF
+			}
+			if errors.Is(err, bufio.ErrBufferFull) {
+				continue
+			}
+			r.done = true
+			return 0, err
+		}
+	}
 }
 
 func consumeNestedJSONValue(decoder *json.Decoder) error {
@@ -1182,13 +1239,6 @@ func consumeNestedJSONValue(decoder *json.Decoder) error {
 		}
 	}
 	return nil
-}
-
-func capSlice(data []byte, limit int) []byte {
-	if len(data) <= limit {
-		return data
-	}
-	return data[:limit]
 }
 
 // handleRequest dispatches an incoming server→client request to the handler
