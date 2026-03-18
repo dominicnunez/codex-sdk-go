@@ -10,6 +10,14 @@ import (
 	"github.com/dominicnunez/codex-sdk-go"
 )
 
+func validInitializeResponseData(userAgent string) map[string]interface{} {
+	return map[string]interface{}{
+		"platformFamily": "unix",
+		"platformOs":     "linux",
+		"userAgent":      userAgent,
+	}
+}
+
 // MockTransport is a test implementation of the Transport interface that records
 // sent messages and allows injecting responses and notifications for testing.
 type MockTransport struct {

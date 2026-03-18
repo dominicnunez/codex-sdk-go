@@ -2,6 +2,7 @@ package codex
 
 import (
 	"context"
+	"errors"
 )
 
 // ClientInfo represents information about the client application.
@@ -34,11 +35,27 @@ type InitializeResponse struct {
 	UserAgent      string `json:"userAgent"`
 }
 
+func (r InitializeResponse) validate() error {
+	switch {
+	case r.PlatformFamily == "":
+		return errors.New("missing platformFamily")
+	case r.PlatformOS == "":
+		return errors.New("missing platformOs")
+	case r.UserAgent == "":
+		return errors.New("missing userAgent")
+	default:
+		return nil
+	}
+}
+
 // Initialize sends an initialize request to the server.
 // This is the v1 handshake that must be performed before using v2 protocol methods.
 func (c *Client) Initialize(ctx context.Context, params InitializeParams) (InitializeResponse, error) {
 	var result InitializeResponse
 	if err := c.sendRequest(ctx, methodInitialize, params, &result); err != nil {
+		return InitializeResponse{}, err
+	}
+	if err := result.validate(); err != nil {
 		return InitializeResponse{}, err
 	}
 	return result, nil

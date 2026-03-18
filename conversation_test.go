@@ -844,9 +844,7 @@ func TestConversationWithCollaborationMode(t *testing.T) {
 func TestStartConversationThreadStartFailure(t *testing.T) {
 	mock := NewMockTransport()
 
-	_ = mock.SetResponseData("initialize", map[string]interface{}{
-		"userAgent": "codex-test/1.0",
-	})
+	_ = mock.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
 
 	// thread/start returns an RPC error.
 	mock.SetResponse("thread/start", codex.Response{
@@ -869,6 +867,41 @@ func TestStartConversationThreadStartFailure(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "thread/start") {
 		t.Errorf("error = %q, want it to mention 'thread/start'", err)
+	}
+}
+
+func TestStartConversationThreadStartMissingThreadID(t *testing.T) {
+	mock := NewMockTransport()
+	_ = mock.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
+	_ = mock.SetResponseData("thread/start", map[string]interface{}{
+		"approvalPolicy": "never",
+		"cwd":            "/tmp",
+		"model":          "o3",
+		"modelProvider":  "openai",
+		"sandbox":        map[string]interface{}{"type": "readOnly"},
+		"thread": map[string]interface{}{
+			"cliVersion":    "1.0.0",
+			"createdAt":     1700000000,
+			"cwd":           "/tmp",
+			"modelProvider": "openai",
+			"preview":       "",
+			"source":        "exec",
+			"status":        map[string]interface{}{"type": "idle"},
+			"turns":         []interface{}{},
+			"updatedAt":     1700000000,
+			"ephemeral":     false,
+		},
+	})
+
+	client := codex.NewClient(mock, codex.WithRequestTimeout(2*time.Second))
+	proc := codex.NewProcessFromClient(client)
+
+	_, err := proc.StartConversation(context.Background(), codex.ConversationOptions{})
+	if err == nil {
+		t.Fatal("expected error from missing thread.id")
+	}
+	if !strings.Contains(err.Error(), "thread/start: missing thread.id") {
+		t.Fatalf("error = %q, want thread/start: missing thread.id", err.Error())
 	}
 }
 
@@ -1295,9 +1328,7 @@ func TestConversationStreamedThreadSnapshotDuringTurnCompletion(t *testing.T) {
 func TestConversationThreadDeepCopyIsolation_ZeroTurnsPointerFields(t *testing.T) {
 	mock := NewMockTransport()
 
-	_ = mock.SetResponseData("initialize", map[string]interface{}{
-		"userAgent": "codex-test/1.0",
-	})
+	_ = mock.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
 
 	_ = mock.SetResponseData("thread/start", map[string]interface{}{
 		"approvalPolicy": "never",

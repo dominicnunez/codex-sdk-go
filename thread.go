@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 )
 
@@ -686,10 +687,20 @@ type ThreadStartResponse struct {
 	Thread            Thread                `json:"thread"`
 }
 
+func (r ThreadStartResponse) validate() error {
+	if r.Thread.ID == "" {
+		return errors.New("missing thread.id")
+	}
+	return nil
+}
+
 // Start initiates a new thread
 func (s *ThreadService) Start(ctx context.Context, params ThreadStartParams) (ThreadStartResponse, error) {
 	var response ThreadStartResponse
 	if err := s.client.sendRequest(ctx, methodThreadStart, params, &response); err != nil {
+		return ThreadStartResponse{}, err
+	}
+	if err := response.validate(); err != nil {
 		return ThreadStartResponse{}, err
 	}
 	return response, nil

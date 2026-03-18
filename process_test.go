@@ -25,11 +25,11 @@ func TestStartProcess(t *testing.T) {
 	dir := t.TempDir()
 	fakeBinary := filepath.Join(dir, "fake-codex")
 
-	// The script ignores args, reads one line from stdin, and writes a valid
+	// The script ignores args, reads one line from stdin, and writes a schema-valid
 	// JSON-RPC initialize response back.
 	script := `#!/bin/sh
 read line
-echo '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2.0","capabilities":{}}}'
+echo '{"jsonrpc":"2.0","id":1,"result":{"platformFamily":"unix","platformOs":"linux","userAgent":"fake-codex/0.0.1"}}'
 # Keep running until killed
 while true; do sleep 1; done
 `
@@ -593,9 +593,7 @@ func TestEnsureInitRetryAfterFailure(t *testing.T) {
 	// Clear the error and set up proper responses for initialize and thread/start.
 	mock.SetSendError(nil)
 
-	_ = mock.SetResponseData("initialize", map[string]interface{}{
-		"userAgent": "codex-test/1.0",
-	})
+	_ = mock.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
 
 	_ = mock.SetResponseData("thread/start", map[string]interface{}{
 		"approvalPolicy": "never",
@@ -624,6 +622,58 @@ func TestEnsureInitRetryAfterFailure(t *testing.T) {
 		t.Fatalf("expected StartConversation to succeed after clearing error: %v", err)
 	}
 
+	if conv.ThreadID() != "thread-1" {
+		t.Errorf("ThreadID() = %q, want %q", conv.ThreadID(), "thread-1")
+	}
+}
+
+func TestEnsureInitRetryAfterInvalidInitializeResponse(t *testing.T) {
+	mock := NewMockTransport()
+	mock.SetResponse("initialize", codex.Response{
+		JSONRPC: "2.0",
+		Result:  json.RawMessage(`{"userAgent":"codex-test/1.0"}`),
+	})
+
+	client := codex.NewClient(mock, codex.WithRequestTimeout(2*time.Second))
+	proc := codex.NewProcessFromClient(client)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err == nil {
+		t.Fatal("expected StartConversation to fail on invalid initialize response")
+	}
+	if !strings.Contains(err.Error(), "missing platformFamily") {
+		t.Fatalf("error = %q, want missing platformFamily", err.Error())
+	}
+
+	_ = mock.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
+	_ = mock.SetResponseData("thread/start", map[string]interface{}{
+		"approvalPolicy": "never",
+		"cwd":            "/tmp",
+		"model":          "o3",
+		"modelProvider":  "openai",
+		"sandbox":        map[string]interface{}{"type": "readOnly"},
+		"thread": map[string]interface{}{
+			"id":            "thread-1",
+			"cliVersion":    "1.0.0",
+			"createdAt":     1700000000,
+			"cwd":           "/tmp",
+			"modelProvider": "openai",
+			"preview":       "",
+			"source":        "exec",
+			"status":        map[string]interface{}{"type": "idle"},
+			"turns":         []interface{}{},
+			"updatedAt":     1700000000,
+			"ephemeral":     true,
+		},
+	})
+
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("expected StartConversation to succeed after fixing initialize response: %v", err)
+	}
 	if conv.ThreadID() != "thread-1" {
 		t.Errorf("ThreadID() = %q, want %q", conv.ThreadID(), "thread-1")
 	}
@@ -809,7 +859,7 @@ func (d *delayedCountingTransport) Send(ctx context.Context, req codex.Request) 
 	return codex.Response{
 		JSONRPC: "2.0",
 		ID:      req.ID,
-		Result:  json.RawMessage(`{"userAgent":"test"}`),
+		Result:  json.RawMessage(`{"platformFamily":"unix","platformOs":"linux","userAgent":"test"}`),
 	}, nil
 }
 
@@ -889,9 +939,7 @@ func TestEnsureInitConcurrentCallers(t *testing.T) {
 func TestRunAfterTransportClose(t *testing.T) {
 	mock := NewMockTransport()
 
-	_ = mock.SetResponseData("initialize", map[string]interface{}{
-		"userAgent": "codex-test/1.0",
-	})
+	_ = mock.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
 	_ = mock.SetResponseData("thread/start", map[string]interface{}{
 		"approvalPolicy": "never",
 		"cwd":            "/tmp",

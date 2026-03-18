@@ -19,9 +19,7 @@ func mockProcess(t *testing.T) (*codex.Process, *MockTransport) {
 	t.Helper()
 	mock := NewMockTransport()
 
-	_ = mock.SetResponseData("initialize", map[string]interface{}{
-		"userAgent": "codex-test/1.0",
-	})
+	_ = mock.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
 
 	_ = mock.SetResponseData("thread/start", map[string]interface{}{
 		"approvalPolicy": "never",
@@ -263,9 +261,7 @@ func TestRunInitializeFailure(t *testing.T) {
 func TestRunThreadStartFailure(t *testing.T) {
 	mock := NewMockTransport()
 
-	_ = mock.SetResponseData("initialize", map[string]interface{}{
-		"userAgent": "codex-test/1.0",
-	})
+	_ = mock.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
 
 	// thread/start returns an RPC error.
 	mock.SetResponse("thread/start", codex.Response{
@@ -289,12 +285,45 @@ func TestRunThreadStartFailure(t *testing.T) {
 	}
 }
 
+func TestRunThreadStartMissingThreadID(t *testing.T) {
+	mock := NewMockTransport()
+	_ = mock.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
+	_ = mock.SetResponseData("thread/start", map[string]interface{}{
+		"approvalPolicy": "never",
+		"cwd":            "/tmp",
+		"model":          "o3",
+		"modelProvider":  "openai",
+		"sandbox":        map[string]interface{}{"type": "readOnly"},
+		"thread": map[string]interface{}{
+			"cliVersion":    "1.0.0",
+			"createdAt":     1700000000,
+			"cwd":           "/tmp",
+			"modelProvider": "openai",
+			"preview":       "",
+			"source":        "exec",
+			"status":        map[string]interface{}{"type": "idle"},
+			"turns":         []interface{}{},
+			"updatedAt":     1700000000,
+			"ephemeral":     true,
+		},
+	})
+
+	client := codex.NewClient(mock, codex.WithRequestTimeout(2*time.Second))
+	proc := codex.NewProcessFromClient(client)
+
+	_, err := proc.Run(context.Background(), codex.RunOptions{Prompt: "hello"})
+	if err == nil {
+		t.Fatal("expected error from missing thread.id")
+	}
+	if !strings.Contains(err.Error(), "thread/start: missing thread.id") {
+		t.Fatalf("error = %q, want thread/start: missing thread.id", err.Error())
+	}
+}
+
 func TestRunTurnStartFailure(t *testing.T) {
 	mock := NewMockTransport()
 
-	_ = mock.SetResponseData("initialize", map[string]interface{}{
-		"userAgent": "codex-test/1.0",
-	})
+	_ = mock.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
 
 	_ = mock.SetResponseData("thread/start", map[string]interface{}{
 		"approvalPolicy": "never",
@@ -522,9 +551,7 @@ func TestRunInitRetry(t *testing.T) {
 
 	// Fix the transport — second call should retry and succeed.
 	mock.SetSendError(nil)
-	_ = mock.SetResponseData("initialize", map[string]interface{}{
-		"userAgent": "codex-test/1.0",
-	})
+	_ = mock.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
 	_ = mock.SetResponseData("thread/start", map[string]interface{}{
 		"approvalPolicy": "never",
 		"cwd":            "/tmp",

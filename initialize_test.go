@@ -105,35 +105,30 @@ func TestInitializeParamsSerialization(t *testing.T) {
 	}
 }
 
-// TestInitializeResponseDeserialization verifies that InitializeResponse deserializes correctly
-// matching the specs/v1/InitializeResponse.json schema.
+// TestInitializeResponseDeserialization verifies that InitializeResponse
+// deserializes schema-valid payloads while ignoring unknown fields.
 func TestInitializeResponseDeserialization(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
 		expected codex.InitializeResponse
-		wantErr  bool
 	}{
 		{
-			name:  "valid response with userAgent",
-			input: `{"userAgent":"codex-server/1.0.0"}`,
+			name:  "valid response with required fields",
+			input: `{"platformFamily":"unix","platformOs":"linux","userAgent":"codex-server/1.0.0"}`,
 			expected: codex.InitializeResponse{
-				UserAgent: "codex-server/1.0.0",
-			},
-		},
-		{
-			name:    "missing required userAgent field",
-			input:   `{}`,
-			wantErr: false, // JSON unmarshal succeeds, just empty string
-			expected: codex.InitializeResponse{
-				UserAgent: "",
+				PlatformFamily: "unix",
+				PlatformOS:     "linux",
+				UserAgent:      "codex-server/1.0.0",
 			},
 		},
 		{
 			name:  "response with extra fields (forward compatibility)",
-			input: `{"userAgent":"codex-server/1.0.0","extra":"field"}`,
+			input: `{"platformFamily":"unix","platformOs":"linux","userAgent":"codex-server/1.0.0","extra":"field"}`,
 			expected: codex.InitializeResponse{
-				UserAgent: "codex-server/1.0.0",
+				PlatformFamily: "unix",
+				PlatformOS:     "linux",
+				UserAgent:      "codex-server/1.0.0",
 			},
 		},
 	}
@@ -142,11 +137,15 @@ func TestInitializeResponseDeserialization(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var resp codex.InitializeResponse
 			err := json.Unmarshal([]byte(tt.input), &resp)
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("Unmarshal error = %v, wantErr %v", err, tt.wantErr)
-			}
 			if err != nil {
-				return
+				t.Fatalf("Unmarshal error = %v", err)
+			}
+
+			if resp.PlatformFamily != tt.expected.PlatformFamily {
+				t.Errorf("PlatformFamily = %q, want %q", resp.PlatformFamily, tt.expected.PlatformFamily)
+			}
+			if resp.PlatformOS != tt.expected.PlatformOS {
+				t.Errorf("PlatformOS = %q, want %q", resp.PlatformOS, tt.expected.PlatformOS)
 			}
 
 			if resp.UserAgent != tt.expected.UserAgent {
@@ -163,7 +162,9 @@ func TestClientInitialize(t *testing.T) {
 
 	// Set up expected response
 	responseData := codex.InitializeResponse{
-		UserAgent: "codex-server/1.0.0",
+		PlatformFamily: "unix",
+		PlatformOS:     "linux",
+		UserAgent:      "codex-server/1.0.0",
 	}
 	responseJSON, _ := json.Marshal(responseData)
 	mock.SetResponse("initialize", codex.Response{
@@ -192,6 +193,12 @@ func TestClientInitialize(t *testing.T) {
 	// Verify response
 	if resp.UserAgent != "codex-server/1.0.0" {
 		t.Errorf("UserAgent = %q, want %q", resp.UserAgent, "codex-server/1.0.0")
+	}
+	if resp.PlatformFamily != "unix" {
+		t.Errorf("PlatformFamily = %q, want %q", resp.PlatformFamily, "unix")
+	}
+	if resp.PlatformOS != "linux" {
+		t.Errorf("PlatformOS = %q, want %q", resp.PlatformOS, "linux")
 	}
 
 	// Verify the correct method name was sent
@@ -278,6 +285,49 @@ func TestClientInitializeIncludesMethodInTransportError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "initialize") {
 		t.Fatalf("error = %q; want method context", err.Error())
+	}
+}
+
+func TestClientInitializeRejectsMissingRequiredFields(t *testing.T) {
+	tests := []struct {
+		name   string
+		result string
+		want   string
+	}{
+		{
+			name:   "missing platformFamily",
+			result: `{"platformOs":"linux","userAgent":"codex-server/1.0.0"}`,
+			want:   "missing platformFamily",
+		},
+		{
+			name:   "missing platformOs",
+			result: `{"platformFamily":"unix","userAgent":"codex-server/1.0.0"}`,
+			want:   "missing platformOs",
+		},
+		{
+			name:   "missing userAgent",
+			result: `{"platformFamily":"unix","platformOs":"linux"}`,
+			want:   "missing userAgent",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := NewMockTransport()
+			client := codex.NewClient(mock)
+			mock.SetResponse("initialize", codex.Response{
+				JSONRPC: "2.0",
+				Result:  json.RawMessage(tt.result),
+			})
+
+			_, err := client.Initialize(context.Background(), codex.InitializeParams{})
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %q, want substring %q", err.Error(), tt.want)
+			}
+		})
 	}
 }
 

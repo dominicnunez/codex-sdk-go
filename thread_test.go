@@ -115,6 +115,39 @@ func TestThreadStart(t *testing.T) {
 			t.Errorf("expected thread ID 'thread-456', got %q", response.Thread.ID)
 		}
 	})
+
+	t.Run("rejects response missing thread id", func(t *testing.T) {
+		transport := NewMockTransport()
+		defer func() { _ = transport.Close() }()
+
+		client := codex.NewClient(transport)
+		_ = transport.SetResponseData("thread/start", map[string]interface{}{
+			"approvalPolicy": "never",
+			"cwd":            "/test/dir",
+			"model":          "gpt-4",
+			"modelProvider":  "openai",
+			"sandbox":        map[string]interface{}{"type": "dangerFullAccess"},
+			"thread": map[string]interface{}{
+				"cliVersion":    "1.0.0",
+				"createdAt":     int64(1234567890),
+				"cwd":           "/test/dir",
+				"modelProvider": "openai",
+				"preview":       "test preview",
+				"source":        "cli",
+				"status":        map[string]interface{}{"type": "idle"},
+				"turns":         []interface{}{},
+				"updatedAt":     int64(1234567890),
+			},
+		})
+
+		_, err := client.Thread.Start(context.Background(), codex.ThreadStartParams{})
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "missing thread.id") {
+			t.Fatalf("error = %q, want missing thread.id", err.Error())
+		}
+	})
 }
 
 // TestThreadRead tests the ThreadService.Read method

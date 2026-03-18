@@ -451,9 +451,7 @@ func TestRunStreamedInitializeFailure(t *testing.T) {
 func TestRunStreamedThreadStartFailure(t *testing.T) {
 	mock := NewMockTransport()
 
-	_ = mock.SetResponseData("initialize", map[string]interface{}{
-		"userAgent": "codex-test/1.0",
-	})
+	_ = mock.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
 	mock.SetResponse("thread/start", codex.Response{
 		JSONRPC: "2.0",
 		Error:   &codex.Error{Code: -32600, Message: "invalid model"},
@@ -481,12 +479,53 @@ func TestRunStreamedThreadStartFailure(t *testing.T) {
 	}
 }
 
+func TestRunStreamedThreadStartMissingThreadID(t *testing.T) {
+	mock := NewMockTransport()
+	_ = mock.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
+	_ = mock.SetResponseData("thread/start", map[string]interface{}{
+		"approvalPolicy": "never",
+		"cwd":            "/tmp",
+		"model":          "o3",
+		"modelProvider":  "openai",
+		"sandbox":        map[string]interface{}{"type": "readOnly"},
+		"thread": map[string]interface{}{
+			"cliVersion":    "1.0.0",
+			"createdAt":     1700000000,
+			"cwd":           "/tmp",
+			"modelProvider": "openai",
+			"preview":       "",
+			"source":        "exec",
+			"status":        map[string]interface{}{"type": "idle"},
+			"turns":         []interface{}{},
+			"updatedAt":     1700000000,
+			"ephemeral":     true,
+		},
+	})
+
+	client := codex.NewClient(mock, codex.WithRequestTimeout(2*time.Second))
+	proc := codex.NewProcessFromClient(client)
+
+	stream := proc.RunStreamed(context.Background(), codex.RunOptions{Prompt: "hello"})
+
+	var gotErr error
+	for _, err := range stream.Events() {
+		if err != nil {
+			gotErr = err
+			break
+		}
+	}
+	if gotErr == nil {
+		t.Fatal("expected error from missing thread.id")
+	}
+	if !strings.Contains(gotErr.Error(), "thread/start: missing thread.id") {
+		t.Fatalf("error = %q, want thread/start: missing thread.id", gotErr.Error())
+	}
+}
+
 func TestRunStreamedTurnStartFailure(t *testing.T) {
 	mock := NewMockTransport()
 
-	_ = mock.SetResponseData("initialize", map[string]interface{}{
-		"userAgent": "codex-test/1.0",
-	})
+	_ = mock.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
 	_ = mock.SetResponseData("thread/start", map[string]interface{}{
 		"approvalPolicy": "never",
 		"cwd":            "/tmp",
@@ -783,9 +822,7 @@ func TestRunStreamedInitRetry(t *testing.T) {
 
 	// Fix the transport — init should retry.
 	mock.SetSendError(nil)
-	_ = mock.SetResponseData("initialize", map[string]interface{}{
-		"userAgent": "codex-test/1.0",
-	})
+	_ = mock.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
 	_ = mock.SetResponseData("thread/start", map[string]interface{}{
 		"approvalPolicy": "never",
 		"cwd":            "/tmp",

@@ -54,9 +54,7 @@ func (t *notifyDuringSendTransport) Send(ctx context.Context, req codex.Request)
 func TestRunNotificationBeforeTurnStartResponse(t *testing.T) {
 	base := NewMockTransport()
 
-	_ = base.SetResponseData("initialize", map[string]interface{}{
-		"userAgent": "codex-test/1.0",
-	})
+	_ = base.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
 	_ = base.SetResponseData("thread/start", map[string]interface{}{
 		"approvalPolicy": "never",
 		"cwd":            "/tmp",
@@ -115,9 +113,7 @@ func TestRunNotificationBeforeTurnStartResponse(t *testing.T) {
 func TestRunStreamedNotificationBeforeTurnStartResponse(t *testing.T) {
 	base := NewMockTransport()
 
-	_ = base.SetResponseData("initialize", map[string]interface{}{
-		"userAgent": "codex-test/1.0",
-	})
+	_ = base.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
 	_ = base.SetResponseData("thread/start", map[string]interface{}{
 		"approvalPolicy": "never",
 		"cwd":            "/tmp",

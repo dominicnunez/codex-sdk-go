@@ -366,9 +366,7 @@ func TestRepresentativeRequestMethodOutcomes(t *testing.T) {
 	client := codex.NewClient(transport)
 	ctx := context.Background()
 
-	_ = transport.SetResponseData("initialize", map[string]interface{}{
-		"userAgent": "codex-test/1.0",
-	})
+	_ = transport.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
 	_ = transport.SetResponseData("thread/start", map[string]interface{}{
 		"thread": map[string]interface{}{
 			"id":            "thread-1",

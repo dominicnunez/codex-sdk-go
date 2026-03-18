@@ -116,7 +116,7 @@ func (t *blockingInitializeTransport) Send(ctx context.Context, req Request) (Re
 		return Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
-			Result:  json.RawMessage(`{"userAgent":"codex-test/1.0"}`),
+			Result:  json.RawMessage(`{"platformFamily":"unix","platformOs":"linux","userAgent":"codex-test/1.0"}`),
 		}, nil
 	default:
 		return Response{
@@ -228,7 +228,7 @@ func (t *retryableInitializeTransport) Send(_ context.Context, req Request) (Res
 		return Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
-			Result:  json.RawMessage(`{"userAgent":"codex-test/1.0"}`),
+			Result:  json.RawMessage(`{"platformFamily":"unix","platformOs":"linux","userAgent":"codex-test/1.0"}`),
 		}, nil
 	default:
 		return Response{

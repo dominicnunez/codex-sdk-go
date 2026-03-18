@@ -134,7 +134,7 @@ func (t *concurrentThreadTransport) Send(_ context.Context, req codex.Request) (
 		return codex.Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
-			Result:  json.RawMessage(`{"userAgent":"codex-test/1.0"}`),
+			Result:  json.RawMessage(`{"platformFamily":"unix","platformOs":"linux","userAgent":"codex-test/1.0"}`),
 		}, nil
 	case "thread/start":
 		t.mu.Lock()
