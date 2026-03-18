@@ -65,7 +65,7 @@ func validateObjectResponseResult(result json.RawMessage) error {
 
 	var payload map[string]json.RawMessage
 	if err := json.Unmarshal(result, &payload); err != nil {
-		return fmt.Errorf("%w: %v", ErrResultNotObject, err)
+		return fmt.Errorf("%w: %w", ErrResultNotObject, err)
 	}
 
 	return nil

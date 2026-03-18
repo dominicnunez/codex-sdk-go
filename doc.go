@@ -25,7 +25,10 @@
 //
 // Using StartProcess for automatic process management:
 //
-//	proc, err := codex.StartProcess(ctx, nil)
+//	binaryPath := "/absolute/path/to/codex"
+//	proc, err := codex.StartProcess(ctx, &codex.ProcessOptions{
+//		BinaryPath: binaryPath,
+//	})
 //	if err != nil { ... }
 //	defer proc.Close()
 //
@@ -35,7 +38,9 @@
 //
 // Using Run for a single-turn conversation (simplest usage):
 //
+//	binaryPath := "/absolute/path/to/codex"
 //	proc, err := codex.StartProcess(ctx, &codex.ProcessOptions{
+//		BinaryPath:   binaryPath,
 //		Model:        "o3",
 //		Sandbox:      codex.SandboxModeReadOnly,
 //		ApprovalMode: "full-auto",
