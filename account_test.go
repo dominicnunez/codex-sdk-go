@@ -3,6 +3,7 @@ package codex_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 
@@ -377,6 +378,104 @@ func TestAccountLogin(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestAccountLoginRejectsNullResult(t *testing.T) {
+	transport := NewMockTransport()
+	client := codex.NewClient(transport)
+	transport.SetResponse("account/login/start", codex.Response{
+		JSONRPC: "2.0",
+		Result:  json.RawMessage(`null`),
+	})
+
+	_, err := client.Account.Login(context.Background(), &codex.ChatgptLoginAccountParams{})
+	if err == nil {
+		t.Fatal("expected error for null login result")
+	}
+	if !strings.Contains(err.Error(), "non-null object") {
+		t.Fatalf("error = %v; want non-null object context", err)
+	}
+}
+
+func TestAccountLoginRejectsMissingType(t *testing.T) {
+	transport := NewMockTransport()
+	client := codex.NewClient(transport)
+	transport.SetResponse("account/login/start", codex.Response{
+		JSONRPC: "2.0",
+		Result:  json.RawMessage(`{"authUrl":"https://auth.example.com"}`),
+	})
+
+	_, err := client.Account.Login(context.Background(), &codex.ChatgptLoginAccountParams{})
+	if err == nil {
+		t.Fatal("expected error for login result without type")
+	}
+	if !strings.Contains(err.Error(), "missing type") {
+		t.Fatalf("error = %v; want missing type context", err)
+	}
+}
+
+func TestAccountLoginRejectsMalformedResult(t *testing.T) {
+	transport := NewMockTransport()
+	client := codex.NewClient(transport)
+	transport.SetResponse("account/login/start", codex.Response{
+		JSONRPC: "2.0",
+		Result:  json.RawMessage(`{"type":`),
+	})
+
+	_, err := client.Account.Login(context.Background(), &codex.ChatgptLoginAccountParams{})
+	if err == nil {
+		t.Fatal("expected error for malformed login result")
+	}
+}
+
+func TestAccountLoginPreservesUnknownVariant(t *testing.T) {
+	transport := NewMockTransport()
+	client := codex.NewClient(transport)
+	transport.SetResponse("account/login/start", codex.Response{
+		JSONRPC: "2.0",
+		Result:  json.RawMessage(`{"type":"futureMode","extra":true}`),
+	})
+
+	resp, err := client.Account.Login(context.Background(), &codex.ChatgptLoginAccountParams{})
+	if err != nil {
+		t.Fatalf("Login() error = %v", err)
+	}
+
+	unknown, ok := resp.(*codex.UnknownLoginAccountResponse)
+	if !ok {
+		t.Fatalf("response type = %T; want *UnknownLoginAccountResponse", resp)
+	}
+	if unknown.Type != "futureMode" {
+		t.Fatalf("unknown type = %q; want futureMode", unknown.Type)
+	}
+	if string(unknown.Raw) != `{"type":"futureMode","extra":true}` {
+		t.Fatalf("unknown raw = %s", unknown.Raw)
+	}
+}
+
+func TestAccountLoginPropagatesRPCError(t *testing.T) {
+	transport := NewMockTransport()
+	client := codex.NewClient(transport)
+	transport.SetResponse("account/login/start", codex.Response{
+		JSONRPC: "2.0",
+		Error: &codex.Error{
+			Code:    codex.ErrCodeInvalidRequest,
+			Message: "rejected",
+		},
+	})
+
+	_, err := client.Account.Login(context.Background(), &codex.ChatgptLoginAccountParams{})
+	if err == nil {
+		t.Fatal("expected RPC error")
+	}
+
+	var rpcErr *codex.RPCError
+	if !errors.As(err, &rpcErr) {
+		t.Fatalf("error type = %T; want *RPCError", err)
+	}
+	if rpcErr.Code() != codex.ErrCodeInvalidRequest {
+		t.Fatalf("rpc error code = %d; want %d", rpcErr.Code(), codex.ErrCodeInvalidRequest)
 	}
 }
 

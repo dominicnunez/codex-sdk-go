@@ -1,6 +1,7 @@
 package codex
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -173,6 +174,8 @@ const (
 )
 
 var errNilLoginAccountParams = errors.New("login params cannot be nil")
+var errEmptyLoginAccountResponse = errors.New("login response must be a non-null object")
+var errMissingLoginAccountResponseType = errors.New("login response missing type")
 
 // LoginAccountParams is an interface for login parameter variants
 type LoginAccountParams interface {
@@ -339,34 +342,46 @@ func (u *UnknownLoginAccountResponse) MarshalJSON() ([]byte, error) {
 
 // UnmarshalLoginAccountResponse unmarshals a LoginAccountResponse from JSON
 func UnmarshalLoginAccountResponse(data []byte) (LoginAccountResponse, error) {
-	var typeCheck struct {
-		Type string `json:"type"`
-	}
-	if err := json.Unmarshal(data, &typeCheck); err != nil {
-		return nil, err
+	trimmed := bytes.TrimSpace(data)
+	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
+		return nil, errEmptyLoginAccountResponse
 	}
 
-	switch typeCheck.Type {
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(trimmed, &envelope); err != nil {
+		return nil, err
+	}
+	rawType, ok := envelope["type"]
+	if !ok {
+		return nil, errMissingLoginAccountResponseType
+	}
+
+	var typeCheck string
+	if err := json.Unmarshal(rawType, &typeCheck); err != nil {
+		return nil, fmt.Errorf("invalid login response type: %w", err)
+	}
+
+	switch typeCheck {
 	case "apiKey":
 		var resp ApiKeyLoginAccountResponse
-		if err := json.Unmarshal(data, &resp); err != nil {
+		if err := json.Unmarshal(trimmed, &resp); err != nil {
 			return nil, err
 		}
 		return &resp, nil
 	case "chatgpt":
 		var resp ChatgptLoginAccountResponse
-		if err := json.Unmarshal(data, &resp); err != nil {
+		if err := json.Unmarshal(trimmed, &resp); err != nil {
 			return nil, err
 		}
 		return &resp, nil
 	case "chatgptAuthTokens":
 		var resp ChatgptAuthTokensLoginAccountResponse
-		if err := json.Unmarshal(data, &resp); err != nil {
+		if err := json.Unmarshal(trimmed, &resp); err != nil {
 			return nil, err
 		}
 		return &resp, nil
 	default:
-		return &UnknownLoginAccountResponse{Type: typeCheck.Type, Raw: append(json.RawMessage(nil), data...)}, nil
+		return &UnknownLoginAccountResponse{Type: typeCheck, Raw: append(json.RawMessage(nil), trimmed...)}, nil
 	}
 }
 
