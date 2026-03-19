@@ -144,6 +144,17 @@ type AppListUpdatedNotification struct {
 	Data []AppInfo `json:"data"`
 }
 
+func (n *AppListUpdatedNotification) UnmarshalJSON(data []byte) error {
+	type wire AppListUpdatedNotification
+	var decoded wire
+	required := []string{"data"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = AppListUpdatedNotification(decoded)
+	return nil
+}
+
 // AppsService provides access to app-related operations.
 type AppsService struct {
 	client *Client

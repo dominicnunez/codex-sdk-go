@@ -30,6 +30,10 @@ func TestClientMethodsRejectMalformedSuccessResponses(t *testing.T) {
 					"user": map[string]interface{}{},
 				},
 			},
+			nullFieldObject: map[string]interface{}{
+				"config":  nil,
+				"origins": map[string]interface{}{},
+			},
 			call: func(client *codex.Client) error {
 				_, err := client.Config.Read(context.Background(), codex.ConfigReadParams{})
 				return err
@@ -133,6 +137,20 @@ func TestClientMethodsRejectMalformedSuccessResponses(t *testing.T) {
 					Classification: "bug",
 					IncludeLogs:    true,
 				})
+				return err
+			},
+		},
+		{
+			name:          "model list",
+			method:        "model/list",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"data": []interface{}{
+					map[string]interface{}{},
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Model.List(context.Background(), codex.ModelListParams{})
 				return err
 			},
 		},

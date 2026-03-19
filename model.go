@@ -68,9 +68,45 @@ type Model struct {
 	UpgradeInfo *ModelUpgradeInfo `json:"upgradeInfo,omitempty"`
 }
 
+func (m *Model) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(
+		data,
+		"defaultReasoningEffort",
+		"description",
+		"displayName",
+		"hidden",
+		"id",
+		"isDefault",
+		"model",
+		"supportedReasoningEfforts",
+	); err != nil {
+		return err
+	}
+	type wire Model
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*m = Model(decoded)
+	return nil
+}
+
 // ModelAvailabilityNux contains an availability nux message for a model.
 type ModelAvailabilityNux struct {
 	Message string `json:"message"`
+}
+
+func (n *ModelAvailabilityNux) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "message"); err != nil {
+		return err
+	}
+	type wire ModelAvailabilityNux
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*n = ModelAvailabilityNux(decoded)
+	return nil
 }
 
 // ModelUpgradeInfo contains upgrade information for a model.
@@ -81,12 +117,38 @@ type ModelUpgradeInfo struct {
 	UpgradeCopy       *string `json:"upgradeCopy,omitempty"`
 }
 
+func (i *ModelUpgradeInfo) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "model"); err != nil {
+		return err
+	}
+	type wire ModelUpgradeInfo
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*i = ModelUpgradeInfo(decoded)
+	return nil
+}
+
 // ReasoningEffortOption describes a supported reasoning effort level.
 type ReasoningEffortOption struct {
 	// The reasoning effort level.
 	ReasoningEffort ReasoningEffort `json:"reasoningEffort"`
 	// Human-readable description of this effort level.
 	Description string `json:"description"`
+}
+
+func (o *ReasoningEffortOption) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "description", "reasoningEffort"); err != nil {
+		return err
+	}
+	type wire ReasoningEffortOption
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*o = ReasoningEffortOption(decoded)
+	return nil
 }
 
 // ModelReroutedNotification is sent when a model is rerouted to a different model.
@@ -101,6 +163,17 @@ type ModelReroutedNotification struct {
 	ToModel string `json:"toModel"`
 	// Reason for the reroute.
 	Reason ModelRerouteReason `json:"reason"`
+}
+
+func (n *ModelReroutedNotification) UnmarshalJSON(data []byte) error {
+	type wire ModelReroutedNotification
+	var decoded wire
+	required := []string{"fromModel", "reason", "threadId", "toModel", "turnId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = ModelReroutedNotification(decoded)
+	return nil
 }
 
 // ModelRerouteReason represents the reason why a model was rerouted.

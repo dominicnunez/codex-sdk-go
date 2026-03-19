@@ -3,6 +3,7 @@ package codex_test
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go"
@@ -215,5 +216,39 @@ func TestModelReroutedNotification(t *testing.T) {
 	}
 	if receivedNotif.Reason != "highRiskCyberActivity" {
 		t.Errorf("expected Reason = highRiskCyberActivity, got %s", receivedNotif.Reason)
+	}
+}
+
+func TestModelReroutedNotificationMissingRequiredFieldReportsHandlerError(t *testing.T) {
+	mock := NewMockTransport()
+
+	var (
+		gotMethod string
+		gotErr    error
+	)
+	client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+		gotMethod = method
+		gotErr = err
+	}))
+
+	var called bool
+	client.OnModelRerouted(func(codex.ModelReroutedNotification) {
+		called = true
+	})
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "model/rerouted",
+		Params:  json.RawMessage(`{"threadId":"thread-123","turnId":"turn-456","toModel":"gpt-5","reason":"highRiskCyberActivity"}`),
+	})
+
+	if called {
+		t.Fatal("handler should not be called for malformed payload")
+	}
+	if gotMethod != "model/rerouted" {
+		t.Fatalf("handler error method = %q; want %q", gotMethod, "model/rerouted")
+	}
+	if gotErr == nil || !strings.Contains(gotErr.Error(), "missing required field") {
+		t.Fatalf("handler error = %v; want missing required field failure", gotErr)
 	}
 }

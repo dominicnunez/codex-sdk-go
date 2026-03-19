@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go"
@@ -473,6 +474,40 @@ func TestErrorNotification(t *testing.T) {
 	}
 }
 
+func TestErrorNotificationMissingRequiredFieldReportsHandlerError(t *testing.T) {
+	mock := NewMockTransport()
+
+	var (
+		gotMethod string
+		gotErr    error
+	)
+	client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+		gotMethod = method
+		gotErr = err
+	}))
+
+	var called bool
+	client.OnError(func(codex.ErrorNotification) {
+		called = true
+	})
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "error",
+		Params:  json.RawMessage(`{"threadId":"thread-123","turnId":"turn-456","willRetry":true}`),
+	})
+
+	if called {
+		t.Fatal("handler should not be called for malformed payload")
+	}
+	if gotMethod != "error" {
+		t.Fatalf("handler error method = %q; want %q", gotMethod, "error")
+	}
+	if gotErr == nil || !strings.Contains(gotErr.Error(), "missing required field") {
+		t.Fatalf("handler error = %v; want missing required field failure", gotErr)
+	}
+}
+
 // TestTerminalInteractionNotification tests the terminal interaction notification
 func TestTerminalInteractionNotification(t *testing.T) {
 	params := map[string]interface{}{
@@ -533,6 +568,127 @@ func TestTerminalInteractionNotification(t *testing.T) {
 	}
 	if received.Stdin != "ls -la\n" {
 		t.Errorf("Listener received stdin %q, expected 'ls -la\\n'", received.Stdin)
+	}
+}
+
+func TestTerminalInteractionNotificationMissingRequiredFieldReportsHandlerError(t *testing.T) {
+	mock := NewMockTransport()
+
+	var (
+		gotMethod string
+		gotErr    error
+	)
+	client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+		gotMethod = method
+		gotErr = err
+	}))
+
+	var called bool
+	client.OnTerminalInteraction(func(codex.TerminalInteractionNotification) {
+		called = true
+	})
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/commandExecution/terminalInteraction",
+		Params:  json.RawMessage(`{"itemId":"item-789","processId":"process-abc","stdin":"ls -la\n","threadId":"thread-123"}`),
+	})
+
+	if called {
+		t.Fatal("handler should not be called for malformed payload")
+	}
+	if gotMethod != "item/commandExecution/terminalInteraction" {
+		t.Fatalf(
+			"handler error method = %q; want %q",
+			gotMethod,
+			"item/commandExecution/terminalInteraction",
+		)
+	}
+	if gotErr == nil || !strings.Contains(gotErr.Error(), "missing required field") {
+		t.Fatalf("handler error = %v; want missing required field failure", gotErr)
+	}
+}
+
+func TestSystemNotificationsMissingRequiredFieldReportHandlerError(t *testing.T) {
+	tests := []struct {
+		name   string
+		method string
+		params json.RawMessage
+		on     func(*codex.Client, *bool)
+	}{
+		{
+			name:   "windows sandbox setup completed",
+			method: "windowsSandbox/setupCompleted",
+			params: json.RawMessage(`{"mode":"elevated"}`),
+			on: func(client *codex.Client, called *bool) {
+				client.OnWindowsSandboxSetupCompleted(func(codex.WindowsSandboxSetupCompletedNotification) {
+					*called = true
+				})
+			},
+		},
+		{
+			name:   "windows world writable warning",
+			method: "windows/worldWritableWarning",
+			params: json.RawMessage(`{"extraCount":0,"failedScan":false}`),
+			on: func(client *codex.Client, called *bool) {
+				client.OnWindowsWorldWritableWarning(func(codex.WindowsWorldWritableWarningNotification) {
+					*called = true
+				})
+			},
+		},
+		{
+			name:   "context compacted",
+			method: "thread/compacted",
+			params: json.RawMessage(`{"threadId":"thread-123"}`),
+			on: func(client *codex.Client, called *bool) {
+				client.OnContextCompacted(func(codex.ContextCompactedNotification) {
+					*called = true
+				})
+			},
+		},
+		{
+			name:   "deprecation notice",
+			method: "deprecationNotice",
+			params: json.RawMessage(`{}`),
+			on: func(client *codex.Client, called *bool) {
+				client.OnDeprecationNotice(func(codex.DeprecationNoticeNotification) {
+					*called = true
+				})
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := NewMockTransport()
+
+			var (
+				gotMethod string
+				gotErr    error
+				called    bool
+			)
+			client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+				gotMethod = method
+				gotErr = err
+			}))
+			tt.on(client, &called)
+
+			mock.InjectServerNotification(context.Background(), codex.Notification{
+				JSONRPC: "2.0",
+				Method:  tt.method,
+				Params:  tt.params,
+			})
+
+			if called {
+				t.Fatal("handler should not be called for malformed payload")
+			}
+			if gotMethod != tt.method {
+				t.Fatalf("handler error method = %q, want %q", gotMethod, tt.method)
+			}
+			if gotErr == nil || !strings.Contains(gotErr.Error(), "missing required field") {
+				t.Fatalf("handler error = %v; want missing required field failure", gotErr)
+			}
+		})
 	}
 }
 

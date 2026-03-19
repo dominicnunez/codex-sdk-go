@@ -3,6 +3,7 @@ package codex_test
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/dominicnunez/codex-sdk-go"
@@ -134,6 +135,40 @@ func TestFuzzyFileSearchSessionCompletedNotification(t *testing.T) {
 	}
 }
 
+func TestFuzzyFileSearchSessionCompletedNotificationMissingRequiredFieldReportsHandlerError(t *testing.T) {
+	mock := NewMockTransport()
+
+	var (
+		gotMethod string
+		gotErr    error
+	)
+	client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+		gotMethod = method
+		gotErr = err
+	}))
+
+	var called bool
+	client.OnFuzzyFileSearchSessionCompleted(func(codex.FuzzyFileSearchSessionCompletedNotification) {
+		called = true
+	})
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "fuzzyFileSearch/sessionCompleted",
+		Params:  json.RawMessage(`{}`),
+	})
+
+	if called {
+		t.Fatal("handler should not be called for malformed payload")
+	}
+	if gotMethod != "fuzzyFileSearch/sessionCompleted" {
+		t.Fatalf("handler error method = %q, want %q", gotMethod, "fuzzyFileSearch/sessionCompleted")
+	}
+	if gotErr == nil || !strings.Contains(gotErr.Error(), "missing required field") {
+		t.Fatalf("handler error = %v; want missing required field failure", gotErr)
+	}
+}
+
 // TestFuzzyFileSearchSessionUpdatedNotification tests the sessionUpdated notification dispatch.
 func TestFuzzyFileSearchSessionUpdatedNotification(t *testing.T) {
 	mock := NewMockTransport()
@@ -209,6 +244,40 @@ func TestFuzzyFileSearchSessionUpdatedNotification(t *testing.T) {
 		} else if len(*file.Indices) != 4 {
 			t.Errorf("File[1].Indices length mismatch: got %d, want 4", len(*file.Indices))
 		}
+	}
+}
+
+func TestFuzzyFileSearchSessionUpdatedNotificationMissingRequiredFieldReportsHandlerError(t *testing.T) {
+	mock := NewMockTransport()
+
+	var (
+		gotMethod string
+		gotErr    error
+	)
+	client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+		gotMethod = method
+		gotErr = err
+	}))
+
+	var called bool
+	client.OnFuzzyFileSearchSessionUpdated(func(codex.FuzzyFileSearchSessionUpdatedNotification) {
+		called = true
+	})
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "fuzzyFileSearch/sessionUpdated",
+		Params:  json.RawMessage(`{"sessionId":"session-456","files":[]}`),
+	})
+
+	if called {
+		t.Fatal("handler should not be called for malformed payload")
+	}
+	if gotMethod != "fuzzyFileSearch/sessionUpdated" {
+		t.Fatalf("handler error method = %q, want %q", gotMethod, "fuzzyFileSearch/sessionUpdated")
+	}
+	if gotErr == nil || !strings.Contains(gotErr.Error(), "missing required field") {
+		t.Fatalf("handler error = %v; want missing required field failure", gotErr)
 	}
 }
 

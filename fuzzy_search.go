@@ -58,11 +58,33 @@ type FuzzyFileSearchSessionCompletedNotification struct {
 	SessionID string `json:"sessionId"`
 }
 
+func (n *FuzzyFileSearchSessionCompletedNotification) UnmarshalJSON(data []byte) error {
+	type wire FuzzyFileSearchSessionCompletedNotification
+	var decoded wire
+	required := []string{"sessionId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = FuzzyFileSearchSessionCompletedNotification(decoded)
+	return nil
+}
+
 // FuzzyFileSearchSessionUpdatedNotification is sent when a fuzzy file search session has new results.
 type FuzzyFileSearchSessionUpdatedNotification struct {
 	SessionID string                  `json:"sessionId"`
 	Query     string                  `json:"query"`
 	Files     []FuzzyFileSearchResult `json:"files"`
+}
+
+func (n *FuzzyFileSearchSessionUpdatedNotification) UnmarshalJSON(data []byte) error {
+	type wire FuzzyFileSearchSessionUpdatedNotification
+	var decoded wire
+	required := []string{"files", "query", "sessionId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = FuzzyFileSearchSessionUpdatedNotification(decoded)
+	return nil
 }
 
 // FuzzyFileSearchService provides fuzzy file search operations.

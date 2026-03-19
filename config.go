@@ -20,7 +20,7 @@ type ConfigReadResponse struct {
 }
 
 func (r *ConfigReadResponse) UnmarshalJSON(data []byte) error {
-	if err := validateRequiredObjectKeys(data, "config"); err != nil {
+	if err := validateRequiredObjectFields(data, "config"); err != nil {
 		return err
 	}
 	if err := validateRequiredObjectFields(data, "origins"); err != nil {

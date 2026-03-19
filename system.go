@@ -49,11 +49,33 @@ type WindowsSandboxSetupCompletedNotification struct {
 	Error   *string                 `json:"error,omitempty"`
 }
 
+func (n *WindowsSandboxSetupCompletedNotification) UnmarshalJSON(data []byte) error {
+	type wire WindowsSandboxSetupCompletedNotification
+	var decoded wire
+	required := []string{"mode", "success"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = WindowsSandboxSetupCompletedNotification(decoded)
+	return nil
+}
+
 // WindowsWorldWritableWarningNotification warns about world-writable files
 type WindowsWorldWritableWarningNotification struct {
 	ExtraCount  uint     `json:"extraCount"`
 	FailedScan  bool     `json:"failedScan"`
 	SamplePaths []string `json:"samplePaths"`
+}
+
+func (n *WindowsWorldWritableWarningNotification) UnmarshalJSON(data []byte) error {
+	type wire WindowsWorldWritableWarningNotification
+	var decoded wire
+	required := []string{"extraCount", "failedScan", "samplePaths"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = WindowsWorldWritableWarningNotification(decoded)
+	return nil
 }
 
 // Deprecated: Use ContextCompaction item type instead.
@@ -63,10 +85,32 @@ type ContextCompactedNotification struct {
 	TurnID   string `json:"turnId"`
 }
 
+func (n *ContextCompactedNotification) UnmarshalJSON(data []byte) error {
+	type wire ContextCompactedNotification
+	var decoded wire
+	required := []string{"threadId", "turnId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = ContextCompactedNotification(decoded)
+	return nil
+}
+
 // DeprecationNoticeNotification informs about deprecated features
 type DeprecationNoticeNotification struct {
 	Summary string  `json:"summary"`
 	Details *string `json:"details,omitempty"`
+}
+
+func (n *DeprecationNoticeNotification) UnmarshalJSON(data []byte) error {
+	type wire DeprecationNoticeNotification
+	var decoded wire
+	required := []string{"summary"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = DeprecationNoticeNotification(decoded)
+	return nil
 }
 
 // ErrorNotification is sent when a system error occurs
@@ -77,6 +121,17 @@ type ErrorNotification struct {
 	WillRetry bool      `json:"willRetry"`
 }
 
+func (n *ErrorNotification) UnmarshalJSON(data []byte) error {
+	type wire ErrorNotification
+	var decoded wire
+	required := []string{"error", "threadId", "turnId", "willRetry"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = ErrorNotification(decoded)
+	return nil
+}
+
 // TerminalInteractionNotification is sent for terminal stdin interactions
 type TerminalInteractionNotification struct {
 	ItemID    string `json:"itemId"`
@@ -84,6 +139,17 @@ type TerminalInteractionNotification struct {
 	Stdin     string `json:"stdin"`
 	ThreadID  string `json:"threadId"`
 	TurnID    string `json:"turnId"`
+}
+
+func (n *TerminalInteractionNotification) UnmarshalJSON(data []byte) error {
+	type wire TerminalInteractionNotification
+	var decoded wire
+	required := []string{"itemId", "processId", "stdin", "threadId", "turnId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = TerminalInteractionNotification(decoded)
+	return nil
 }
 
 // --- SystemService ---

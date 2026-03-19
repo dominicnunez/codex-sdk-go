@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go"
@@ -240,6 +241,40 @@ func TestAppListUpdatedNotification(t *testing.T) {
 	}
 	if app.Name != "New App" {
 		t.Errorf("expected Name 'New App', got %s", app.Name)
+	}
+}
+
+func TestAppListUpdatedNotificationMissingRequiredFieldReportsHandlerError(t *testing.T) {
+	mock := NewMockTransport()
+
+	var (
+		gotMethod string
+		gotErr    error
+	)
+	client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+		gotMethod = method
+		gotErr = err
+	}))
+
+	var called bool
+	client.OnAppListUpdated(func(codex.AppListUpdatedNotification) {
+		called = true
+	})
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "app/list/updated",
+		Params:  json.RawMessage(`{}`),
+	})
+
+	if called {
+		t.Fatal("handler should not be called for malformed payload")
+	}
+	if gotMethod != "app/list/updated" {
+		t.Fatalf("handler error method = %q, want %q", gotMethod, "app/list/updated")
+	}
+	if gotErr == nil || !strings.Contains(gotErr.Error(), "missing required field") {
+		t.Fatalf("handler error = %v; want missing required field failure", gotErr)
 	}
 }
 
