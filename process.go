@@ -366,14 +366,15 @@ func stopStartedCommand(cmd *exec.Cmd) {
 	_ = cmd.Wait()
 }
 
-// Close stops the child process and closes the transport.
+// Close stops the child process, waits for its stdout reader to drain, and
+// then closes the transport.
 // Safe to call multiple times. No-op when created via NewProcessFromClient.
 func (p *Process) Close() error {
 	var closeErr error
 	p.closeOnce.Do(func() {
 		closeErr = errors.Join(closeErr, p.closeStdin())
-		closeErr = errors.Join(closeErr, p.closeTransport())
 		closeErr = errors.Join(closeErr, p.closeChildProcess())
+		closeErr = errors.Join(closeErr, p.closeTransport())
 	})
 	return closeErr
 }
@@ -415,6 +416,9 @@ func (p *Process) closeChildProcess() error {
 		closeErr = errors.Join(closeErr, p.signalProcessShutdown(process))
 	}
 	closeErr = errors.Join(closeErr, p.waitForProcessExit(process, shutdownMode))
+	if p.waitCompleted() {
+		p.waitForTransportReaderStop()
+	}
 	return errors.Join(closeErr, p.processExitError())
 }
 
@@ -458,6 +462,13 @@ func (p *Process) processExitError() error {
 		return p.waitErr
 	}
 	return nil
+}
+
+func (p *Process) waitForTransportReaderStop() {
+	if p.transport == nil || p.transport.readerStopped == nil {
+		return
+	}
+	<-p.transport.readerStopped
 }
 
 // ensureInit runs the idempotent initialize handshake. On success the result is
