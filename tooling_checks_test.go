@@ -6,35 +6,30 @@ package codex_test
 import (
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 )
-
-const golangciLintVersion = "v2.11.3"
 
 // TestGolangciLint verifies that golangci-lint passes with no issues.
 //
 // To run golangci-lint manually:
 //
-//	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.3
-//	golangci-lint run ./...
+//	scripts/hooks/run.sh golangci-lint run ./...
 func TestGolangciLint(t *testing.T) {
-	lintBin := "golangci-lint"
-	if _, err := exec.LookPath(lintBin); err != nil {
-		// Fall back to GOPATH/bin or ~/go/bin
-		gopath := os.Getenv("GOPATH")
-		if gopath == "" {
-			gopath = filepath.Join(os.Getenv("HOME"), "go")
-		}
-		candidate := filepath.Join(gopath, "bin", "golangci-lint")
-		if _, err := exec.LookPath(candidate); err != nil {
-			t.Skip("golangci-lint not found - install with: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@" + golangciLintVersion)
-		}
-		lintBin = candidate
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("bash not found")
 	}
 
-	cmd := exec.Command(lintBin, "run", "./...")
+	cmd := exec.Command(
+		bash,
+		repoPath(t, "scripts", "hooks", "run.sh"),
+		"golangci-lint",
+		"run",
+		"./...",
+	)
+	cmd.Dir = repoRoot(t)
+	cmd.Env = append(os.Environ(), "IN_NIX_SHELL=1")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("golangci-lint failed:\n%s", string(output))
