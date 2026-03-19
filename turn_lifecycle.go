@@ -125,7 +125,7 @@ type turnLifecycleParams struct {
 	thread                    Thread
 	threadID                  string
 	allowMissingInitialTurnID bool
-	onComplete                func(Turn) // called when a turn is finalized into thread state; nil = no-op
+	onComplete                func(Thread) // called with the completed thread snapshot; nil = no-op
 	collector                 *StreamCollector
 }
 
@@ -232,13 +232,20 @@ func waitForTurnCompletion(ctx context.Context, done <-chan TurnCompletedNotific
 
 func completeTurnLifecycle(p turnLifecycleParams, completed Turn, items []ThreadItemWrapper) *RunResult {
 	completedTurn := turnWithItems(completed, items)
-
-	if p.onComplete != nil {
-		p.onComplete(completedTurn)
+	thread := p.thread
+	if p.client != nil {
+		if snapshot, ok := p.client.threadStateSnapshot(p.threadID); ok {
+			thread = snapshot
+		}
 	}
 
-	result := buildRunResult(p.thread, completedTurn, items)
-	p.client.cacheThreadState(result.Thread)
+	result := buildRunResult(thread, completedTurn, items)
+	if p.client != nil {
+		p.client.cacheThreadState(result.Thread)
+	}
+	if p.onComplete != nil {
+		p.onComplete(result.Thread)
+	}
 	return result
 }
 

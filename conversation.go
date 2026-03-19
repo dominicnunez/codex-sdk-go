@@ -63,6 +63,22 @@ func (c *Conversation) Thread() Thread {
 	return cloneThreadState(c.thread)
 }
 
+func (c *Conversation) latestThreadStateLocked() Thread {
+	if c.process != nil && c.process.Client != nil {
+		if snapshot, ok := c.process.Client.threadStateSnapshot(c.threadID); ok {
+			return snapshot
+		}
+	}
+	return cloneThreadState(c.thread)
+}
+
+func (c *Conversation) applyCompletedThread(thread Thread) {
+	c.mu.Lock()
+	c.thread = cloneThreadState(thread)
+	c.hasCompletedTerminalTurn = true
+	c.mu.Unlock()
+}
+
 func cloneThreadState(thread Thread) Thread {
 	t := thread
 	t.Name = cloneStringPtr(thread.Name)
@@ -675,7 +691,7 @@ func (c *Conversation) Turn(ctx context.Context, opts TurnOptions) (*RunResult, 
 		return nil, errTurnInProgress
 	}
 	c.activeTurn = true
-	thread := c.thread
+	thread := c.latestThreadStateLocked()
 	allowMissingInitialTurnID := !c.hasCompletedTerminalTurn
 	c.mu.Unlock()
 
@@ -691,12 +707,7 @@ func (c *Conversation) Turn(ctx context.Context, opts TurnOptions) (*RunResult, 
 		thread:                    thread,
 		threadID:                  c.threadID,
 		allowMissingInitialTurnID: allowMissingInitialTurnID,
-		onComplete: func(turn Turn) {
-			c.mu.Lock()
-			c.thread.Turns = append(c.thread.Turns, turn)
-			c.hasCompletedTerminalTurn = true
-			c.mu.Unlock()
-		},
+		onComplete:                c.applyCompletedThread,
 	})
 }
 
@@ -739,7 +750,7 @@ func (c *Conversation) turnStreamedLifecycle(ctx context.Context, opts TurnOptio
 		return
 	}
 	c.activeTurn = true
-	thread := c.thread
+	thread := c.latestThreadStateLocked()
 	allowMissingInitialTurnID := !c.hasCompletedTerminalTurn
 	c.mu.Unlock()
 
@@ -755,11 +766,6 @@ func (c *Conversation) turnStreamedLifecycle(ctx context.Context, opts TurnOptio
 		thread:                    thread,
 		threadID:                  c.threadID,
 		allowMissingInitialTurnID: allowMissingInitialTurnID,
-		onComplete: func(turn Turn) {
-			c.mu.Lock()
-			c.thread.Turns = append(c.thread.Turns, turn)
-			c.hasCompletedTerminalTurn = true
-			c.mu.Unlock()
-		},
+		onComplete:                c.applyCompletedThread,
 	}, g, s)
 }

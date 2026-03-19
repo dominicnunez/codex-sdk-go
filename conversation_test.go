@@ -246,6 +246,171 @@ func TestConversationThreadAppliesNotificationOnlyMetadataUpdates(t *testing.T) 
 	}
 }
 
+func primeConversationThreadMetadata(t *testing.T, ctx context.Context, proc *codex.Process, mock *MockTransport, conv *codex.Conversation) (string, string, string) {
+	t.Helper()
+
+	threadName := "Renamed Thread"
+	threadPath := "/workspace/project"
+	threadBranch := "main"
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "thread/name/updated",
+		Params:  json.RawMessage(`{"threadId":"thread-1","threadName":"` + threadName + `"}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "thread/status/changed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","status":{"type":"active","activeFlags":["waitingOnApproval"]}}`),
+	})
+
+	_ = mock.SetResponseData("thread/read", map[string]interface{}{
+		"thread": map[string]interface{}{
+			"id":            "thread-1",
+			"cliVersion":    "1.0.0",
+			"createdAt":     1700000000,
+			"cwd":           "/tmp",
+			"modelProvider": "openai",
+			"path":          threadPath,
+			"preview":       "",
+			"source":        "exec",
+			"status": map[string]interface{}{
+				"type":        "active",
+				"activeFlags": []interface{}{"waitingOnApproval"},
+			},
+			"turns":     []interface{}{},
+			"updatedAt": 1700000001,
+			"ephemeral": true,
+			"name":      threadName,
+			"gitInfo": map[string]interface{}{
+				"branch":    threadBranch,
+				"originUrl": "https://example.com/repo.git",
+				"sha":       "abc123",
+			},
+		},
+	})
+
+	if _, err := proc.Client.Thread.Read(ctx, codex.ThreadReadParams{ThreadID: conv.ThreadID()}); err != nil {
+		t.Fatalf("Thread.Read: %v", err)
+	}
+
+	return threadName, threadPath, threadBranch
+}
+
+func assertConversationThreadMetadata(t *testing.T, thread codex.Thread, wantName, wantPath, wantBranch string, wantTurns int) {
+	t.Helper()
+
+	if thread.Name == nil || *thread.Name != wantName {
+		t.Fatalf("thread.Name = %v, want %q", thread.Name, wantName)
+	}
+	if thread.Path == nil || *thread.Path != wantPath {
+		t.Fatalf("thread.Path = %v, want %q", thread.Path, wantPath)
+	}
+	if thread.GitInfo == nil || thread.GitInfo.Branch == nil || *thread.GitInfo.Branch != wantBranch {
+		t.Fatalf("thread.GitInfo = %+v, want branch %q", thread.GitInfo, wantBranch)
+	}
+	if len(thread.Turns) != wantTurns {
+		t.Fatalf("len(thread.Turns) = %d, want %d", len(thread.Turns), wantTurns)
+	}
+
+	active, ok := thread.Status.Value.(codex.ThreadStatusActive)
+	if !ok {
+		t.Fatalf("thread.Status = %T, want ThreadStatusActive", thread.Status.Value)
+	}
+	if len(active.ActiveFlags) != 1 || active.ActiveFlags[0] != codex.ThreadActiveFlagWaitingOnApproval {
+		t.Fatalf("thread.Status.ActiveFlags = %v, want waitingOnApproval", active.ActiveFlags)
+	}
+}
+
+func TestConversationTurnPreservesLatestCachedThreadMetadata(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+
+	threadName, threadPath, threadBranch := primeConversationThreadMetadata(t, ctx, proc, mock, conv)
+
+	resultCh := make(chan struct {
+		result *codex.RunResult
+		err    error
+	}, 1)
+	go func() {
+		result, err := conv.Turn(ctx, codex.TurnOptions{Prompt: "Hello"})
+		resultCh <- struct {
+			result *codex.RunResult
+			err    error
+		}{result: result, err: err}
+	}()
+
+	waitForMethodCallCount(t, mock, "turn/start", 1)
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-1","text":"Hi there!"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	out := <-resultCh
+	if out.err != nil {
+		t.Fatalf("Turn error: %v", out.err)
+	}
+	assertConversationThreadMetadata(t, out.result.Thread, threadName, threadPath, threadBranch, 1)
+	assertConversationThreadMetadata(t, conv.Thread(), threadName, threadPath, threadBranch, 1)
+}
+
+func TestConversationTurnStreamedPreservesLatestCachedThreadMetadata(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+
+	threadName, threadPath, threadBranch := primeConversationThreadMetadata(t, ctx, proc, mock, conv)
+
+	stream := conv.TurnStreamed(ctx, codex.TurnOptions{Prompt: "Stream me"})
+
+	waitForMethodCallCount(t, mock, "turn/start", 1)
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-1","text":"Hi there!"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	for _, err := range stream.Events() {
+		if err != nil {
+			t.Fatalf("unexpected stream error: %v", err)
+		}
+	}
+
+	result := stream.Result()
+	if result == nil {
+		t.Fatal("expected streamed result")
+		return
+	}
+	assertConversationThreadMetadata(t, result.Thread, threadName, threadPath, threadBranch, 1)
+	assertConversationThreadMetadata(t, conv.Thread(), threadName, threadPath, threadBranch, 1)
+}
+
 func TestConversationTurnStreamed(t *testing.T) {
 	proc, mock := mockProcess(t)
 
