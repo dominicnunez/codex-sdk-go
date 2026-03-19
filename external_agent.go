@@ -44,6 +44,11 @@ func (i *ExternalAgentConfigMigrationItem) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	validatedCwd, err := validateInboundAbsolutePathPointerField("externalAgentConfig.cwd", decoded.Cwd)
+	if err != nil {
+		return err
+	}
+	decoded.Cwd = validatedCwd
 	*i = ExternalAgentConfigMigrationItem(decoded)
 	return nil
 }

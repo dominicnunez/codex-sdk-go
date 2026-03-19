@@ -290,6 +290,47 @@ func TestExternalAgentConfigDetectRejectsInvalidItemType(t *testing.T) {
 	}
 }
 
+func TestExternalAgentConfigDetectRejectsInvalidCwd(t *testing.T) {
+	tests := []struct {
+		name         string
+		cwd          string
+		wantContains string
+	}{
+		{
+			name:         "relative cwd",
+			cwd:          "relative/path",
+			wantContains: `externalAgentConfig.cwd: must be an absolute path`,
+		},
+		{
+			name:         "non-normalized cwd",
+			cwd:          "/repo/../project",
+			wantContains: `externalAgentConfig.cwd: must be normalized`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := NewMockTransport()
+			_ = mock.SetResponseData("externalAgentConfig/detect", map[string]interface{}{
+				"items": []interface{}{
+					map[string]interface{}{
+						"cwd":         tt.cwd,
+						"description": "Project skills",
+						"itemType":    "SKILLS",
+					},
+				},
+			})
+
+			client := codex.NewClient(mock)
+
+			_, err := client.ExternalAgent.ConfigDetect(context.Background(), codex.ExternalAgentConfigDetectParams{})
+			if err == nil || !strings.Contains(err.Error(), tt.wantContains) {
+				t.Fatalf("ConfigDetect error = %v; want substring %q", err, tt.wantContains)
+			}
+		})
+	}
+}
+
 func TestExternalAgentConfigImportPreparesRequestParams(t *testing.T) {
 	tests := []struct {
 		name    string
