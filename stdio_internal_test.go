@@ -491,6 +491,86 @@ func TestStopAfterReadFailureWakesWaitingTurnScopedWorkers(t *testing.T) {
 	}
 }
 
+func TestReadLoopEOFCancelsTransportAndWakesWaitingTurnScopedWorkers(t *testing.T) {
+	reader, writer := io.Pipe()
+	transport := NewStdioTransport(reader, io.Discard)
+	defer func() { _ = transport.Close() }()
+	transport.initTurnScopedScheduler()
+	transport.ensureReadLoopStarted()
+
+	done := make(chan bool, 1)
+	go func() {
+		_, ok := transport.nextTurnScopedNotificationQueue()
+		done <- ok
+	}()
+
+	time.Sleep(25 * time.Millisecond)
+	if err := writer.Close(); err != nil {
+		t.Fatalf("Close() writer: %v", err)
+	}
+
+	select {
+	case <-transport.ctx.Done():
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout waiting for transport context cancellation after reader EOF")
+	}
+
+	select {
+	case ok := <-done:
+		if ok {
+			t.Fatal("nextTurnScopedNotificationQueue() reported work after reader EOF")
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout waiting for turn-scoped worker to wake after reader EOF")
+	}
+
+	if transport.ScanErr() != nil {
+		t.Fatalf("ScanErr() = %v, want nil after reader EOF", transport.ScanErr())
+	}
+	if err := transport.Notify(context.Background(), Notification{JSONRPC: "2.0", Method: "test/eof"}); err == nil {
+		t.Fatal("expected notify to fail after reader EOF")
+	} else if !strings.Contains(err.Error(), errTransportReaderStopped.Error()) {
+		t.Fatalf("Notify() error = %v, want reader stopped error", err)
+	}
+}
+
+func TestStopAfterReaderEOFWakesWaitingTurnScopedWorkers(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	reader, writer := io.Pipe()
+	defer func() { _ = writer.Close() }()
+
+	transport := &StdioTransport{
+		readerCloser: reader,
+		ctx:          ctx,
+		cancelCtx:    cancel,
+	}
+	transport.initTurnScopedScheduler()
+
+	done := make(chan bool, 1)
+	go func() {
+		_, ok := transport.nextTurnScopedNotificationQueue()
+		done <- ok
+	}()
+
+	time.Sleep(25 * time.Millisecond)
+	transport.stopAfterReaderEOF()
+
+	select {
+	case ok := <-done:
+		if ok {
+			t.Fatal("nextTurnScopedNotificationQueue() reported work after reader EOF")
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout waiting for turn-scoped worker to wake after reader EOF")
+	}
+
+	select {
+	case <-transport.ctx.Done():
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout waiting for transport context cancellation after reader EOF")
+	}
+}
+
 func TestEnqueueTurnScopedNotificationCapsTrackedQueues(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

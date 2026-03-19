@@ -2853,3 +2853,40 @@ func TestStdioSpontaneousReaderEOF(t *testing.T) {
 		t.Fatal("timeout: Send was not unblocked after reader EOF")
 	}
 }
+
+func TestStdioNotifyAfterReaderEOFReturnsReaderStopped(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	go func() {
+		scanner := bufio.NewScanner(serverReader)
+		for scanner.Scan() {
+		}
+	}()
+
+	_ = serverWriter.Close()
+	_ = clientReader.Close()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		err := transport.Notify(context.Background(), codex.Notification{
+			JSONRPC: "2.0",
+			Method:  "test/notification",
+		})
+		if err == nil {
+			time.Sleep(10 * time.Millisecond)
+			continue
+		}
+		if !strings.Contains(err.Error(), "transport reader stopped") {
+			t.Fatalf("expected reader stopped error, got %v", err)
+		}
+		return
+	}
+
+	t.Fatal("timeout waiting for notify to observe reader EOF")
+}

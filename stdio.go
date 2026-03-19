@@ -151,6 +151,7 @@ type StdioTransport struct {
 
 	mu                 sync.Mutex
 	closed             bool
+	readerEOF          bool
 	pendingReqs        map[string]pendingReq
 	reqHandler         RequestHandler
 	notifHandler       NotificationHandler
@@ -180,6 +181,7 @@ type StdioTransport struct {
 // that is not a supported JSON-RPC ID type (string, number).
 var errUnexpectedIDType = errors.New("unexpected ID type")
 var errTransportClosed = errors.New("transport closed")
+var errTransportReaderStopped = errors.New("transport reader stopped")
 var errOversizedInboundFrame = errors.New("oversized inbound frame exceeded maximum size")
 var errTurnScopedNotificationQueueOverflow = errors.New("turn-scoped notification queue overflow")
 
@@ -295,7 +297,11 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 
 	t.mu.Lock()
 	if t.closed {
+		readerEOF := t.readerEOF
 		t.mu.Unlock()
+		if readerEOF {
+			return Response{}, NewTransportError("send failed", errTransportReaderStopped)
+		}
 		return Response{}, NewTransportError("send failed", errTransportClosed)
 	}
 
@@ -337,7 +343,7 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 			return resp, nil
 		default:
 		}
-		return Response{}, NewTransportError("send failed", errors.New("transport reader stopped"))
+		return Response{}, NewTransportError("send failed", errTransportReaderStopped)
 	}
 }
 
@@ -350,7 +356,11 @@ func (t *StdioTransport) Notify(ctx context.Context, notif Notification) error {
 
 	t.mu.Lock()
 	if t.closed {
+		readerEOF := t.readerEOF
 		t.mu.Unlock()
+		if readerEOF {
+			return NewTransportError("notify failed", errTransportReaderStopped)
+		}
 		return NewTransportError("notify failed", errTransportClosed)
 	}
 	t.mu.Unlock()
@@ -435,6 +445,16 @@ func (t *StdioTransport) wakeTurnScopedNotificationWorkers() {
 	t.turnNotifReadyMu.Unlock()
 }
 
+func (t *StdioTransport) transportStopError(op string) error {
+	t.mu.Lock()
+	readerEOF := t.readerEOF
+	t.mu.Unlock()
+	if readerEOF {
+		return NewTransportError(op, errTransportReaderStopped)
+	}
+	return NewTransportError(op, errTransportClosed)
+}
+
 func (t *StdioTransport) closeWithFailure(scanErr error, message string, data json.RawMessage) {
 	t.mu.Lock()
 	if scanErr != nil && t.scanErr == nil {
@@ -445,6 +465,7 @@ func (t *StdioTransport) closeWithFailure(scanErr error, message string, data js
 		return
 	}
 	t.closed = true
+	t.readerEOF = false
 	pending := t.pendingReqs
 	t.pendingReqs = make(map[string]pendingReq)
 	cancel := t.cancelCtx
@@ -533,9 +554,9 @@ func (t *StdioTransport) enqueueWrite(ctx context.Context, msg interface{}, op s
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-t.ctx.Done():
-			return NewTransportError(op, errTransportClosed)
+			return t.transportStopError(op)
 		case <-t.readerStopped:
-			return NewTransportError(op, errors.New("transport reader stopped"))
+			return NewTransportError(op, errTransportReaderStopped)
 		case t.writeQueue <- env:
 		}
 	} else {
@@ -558,9 +579,9 @@ func (t *StdioTransport) enqueueWrite(ctx context.Context, msg interface{}, op s
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-t.ctx.Done():
-			return NewTransportError(op, errTransportClosed)
+			return t.transportStopError(op)
 		case <-t.readerStopped:
-			return NewTransportError(op, errors.New("transport reader stopped"))
+			return NewTransportError(op, errTransportReaderStopped)
 		}
 	}
 
@@ -693,6 +714,7 @@ func (t *StdioTransport) readLoop() {
 
 		if err != nil {
 			if errors.Is(err, io.EOF) {
+				t.stopAfterReaderEOF()
 				return
 			}
 			t.mu.Lock()
@@ -1565,6 +1587,27 @@ func (t *StdioTransport) stopAfterReadFailure(scanErr error) {
 		return
 	}
 	t.closed = true
+	t.readerEOF = false
+	cancel := t.cancelCtx
+	readerCloser := t.readerCloser
+	t.mu.Unlock()
+
+	cancel()
+	t.wakeTurnScopedNotificationWorkers()
+	if readerCloser != nil {
+		_ = readerCloser.Close()
+	}
+}
+
+func (t *StdioTransport) stopAfterReaderEOF() {
+	t.mu.Lock()
+	if t.closed {
+		t.mu.Unlock()
+		return
+	}
+	t.closed = true
+	t.readerEOF = true
+	t.pendingReqs = make(map[string]pendingReq)
 	cancel := t.cancelCtx
 	readerCloser := t.readerCloser
 	t.mu.Unlock()
