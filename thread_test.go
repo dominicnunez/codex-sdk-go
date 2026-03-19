@@ -1272,6 +1272,62 @@ func validThreadPayload(threadID string) map[string]interface{} {
 	}
 }
 
+func TestThreadReadRejectsInvalidInboundEnums(t *testing.T) {
+	tests := []struct {
+		name    string
+		mutate  func(map[string]interface{})
+		wantErr string
+	}{
+		{
+			name: "invalid active flag",
+			mutate: func(thread map[string]interface{}) {
+				thread["status"] = map[string]interface{}{
+					"type":        "active",
+					"activeFlags": []interface{}{"bogus"},
+				}
+			},
+			wantErr: `invalid thread.status.activeFlags "bogus"`,
+		},
+		{
+			name: "invalid turn status",
+			mutate: func(thread map[string]interface{}) {
+				thread["turns"] = []interface{}{
+					map[string]interface{}{
+						"id":     "turn-1",
+						"status": "bogus",
+						"items":  []interface{}{},
+					},
+				}
+			},
+			wantErr: `invalid turn.status "bogus"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := NewMockTransport()
+			defer func() { _ = transport.Close() }()
+
+			client := codex.NewClient(transport)
+			thread := validThreadPayload("thread-invalid-enum")
+			tt.mutate(thread)
+			_ = transport.SetResponseData("thread/read", map[string]interface{}{
+				"thread": thread,
+			})
+
+			_, err := client.Thread.Read(context.Background(), codex.ThreadReadParams{
+				ThreadID: "thread-invalid-enum",
+			})
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %v; want substring %q", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 // TestThreadUnsubscribe tests the ThreadService.Unsubscribe method
 func TestThreadUnsubscribe(t *testing.T) {
 	transport := NewMockTransport()

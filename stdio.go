@@ -840,7 +840,12 @@ func (t *StdioTransport) processInboundLine(line []byte) {
 	}
 
 	// Response: has ID, no method, and explicit response fields.
-	if hasID && frame.Method == "" && frame.hasResponseFields() {
+	if hasID && frame.hasResponseFields() {
+		if frame.Method != "" {
+			t.failPendingWithParseError(frame.ID, "failed to parse server response")
+			t.handleMalformedInboundObject()
+			return
+		}
 		id, ok := frame.ID.requestID()
 		if !ok || frame.hasMalformedResponseShape() {
 			t.handleMalformedResponse(line)
@@ -914,6 +919,45 @@ func (t *StdioTransport) rejectInvalidProtocolVersion(idField inboundID) {
 }
 
 func (t *StdioTransport) failPendingWithInvalidProtocolVersion(idField inboundID) {
+	t.failPendingWithError(
+		idField,
+		func(id RequestID) pendingReqResult {
+			return pendingReqResult{
+				resp: Response{
+					JSONRPC: jsonrpcVersion,
+					ID:      id,
+					Error: &Error{
+						Code:    ErrCodeInvalidRequest,
+						Message: errInvalidResponseJSONRPC,
+					},
+				},
+			}
+		},
+	)
+}
+
+func (t *StdioTransport) failPendingWithParseError(idField inboundID, message string) {
+	t.failPendingWithError(
+		idField,
+		func(id RequestID) pendingReqResult {
+			return pendingReqResult{
+				resp: Response{
+					JSONRPC: jsonrpcVersion,
+					ID:      id,
+					Error: &Error{
+						Code:    ErrCodeParseError,
+						Message: message,
+					},
+				},
+			}
+		},
+	)
+}
+
+func (t *StdioTransport) failPendingWithError(
+	idField inboundID,
+	build func(RequestID) pendingReqResult,
+) {
 	id, ok := idField.requestID()
 	if !ok {
 		return
@@ -935,16 +979,7 @@ func (t *StdioTransport) failPendingWithInvalidProtocolVersion(idField inboundID
 	t.mu.Unlock()
 
 	if ok {
-		pending.ch <- pendingReqResult{
-			resp: Response{
-				JSONRPC: jsonrpcVersion,
-				ID:      pending.id,
-				Error: &Error{
-					Code:    ErrCodeInvalidRequest,
-					Message: errInvalidResponseJSONRPC,
-				},
-			},
-		}
+		pending.ch <- build(pending.id)
 	}
 }
 
