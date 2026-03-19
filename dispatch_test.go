@@ -1004,7 +1004,7 @@ func TestNilHandlerDeregistration(t *testing.T) {
 			deregister: func(client *codex.Client) {
 				client.OnError(nil)
 			},
-			params: `{"error": {"message": "test error"}, "threadId": "thread-123", "turnId": "turn-1"}`,
+			params: `{"error": {"message": "test error"}, "threadId": "thread-123", "turnId": "turn-1", "willRetry": false}`,
 		},
 	}
 
