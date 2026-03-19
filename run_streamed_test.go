@@ -256,9 +256,16 @@ func TestRunStreamedTurnError(t *testing.T) {
 		t.Error("expected TurnCompleted event before error")
 	}
 
-	// Result should be nil since the turn errored.
-	if stream.Result() != nil {
-		t.Error("expected nil Result() after turn error")
+	result := stream.Result()
+	if result == nil {
+		t.Fatal("expected Result() to retain failed turn state")
+		return
+	}
+	if result.Turn.Status != codex.TurnStatusFailed {
+		t.Fatalf("Result().Turn.Status = %q, want %q", result.Turn.Status, codex.TurnStatusFailed)
+	}
+	if result.Turn.Error == nil || result.Turn.Error.Message != "model rate limited" {
+		t.Fatalf("Result().Turn.Error = %+v, want model rate limited", result.Turn.Error)
 	}
 }
 

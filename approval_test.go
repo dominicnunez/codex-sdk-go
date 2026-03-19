@@ -514,7 +514,7 @@ func TestApprovalHandlerDispatch(t *testing.T) {
 		JSONRPC: "2.0",
 		ID:      codex.RequestID{Value: 9},
 		Method:  "mcpServer/elicitation/request",
-		Params:  json.RawMessage(`{"serverName":"demo","threadId":"t1","message":"Need input","mode":"url","url":"https://example.com"}`),
+		Params:  json.RawMessage(`{"serverName":"demo","threadId":"t1","message":"Need input","mode":"url","elicitationId":"e1","url":"https://example.com"}`),
 	})
 
 	// Verify all handlers were called
