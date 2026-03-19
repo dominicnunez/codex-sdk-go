@@ -2255,6 +2255,14 @@ func TestStdioHandleResponseUnmarshalError(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("timeout: caller should have received a parse error, not hung")
 	}
+
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for transport.MalformedMessageCount() < 1 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if got := transport.MalformedMessageCount(); got != 1 {
+		t.Fatalf("MalformedMessageCount() = %d; want 1 after malformed response shape", got)
+	}
 }
 
 func TestStdioIgnoresNonResponseFramesWithID(t *testing.T) {

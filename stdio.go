@@ -1484,6 +1484,8 @@ func (t *StdioTransport) handleMalformedInboundObject() {
 // handleMalformedResponse attempts to extract the ID from a response that
 // failed full unmarshal, and sends a parse error to the pending caller.
 func (t *StdioTransport) handleMalformedResponse(data []byte) {
+	t.malformedCount.Add(1)
+
 	var partial struct {
 		ID json.RawMessage `json:"id"`
 	}
@@ -1493,12 +1495,10 @@ func (t *StdioTransport) handleMalformedResponse(data []byte) {
 
 	id, err := parseRequestID(partial.ID)
 	if err != nil {
-		t.malformedCount.Add(1)
 		return
 	}
 	normalizedID, err := normalizePendingRequestID(id.Value)
 	if err != nil {
-		t.malformedCount.Add(1)
 		return
 	}
 
