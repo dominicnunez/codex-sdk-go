@@ -1275,14 +1275,15 @@ missing `plugin`, `appsNeedingAuth`, or `authPolicy` fields no longer occurs.
 
 ### Oversized response recovery does not depend on top-level id appearing early in the frame
 
-**Location:** `stdio.go:781` — oversized frame parsing
+**Location:** `stdio.go:1520` — oversized frame parsing
 
 **Reason:** The current oversized-frame path does not rely on a retained prefix. It
-streams the discarded frame through `extractTopLevelIDAndMethodFromReader` via
-`newOversizedFrameReader`, so top-level routing metadata can still be found after a
-large `result` field. A regression test now covers a valid oversized response where
-`result` appears before `id`, and `Send` resolves with the expected parse error
-instead of timing out.
+continues scanning the oversized frame with `extractOversizedFrameInfo`,
+`oversizedFrameScanner`, and `newlineTerminatedReader`, so top-level routing
+metadata can still be found after a large `result` or `error` field. The
+regression test `TestStdioOversizeResponseWithLateIDUnblocksPendingSend` covers a
+valid oversized response where `result` appears before `id`, and `Send`
+resolves with the expected parse error instead of timing out.
 
 ### Same-thread completion notifications are not routed through dropping transport queues
 
@@ -1326,3 +1327,21 @@ under heavy same-thread completion backlog and assert that items and turn comple
 `required field "authPolicy"`, not the legacy `missing appsNeedingAuth` / `missing authPolicy`
 strings described in the report. The described red-suite behavior does not occur in this checkout:
 `go test -run TestPluginRequiredFieldValidation ./...` and `go test ./...` both pass.
+
+### Stream collector retention for output deltas and latest plan text is already byte-bounded
+
+**Location:** `stream_collector.go:12` — collector retention limits
+
+**Reason:** The current collector already enforces byte budgets for retained command output deltas
+and latest plan text. `streamCollectorOutputDeltaBytesLimit`,
+`CommandExecutionLifecycle.DroppedOutputDeltaBytes`, `streamCollectorPlanTextBytesLimit`, and
+`StreamSummary.DroppedLatestPlanTextBytes` are already present in the checked-in code, so the
+reported unbounded-retention path does not exist in this checkout.
+
+### Hook bootstrap already handles a missing nix installation with a clear fallback message
+
+**Location:** `scripts/setup-hooks.sh:10` — hook bootstrap fallback
+
+**Reason:** The current script checks whether `nix` is installed before trying to invoke it. When
+both `lefthook` and `nix` are absent, it prints an actionable install message and exits cleanly
+instead of failing with a bare shell error. The reported bootstrap behavior is stale.
