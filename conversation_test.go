@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -243,6 +244,56 @@ func TestConversationThreadAppliesNotificationOnlyMetadataUpdates(t *testing.T) 
 	}
 	if latest.GitInfo != nil {
 		t.Fatalf("latest Thread().GitInfo = %+v, want nil", latest.GitInfo)
+	}
+}
+
+func TestConversationThreadRetainsNotificationMetadataAfterCacheEviction(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+
+	threadName := "Renamed Thread"
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "thread/name/updated",
+		Params:  json.RawMessage(`{"threadId":"thread-1","threadName":"` + threadName + `"}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "thread/status/changed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","status":{"type":"active","activeFlags":["waitingOnApproval"]}}`),
+	})
+
+	for i := range 70 {
+		payload, err := json.Marshal(map[string]interface{}{
+			"thread": validProcessThreadPayload(fmt.Sprintf("other-%02d", i)),
+		})
+		if err != nil {
+			t.Fatalf("marshal thread/started payload: %v", err)
+		}
+		mock.InjectServerNotification(ctx, codex.Notification{
+			JSONRPC: "2.0",
+			Method:  "thread/started",
+			Params:  payload,
+		})
+	}
+
+	thread := conv.Thread()
+	if thread.Name == nil || *thread.Name != threadName {
+		t.Fatalf("Thread().Name = %v, want %q", thread.Name, threadName)
+	}
+	active, ok := thread.Status.Value.(codex.ThreadStatusActive)
+	if !ok {
+		t.Fatalf("Thread().Status = %T, want ThreadStatusActive", thread.Status.Value)
+	}
+	if len(active.ActiveFlags) != 1 || active.ActiveFlags[0] != codex.ThreadActiveFlagWaitingOnApproval {
+		t.Fatalf("Thread().Status.ActiveFlags = %v, want waitingOnApproval", active.ActiveFlags)
 	}
 }
 
@@ -1169,8 +1220,60 @@ func TestConversationTurnStreamedTurnError(t *testing.T) {
 	if result != nil {
 		t.Fatalf("expected nil Result() on turn error, got %+v", result)
 	}
-	if got := len(conv.Thread().Turns); got != 0 {
-		t.Fatalf("len(Thread().Turns) = %d, want 0 after failed streamed turn", got)
+	thread := conv.Thread()
+	if got := len(thread.Turns); got != 1 {
+		t.Fatalf("len(Thread().Turns) = %d, want 1 after failed streamed turn", got)
+	}
+	if thread.Turns[0].Status != codex.TurnStatusFailed {
+		t.Fatalf("Thread().Turns[0].Status = %q, want %q", thread.Turns[0].Status, codex.TurnStatusFailed)
+	}
+	if thread.Turns[0].Error == nil || thread.Turns[0].Error.Message != "model error" {
+		t.Fatalf("Thread().Turns[0].Error = %+v, want model error", thread.Turns[0].Error)
+	}
+
+	type turnResult struct {
+		result *codex.RunResult
+		err    error
+	}
+	secondDone := make(chan turnResult, 1)
+	go func() {
+		r, err := conv.Turn(ctx, codex.TurnOptions{Prompt: "second succeeds"})
+		secondDone <- turnResult{result: r, err: err}
+	}()
+
+	waitForMethodCallCount(t, mock, "turn/start", 2)
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"status":"completed","items":[]}}`),
+	})
+
+	select {
+	case second := <-secondDone:
+		t.Fatalf("second turn completed early after malformed notification: result=%+v err=%v", second.result, second.err)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-2","text":"final"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	second := <-secondDone
+	if second.err != nil {
+		t.Fatalf("second turn error: %v", second.err)
+	}
+	if second.result == nil {
+		t.Fatal("expected result from second turn")
+	}
+	if second.result.Response != "final" {
+		t.Fatalf("second turn response = %q, want final", second.result.Response)
 	}
 }
 
@@ -1651,6 +1754,51 @@ func TestConversationThreadDeepCopyRetainsItemsFromItemCompleted(t *testing.T) {
 	}
 	if msg2.Text != "original" {
 		t.Errorf("item value mutation leaked: got %q, want %q", msg2.Text, "original")
+	}
+}
+
+func TestConversationThreadDeepCopyIsolationTurnErrorRaw(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+
+	turnDone := make(chan error, 1)
+	go func() {
+		_, err := conv.Turn(ctx, codex.TurnOptions{Prompt: "fail"})
+		turnDone <- err
+	}()
+
+	waitForMethodCallCount(t, mock, "turn/start", 1)
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"failed","items":[],"error":{"message":"rate limited","codexErrorInfo":{"retryAfterMs":123}}}}`),
+	})
+
+	if err := <-turnDone; err == nil {
+		t.Fatal("expected error from failed turn")
+	}
+
+	snapshot1 := conv.Thread()
+	if len(snapshot1.Turns) != 1 || snapshot1.Turns[0].Error == nil {
+		t.Fatalf("snapshot missing failed turn error: %+v", snapshot1.Turns)
+	}
+	if len(snapshot1.Turns[0].Error.Raw) == 0 {
+		t.Fatal("expected Turn.Error.Raw to be populated")
+	}
+
+	originalRaw := append(json.RawMessage(nil), snapshot1.Turns[0].Error.Raw...)
+	snapshot1.Turns[0].Error.Raw[0] = 'x'
+
+	snapshot2 := conv.Thread()
+	if got := string(snapshot2.Turns[0].Error.Raw); got != string(originalRaw) {
+		t.Fatalf("Turn.Error.Raw mutation leaked: got %q, want %q", got, string(originalRaw))
 	}
 }
 
