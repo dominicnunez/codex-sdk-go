@@ -120,6 +120,7 @@ var errTypedFlagInExecArgs = errors.New("ExecArgs must not contain typed safety 
 var errNilProcessClient = errors.New("process client must not be nil")
 
 const approvalModeFullAuto = "full-auto"
+const processConfigApprovalPolicyKey = "approval_policy"
 
 var commonChildEnvKeys = []string{
 	"HOME",
@@ -228,6 +229,9 @@ func (opts *ProcessOptions) buildArgs() ([]string, error) {
 		args = append(args, "--sandbox", string(opts.Sandbox))
 	}
 	if opts.ApprovalMode != "" {
+		if _, ok := opts.Config[processConfigApprovalPolicyKey]; ok {
+			return nil, fmt.Errorf("ApprovalMode conflicts with Config[%q]; set only one approval policy input", processConfigApprovalPolicyKey)
+		}
 		switch opts.ApprovalMode {
 		case approvalModeFullAuto:
 			args = append(args, "--full-auto")

@@ -488,6 +488,23 @@ func TestStartProcessApprovalModeRejectsUnknownValue(t *testing.T) {
 	}
 }
 
+func TestStartProcessApprovalModeRejectsConfigConflict(t *testing.T) {
+	ctx := context.Background()
+	_, err := codex.StartProcess(ctx, &codex.ProcessOptions{
+		BinaryPath:   "/nonexistent/binary",
+		ApprovalMode: "full-auto",
+		Config: map[string]string{
+			"approval_policy": "never",
+		},
+	})
+	if err == nil {
+		t.Fatal("expected error for conflicting approval inputs")
+	}
+	if !strings.Contains(err.Error(), "ApprovalMode conflicts") {
+		t.Fatalf("expected conflict error, got: %v", err)
+	}
+}
+
 // TestStartProcessExecArgsAllowsNonSafetyFlags verifies that non-safety
 // flags with = values are allowed through validation (failing only at exec).
 func TestStartProcessExecArgsAllowsNonSafetyFlags(t *testing.T) {
