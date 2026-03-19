@@ -43,7 +43,7 @@ func normalizeAdditionalFileSystemPermissionsField(
 	value *AdditionalFileSystemPermissions,
 ) (*AdditionalFileSystemPermissions, error) {
 	if value == nil {
-		return nil, nil
+		return value, nil
 	}
 
 	normalized := *value
