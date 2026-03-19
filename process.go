@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 )
@@ -37,6 +38,14 @@ const (
 	processShutdownModeUnset processShutdownMode = iota
 	processShutdownModeGraceful
 	processShutdownModeNoSignal
+)
+
+type processShutdownAttempt uint8
+
+const (
+	processShutdownAttemptNone processShutdownAttempt = iota
+	processShutdownAttemptInterrupt
+	processShutdownAttemptKill
 )
 
 // ProcessOptions configures how the Codex CLI process is spawned.
@@ -96,6 +105,7 @@ type Process struct {
 	initDone     bool
 	initWait     chan struct{}
 	shutdownMode processShutdownMode
+	shutdownStep atomic.Uint32
 }
 
 // errEndOfOptionsInExecArgs is returned when ExecArgs contains "--", which
@@ -433,6 +443,7 @@ func (p *Process) signalProcessShutdown(process *os.Process) error {
 	if err := requestProcessShutdown(process); err != nil && !isExpectedProcessStopError(err) {
 		return fmt.Errorf("signal process: %w", err)
 	}
+	p.recordShutdownAttempt(processShutdownAttemptInterrupt)
 	return nil
 }
 
@@ -451,17 +462,35 @@ func (p *Process) waitForProcessExit(process *os.Process, shutdownMode processSh
 	if err := process.Kill(); err != nil && !isExpectedProcessStopError(err) {
 		return fmt.Errorf("kill process: %w", err)
 	}
+	p.recordShutdownAttempt(processShutdownAttemptKill)
 	<-p.waitDone
 	return nil
 }
 
 func (p *Process) processExitError() error {
-	// Surface the process exit error unless it was caused by
-	// our own interrupt/kill signal (expected during shutdown).
-	if p.waitErr != nil && !isSignalError(p.waitErr) {
-		return p.waitErr
+	if p.waitErr == nil {
+		return nil
 	}
-	return nil
+	if isExpectedShutdownWaitError(p.waitErr, p.recordedShutdownAttempt()) {
+		return nil
+	}
+	return p.waitErr
+}
+
+func (p *Process) recordShutdownAttempt(attempt processShutdownAttempt) {
+	for {
+		current := p.recordedShutdownAttempt()
+		if current >= attempt {
+			return
+		}
+		if p.shutdownStep.CompareAndSwap(uint32(current), uint32(attempt)) {
+			return
+		}
+	}
+}
+
+func (p *Process) recordedShutdownAttempt() processShutdownAttempt {
+	return processShutdownAttempt(p.shutdownStep.Load())
 }
 
 func (p *Process) waitForTransportReaderStop() {
@@ -531,8 +560,7 @@ func (p *Process) doWait() {
 }
 
 // isSignalError returns true if the error is an exec.ExitError caused by a signal
-// (as opposed to a non-zero exit code). Signal-caused exits are expected during
-// Process.Close shutdown and should not be surfaced as errors.
+// (as opposed to a non-zero exit code).
 func isSignalError(err error) bool {
 	var exitErr *exec.ExitError
 	if !errors.As(err, &exitErr) {

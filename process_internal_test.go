@@ -69,6 +69,34 @@ func TestIsSignalError(t *testing.T) {
 	})
 }
 
+func TestProcessExitErrorSurfacesUnexpectedSignalExit(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("signal-based exit errors require unix")
+	}
+
+	cmd := exec.Command("sleep", "60")
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+
+	proc := &Process{
+		cmd:      cmd,
+		waitDone: make(chan struct{}),
+	}
+
+	if err := cmd.Process.Signal(os.Interrupt); err != nil {
+		t.Fatalf("signal: %v", err)
+	}
+
+	proc.doWait()
+
+	if err := proc.processExitError(); err == nil {
+		t.Fatal("processExitError() = nil, want unexpected signal exit")
+	} else if !isSignalError(err) {
+		t.Fatalf("processExitError() = %v, want signal exit error", err)
+	}
+}
+
 func TestBuildArgsEmitFlagsAcceptedByCodexCLI(t *testing.T) {
 	if _, err := exec.LookPath("codex"); err != nil {
 		t.Skip("codex binary not available in PATH")

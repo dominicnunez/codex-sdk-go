@@ -868,6 +868,52 @@ while :; do :; done
 	waitForRealtimeErrorMessage(t, received, "sigint")
 }
 
+func TestProcessCloseTreatsInterruptExitCode130AsExpected(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("process test requires unix signal semantics")
+	}
+
+	dir := t.TempDir()
+	fakeBinary := writeProcessScriptBinary(t, dir, `#!/bin/sh
+emit_shutdown() {
+  printf '%s\n' '{"jsonrpc":"2.0","method":"thread/realtime/error","params":{"threadId":"thread-1","message":"sigint-130"}}'
+}
+trap 'emit_shutdown; sleep 1; exit 130' INT
+IFS= read -r line || exit 1
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"platformFamily":"unix","platformOs":"linux","userAgent":"fake-codex/0.0.1"}}'
+while :; do :; done
+`)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	proc, err := codex.StartProcess(ctx, &codex.ProcessOptions{
+		BinaryPath:    fakeBinary,
+		ClientOptions: []codex.ClientOption{codex.WithRequestTimeout(2 * time.Second)},
+	})
+	if err != nil {
+		t.Fatalf("StartProcess: %v", err)
+	}
+
+	received := make(chan codex.ThreadRealtimeErrorNotification, 1)
+	proc.Client.OnThreadRealtimeError(func(notif codex.ThreadRealtimeErrorNotification) {
+		received <- notif
+	})
+
+	_, err = proc.Client.Initialize(ctx, codex.InitializeParams{
+		ClientInfo: codex.ClientInfo{Name: "codex-sdk-go", Version: "test"},
+	})
+	if err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+
+	if err := proc.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	waitForRealtimeErrorMessage(t, received, "sigint-130")
+}
+
 func TestProcessCloseDrainsFinalStdoutOnStdinEOFShutdown(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("process test requires unix shell script")
