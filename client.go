@@ -616,8 +616,17 @@ func (c *Client) nextRequestID() uint64 {
 
 // sendResponse is a helper that sends a typed request and returns the raw response.
 func (c *Client) sendResponse(ctx context.Context, method string, params interface{}) (Response, error) {
+	preparedParams := params
+	if params != nil {
+		var err error
+		preparedParams, err = prepareRequestParams(params)
+		if err != nil {
+			return Response{}, fmt.Errorf("%s: %w", method, err)
+		}
+	}
+
 	// Marshal params to JSON
-	paramsJSON, err := marshalForWire(params)
+	paramsJSON, err := marshalForWire(preparedParams)
 	if err != nil {
 		return Response{}, fmt.Errorf("marshal request params for %s: %w", method, err)
 	}

@@ -169,7 +169,10 @@ func TestPluginRead(t *testing.T) {
 		client := codex.NewClient(transport)
 		transport.SetResponse("plugin/read", codex.Response{JSONRPC: "2.0"})
 
-		_, err := client.Plugin.Read(context.Background(), codex.PluginReadParams{})
+		_, err := client.Plugin.Read(context.Background(), codex.PluginReadParams{
+			MarketplacePath: "/plugins",
+			PluginName:      "calendar",
+		})
 		if !errors.Is(err, codex.ErrEmptyResult) {
 			t.Fatalf("error = %v; want ErrEmptyResult", err)
 		}
@@ -183,7 +186,10 @@ func TestPluginRead(t *testing.T) {
 			Result:  json.RawMessage(`{"plugin":"bad"}`),
 		})
 
-		_, err := client.Plugin.Read(context.Background(), codex.PluginReadParams{})
+		_, err := client.Plugin.Read(context.Background(), codex.PluginReadParams{
+			MarketplacePath: "/plugins",
+			PluginName:      "calendar",
+		})
 		if err == nil {
 			t.Fatal("expected malformed result error")
 		}
@@ -200,7 +206,10 @@ func TestPluginRead(t *testing.T) {
 			},
 		})
 
-		_, err := client.Plugin.Read(context.Background(), codex.PluginReadParams{})
+		_, err := client.Plugin.Read(context.Background(), codex.PluginReadParams{
+			MarketplacePath: "/plugins",
+			PluginName:      "calendar",
+		})
 		assertRPCErrorCode(t, err, codex.ErrCodeInternalError)
 	})
 }
@@ -251,7 +260,10 @@ func TestPluginInstall(t *testing.T) {
 		client := codex.NewClient(transport)
 		transport.SetResponse("plugin/install", codex.Response{JSONRPC: "2.0"})
 
-		_, err := client.Plugin.Install(context.Background(), codex.PluginInstallParams{})
+		_, err := client.Plugin.Install(context.Background(), codex.PluginInstallParams{
+			MarketplacePath: "/plugins",
+			PluginName:      "calendar",
+		})
 		if !errors.Is(err, codex.ErrEmptyResult) {
 			t.Fatalf("error = %v; want ErrEmptyResult", err)
 		}
@@ -265,7 +277,10 @@ func TestPluginInstall(t *testing.T) {
 			Result:  json.RawMessage(`{"appsNeedingAuth":"bad","authPolicy":"ON_INSTALL"}`),
 		})
 
-		_, err := client.Plugin.Install(context.Background(), codex.PluginInstallParams{})
+		_, err := client.Plugin.Install(context.Background(), codex.PluginInstallParams{
+			MarketplacePath: "/plugins",
+			PluginName:      "calendar",
+		})
 		if err == nil {
 			t.Fatal("expected malformed result error")
 		}
@@ -282,7 +297,10 @@ func TestPluginInstall(t *testing.T) {
 			},
 		})
 
-		_, err := client.Plugin.Install(context.Background(), codex.PluginInstallParams{})
+		_, err := client.Plugin.Install(context.Background(), codex.PluginInstallParams{
+			MarketplacePath: "/plugins",
+			PluginName:      "calendar",
+		})
 		assertRPCErrorCode(t, err, codex.ErrCodeInternalError)
 	})
 }
