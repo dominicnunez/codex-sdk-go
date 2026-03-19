@@ -40,6 +40,9 @@ jobs:
             exit 1
           fi
 
+      - name: Verify module tidiness
+        run: go mod tidy -diff
+
       - name: Build
         run: go build ./...
 
