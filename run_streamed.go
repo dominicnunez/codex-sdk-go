@@ -95,20 +95,6 @@ func (g *guardedChan) setTerminalError(err error) {
 	g.notEmpty.Broadcast()
 }
 
-func (g *guardedChan) fail(err error) {
-	if err == nil {
-		return
-	}
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	if g.terminalErr == nil {
-		g.terminalErr = err
-	}
-	g.closed = true
-	g.notEmpty.Broadcast()
-	g.notFull.Broadcast()
-}
-
 func (g *guardedChan) terminalError() error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
