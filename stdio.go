@@ -1518,7 +1518,16 @@ func extractTopLevelIDAndMethodFromReader(reader io.Reader) (RequestID, bool, bo
 }
 
 func extractOversizedFrameInfo(prefix []byte, reader *bufio.Reader) oversizedFrameInfo {
-	scanner := newOversizedFrameScanner(prefix, reader)
+	scanner := newOversizedFrameScanner(prefix, nil)
+	info := scanner.scan()
+	if info.hasMethod || (info.hasResponseFields && info.hasID) {
+		return info
+	}
+	if reader == nil || bytes.HasSuffix(prefix, []byte{'\n'}) {
+		return info
+	}
+
+	scanner = newOversizedFrameScanner(prefix, reader)
 	return scanner.scan()
 }
 
@@ -1727,8 +1736,8 @@ func (s *oversizedFrameScanner) skipJSONArrayBody() bool {
 	return s.skipCompositeJSONValue(']')
 }
 
-func (s *oversizedFrameScanner) skipCompositeJSONValue(close byte) bool {
-	stack := []byte{close}
+func (s *oversizedFrameScanner) skipCompositeJSONValue(closing byte) bool {
+	stack := []byte{closing}
 	for len(stack) > 0 {
 		b, err := s.reader.ReadByte()
 		if err != nil {
@@ -1834,141 +1843,6 @@ func isJSONScalarTerminator(b byte) bool {
 	default:
 		return false
 	}
-}
-
-func skipJSONWhitespace(data []byte, start int) int {
-	for start < len(data) {
-		switch data[start] {
-		case ' ', '\n', '\r', '\t':
-			start++
-		default:
-			return start
-		}
-	}
-	return start
-}
-
-func consumeJSONString(data []byte, start int) (string, int, bool) {
-	if start >= len(data) || data[start] != '"' {
-		return "", start, false
-	}
-
-	for i := start + 1; i < len(data); i++ {
-		switch data[i] {
-		case '\\':
-			i++
-		case '"':
-			raw := data[start : i+1]
-			var value string
-			if err := json.Unmarshal(raw, &value); err != nil {
-				return "", start, false
-			}
-			return value, i + 1, true
-		}
-	}
-
-	return "", start, false
-}
-
-func consumeRequestIDValue(data []byte, start int) (RequestID, int, bool) {
-	if start >= len(data) {
-		return RequestID{}, start, false
-	}
-
-	switch data[start] {
-	case '"':
-		_, end, ok := consumeJSONString(data, start)
-		if !ok {
-			return RequestID{}, start, false
-		}
-		var id RequestID
-		if err := json.Unmarshal(data[start:end], &id); err != nil {
-			return RequestID{}, start, false
-		}
-		return id, end, true
-	case '{', '[':
-		return RequestID{}, start, false
-	default:
-		end, ok := consumeJSONScalar(data, start)
-		if !ok {
-			return RequestID{}, start, false
-		}
-		var id RequestID
-		if err := json.Unmarshal(data[start:end], &id); err != nil {
-			return RequestID{}, start, false
-		}
-		return id, end, true
-	}
-}
-
-func consumeJSONValue(data []byte, start int) (int, bool) {
-	if start >= len(data) {
-		return start, false
-	}
-
-	switch data[start] {
-	case '"':
-		_, end, ok := consumeJSONString(data, start)
-		return end, ok
-	case '{', '[':
-		return consumeCompositeJSONValue(data, start)
-	default:
-		return consumeJSONScalar(data, start)
-	}
-}
-
-func consumeCompositeJSONValue(data []byte, start int) (int, bool) {
-	var stack []byte
-	i := start
-
-	for i < len(data) {
-		switch data[i] {
-		case '"':
-			_, next, ok := consumeJSONString(data, i)
-			if !ok {
-				return start, false
-			}
-			i = next
-			continue
-		case '{':
-			stack = append(stack, '}')
-		case '[':
-			stack = append(stack, ']')
-		case '}', ']':
-			if len(stack) == 0 || data[i] != stack[len(stack)-1] {
-				return start, false
-			}
-			stack = stack[:len(stack)-1]
-			if len(stack) == 0 {
-				return i + 1, true
-			}
-		}
-		i++
-	}
-
-	return start, false
-}
-
-func consumeJSONScalar(data []byte, start int) (int, bool) {
-	i := start
-	for i < len(data) {
-		switch data[i] {
-		case ',', '}', ']', ' ', '\n', '\r', '\t':
-			end := i
-			i = skipJSONWhitespace(data, i)
-			if end > start && json.Valid(data[start:end]) {
-				return i, true
-			}
-			return start, false
-		default:
-			i++
-		}
-	}
-
-	if json.Valid(data[start:i]) {
-		return i, true
-	}
-	return start, false
 }
 
 func (t *StdioTransport) stopAfterReadFailure(scanErr error) {
