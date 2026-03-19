@@ -84,6 +84,29 @@ type inboundFrame struct {
 	Error   inboundError    `json:"error,omitempty"`
 }
 
+func (f inboundFrame) hasResultField() bool {
+	return len(f.Result) > 0
+}
+
+func (f inboundFrame) hasResponseFields() bool {
+	return f.hasResultField() || f.Error.present
+}
+
+func (f inboundFrame) hasMalformedResponseShape() bool {
+	hasResult := f.hasResultField()
+	hasError := f.Error.present
+	if !hasResult && !hasError {
+		return false
+	}
+	if hasResult && hasError {
+		return true
+	}
+	if hasError {
+		return f.Error.invalid || f.Error.isNull || f.Error.value == nil
+	}
+	return false
+}
+
 type inboundID struct {
 	present bool
 	isNull  bool
@@ -444,8 +467,8 @@ func (t *StdioTransport) ScanErr() error {
 	return t.scanErr
 }
 
-// MalformedMessageCount reports how many inbound response frames could not be
-// routed because they were invalid JSON or carried an invalid/unusable ID.
+// MalformedMessageCount reports how many inbound messages were malformed,
+// unclassifiable, or carried an unusable response ID.
 func (t *StdioTransport) MalformedMessageCount() uint64 {
 	return t.malformedCount.Load()
 }
@@ -816,10 +839,10 @@ func (t *StdioTransport) processInboundLine(line []byte) {
 		return
 	}
 
-	// Response: has ID but no method.
-	if hasID && frame.Method == "" {
+	// Response: has ID, no method, and explicit response fields.
+	if hasID && frame.Method == "" && frame.hasResponseFields() {
 		id, ok := frame.ID.requestID()
-		if !ok || frame.Error.invalid {
+		if !ok || frame.hasMalformedResponseShape() {
 			t.handleMalformedResponse(line)
 			return
 		}
@@ -853,7 +876,10 @@ func (t *StdioTransport) processInboundLine(line []byte) {
 	// Notification: has method but no ID.
 	if frame.Method != "" {
 		t.enqueueNotification(frame.toNotification())
+		return
 	}
+
+	t.handleMalformedInboundObject()
 }
 
 func (t *StdioTransport) handleInvalidJSONRPCVersion(frame inboundFrame, hasID bool) {
@@ -865,7 +891,7 @@ func (t *StdioTransport) handleInvalidJSONRPCVersion(frame inboundFrame, hasID b
 
 	// Response with invalid protocol version: fail matching pending request so
 	// callers do not wait for context timeout.
-	if hasID && frame.Method == "" {
+	if hasID && frame.Method == "" && frame.hasResponseFields() {
 		t.failPendingWithInvalidProtocolVersion(frame.ID)
 	}
 }
@@ -954,16 +980,30 @@ func readLimitedLine(r *bufio.Reader, limit int) ([]byte, *oversizedFrameInfo, e
 		}
 	}
 
+	var chunkBuf [readBufferSizeBytes]byte
 	for {
-		b, err := r.ReadByte()
+		remaining := limit - len(line) + 1
+		if remaining <= 0 {
+			return handleOversizedLine(r, bufio.ErrBufferFull, line)
+		}
+		if remaining > len(chunkBuf) {
+			remaining = len(chunkBuf)
+		}
+
+		n, err := r.Read(chunkBuf[:remaining])
 		switch {
-		case err == nil:
-			line = append(line, b)
+		case n > 0:
+			chunk := chunkBuf[:n]
+			if newline := bytes.IndexByte(chunk, '\n'); newline >= 0 {
+				line = append(line, chunk[:newline+1]...)
+				if len(line) > limit {
+					return handleOversizedLine(r, nil, line)
+				}
+				return bytes.TrimSuffix(line, []byte{'\n'}), nil, nil
+			}
+			line = append(line, chunk...)
 			if len(line) > limit {
 				return handleOversizedLine(r, bufio.ErrBufferFull, line)
-			}
-			if b == '\n' {
-				return bytes.TrimSuffix(line, []byte{'\n'}), nil, nil
 			}
 		case errors.Is(err, io.EOF):
 			if len(line) == 0 {
@@ -1435,6 +1475,10 @@ func (t *StdioTransport) handleMalformedFrame(data []byte) {
 			},
 		}
 	}
+}
+
+func (t *StdioTransport) handleMalformedInboundObject() {
+	t.malformedCount.Add(1)
 }
 
 // handleMalformedResponse attempts to extract the ID from a response that

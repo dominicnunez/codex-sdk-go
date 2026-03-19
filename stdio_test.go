@@ -2257,6 +2257,65 @@ func TestStdioHandleResponseUnmarshalError(t *testing.T) {
 	}
 }
 
+func TestStdioIgnoresNonResponseFramesWithID(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	sendResultCh := make(chan sendResult, 1)
+	go func() {
+		req := codex.Request{
+			JSONRPC: "2.0",
+			ID:      codex.RequestID{Value: "non-response-frame"},
+			Method:  "test/method",
+		}
+		resp, err := transport.Send(ctx, req)
+		sendResultCh <- sendResult{resp: resp, err: err}
+	}()
+
+	waitForOutboundRequest(t, serverReader)
+
+	_, _ = serverWriter.Write([]byte(`{"jsonrpc":"2.0","id":"non-response-frame","params":{"ignored":true}}` + "\n"))
+	_, _ = serverWriter.Write([]byte(`{"jsonrpc":"2.0","params":{"ignored":true}}` + "\n"))
+
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for transport.MalformedMessageCount() < 2 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if got := transport.MalformedMessageCount(); got != 2 {
+		t.Fatalf("MalformedMessageCount() = %d; want 2 after malformed inbound objects", got)
+	}
+
+	select {
+	case result := <-sendResultCh:
+		t.Fatalf("Send returned early after malformed inbound object: resp=%+v err=%v", result.resp, result.err)
+	case <-time.After(150 * time.Millisecond):
+	}
+
+	_, _ = serverWriter.Write([]byte(`{"jsonrpc":"2.0","id":"non-response-frame","result":{"ok":true}}` + "\n"))
+
+	select {
+	case result := <-sendResultCh:
+		if result.err != nil {
+			t.Fatalf("Send returned error: %v", result.err)
+		}
+		if string(result.resp.Result) != `{"ok":true}` {
+			t.Fatalf("response result = %s; want {\"ok\":true}", string(result.resp.Result))
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for response after malformed inbound objects")
+	}
+}
+
 func TestStdioMalformedResponseInvalidIDDoesNotFailUnrelatedPending(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()
