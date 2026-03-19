@@ -1,14 +1,115 @@
 package codex
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"reflect"
+	"strings"
+	"sync"
 )
 
+type inboundObjectField struct {
+	index []int
+}
+
+var inboundObjectFieldCache sync.Map
+
 func validateInboundObjectFields(data []byte, requiredFields []string, nonNullFields []string) error {
-	var payload map[string]json.RawMessage
-	if err := json.Unmarshal(data, &payload); err != nil {
+	return decodeInboundObject(data, nil, requiredFields, nonNullFields)
+}
+
+func unmarshalInboundObject(data []byte, dest interface{}, requiredFields []string, nonNullFields []string) error {
+	return decodeInboundObject(data, dest, requiredFields, nonNullFields)
+}
+
+func decodeInboundObject(data []byte, dest interface{}, requiredFields []string, nonNullFields []string) error {
+	required, nonNull := inboundObjectValidation(requiredFields, nonNullFields)
+
+	destValue, fields, handled, err := resolveInboundObjectDestination(data, dest)
+	if err != nil {
 		return err
+	}
+	if handled {
+		return nil
+	}
+
+	decoder := newInboundObjectDecoder(data)
+	if err := expectInboundObjectStart(decoder); err != nil {
+		return err
+	}
+
+	for decoder.More() {
+		if err := decodeInboundObjectField(decoder, required, nonNull, destValue, fields); err != nil {
+			return err
+		}
+	}
+
+	if err := expectInboundObjectEnd(decoder); err != nil {
+		return err
+	}
+	if err := validateRequiredInboundObjectFields(required); err != nil {
+		return err
+	}
+	if err := expectNoTrailingInboundObjectData(decoder); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func inboundObjectFields(typ reflect.Type) map[string]inboundObjectField {
+	if cached, ok := inboundObjectFieldCache.Load(typ); ok {
+		fields, ok := cached.(map[string]inboundObjectField)
+		if ok {
+			return fields
+		}
+	}
+
+	fields := make(map[string]inboundObjectField)
+	for _, field := range reflect.VisibleFields(typ) {
+		if !field.IsExported() {
+			continue
+		}
+		name, ok := inboundObjectFieldName(field)
+		if !ok {
+			continue
+		}
+		fields[name] = inboundObjectField{index: field.Index}
+	}
+
+	actual, _ := inboundObjectFieldCache.LoadOrStore(typ, fields)
+	cachedFields, ok := actual.(map[string]inboundObjectField)
+	if ok {
+		return cachedFields
+	}
+	return fields
+}
+
+func inboundObjectFieldName(field reflect.StructField) (string, bool) {
+	tag := field.Tag.Get("json")
+	if tag == "-" {
+		return "", false
+	}
+	name, _, _ := strings.Cut(tag, ",")
+	if name != "" {
+		return name, true
+	}
+	if tag != "" {
+		return field.Name, true
+	}
+	return field.Name, true
+}
+
+func inboundObjectValidation(
+	requiredFields []string,
+	nonNullFields []string,
+) (map[string]bool, map[string]struct{}) {
+	required := make(map[string]bool, len(requiredFields))
+	for _, field := range requiredFields {
+		required[field] = false
 	}
 
 	nonNull := make(map[string]struct{}, len(nonNullFields))
@@ -16,22 +117,113 @@ func validateInboundObjectFields(data []byte, requiredFields []string, nonNullFi
 		nonNull[field] = struct{}{}
 	}
 
-	for _, field := range requiredFields {
-		raw, ok := payload[field]
-		if !ok {
-			return fmt.Errorf("missing required field %q", field)
-		}
-		if _, mustBeNonNull := nonNull[field]; mustBeNonNull && isNullJSONValue(raw) {
-			return fmt.Errorf("required field %q must not be null", field)
-		}
+	return required, nonNull
+}
+
+func resolveInboundObjectDestination(
+	data []byte,
+	dest interface{},
+) (reflect.Value, map[string]inboundObjectField, bool, error) {
+	if dest == nil {
+		return reflect.Value{}, nil, false, nil
 	}
 
+	value := reflect.ValueOf(dest)
+	if value.Kind() != reflect.Pointer || value.IsNil() {
+		return reflect.Value{}, nil, false, fmt.Errorf("destination must be a non-nil pointer")
+	}
+
+	destValue := value.Elem()
+	if destValue.Kind() != reflect.Struct {
+		return reflect.Value{}, nil, true, json.Unmarshal(data, dest)
+	}
+
+	return destValue, inboundObjectFields(destValue.Type()), false, nil
+}
+
+func newInboundObjectDecoder(data []byte) *json.Decoder {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	return decoder
+}
+
+func expectInboundObjectStart(decoder *json.Decoder) error {
+	start, err := decoder.Token()
+	if err != nil {
+		return err
+	}
+	delim, ok := start.(json.Delim)
+	if !ok || delim != '{' {
+		return fmt.Errorf("expected JSON object")
+	}
 	return nil
 }
 
-func unmarshalInboundObject(data []byte, dest interface{}, requiredFields []string, nonNullFields []string) error {
-	if err := validateInboundObjectFields(data, requiredFields, nonNullFields); err != nil {
+func decodeInboundObjectField(
+	decoder *json.Decoder,
+	required map[string]bool,
+	nonNull map[string]struct{},
+	destValue reflect.Value,
+	fields map[string]inboundObjectField,
+) error {
+	keyToken, err := decoder.Token()
+	if err != nil {
 		return err
 	}
-	return json.Unmarshal(data, dest)
+	key, ok := keyToken.(string)
+	if !ok {
+		return fmt.Errorf("expected object field name")
+	}
+
+	var raw json.RawMessage
+	if err := decoder.Decode(&raw); err != nil {
+		return err
+	}
+
+	if _, ok := required[key]; ok {
+		required[key] = true
+	}
+	if _, mustBeNonNull := nonNull[key]; mustBeNonNull && isNullJSONValue(raw) {
+		return fmt.Errorf("required field %q must not be null", key)
+	}
+	if !destValue.IsValid() {
+		return nil
+	}
+
+	field, ok := fields[key]
+	if !ok {
+		return nil
+	}
+	return json.Unmarshal(raw, destValue.FieldByIndex(field.index).Addr().Interface())
+}
+
+func expectInboundObjectEnd(decoder *json.Decoder) error {
+	end, err := decoder.Token()
+	if err != nil {
+		return err
+	}
+	delim, ok := end.(json.Delim)
+	if !ok || delim != '}' {
+		return fmt.Errorf("expected JSON object end")
+	}
+	return nil
+}
+
+func validateRequiredInboundObjectFields(required map[string]bool) error {
+	for field, seen := range required {
+		if !seen {
+			return fmt.Errorf("missing required field %q", field)
+		}
+	}
+	return nil
+}
+
+func expectNoTrailingInboundObjectData(decoder *json.Decoder) error {
+	if _, err := decoder.Token(); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return fmt.Errorf("unexpected trailing data")
+		}
+		return err
+	}
+	return nil
 }
