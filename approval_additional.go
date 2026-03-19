@@ -1,6 +1,9 @@
 package codex
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // AdditionalFileSystemPermissions requests or grants extra filesystem access.
 type AdditionalFileSystemPermissions struct {
@@ -35,6 +38,11 @@ func (p *PermissionsRequestApprovalParams) UnmarshalJSON(data []byte) error {
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
+	var err error
+	decoded.Permissions, err = normalizeRequestPermissionProfileField("permissions", decoded.Permissions)
+	if err != nil {
+		return err
+	}
 	*p = PermissionsRequestApprovalParams(decoded)
 	return nil
 }
@@ -60,6 +68,9 @@ type PermissionsRequestApprovalResponse struct {
 }
 
 func (r PermissionsRequestApprovalResponse) validate() error {
+	if _, err := normalizeGrantedPermissionProfileField("permissions", r.Permissions); err != nil {
+		return err
+	}
 	if r.Scope == nil {
 		return nil
 	}
@@ -69,6 +80,18 @@ func (r PermissionsRequestApprovalResponse) validate() error {
 	default:
 		return fmt.Errorf("invalid scope %q", *r.Scope)
 	}
+}
+
+func (r PermissionsRequestApprovalResponse) marshalWire() ([]byte, error) {
+	normalized, err := normalizeGrantedPermissionProfileField("permissions", r.Permissions)
+	if err != nil {
+		return nil, err
+	}
+
+	type wire PermissionsRequestApprovalResponse
+	payload := wire(r)
+	payload.Permissions = normalized
+	return json.Marshal(payload)
 }
 
 // McpServerElicitationMode indicates how an MCP server wants user input collected.

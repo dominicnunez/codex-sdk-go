@@ -632,6 +632,26 @@ func TestMalformedApprovalRequestReturnsInvalidParams(t *testing.T) {
 			},
 		},
 		{
+			name:   "item/permissions/requestApproval relative filesystem root",
+			method: "item/permissions/requestApproval",
+			params: map[string]interface{}{
+				"itemId":   "item-1",
+				"threadId": "thread-1",
+				"turnId":   "turn-1",
+				"permissions": map[string]interface{}{
+					"fileSystem": map[string]interface{}{
+						"read": []interface{}{"relative/path"},
+					},
+				},
+			},
+			handler: func(ah *codex.ApprovalHandlers, called *bool) {
+				ah.OnPermissionsRequestApproval = func(context.Context, codex.PermissionsRequestApprovalParams) (codex.PermissionsRequestApprovalResponse, error) {
+					*called = true
+					return codex.PermissionsRequestApprovalResponse{}, nil
+				}
+			},
+		},
+		{
 			name:   "mcpServer/elicitation/request missing server name",
 			method: "mcpServer/elicitation/request",
 			params: map[string]interface{}{
@@ -898,6 +918,25 @@ func TestApprovalHandlerRejectsInvalidResponsePayloads(t *testing.T) {
 				})
 			},
 			wantErrPart: `invalid scope "forever"`,
+		},
+		{
+			name:   "permissions approval relative granted filesystem root",
+			method: "item/permissions/requestApproval",
+			params: `{"itemId":"item-1","permissions":{},"threadId":"thread-1","turnId":"turn-1"}`,
+			register: func(client *codex.Client) {
+				client.SetApprovalHandlers(codex.ApprovalHandlers{
+					OnPermissionsRequestApproval: func(context.Context, codex.PermissionsRequestApprovalParams) (codex.PermissionsRequestApprovalResponse, error) {
+						return codex.PermissionsRequestApprovalResponse{
+							Permissions: codex.GrantedPermissionProfile{
+								FileSystem: &codex.AdditionalFileSystemPermissions{
+									Read: []string{"relative/path"},
+								},
+							},
+						}, nil
+					},
+				})
+			},
+			wantErrPart: `permissions.fileSystem.read[0]`,
 		},
 		{
 			name:   "chatgpt auth refresh missing access token",

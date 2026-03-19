@@ -38,6 +38,51 @@ func normalizeAbsolutePathSliceField(field string, values []string) ([]string, e
 	return normalized, nil
 }
 
+func normalizeAdditionalFileSystemPermissionsField(
+	field string,
+	value *AdditionalFileSystemPermissions,
+) (*AdditionalFileSystemPermissions, error) {
+	if value == nil {
+		return nil, nil
+	}
+
+	normalized := *value
+	var err error
+	normalized.Read, err = normalizeAbsolutePathSliceField(field+".read", value.Read)
+	if err != nil {
+		return nil, err
+	}
+	normalized.Write, err = normalizeAbsolutePathSliceField(field+".write", value.Write)
+	if err != nil {
+		return nil, err
+	}
+	return &normalized, nil
+}
+
+func normalizeRequestPermissionProfileField(
+	field string,
+	value RequestPermissionProfile,
+) (RequestPermissionProfile, error) {
+	var err error
+	value.FileSystem, err = normalizeAdditionalFileSystemPermissionsField(field+".fileSystem", value.FileSystem)
+	if err != nil {
+		return RequestPermissionProfile{}, err
+	}
+	return value, nil
+}
+
+func normalizeGrantedPermissionProfileField(
+	field string,
+	value GrantedPermissionProfile,
+) (GrantedPermissionProfile, error) {
+	var err error
+	value.FileSystem, err = normalizeAdditionalFileSystemPermissionsField(field+".fileSystem", value.FileSystem)
+	if err != nil {
+		return GrantedPermissionProfile{}, err
+	}
+	return value, nil
+}
+
 func normalizeAbsolutePath(value string) (string, error) {
 	switch {
 	case value == "":

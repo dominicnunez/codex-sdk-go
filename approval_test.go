@@ -146,6 +146,47 @@ func TestChatgptAuthTokensRefreshParamsRejectInvalidReason(t *testing.T) {
 	}
 }
 
+func TestPermissionsRequestApprovalParamsNormalizeFileSystemRoots(t *testing.T) {
+	var params codex.PermissionsRequestApprovalParams
+	err := json.Unmarshal([]byte(`{
+		"itemId":"item-1",
+		"threadId":"thread-1",
+		"turnId":"turn-1",
+		"permissions":{
+			"fileSystem":{
+				"read":["/tmp/../project"],
+				"write":["C:\\\\workspace\\\\..\\\\repo"]
+			}
+		}
+	}`), &params)
+	if err != nil {
+		t.Fatalf("Unmarshal permissions request: %v", err)
+	}
+
+	if got := params.Permissions.FileSystem.Read[0]; got != "/project" {
+		t.Fatalf("Read[0] = %q, want /project", got)
+	}
+	if got := params.Permissions.FileSystem.Write[0]; got != `C:\repo` {
+		t.Fatalf("Write[0] = %q, want %q", got, `C:\repo`)
+	}
+}
+
+func TestPermissionsRequestApprovalParamsRejectRelativeFileSystemRoots(t *testing.T) {
+	var params codex.PermissionsRequestApprovalParams
+	err := json.Unmarshal([]byte(`{
+		"itemId":"item-1",
+		"threadId":"thread-1",
+		"turnId":"turn-1",
+		"permissions":{"fileSystem":{"read":["relative/path"]}}
+	}`), &params)
+	if err == nil {
+		t.Fatal("expected invalid path error")
+	}
+	if !strings.Contains(err.Error(), `permissions.fileSystem.read[0]`) {
+		t.Fatalf("error = %v; want permissions.fileSystem.read[0] context", err)
+	}
+}
+
 // TestCommandExecutionRequestApprovalRoundTrip tests CommandExecutionRequestApproval params/response
 func TestCommandExecutionRequestApprovalRoundTrip(t *testing.T) {
 	// Test params serialization
@@ -670,6 +711,9 @@ func TestAdditionalApprovalEndToEnd(t *testing.T) {
 				if params.ItemID != "item-abc" {
 					t.Fatalf("Expected itemId=item-abc, got %s", params.ItemID)
 				}
+				if params.Permissions.FileSystem == nil || len(params.Permissions.FileSystem.Read) != 1 || params.Permissions.FileSystem.Read[0] != "/sandbox" {
+					t.Fatalf("Expected normalized read permission, got %#v", params.Permissions.FileSystem)
+				}
 				if params.Permissions.Network == nil || params.Permissions.Network.Enabled == nil || !*params.Permissions.Network.Enabled {
 					t.Fatalf("Expected requested network permission to be enabled, got %#v", params.Permissions.Network)
 				}
@@ -678,7 +722,7 @@ func TestAdditionalApprovalEndToEnd(t *testing.T) {
 				return codex.PermissionsRequestApprovalResponse{
 					Permissions: codex.GrantedPermissionProfile{
 						FileSystem: &codex.AdditionalFileSystemPermissions{
-							Read: []string{"/tmp/project"},
+							Read: []string{"/tmp/../project"},
 						},
 					},
 					Scope: &scope,
@@ -690,7 +734,7 @@ func TestAdditionalApprovalEndToEnd(t *testing.T) {
 			JSONRPC: "2.0",
 			ID:      codex.RequestID{Value: 101},
 			Method:  "item/permissions/requestApproval",
-			Params:  json.RawMessage(`{"itemId":"item-abc","threadId":"t1","turnId":"tu1","permissions":{"network":{"enabled":true}}}`),
+			Params:  json.RawMessage(`{"itemId":"item-abc","threadId":"t1","turnId":"tu1","permissions":{"fileSystem":{"read":["/tmp/../sandbox"]},"network":{"enabled":true}}}`),
 		})
 		if err != nil {
 			t.Fatalf("InjectServerRequest() error = %v", err)
@@ -706,8 +750,8 @@ func TestAdditionalApprovalEndToEnd(t *testing.T) {
 		if result.Scope == nil || *result.Scope != codex.PermissionGrantScopeTurn {
 			t.Fatalf("Scope = %#v; want %q", result.Scope, codex.PermissionGrantScopeTurn)
 		}
-		if result.Permissions.FileSystem == nil || len(result.Permissions.FileSystem.Read) != 1 || result.Permissions.FileSystem.Read[0] != "/tmp/project" {
-			t.Fatalf("Permissions = %#v; want granted read path", result.Permissions)
+		if result.Permissions.FileSystem == nil || len(result.Permissions.FileSystem.Read) != 1 || result.Permissions.FileSystem.Read[0] != "/project" {
+			t.Fatalf("Permissions = %#v; want normalized granted read path", result.Permissions)
 		}
 	})
 
