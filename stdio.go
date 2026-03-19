@@ -37,6 +37,7 @@ const (
 	turnScopedNotificationWorkers      = 8
 	maxTurnScopedNotificationQueueSize = 256
 	maxTurnScopedNotificationQueues    = 128
+	maxStreamingNotificationBacklog    = 1024
 	inboundNotifQueueSize              = 128
 	streamingNotifQueueSize            = 256
 	protectedNotifQueueSize            = 128
@@ -66,6 +67,12 @@ type turnScopedNotificationQueue struct {
 	threadKey string
 	queue     []Notification
 	scheduled bool
+}
+
+type streamingNotificationBacklog struct {
+	mu       sync.Mutex
+	queue    []Notification
+	draining bool
 }
 
 type inboundFrame struct {
@@ -173,6 +180,7 @@ type StdioTransport struct {
 	turnNotifReadyCond  *sync.Cond
 	turnNotifReadyOnce  sync.Once
 	streamingNotifQueue chan Notification
+	streamingBacklog    streamingNotificationBacklog
 	protectedNotifQueue chan Notification
 	criticalNotifQueue  chan Notification
 	notifQueue          chan Notification
@@ -194,6 +202,7 @@ var errTransportClosed = errors.New("transport closed")
 var errTransportReaderStopped = errors.New("transport reader stopped")
 var errOversizedInboundFrame = errors.New("oversized inbound frame exceeded maximum size")
 var errNotificationQueueOverflow = errors.New("notification queue overflow")
+var errStreamingNotificationBacklogOverflow = errors.New("streaming notification backlog overflow")
 var errTurnScopedNotificationQueueOverflow = errors.New("turn-scoped notification queue overflow")
 var errTurnScopedNotificationQueueLimit = errors.New("turn-scoped notification queue limit exceeded")
 
@@ -1136,11 +1145,68 @@ func (t *StdioTransport) enqueueLosslessNotification(
 }
 
 func (t *StdioTransport) enqueueStreamingNotification(notif Notification) {
-	select {
-	case <-t.ctx.Done():
-		return
-	case t.streamingNotifQueue <- notif:
+	var startDrainer bool
+
+	t.streamingBacklog.mu.Lock()
+	if len(t.streamingBacklog.queue) == 0 && !t.streamingBacklog.draining {
+		select {
+		case <-t.ctx.Done():
+			t.streamingBacklog.mu.Unlock()
+			return
+		case t.streamingNotifQueue <- notif:
+			t.streamingBacklog.mu.Unlock()
+			return
+		default:
+		}
 	}
+	if len(t.streamingBacklog.queue) >= maxStreamingNotificationBacklog {
+		t.streamingBacklog.mu.Unlock()
+		t.closeWithFailure(
+			errStreamingNotificationBacklogOverflow,
+			errStreamingNotificationBacklogOverflow,
+		)
+		return
+	}
+	t.streamingBacklog.queue = append(t.streamingBacklog.queue, notif)
+	if !t.streamingBacklog.draining {
+		t.streamingBacklog.draining = true
+		startDrainer = true
+	}
+	t.streamingBacklog.mu.Unlock()
+
+	if startDrainer {
+		go t.flushStreamingNotificationBacklog()
+	}
+}
+
+func (t *StdioTransport) flushStreamingNotificationBacklog() {
+	for {
+		notif, ok := t.nextStreamingBacklogNotification()
+		if !ok {
+			return
+		}
+
+		select {
+		case <-t.ctx.Done():
+			return
+		case t.streamingNotifQueue <- notif:
+		}
+	}
+}
+
+func (t *StdioTransport) nextStreamingBacklogNotification() (Notification, bool) {
+	t.streamingBacklog.mu.Lock()
+	defer t.streamingBacklog.mu.Unlock()
+
+	if len(t.streamingBacklog.queue) == 0 {
+		t.streamingBacklog.draining = false
+		return Notification{}, false
+	}
+
+	notif := t.streamingBacklog.queue[0]
+	t.streamingBacklog.queue[0] = Notification{}
+	t.streamingBacklog.queue = t.streamingBacklog.queue[1:]
+	return notif, true
 }
 
 func (t *StdioTransport) enqueueProtectedNotification(notif Notification) {
@@ -2089,6 +2155,7 @@ func (t *StdioTransport) drainPendingNotificationsAfterStop() {
 		drained = t.drainNotificationQueue(t.criticalNotifQueue) || drained
 		drained = t.drainNotificationQueue(t.protectedNotifQueue) || drained
 		drained = t.drainNotificationQueue(t.streamingNotifQueue) || drained
+		drained = t.drainStreamingNotificationBacklog() || drained
 		drained = t.drainNotificationQueue(t.notifQueue) || drained
 		drained = t.drainTurnScopedNotificationQueues() || drained
 
@@ -2109,6 +2176,24 @@ func (t *StdioTransport) drainNotificationQueue(queue chan Notification) bool {
 			return drained
 		}
 	}
+}
+
+func (t *StdioTransport) drainStreamingNotificationBacklog() bool {
+	t.streamingBacklog.mu.Lock()
+	if len(t.streamingBacklog.queue) == 0 {
+		t.streamingBacklog.draining = false
+		t.streamingBacklog.mu.Unlock()
+		return false
+	}
+	queue := append([]Notification(nil), t.streamingBacklog.queue...)
+	t.streamingBacklog.queue = nil
+	t.streamingBacklog.draining = false
+	t.streamingBacklog.mu.Unlock()
+
+	for _, notif := range queue {
+		t.handleNotification(notif)
+	}
+	return true
 }
 
 func (t *StdioTransport) drainTurnScopedNotificationQueues() bool {

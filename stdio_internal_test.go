@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1190,6 +1191,108 @@ func TestStdioStreamingFloodBackpressuresWithoutClosingTransport(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("follow-up notification was not delivered after streaming flood")
 	}
+}
+
+func TestStdioStreamingBackpressureDoesNotStarveUnrelatedResponses(t *testing.T) {
+	clientReader, serverWriter, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe inbound: %v", err)
+	}
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	streamingBlocked := make(chan struct{}, 1)
+	releaseStreaming := make(chan struct{})
+	transport.OnNotify(func(_ context.Context, notif Notification) {
+		if notif.Method != notifyAgentMessageDelta {
+			return
+		}
+		select {
+		case streamingBlocked <- struct{}{}:
+		default:
+		}
+		<-releaseStreaming
+	})
+
+	requestWritten := make(chan struct{})
+	go func() {
+		reader := bufio.NewReader(serverReader)
+		if _, readErr := reader.ReadBytes('\n'); readErr == nil {
+			close(requestWritten)
+		}
+	}()
+
+	sendCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	sendResult := make(chan error, 1)
+	go func() {
+		_, sendErr := transport.Send(sendCtx, Request{
+			JSONRPC: jsonrpcVersion,
+			ID:      RequestID{Value: "pending-1"},
+			Method:  "test/pending",
+		})
+		sendResult <- sendErr
+	}()
+
+	select {
+	case <-requestWritten:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for outbound request")
+	}
+
+	streaming := Notification{
+		JSONRPC: jsonrpcVersion,
+		Method:  notifyAgentMessageDelta,
+		Params:  json.RawMessage(`{"delta":"x","itemId":"item-1","threadId":"thread-1","turnId":"turn-1"}`),
+	}
+	streamingBytes, err := json.Marshal(streaming)
+	if err != nil {
+		t.Fatalf("marshal streaming notification: %v", err)
+	}
+
+	totalFlood := streamingNotificationWorkers + streamingNotifQueueSize + 32
+	for range totalFlood {
+		if _, err := serverWriter.Write(append(streamingBytes, '\n')); err != nil {
+			t.Fatalf("write streaming notification: %v", err)
+		}
+	}
+
+	select {
+	case <-streamingBlocked:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for blocked streaming handler")
+	}
+
+	response := Response{
+		JSONRPC: jsonrpcVersion,
+		ID:      RequestID{Value: "pending-1"},
+		Result:  json.RawMessage(`{"ok":true}`),
+	}
+	responseBytes, err := json.Marshal(response)
+	if err != nil {
+		t.Fatalf("marshal response: %v", err)
+	}
+	if _, err := serverWriter.Write(append(responseBytes, '\n')); err != nil {
+		t.Fatalf("write response: %v", err)
+	}
+
+	select {
+	case err := <-sendResult:
+		if err != nil {
+			t.Fatalf("Send returned error while streaming handlers were blocked: %v", err)
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("Send did not complete while streaming handlers were blocked")
+	}
+
+	close(releaseStreaming)
 }
 
 func TestStdioCloseStopsReaderForClosableReader(t *testing.T) {
