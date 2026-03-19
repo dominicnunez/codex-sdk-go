@@ -248,9 +248,11 @@ func TestClientInitializeCachesSuccessfulHandshake(t *testing.T) {
 		t.Fatalf("first Initialize failed: %v", err)
 	}
 
-	second, err := client.Initialize(ctx, codex.InitializeParams{
-		ClientInfo: codex.ClientInfo{Name: "other-client", Version: "2.0.0"},
-	})
+	params := codex.InitializeParams{
+		ClientInfo: codex.ClientInfo{Name: "test-client", Version: "1.0.0"},
+	}
+
+	second, err := client.Initialize(ctx, params)
 	if err != nil {
 		t.Fatalf("second Initialize failed: %v", err)
 	}
@@ -258,6 +260,102 @@ func TestClientInitializeCachesSuccessfulHandshake(t *testing.T) {
 	if first != second {
 		t.Fatalf("cached Initialize response = %+v, want %+v", second, first)
 	}
+	if got := mock.MethodCallCount("initialize"); got != 1 {
+		t.Fatalf("initialize call count = %d, want 1", got)
+	}
+}
+
+func TestClientInitializeRejectsMismatchedHandshakeParams(t *testing.T) {
+	tests := []struct {
+		name      string
+		first     codex.InitializeParams
+		second    codex.InitializeParams
+		wantError string
+	}{
+		{
+			name: "client info mismatch",
+			first: codex.InitializeParams{
+				ClientInfo: codex.ClientInfo{Name: "test-client", Version: "1.0.0"},
+			},
+			second: codex.InitializeParams{
+				ClientInfo: codex.ClientInfo{Name: "other-client", Version: "1.0.0"},
+			},
+			wantError: "active session",
+		},
+		{
+			name: "capabilities mismatch",
+			first: codex.InitializeParams{
+				ClientInfo: codex.ClientInfo{Name: "test-client", Version: "1.0.0"},
+			},
+			second: codex.InitializeParams{
+				ClientInfo: codex.ClientInfo{Name: "test-client", Version: "1.0.0"},
+				Capabilities: &codex.InitializeCapabilities{
+					ExperimentalAPI:           true,
+					OptOutNotificationMethods: []string{"thread/started"},
+				},
+			},
+			wantError: "active session",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := NewMockTransport()
+			client := codex.NewClient(mock)
+
+			_ = mock.SetResponseData("initialize", codex.InitializeResponse{
+				PlatformFamily: "unix",
+				PlatformOS:     "linux",
+				UserAgent:      "codex-server/1.0.0",
+			})
+
+			if _, err := client.Initialize(context.Background(), tt.first); err != nil {
+				t.Fatalf("first Initialize failed: %v", err)
+			}
+
+			_, err := client.Initialize(context.Background(), tt.second)
+			if err == nil {
+				t.Fatal("expected mismatch error, got nil")
+			}
+
+			var mismatchErr *codex.InitializeParamsMismatchError
+			if !errors.As(err, &mismatchErr) {
+				t.Fatalf("expected InitializeParamsMismatchError, got %T", err)
+			}
+			if !strings.Contains(err.Error(), tt.wantError) {
+				t.Fatalf("error = %q, want substring %q", err.Error(), tt.wantError)
+			}
+			if got := mock.MethodCallCount("initialize"); got != 1 {
+				t.Fatalf("initialize call count = %d, want 1", got)
+			}
+		})
+	}
+}
+
+func TestClientInitializeTreatsDefaultCapabilitiesAsEquivalent(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+
+	_ = mock.SetResponseData("initialize", codex.InitializeResponse{
+		PlatformFamily: "unix",
+		PlatformOS:     "linux",
+		UserAgent:      "codex-server/1.0.0",
+	})
+
+	ctx := context.Background()
+	if _, err := client.Initialize(ctx, codex.InitializeParams{
+		ClientInfo: codex.ClientInfo{Name: "test-client", Version: "1.0.0"},
+	}); err != nil {
+		t.Fatalf("first Initialize failed: %v", err)
+	}
+
+	if _, err := client.Initialize(ctx, codex.InitializeParams{
+		ClientInfo:   codex.ClientInfo{Name: "test-client", Version: "1.0.0"},
+		Capabilities: &codex.InitializeCapabilities{},
+	}); err != nil {
+		t.Fatalf("second Initialize failed: %v", err)
+	}
+
 	if got := mock.MethodCallCount("initialize"); got != 1 {
 		t.Fatalf("initialize call count = %d, want 1", got)
 	}

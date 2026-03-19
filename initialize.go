@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"errors"
+	"slices"
 )
 
 // ClientInfo represents information about the client application.
@@ -35,6 +36,17 @@ type InitializeResponse struct {
 	UserAgent      string `json:"userAgent"`
 }
 
+// InitializeParamsMismatchError reports that a later initialize call attempted
+// to reuse an already initialized session with different handshake params.
+type InitializeParamsMismatchError struct {
+	Existing  InitializeParams
+	Requested InitializeParams
+}
+
+func (e *InitializeParamsMismatchError) Error() string {
+	return "initialize params do not match the active session"
+}
+
 func (r InitializeResponse) validate() error {
 	switch {
 	case r.PlatformFamily == "":
@@ -48,6 +60,74 @@ func (r InitializeResponse) validate() error {
 	}
 }
 
+func cloneClientInfo(info ClientInfo) ClientInfo {
+	cp := info
+	cp.Title = cloneStringPtr(info.Title)
+	return cp
+}
+
+func cloneInitializeCapabilities(capabilities *InitializeCapabilities) *InitializeCapabilities {
+	if capabilities == nil {
+		return nil
+	}
+	cp := *capabilities
+	cp.OptOutNotificationMethods = append([]string(nil), capabilities.OptOutNotificationMethods...)
+	return &cp
+}
+
+func cloneInitializeParams(params InitializeParams) InitializeParams {
+	cp := params
+	cp.ClientInfo = cloneClientInfo(params.ClientInfo)
+	cp.Capabilities = cloneInitializeCapabilities(params.Capabilities)
+	return cp
+}
+
+func normalizeInitializeParams(params InitializeParams) InitializeParams {
+	cp := cloneInitializeParams(params)
+	if cp.Capabilities != nil && !cp.Capabilities.ExperimentalAPI && len(cp.Capabilities.OptOutNotificationMethods) == 0 {
+		cp.Capabilities = nil
+	}
+	return cp
+}
+
+func initializeParamsEqual(a, b InitializeParams) bool {
+	a = normalizeInitializeParams(a)
+	b = normalizeInitializeParams(b)
+
+	if a.ClientInfo.Name != b.ClientInfo.Name || a.ClientInfo.Version != b.ClientInfo.Version {
+		return false
+	}
+	if !equalStringPtr(a.ClientInfo.Title, b.ClientInfo.Title) {
+		return false
+	}
+	switch {
+	case a.Capabilities == nil || b.Capabilities == nil:
+		return a.Capabilities == nil && b.Capabilities == nil
+	default:
+		return a.Capabilities.ExperimentalAPI == b.Capabilities.ExperimentalAPI &&
+			slices.Equal(a.Capabilities.OptOutNotificationMethods, b.Capabilities.OptOutNotificationMethods)
+	}
+}
+
+func equalStringPtr(a, b *string) bool {
+	switch {
+	case a == nil || b == nil:
+		return a == nil && b == nil
+	default:
+		return *a == *b
+	}
+}
+
+func (c *Client) initializedParams() (InitializeParams, bool) {
+	c.initializeMu.Lock()
+	defer c.initializeMu.Unlock()
+
+	if !c.initializeDone {
+		return InitializeParams{}, false
+	}
+	return cloneInitializeParams(c.initializeParams), true
+}
+
 // Initialize sends an initialize request to the server.
 // This is the one-time handshake that must be performed before using v2
 // protocol methods. Successful calls are cached so repeated callers share the
@@ -57,11 +137,20 @@ func (c *Client) Initialize(ctx context.Context, params InitializeParams) (Initi
 		return InitializeResponse{}, err
 	}
 
+	requested := normalizeInitializeParams(params)
+
 	for {
 		c.initializeMu.Lock()
 		if c.initializeDone {
+			existing := c.initializeParams
 			resp := c.initializeResp
 			c.initializeMu.Unlock()
+			if !initializeParamsEqual(existing, requested) {
+				return InitializeResponse{}, &InitializeParamsMismatchError{
+					Existing:  cloneInitializeParams(existing),
+					Requested: cloneInitializeParams(params),
+				}
+			}
 			return resp, nil
 		}
 		if wait := c.initializeWait; wait != nil {
@@ -84,6 +173,7 @@ func (c *Client) Initialize(ctx context.Context, params InitializeParams) (Initi
 		c.initializeMu.Lock()
 		if err == nil {
 			c.initializeDone = true
+			c.initializeParams = requested
 			c.initializeResp = result
 		}
 		c.initializeWait = nil

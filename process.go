@@ -76,6 +76,11 @@ type ProcessOptions struct {
 	// Client options forwarded to NewClient.
 	ClientOptions []ClientOption
 
+	// InitializeParams overrides the default initialize handshake used by
+	// helper methods such as Run, RunStreamed, and StartConversation.
+	// Nil uses the SDK default client info.
+	InitializeParams *InitializeParams
+
 	// Model sets --model for the Codex CLI.
 	Model string
 
@@ -93,17 +98,18 @@ type ProcessOptions struct {
 
 // Process wraps a running Codex CLI child process and its connected Client.
 type Process struct {
-	Client       *Client
-	cmd          *exec.Cmd
-	transport    *StdioTransport
-	stdin        io.Closer
-	processTree  processTreeState
-	closeOnce    sync.Once
-	waitOnce     sync.Once
-	waitErr      error
-	waitDone     chan struct{}
-	shutdownMode processShutdownMode
-	shutdownStep atomic.Uint32
+	Client           *Client
+	cmd              *exec.Cmd
+	transport        *StdioTransport
+	stdin            io.Closer
+	initializeParams InitializeParams
+	processTree      processTreeState
+	closeOnce        sync.Once
+	waitOnce         sync.Once
+	waitErr          error
+	waitDone         chan struct{}
+	shutdownMode     processShutdownMode
+	shutdownStep     atomic.Uint32
 }
 
 // errEndOfOptionsInExecArgs is returned when ExecArgs contains "--", which
@@ -250,7 +256,11 @@ func NewProcessFromClient(client *Client) *Process {
 	}
 	done := make(chan struct{})
 	close(done)
-	return &Process{Client: client, waitDone: done}
+	return &Process{
+		Client:           client,
+		waitDone:         done,
+		initializeParams: defaultInitializeParams(),
+	}
 }
 
 // StartProcess spawns "codex exec --experimental-json" as a child process,
@@ -322,14 +332,28 @@ func StartProcess(ctx context.Context, opts *ProcessOptions) (*Process, error) {
 	client := NewClient(transport, opts.ClientOptions...)
 
 	return &Process{
-		Client:       client,
-		cmd:          cmd,
-		transport:    transport,
-		stdin:        stdin,
-		processTree:  processTree,
-		waitDone:     make(chan struct{}),
-		shutdownMode: defaultProcessShutdownMode(),
+		Client:           client,
+		cmd:              cmd,
+		transport:        transport,
+		stdin:            stdin,
+		initializeParams: resolveProcessInitializeParams(opts),
+		processTree:      processTree,
+		waitDone:         make(chan struct{}),
+		shutdownMode:     defaultProcessShutdownMode(),
 	}, nil
+}
+
+func defaultInitializeParams() InitializeParams {
+	return InitializeParams{
+		ClientInfo: ClientInfo{Name: "codex-sdk-go", Version: sdkVersion},
+	}
+}
+
+func resolveProcessInitializeParams(opts *ProcessOptions) InitializeParams {
+	if opts == nil || opts.InitializeParams == nil {
+		return defaultInitializeParams()
+	}
+	return cloneInitializeParams(*opts.InitializeParams)
 }
 
 func resolveBinaryPath(binaryPath string) (string, error) {
@@ -519,10 +543,16 @@ func (p *Process) ensureInit(ctx context.Context) error {
 	if p.Client == nil {
 		return errNilProcessClient
 	}
+	if _, ok := p.Client.initializedParams(); ok {
+		return nil
+	}
 
-	_, err := p.Client.Initialize(ctx, InitializeParams{
-		ClientInfo: ClientInfo{Name: "codex-sdk-go", Version: sdkVersion},
-	})
+	params := p.initializeParams
+	if params.ClientInfo.Name == "" && params.ClientInfo.Version == "" && params.Capabilities == nil {
+		params = defaultInitializeParams()
+	}
+
+	_, err := p.Client.Initialize(ctx, params)
 	if err != nil {
 		return fmt.Errorf("initialize: %w", err)
 	}

@@ -196,10 +196,11 @@ type Client struct {
 	// Initialize handshake state. Successful initialize responses are cached so
 	// direct Client.Initialize calls and Process helper methods share the same
 	// one-time protocol handshake.
-	initializeMu   sync.Mutex
-	initializeDone bool
-	initializeWait chan struct{}
-	initializeResp InitializeResponse
+	initializeMu     sync.Mutex
+	initializeDone   bool
+	initializeWait   chan struct{}
+	initializeParams InitializeParams
+	initializeResp   InitializeResponse
 
 	// Notification listeners: method → handler function (public, replacement semantics)
 	notificationListeners map[string]NotificationHandler

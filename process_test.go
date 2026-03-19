@@ -1244,6 +1244,10 @@ func TestStartConversationAfterManualInitializeDoesNotReinitialize(t *testing.T)
 
 	if _, err := proc.Client.Initialize(ctx, codex.InitializeParams{
 		ClientInfo: codex.ClientInfo{Name: "test-client", Version: "1.0.0"},
+		Capabilities: &codex.InitializeCapabilities{
+			ExperimentalAPI:           true,
+			OptOutNotificationMethods: []string{"thread/started"},
+		},
 	}); err != nil {
 		t.Fatalf("Initialize: %v", err)
 	}

@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -464,6 +465,72 @@ func TestEnsureInitFailureAllowsRetry(t *testing.T) {
 	}
 	if got := transport.calls(); got != 2 {
 		t.Fatalf("initialize call count = %d, want 2", got)
+	}
+}
+
+type recordingInitializeTransport struct {
+	mu         sync.Mutex
+	lastParams InitializeParams
+}
+
+func (t *recordingInitializeTransport) Send(_ context.Context, req Request) (Response, error) {
+	if req.Method != methodInitialize {
+		return Response{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Result:  json.RawMessage(`{}`),
+		}, nil
+	}
+
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if err := json.Unmarshal(req.Params, &t.lastParams); err != nil {
+		return Response{}, err
+	}
+	return Response{
+		JSONRPC: "2.0",
+		ID:      req.ID,
+		Result:  json.RawMessage(`{"platformFamily":"unix","platformOs":"linux","userAgent":"codex-test/1.0"}`),
+	}, nil
+}
+
+func (t *recordingInitializeTransport) Notify(_ context.Context, _ Notification) error { return nil }
+func (t *recordingInitializeTransport) OnRequest(_ RequestHandler)                     {}
+func (t *recordingInitializeTransport) OnNotify(_ NotificationHandler)                 {}
+func (t *recordingInitializeTransport) Close() error                                   { return nil }
+
+func (t *recordingInitializeTransport) params() InitializeParams {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return cloneInitializeParams(t.lastParams)
+}
+
+func TestEnsureInitUsesConfiguredInitializeParams(t *testing.T) {
+	transport := &recordingInitializeTransport{}
+	client := NewClient(transport, WithRequestTimeout(5*time.Second))
+	proc := NewProcessFromClient(client)
+	proc.initializeParams = InitializeParams{
+		ClientInfo: ClientInfo{Name: "custom-client", Version: "2.0.0"},
+		Capabilities: &InitializeCapabilities{
+			ExperimentalAPI:           true,
+			OptOutNotificationMethods: []string{"thread/started"},
+		},
+	}
+
+	if err := proc.ensureInit(context.Background()); err != nil {
+		t.Fatalf("ensureInit failed: %v", err)
+	}
+
+	got := transport.params()
+	if got.ClientInfo.Name != "custom-client" || got.ClientInfo.Version != "2.0.0" {
+		t.Fatalf("initialize client info = %+v, want custom-client/2.0.0", got.ClientInfo)
+	}
+	if got.Capabilities == nil || !got.Capabilities.ExperimentalAPI {
+		t.Fatalf("initialize capabilities = %+v, want experimental API enabled", got.Capabilities)
+	}
+	if !slices.Equal(got.Capabilities.OptOutNotificationMethods, []string{"thread/started"}) {
+		t.Fatalf("optOutNotificationMethods = %v, want [thread/started]", got.Capabilities.OptOutNotificationMethods)
 	}
 }
 
