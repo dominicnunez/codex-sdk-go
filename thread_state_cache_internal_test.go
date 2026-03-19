@@ -7,7 +7,7 @@ import (
 
 func TestCacheThreadStateEvictsLeastRecentlyUpdatedThread(t *testing.T) {
 	client := &Client{
-		threadStates: make(map[string]Thread),
+		threadStates: make(map[string]threadStateEntry),
 	}
 
 	for i := range maxCachedThreadStates {
@@ -33,7 +33,7 @@ func TestCacheThreadStateEvictsLeastRecentlyUpdatedThread(t *testing.T) {
 
 func TestMutateThreadStateRefreshesThreadRecency(t *testing.T) {
 	client := &Client{
-		threadStates: make(map[string]Thread),
+		threadStates: make(map[string]threadStateEntry),
 	}
 
 	for i := range maxCachedThreadStates {
@@ -60,14 +60,14 @@ func TestMutateThreadStateRefreshesThreadRecency(t *testing.T) {
 
 func TestThreadStateListenersReceiveCacheAndMutationUpdates(t *testing.T) {
 	client := &Client{
-		threadStates:         make(map[string]Thread),
+		threadStates:         make(map[string]threadStateEntry),
 		threadStateListeners: make(map[string][]threadStateListener),
 	}
 
 	var snapshots []Thread
 	unsubscribe := client.addThreadStateListener("thread-1", func(thread Thread) {
 		snapshots = append(snapshots, thread)
-	})
+	}, nil)
 	defer unsubscribe()
 
 	client.cacheThreadState(Thread{ID: "thread-1"})
@@ -89,12 +89,12 @@ func TestThreadStateListenersReceiveCacheAndMutationUpdates(t *testing.T) {
 
 func TestObservedThreadStateSurvivesEvictionPressure(t *testing.T) {
 	client := &Client{
-		threadStates:         make(map[string]Thread),
+		threadStates:         make(map[string]threadStateEntry),
 		threadStateListeners: make(map[string][]threadStateListener),
 	}
 
 	client.cacheThreadState(Thread{ID: "thread-observed"})
-	unsubscribe := client.addThreadStateListener("thread-observed", func(Thread) {})
+	unsubscribe := client.addThreadStateListener("thread-observed", func(Thread) {}, nil)
 	defer unsubscribe()
 
 	for i := range maxCachedThreadStates + 10 {
@@ -111,12 +111,12 @@ func TestObservedThreadStateSurvivesEvictionPressure(t *testing.T) {
 
 func TestRemovingThreadStateListenerAllowsDeferredEviction(t *testing.T) {
 	client := &Client{
-		threadStates:         make(map[string]Thread),
+		threadStates:         make(map[string]threadStateEntry),
 		threadStateListeners: make(map[string][]threadStateListener),
 	}
 
 	client.cacheThreadState(Thread{ID: "thread-observed"})
-	unsubscribe := client.addThreadStateListener("thread-observed", func(Thread) {})
+	unsubscribe := client.addThreadStateListener("thread-observed", func(Thread) {}, nil)
 
 	for i := range maxCachedThreadStates + 1 {
 		client.cacheThreadState(Thread{ID: fmt.Sprintf("thread-%02d", i)})
@@ -136,4 +136,48 @@ func (c *Client) cachedThreadStatesWithoutListenersForTest() int {
 	c.threadStateMu.RLock()
 	defer c.threadStateMu.RUnlock()
 	return c.cachedThreadStatesWithoutListenersLocked()
+}
+
+func TestThreadStateListenersReceiveCloseUpdates(t *testing.T) {
+	client := &Client{
+		threadStates:         make(map[string]threadStateEntry),
+		threadStateListeners: make(map[string][]threadStateListener),
+	}
+
+	client.cacheThreadState(Thread{ID: "thread-1"})
+
+	var closed bool
+	unsubscribe := client.addThreadStateListener("thread-1", nil, func() {
+		closed = true
+	})
+	defer unsubscribe()
+
+	client.closeThreadState("thread-1")
+
+	if !closed {
+		t.Fatal("expected close listener to be called")
+	}
+	if _, ok := client.threadStateSnapshot("thread-1"); ok {
+		t.Fatal("expected closed thread to stop exposing snapshots")
+	}
+}
+
+func TestThreadStateCloseIsVisibleToLateListeners(t *testing.T) {
+	client := &Client{
+		threadStates:         make(map[string]threadStateEntry),
+		threadStateListeners: make(map[string][]threadStateListener),
+	}
+
+	client.cacheThreadState(Thread{ID: "thread-1"})
+	client.closeThreadState("thread-1")
+
+	var closed bool
+	unsubscribe := client.addThreadStateListener("thread-1", nil, func() {
+		closed = true
+	})
+	defer unsubscribe()
+
+	if !closed {
+		t.Fatal("expected late close listener to observe closed state")
+	}
 }

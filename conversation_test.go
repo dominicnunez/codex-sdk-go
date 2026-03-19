@@ -289,6 +289,46 @@ func TestConversationCloseStopsThreadStateUpdates(t *testing.T) {
 	}
 }
 
+func TestConversationRejectsTurnsAfterThreadClosedNotification(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "thread/closed",
+		Params:  json.RawMessage(`{"threadId":"thread-1"}`),
+	})
+
+	if _, err := conv.Turn(ctx, codex.TurnOptions{Prompt: "after close"}); err == nil || err.Error() != "conversation is closed" {
+		t.Fatalf("Turn() error = %v, want conversation is closed", err)
+	}
+	if got := mock.MethodCallCount("turn/start"); got != 0 {
+		t.Fatalf("turn/start calls after Turn() = %d, want 0", got)
+	}
+
+	stream := conv.TurnStreamed(ctx, codex.TurnOptions{Prompt: "after close streamed"})
+	var gotErr error
+	for _, err := range stream.Events() {
+		if err != nil {
+			gotErr = err
+			break
+		}
+	}
+	if gotErr == nil || gotErr.Error() != "conversation is closed" {
+		t.Fatalf("TurnStreamed() error = %v, want conversation is closed", gotErr)
+	}
+	if got := mock.MethodCallCount("turn/start"); got != 0 {
+		t.Fatalf("turn/start calls after TurnStreamed() = %d, want 0", got)
+	}
+}
+
 func TestConversationThreadRetainsNotificationMetadataAfterCacheEviction(t *testing.T) {
 	proc, mock := mockProcess(t)
 

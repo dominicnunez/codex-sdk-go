@@ -62,6 +62,10 @@ func (s *conversationState) snapshot() Thread {
 
 func (s *conversationState) storeSnapshot(thread Thread) {
 	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		return
+	}
 	s.thread = cloneThreadState(thread)
 	s.mu.Unlock()
 }
@@ -729,7 +733,7 @@ func (p *Process) StartConversation(ctx context.Context, opts ConversationOption
 		threadID: resp.Thread.ID,
 		state:    state,
 	}
-	unsubscribe := p.Client.addThreadStateListener(resp.Thread.ID, state.storeSnapshot)
+	unsubscribe := p.Client.addThreadStateListener(resp.Thread.ID, state.storeSnapshot, state.close)
 	conv.release = unsubscribe
 	if snapshot, ok := p.Client.threadStateSnapshot(resp.Thread.ID); ok {
 		state.storeSnapshot(snapshot)

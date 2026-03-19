@@ -107,7 +107,7 @@ func TestThreadCloneAdditionalDetails(t *testing.T) {
 
 func TestConversationThreadRetainsLatestSnapshotAfterCacheEvictionPressure(t *testing.T) {
 	client := &Client{
-		threadStates:         make(map[string]Thread),
+		threadStates:         make(map[string]threadStateEntry),
 		threadStateListeners: make(map[string][]threadStateListener),
 	}
 	process := &Process{Client: client}
@@ -119,7 +119,7 @@ func TestConversationThreadRetainsLatestSnapshotAfterCacheEvictionPressure(t *te
 			Status: ThreadStatusWrapper{Value: ThreadStatusIdle{}},
 		}),
 	}
-	unsubscribe := client.addThreadStateListener(conv.threadID, conv.state.storeSnapshot)
+	unsubscribe := client.addThreadStateListener(conv.threadID, conv.state.storeSnapshot, conv.state.close)
 	defer unsubscribe()
 
 	client.cacheThreadState(storedConversationThread(t, conv))

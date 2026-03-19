@@ -16,7 +16,10 @@ func (c *Client) cacheThreadState(thread Thread) {
 	snapshot := cloneThreadState(thread)
 	c.threadStateMu.Lock()
 	c.ensureThreadStateCacheMapsLocked()
-	c.threadStates[thread.ID] = snapshot
+	c.threadStates[thread.ID] = threadStateEntry{
+		thread:      snapshot,
+		hasSnapshot: true,
+	}
 	c.touchThreadStateLocked(thread.ID)
 	c.evictThreadStatesLocked()
 	listeners := c.threadStateListenersLocked(thread.ID)
@@ -27,12 +30,12 @@ func (c *Client) cacheThreadState(thread Thread) {
 
 func (c *Client) threadStateSnapshot(threadID string) (Thread, bool) {
 	c.threadStateMu.RLock()
-	thread, ok := c.threadStates[threadID]
+	entry, ok := c.threadStates[threadID]
 	c.threadStateMu.RUnlock()
-	if !ok {
+	if !ok || !entry.hasSnapshot || entry.closed {
 		return Thread{}, false
 	}
-	return cloneThreadState(thread), true
+	return cloneThreadState(entry.thread), true
 }
 
 func (c *Client) mutateThreadState(threadID string, mutate func(*Thread)) {
@@ -42,52 +45,92 @@ func (c *Client) mutateThreadState(threadID string, mutate func(*Thread)) {
 
 	var (
 		snapshot  Thread
-		ok        bool
+		updated   bool
 		listeners []threadStateListener
 	)
 
 	c.threadStateMu.Lock()
 	c.ensureThreadStateCacheMapsLocked()
-	thread, ok := c.threadStates[threadID]
-	if ok {
-		mutate(&thread)
-		snapshot = cloneThreadState(thread)
-		c.threadStates[threadID] = snapshot
+	entry, ok := c.threadStates[threadID]
+	if ok && entry.hasSnapshot && !entry.closed {
+		mutate(&entry.thread)
+		snapshot = cloneThreadState(entry.thread)
+		entry.thread = snapshot
+		c.threadStates[threadID] = entry
 		c.touchThreadStateLocked(threadID)
 		c.evictThreadStatesLocked()
 		listeners = c.threadStateListenersLocked(threadID)
+		updated = true
 	}
 	c.threadStateMu.Unlock()
 
-	if ok {
+	if updated {
 		c.notifyThreadStateListeners(snapshot, listeners)
 	}
 }
 
-func (c *Client) addThreadStateListener(threadID string, handler func(Thread)) func() {
-	if threadID == "" || handler == nil {
+func (c *Client) closeThreadState(threadID string) {
+	if threadID == "" {
+		return
+	}
+
+	var listeners []threadStateListener
+
+	c.threadStateMu.Lock()
+	c.ensureThreadStateCacheMapsLocked()
+	entry := c.threadStates[threadID]
+	if entry.closed {
+		c.threadStateMu.Unlock()
+		return
+	}
+	entry.thread = Thread{}
+	entry.hasSnapshot = false
+	entry.closed = true
+	c.threadStates[threadID] = entry
+	c.touchThreadStateLocked(threadID)
+	c.evictThreadStatesLocked()
+	listeners = c.threadStateListenersLocked(threadID)
+	c.threadStateMu.Unlock()
+
+	c.notifyThreadClosedListeners(listeners)
+}
+
+func (c *Client) addThreadStateListener(threadID string, onUpdate func(Thread), onClose func()) func() {
+	if threadID == "" || (onUpdate == nil && onClose == nil) {
 		return func() {}
 	}
 
-	var snapshot *Thread
+	var (
+		snapshot *Thread
+		closed   bool
+	)
 
 	c.threadStateMu.Lock()
 	c.ensureThreadStateCacheMapsLocked()
 	c.threadStateListenerSeq++
 	id := c.threadStateListenerSeq
 	c.threadStateListeners[threadID] = append(c.threadStateListeners[threadID], threadStateListener{
-		id:      id,
-		handler: handler,
+		id:       id,
+		onUpdate: onUpdate,
+		onClose:  onClose,
 	})
-	if thread, ok := c.threadStates[threadID]; ok {
-		cp := cloneThreadState(thread)
-		snapshot = &cp
+	if entry, ok := c.threadStates[threadID]; ok {
+		switch {
+		case entry.closed:
+			closed = true
+		case entry.hasSnapshot:
+			cp := cloneThreadState(entry.thread)
+			snapshot = &cp
+		}
 	}
 	c.evictThreadStatesLocked()
 	c.threadStateMu.Unlock()
 
-	if snapshot != nil {
-		handler(*snapshot)
+	switch {
+	case snapshot != nil && onUpdate != nil:
+		onUpdate(*snapshot)
+	case closed && onClose != nil:
+		onClose()
 	}
 
 	return func() {
@@ -151,7 +194,7 @@ func (c *Client) cachedThreadStatesWithoutListenersLocked() int {
 
 func (c *Client) ensureThreadStateCacheMapsLocked() {
 	if c.threadStates == nil {
-		c.threadStates = make(map[string]Thread)
+		c.threadStates = make(map[string]threadStateEntry)
 	}
 	if c.threadStateListeners == nil {
 		c.threadStateListeners = make(map[string][]threadStateListener)
@@ -170,7 +213,17 @@ func (c *Client) threadStateListenersLocked(threadID string) []threadStateListen
 
 func (c *Client) notifyThreadStateListeners(thread Thread, listeners []threadStateListener) {
 	for _, listener := range listeners {
-		listener.handler(cloneThreadState(thread))
+		if listener.onUpdate != nil {
+			listener.onUpdate(cloneThreadState(thread))
+		}
+	}
+}
+
+func (c *Client) notifyThreadClosedListeners(listeners []threadStateListener) {
+	for _, listener := range listeners {
+		if listener.onClose != nil {
+			listener.onClose()
+		}
 	}
 }
 
@@ -204,5 +257,14 @@ func (c *Client) installThreadStateCache() {
 		c.mutateThreadState(n.ThreadID, func(thread *Thread) {
 			thread.Status = cloneThreadStatusWrapper(n.Status)
 		})
+	})
+
+	c.addNotificationListener(notifyThreadClosed, func(_ context.Context, notif Notification) {
+		var n ThreadClosedNotification
+		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			c.reportHandlerError(notifyThreadClosed, fmt.Errorf("unmarshal %s: %w", notifyThreadClosed, err))
+			return
+		}
+		c.closeThreadState(n.ThreadID)
 	})
 }

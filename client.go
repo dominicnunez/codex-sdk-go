@@ -173,8 +173,15 @@ type internalListener struct {
 }
 
 type threadStateListener struct {
-	id      uint64
-	handler func(Thread)
+	id       uint64
+	onUpdate func(Thread)
+	onClose  func()
+}
+
+type threadStateEntry struct {
+	thread      Thread
+	hasSnapshot bool
+	closed      bool
 }
 
 // Client is the main entry point for interacting with the Codex JSON-RPC server.
@@ -200,7 +207,7 @@ type Client struct {
 	// long-lived client has ever touched. Active conversations subscribe to
 	// updates for their own thread so cache eviction cannot regress their local
 	// state between turns.
-	threadStates           map[string]Thread
+	threadStates           map[string]threadStateEntry
 	threadStateOrder       []string
 	threadStateListeners   map[string][]threadStateListener
 	threadStateListenerSeq uint64
@@ -267,7 +274,7 @@ func NewClient(transport Transport, opts ...ClientOption) *Client {
 		transport:             transport,
 		notificationListeners: make(map[string]NotificationHandler),
 		internalListeners:     make(map[string][]internalListener),
-		threadStates:          make(map[string]Thread),
+		threadStates:          make(map[string]threadStateEntry),
 		threadStateListeners:  make(map[string][]threadStateListener),
 	}
 
