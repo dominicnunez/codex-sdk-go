@@ -11,11 +11,12 @@ import (
 
 func TestClientMethodsRejectMalformedSuccessResponses(t *testing.T) {
 	tests := []struct {
-		name          string
-		method        string
-		missingObject interface{}
-		invalidObject interface{}
-		call          func(*codex.Client) error
+		name            string
+		method          string
+		missingObject   interface{}
+		invalidObject   interface{}
+		nullFieldObject interface{}
+		call            func(*codex.Client) error
 	}{
 		{
 			name:          "config read",
@@ -242,6 +243,30 @@ func TestClientMethodsRejectMalformedSuccessResponses(t *testing.T) {
 			},
 		},
 		{
+			name:          "thread list",
+			method:        "thread/list",
+			missingObject: map[string]interface{}{},
+			nullFieldObject: map[string]interface{}{
+				"data": nil,
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.List(context.Background(), codex.ThreadListParams{})
+				return err
+			},
+		},
+		{
+			name:          "thread loaded list",
+			method:        "thread/loaded/list",
+			missingObject: map[string]interface{}{},
+			nullFieldObject: map[string]interface{}{
+				"data": nil,
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.LoadedList(context.Background(), codex.ThreadLoadedListParams{})
+				return err
+			},
+		},
+		{
 			name:          "thread unsubscribe",
 			method:        "thread/unsubscribe",
 			missingObject: map[string]interface{}{},
@@ -358,6 +383,21 @@ func TestClientMethodsRejectMalformedSuccessResponses(t *testing.T) {
 				err := tt.call(client)
 				if !errors.Is(err, codex.ErrMissingResultField) {
 					t.Fatalf("error = %v; want ErrMissingResultField", err)
+				}
+			})
+		}
+
+		if tt.nullFieldObject != nil {
+			t.Run(tt.name+"/null required field", func(t *testing.T) {
+				mock := NewMockTransport()
+				client := codex.NewClient(mock)
+				if err := mock.SetResponseData(tt.method, tt.nullFieldObject); err != nil {
+					t.Fatalf("SetResponseData(%q): %v", tt.method, err)
+				}
+
+				err := tt.call(client)
+				if !errors.Is(err, codex.ErrNullResultField) {
+					t.Fatalf("error = %v; want ErrNullResultField", err)
 				}
 			})
 		}

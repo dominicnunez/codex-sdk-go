@@ -935,6 +935,19 @@ type ThreadListResponse struct {
 	NextCursor *string  `json:"nextCursor,omitempty"`
 }
 
+func (r *ThreadListResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "data"); err != nil {
+		return err
+	}
+	type wire ThreadListResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = ThreadListResponse(decoded)
+	return nil
+}
+
 // List retrieves a list of threads
 func (s *ThreadService) List(ctx context.Context, params ThreadListParams) (ThreadListResponse, error) {
 	var response ThreadListResponse
@@ -957,6 +970,19 @@ type ThreadLoadedListParams struct {
 type ThreadLoadedListResponse struct {
 	Data       []string `json:"data"`
 	NextCursor *string  `json:"nextCursor,omitempty"`
+}
+
+func (r *ThreadLoadedListResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "data"); err != nil {
+		return err
+	}
+	type wire ThreadLoadedListResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = ThreadLoadedListResponse(decoded)
+	return nil
 }
 
 // LoadedList retrieves loaded threads
