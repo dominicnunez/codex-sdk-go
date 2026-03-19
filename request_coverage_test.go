@@ -53,7 +53,9 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 
 	// Verify Command service
 	verified["command/exec"] = verifyMethod(t, transport, "command/exec", func() {
-		_, _ = client.Command.Exec(context.Background(), codex.CommandExecParams{})
+		_, _ = client.Command.Exec(context.Background(), codex.CommandExecParams{
+			Command: []string{"echo", "hello"},
+		})
 	})
 	verified["command/exec/write"] = verifyMethod(t, transport, "command/exec/write", func() {
 		_, _ = client.Command.Write(context.Background(), codex.CommandExecWriteParams{ProcessID: "proc-1"})
