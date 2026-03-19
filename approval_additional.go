@@ -26,6 +26,17 @@ type PermissionsRequestApprovalParams struct {
 	TurnID      string                   `json:"turnId"`
 }
 
+func (p *PermissionsRequestApprovalParams) UnmarshalJSON(data []byte) error {
+	type wire PermissionsRequestApprovalParams
+	var decoded wire
+	required := []string{"itemId", "permissions", "threadId", "turnId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*p = PermissionsRequestApprovalParams(decoded)
+	return nil
+}
+
 // GrantedPermissionProfile is the granted permission profile returned to the server.
 type GrantedPermissionProfile struct {
 	FileSystem *AdditionalFileSystemPermissions `json:"fileSystem,omitempty"`
@@ -62,6 +73,17 @@ type McpElicitationSchema struct {
 	Type       string                 `json:"type"`
 }
 
+func (s *McpElicitationSchema) UnmarshalJSON(data []byte) error {
+	type wire McpElicitationSchema
+	var decoded wire
+	required := []string{"properties", "type"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*s = McpElicitationSchema(decoded)
+	return nil
+}
+
 // McpServerElicitationRequestParams represents a server request for MCP elicitation.
 type McpServerElicitationRequestParams struct {
 	ServerName      string                   `json:"serverName"`
@@ -73,6 +95,17 @@ type McpServerElicitationRequestParams struct {
 	RequestedSchema *McpElicitationSchema    `json:"requestedSchema,omitempty"`
 	ElicitationID   *string                  `json:"elicitationId,omitempty"`
 	URL             *string                  `json:"url,omitempty"`
+}
+
+func (p *McpServerElicitationRequestParams) UnmarshalJSON(data []byte) error {
+	type wire McpServerElicitationRequestParams
+	var decoded wire
+	required := []string{"serverName", "threadId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*p = McpServerElicitationRequestParams(decoded)
+	return nil
 }
 
 // McpServerElicitationAction is the client response action for an elicitation request.

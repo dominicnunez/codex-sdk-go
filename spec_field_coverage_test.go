@@ -120,12 +120,88 @@ func schemaDefinitionVariantFields(path, defName, variantTitle string) (properti
 	return nil, nil, nil
 }
 
+func schemaTopLevelVariantFields(path, variantTitle string) (properties []string, required map[string]bool, err error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	var s schemaTopLevel
+	if err := json.Unmarshal(data, &s); err != nil {
+		return nil, nil, err
+	}
+	for _, variant := range s.OneOf {
+		var v schemaTopLevel
+		if err := json.Unmarshal(variant, &v); err != nil {
+			continue
+		}
+		var titleCheck struct {
+			Title string `json:"title"`
+		}
+		if err := json.Unmarshal(variant, &titleCheck); err != nil {
+			continue
+		}
+		if titleCheck.Title != variantTitle {
+			continue
+		}
+		for k := range v.Properties {
+			properties = append(properties, k)
+		}
+		sort.Strings(properties)
+		required = make(map[string]bool, len(v.Required))
+		for _, r := range v.Required {
+			required[r] = true
+		}
+		return properties, required, nil
+	}
+	return nil, nil, nil
+}
+
+func schemaDefinitionFields(path, defName string) (properties []string, required map[string]bool, err error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	var s schemaTopLevel
+	if err := json.Unmarshal(data, &s); err != nil {
+		return nil, nil, err
+	}
+	raw, ok := s.Definitions[defName]
+	if !ok {
+		return nil, nil, nil
+	}
+	var def schemaTopLevel
+	if err := json.Unmarshal(raw, &def); err != nil {
+		return nil, nil, err
+	}
+	for k := range def.Properties {
+		properties = append(properties, k)
+	}
+	sort.Strings(properties)
+	required = make(map[string]bool, len(def.Required))
+	for _, r := range def.Required {
+		required[r] = true
+	}
+	return properties, required, nil
+}
+
 // definitionVariantEntry maps a spec file + definition + variant title to a Go struct type.
 type definitionVariantEntry struct {
 	specPath     string
 	defName      string
 	variantTitle string
 	goType       reflect.Type
+}
+
+type topLevelVariantEntry struct {
+	specPath     string
+	variantTitle string
+	goType       reflect.Type
+}
+
+type definitionStructEntry struct {
+	specPath string
+	defName  string
+	goType   reflect.Type
 }
 
 // enumDef represents a parsed enum definition from a spec.
@@ -193,7 +269,7 @@ func testStructFields(t *testing.T) {
 	// Registry of schema file → Go struct.
 	// Excludes:
 	//   - 13 "implemented differently" schemas (JSONRPC*, method dispatch, etc.)
-	//   - Top-level oneOf unions (LoginAccountParams, LoginAccountResponse)
+	//   - Top-level oneOf unions handled by dedicated variant checks below
 	//   - Schemas with no properties (empty response objects)
 	//   - Schemas whose Go type uses interface{}/json.RawMessage for complex unions
 	registry := []structEntry{
@@ -484,6 +560,68 @@ func testStructFields(t *testing.T) {
 					continue
 				}
 
+				if required[prop] && fi.isOptional {
+					t.Errorf("schema requires %q but Go field %s.%s has omitempty", prop, entry.goType.Name(), fi.fieldName)
+				}
+			}
+		})
+	}
+
+	topLevelVariants := []topLevelVariantEntry{
+		{"specs/v2/LoginAccountResponse.json", "ApiKeyv2::LoginAccountResponse", reflect.TypeOf(ApiKeyLoginAccountResponse{})},
+		{"specs/v2/LoginAccountResponse.json", "Chatgptv2::LoginAccountResponse", reflect.TypeOf(ChatgptLoginAccountResponse{})},
+		{"specs/v2/LoginAccountResponse.json", "ChatgptAuthTokensv2::LoginAccountResponse", reflect.TypeOf(ChatgptAuthTokensLoginAccountResponse{})},
+	}
+
+	for _, entry := range topLevelVariants {
+		entry := entry
+		name := entry.specPath + "/oneOf." + entry.variantTitle
+		t.Run(name, func(t *testing.T) {
+			properties, required, err := schemaTopLevelVariantFields(entry.specPath, entry.variantTitle)
+			if err != nil {
+				t.Fatalf("failed to parse schema variant: %v", err)
+			}
+			if len(properties) == 0 {
+				t.Skip("variant has no properties")
+			}
+
+			goFields := structJSONFields(entry.goType)
+			for _, prop := range properties {
+				fi, ok := goFields[prop]
+				if !ok {
+					t.Errorf("schema property %q has no matching JSON field on %s", prop, entry.goType.Name())
+					continue
+				}
+				if required[prop] && fi.isOptional {
+					t.Errorf("schema requires %q but Go field %s.%s has omitempty", prop, entry.goType.Name(), fi.fieldName)
+				}
+			}
+		})
+	}
+
+	definitionStructs := []definitionStructEntry{
+		{"specs/v2/ConfigRequirementsReadResponse.json", "ConfigRequirements", reflect.TypeOf(ConfigRequirements{})},
+	}
+
+	for _, entry := range definitionStructs {
+		entry := entry
+		name := entry.specPath + "/definitions." + entry.defName
+		t.Run(name, func(t *testing.T) {
+			properties, required, err := schemaDefinitionFields(entry.specPath, entry.defName)
+			if err != nil {
+				t.Fatalf("failed to parse schema definition: %v", err)
+			}
+			if len(properties) == 0 {
+				t.Skip("definition has no properties")
+			}
+
+			goFields := structJSONFields(entry.goType)
+			for _, prop := range properties {
+				fi, ok := goFields[prop]
+				if !ok {
+					t.Errorf("schema property %q has no matching JSON field on %s", prop, entry.goType.Name())
+					continue
+				}
 				if required[prop] && fi.isOptional {
 					t.Errorf("schema requires %q but Go field %s.%s has omitempty", prop, entry.goType.Name(), fi.fieldName)
 				}

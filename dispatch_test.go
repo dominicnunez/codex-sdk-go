@@ -3,6 +3,7 @@ package codex_test
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/dominicnunez/codex-sdk-go"
@@ -64,7 +65,11 @@ func TestKnownNotificationDispatch(t *testing.T) {
 			},
 			params: map[string]interface{}{
 				"threadId": "thread-123",
-				"turnId":   float64(1),
+				"turn": map[string]interface{}{
+					"id":     "turn-1",
+					"status": "inProgress",
+					"items":  []interface{}{},
+				},
 			},
 			expectCalled: true,
 		},
@@ -76,7 +81,11 @@ func TestKnownNotificationDispatch(t *testing.T) {
 			},
 			params: map[string]interface{}{
 				"threadId": "thread-123",
-				"turnId":   float64(1),
+				"turn": map[string]interface{}{
+					"id":     "turn-1",
+					"status": "completed",
+					"items":  []interface{}{},
+				},
 			},
 			expectCalled: true,
 		},
@@ -87,11 +96,8 @@ func TestKnownNotificationDispatch(t *testing.T) {
 				client.OnAccountUpdated(func(n codex.AccountUpdatedNotification) { *called = true })
 			},
 			params: map[string]interface{}{
-				"account": map[string]interface{}{
-					"authMode": "apikey",
-					"email":    "user@example.com",
-					"id":       "user-123",
-				},
+				"authMode": "apikey",
+				"planType": "plus",
 			},
 			expectCalled: true,
 		},
@@ -154,6 +160,7 @@ func TestKnownNotificationDispatch(t *testing.T) {
 			},
 			params: map[string]interface{}{
 				"threadId": "thread-123",
+				"version":  "v1",
 			},
 			expectCalled: true,
 		},
@@ -167,8 +174,9 @@ func TestKnownNotificationDispatch(t *testing.T) {
 				"error": map[string]interface{}{
 					"message": "Something went wrong",
 				},
-				"threadId": "thread-123",
-				"turnId":   "turn-1",
+				"threadId":  "thread-123",
+				"turnId":    "turn-1",
+				"willRetry": false,
 			},
 			expectCalled: true,
 		},
@@ -222,7 +230,9 @@ func TestKnownApprovalHandlerDispatch(t *testing.T) {
 			name:   "applyPatchApproval",
 			method: "applyPatchApproval",
 			params: map[string]interface{}{
-				"diff": "diff --git a/file.txt b/file.txt",
+				"callId":         "call-1",
+				"conversationId": "thread-1",
+				"fileChanges":    map[string]interface{}{},
 			},
 			handler: func(ah *codex.ApprovalHandlers) {
 				ah.OnApplyPatchApproval = func(ctx context.Context, p codex.ApplyPatchApprovalParams) (codex.ApplyPatchApprovalResponse, error) {
@@ -237,7 +247,9 @@ func TestKnownApprovalHandlerDispatch(t *testing.T) {
 			name:   "item/commandExecution/requestApproval",
 			method: "item/commandExecution/requestApproval",
 			params: map[string]interface{}{
-				"command": []interface{}{"ls", "-la"},
+				"itemId":   "item-1",
+				"threadId": "thread-1",
+				"turnId":   "turn-1",
 			},
 			handler: func(ah *codex.ApprovalHandlers) {
 				ah.OnCommandExecutionRequestApproval = func(ctx context.Context, p codex.CommandExecutionRequestApprovalParams) (codex.CommandExecutionRequestApprovalResponse, error) {
@@ -252,7 +264,11 @@ func TestKnownApprovalHandlerDispatch(t *testing.T) {
 			name:   "execCommandApproval",
 			method: "execCommandApproval",
 			params: map[string]interface{}{
-				"command": []interface{}{"echo", "hello"},
+				"callId":         "call-1",
+				"command":        []interface{}{"echo", "hello"},
+				"conversationId": "thread-1",
+				"cwd":            "/tmp",
+				"parsedCmd":      []interface{}{},
 			},
 			handler: func(ah *codex.ApprovalHandlers) {
 				ah.OnExecCommandApproval = func(ctx context.Context, p codex.ExecCommandApprovalParams) (codex.ExecCommandApprovalResponse, error) {
@@ -267,12 +283,9 @@ func TestKnownApprovalHandlerDispatch(t *testing.T) {
 			name:   "item/fileChange/requestApproval",
 			method: "item/fileChange/requestApproval",
 			params: map[string]interface{}{
-				"changes": []interface{}{
-					map[string]interface{}{
-						"type": "add",
-						"path": "/tmp/test.txt",
-					},
-				},
+				"itemId":   "item-1",
+				"threadId": "thread-1",
+				"turnId":   "turn-1",
 			},
 			handler: func(ah *codex.ApprovalHandlers) {
 				ah.OnFileChangeRequestApproval = func(ctx context.Context, p codex.FileChangeRequestApprovalParams) (codex.FileChangeRequestApprovalResponse, error) {
@@ -285,7 +298,11 @@ func TestKnownApprovalHandlerDispatch(t *testing.T) {
 			name:   "item/tool/call",
 			method: "item/tool/call",
 			params: map[string]interface{}{
-				"name": "test-tool",
+				"arguments": map[string]interface{}{"query": "value"},
+				"callId":    "call-1",
+				"threadId":  "thread-1",
+				"tool":      "test-tool",
+				"turnId":    "turn-1",
 			},
 			handler: func(ah *codex.ApprovalHandlers) {
 				ah.OnDynamicToolCall = func(ctx context.Context, p codex.DynamicToolCallParams) (codex.DynamicToolCallResponse, error) {
@@ -301,7 +318,18 @@ func TestKnownApprovalHandlerDispatch(t *testing.T) {
 			name:   "item/tool/requestUserInput",
 			method: "item/tool/requestUserInput",
 			params: map[string]interface{}{
-				"prompt": "Enter value:",
+				"itemId": "item-1",
+				"questions": []interface{}{
+					map[string]interface{}{
+						"header":   "Header",
+						"id":       "q1",
+						"isOther":  false,
+						"isSecret": false,
+						"question": "Enter value:",
+					},
+				},
+				"threadId": "thread-1",
+				"turnId":   "turn-1",
 			},
 			handler: func(ah *codex.ApprovalHandlers) {
 				ah.OnToolRequestUserInput = func(ctx context.Context, p codex.ToolRequestUserInputParams) (codex.ToolRequestUserInputResponse, error) {
@@ -315,17 +343,44 @@ func TestKnownApprovalHandlerDispatch(t *testing.T) {
 			expectCalled: true,
 		},
 		{
+			name:   "item/permissions/requestApproval",
+			method: "item/permissions/requestApproval",
+			params: map[string]interface{}{
+				"itemId":      "item-1",
+				"permissions": map[string]interface{}{},
+				"threadId":    "thread-1",
+				"turnId":      "turn-1",
+			},
+			handler: func(ah *codex.ApprovalHandlers) {
+				ah.OnPermissionsRequestApproval = func(ctx context.Context, p codex.PermissionsRequestApprovalParams) (codex.PermissionsRequestApprovalResponse, error) {
+					return codex.PermissionsRequestApprovalResponse{}, nil
+				}
+			},
+			expectCalled: true,
+		},
+		{
 			name:   "account/chatgptAuthTokens/refresh",
 			method: "account/chatgptAuthTokens/refresh",
 			params: map[string]interface{}{
-				"authTokens": map[string]interface{}{
-					"accessToken":  "access-123",
-					"refreshToken": "refresh-456",
-				},
+				"reason": "unauthorized",
 			},
 			handler: func(ah *codex.ApprovalHandlers) {
 				ah.OnChatgptAuthTokensRefresh = func(ctx context.Context, p codex.ChatgptAuthTokensRefreshParams) (codex.ChatgptAuthTokensRefreshResponse, error) {
 					return codex.ChatgptAuthTokensRefreshResponse{}, nil
+				}
+			},
+			expectCalled: true,
+		},
+		{
+			name:   "mcpServer/elicitation/request",
+			method: "mcpServer/elicitation/request",
+			params: map[string]interface{}{
+				"serverName": "server-1",
+				"threadId":   "thread-1",
+			},
+			handler: func(ah *codex.ApprovalHandlers) {
+				ah.OnMcpServerElicitationRequest = func(ctx context.Context, p codex.McpServerElicitationRequestParams) (codex.McpServerElicitationRequestResponse, error) {
+					return codex.McpServerElicitationRequestResponse{Action: codex.McpServerElicitationActionCancel}, nil
 				}
 			},
 			expectCalled: true,
@@ -365,6 +420,265 @@ func TestKnownApprovalHandlerDispatch(t *testing.T) {
 			resp := mock.GetSentResponses()[0]
 			if resp.Error != nil {
 				t.Errorf("expected no error in response, got: %v", resp.Error)
+			}
+		})
+	}
+}
+
+func TestMalformedNotificationDispatchIsDropped(t *testing.T) {
+	ctx := context.Background()
+	mock := NewMockTransport()
+
+	tests := []struct {
+		name     string
+		method   string
+		register func(*codex.Client, *bool)
+		params   interface{}
+	}{
+		{
+			name:   "thread/started missing thread",
+			method: "thread/started",
+			register: func(client *codex.Client, called *bool) {
+				client.OnThreadStarted(func(codex.ThreadStartedNotification) { *called = true })
+			},
+			params: map[string]interface{}{},
+		},
+		{
+			name:   "turn/started missing turn",
+			method: "turn/started",
+			register: func(client *codex.Client, called *bool) {
+				client.OnTurnStarted(func(codex.TurnStartedNotification) { *called = true })
+			},
+			params: map[string]interface{}{
+				"threadId": "thread-123",
+			},
+		},
+		{
+			name:   "turn/completed missing turn",
+			method: "turn/completed",
+			register: func(client *codex.Client, called *bool) {
+				client.OnTurnCompleted(func(codex.TurnCompletedNotification) { *called = true })
+			},
+			params: map[string]interface{}{
+				"threadId": "thread-123",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var (
+				called    bool
+				reported  bool
+				reportErr error
+			)
+			client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+				if method == tt.method {
+					reported = true
+					reportErr = err
+				}
+			}))
+			tt.register(client, &called)
+
+			paramsJSON, err := json.Marshal(tt.params)
+			if err != nil {
+				t.Fatalf("failed to marshal params: %v", err)
+			}
+
+			mock.InjectServerNotification(ctx, codex.Notification{
+				JSONRPC: "2.0",
+				Method:  tt.method,
+				Params:  json.RawMessage(paramsJSON),
+			})
+
+			if called {
+				t.Fatal("expected handler not to be called")
+			}
+			if !reported {
+				t.Fatal("expected handler error callback to run")
+			}
+			if reportErr == nil {
+				t.Fatal("expected handler error")
+			}
+		})
+	}
+}
+
+func TestMalformedApprovalRequestReturnsInvalidParams(t *testing.T) {
+	ctx := context.Background()
+	mock := NewMockTransport()
+
+	tests := []struct {
+		name    string
+		method  string
+		params  interface{}
+		handler func(*codex.ApprovalHandlers, *bool)
+	}{
+		{
+			name:   "applyPatchApproval missing call id",
+			method: "applyPatchApproval",
+			params: map[string]interface{}{
+				"conversationId": "thread-1",
+				"fileChanges":    map[string]interface{}{},
+			},
+			handler: func(ah *codex.ApprovalHandlers, called *bool) {
+				ah.OnApplyPatchApproval = func(context.Context, codex.ApplyPatchApprovalParams) (codex.ApplyPatchApprovalResponse, error) {
+					*called = true
+					return codex.ApplyPatchApprovalResponse{}, nil
+				}
+			},
+		},
+		{
+			name:   "item/commandExecution/requestApproval missing item id",
+			method: "item/commandExecution/requestApproval",
+			params: map[string]interface{}{
+				"threadId": "thread-1",
+				"turnId":   "turn-1",
+			},
+			handler: func(ah *codex.ApprovalHandlers, called *bool) {
+				ah.OnCommandExecutionRequestApproval = func(context.Context, codex.CommandExecutionRequestApprovalParams) (codex.CommandExecutionRequestApprovalResponse, error) {
+					*called = true
+					return codex.CommandExecutionRequestApprovalResponse{}, nil
+				}
+			},
+		},
+		{
+			name:   "execCommandApproval missing call id",
+			method: "execCommandApproval",
+			params: map[string]interface{}{
+				"command":        []interface{}{"echo", "hello"},
+				"conversationId": "thread-1",
+				"cwd":            "/tmp",
+				"parsedCmd":      []interface{}{},
+			},
+			handler: func(ah *codex.ApprovalHandlers, called *bool) {
+				ah.OnExecCommandApproval = func(context.Context, codex.ExecCommandApprovalParams) (codex.ExecCommandApprovalResponse, error) {
+					*called = true
+					return codex.ExecCommandApprovalResponse{}, nil
+				}
+			},
+		},
+		{
+			name:   "item/fileChange/requestApproval missing item id",
+			method: "item/fileChange/requestApproval",
+			params: map[string]interface{}{
+				"threadId": "thread-1",
+				"turnId":   "turn-1",
+			},
+			handler: func(ah *codex.ApprovalHandlers, called *bool) {
+				ah.OnFileChangeRequestApproval = func(context.Context, codex.FileChangeRequestApprovalParams) (codex.FileChangeRequestApprovalResponse, error) {
+					*called = true
+					return codex.FileChangeRequestApprovalResponse{}, nil
+				}
+			},
+		},
+		{
+			name:   "item/tool/call missing call id",
+			method: "item/tool/call",
+			params: map[string]interface{}{
+				"arguments": map[string]interface{}{"query": "value"},
+				"threadId":  "thread-1",
+				"tool":      "test-tool",
+				"turnId":    "turn-1",
+			},
+			handler: func(ah *codex.ApprovalHandlers, called *bool) {
+				ah.OnDynamicToolCall = func(context.Context, codex.DynamicToolCallParams) (codex.DynamicToolCallResponse, error) {
+					*called = true
+					return codex.DynamicToolCallResponse{}, nil
+				}
+			},
+		},
+		{
+			name:   "item/tool/requestUserInput missing item id",
+			method: "item/tool/requestUserInput",
+			params: map[string]interface{}{
+				"questions": []interface{}{
+					map[string]interface{}{"header": "Header", "id": "q1", "question": "Prompt"},
+				},
+				"threadId": "thread-1",
+				"turnId":   "turn-1",
+			},
+			handler: func(ah *codex.ApprovalHandlers, called *bool) {
+				ah.OnToolRequestUserInput = func(context.Context, codex.ToolRequestUserInputParams) (codex.ToolRequestUserInputResponse, error) {
+					*called = true
+					return codex.ToolRequestUserInputResponse{}, nil
+				}
+			},
+		},
+		{
+			name:   "account/chatgptAuthTokens/refresh missing reason",
+			method: "account/chatgptAuthTokens/refresh",
+			params: map[string]interface{}{},
+			handler: func(ah *codex.ApprovalHandlers, called *bool) {
+				ah.OnChatgptAuthTokensRefresh = func(context.Context, codex.ChatgptAuthTokensRefreshParams) (codex.ChatgptAuthTokensRefreshResponse, error) {
+					*called = true
+					return codex.ChatgptAuthTokensRefreshResponse{}, nil
+				}
+			},
+		},
+		{
+			name:   "item/permissions/requestApproval missing permissions",
+			method: "item/permissions/requestApproval",
+			params: map[string]interface{}{
+				"itemId":   "item-1",
+				"threadId": "thread-1",
+				"turnId":   "turn-1",
+			},
+			handler: func(ah *codex.ApprovalHandlers, called *bool) {
+				ah.OnPermissionsRequestApproval = func(context.Context, codex.PermissionsRequestApprovalParams) (codex.PermissionsRequestApprovalResponse, error) {
+					*called = true
+					return codex.PermissionsRequestApprovalResponse{}, nil
+				}
+			},
+		},
+		{
+			name:   "mcpServer/elicitation/request missing server name",
+			method: "mcpServer/elicitation/request",
+			params: map[string]interface{}{
+				"threadId": "thread-1",
+			},
+			handler: func(ah *codex.ApprovalHandlers, called *bool) {
+				ah.OnMcpServerElicitationRequest = func(context.Context, codex.McpServerElicitationRequestParams) (codex.McpServerElicitationRequestResponse, error) {
+					*called = true
+					return codex.McpServerElicitationRequestResponse{}, nil
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock.Reset()
+			client := codex.NewClient(mock)
+
+			var called bool
+			var handlers codex.ApprovalHandlers
+			tt.handler(&handlers, &called)
+			client.SetApprovalHandlers(handlers)
+
+			paramsJSON, err := json.Marshal(tt.params)
+			if err != nil {
+				t.Fatalf("failed to marshal params: %v", err)
+			}
+
+			resp, err := mock.InjectServerRequest(ctx, codex.Request{
+				JSONRPC: "2.0",
+				Method:  tt.method,
+				ID:      codex.RequestID{Value: float64(1)},
+				Params:  json.RawMessage(paramsJSON),
+			})
+
+			if called {
+				t.Fatal("expected handler not to be called")
+			}
+			if err == nil {
+				t.Fatal("expected invalid params error")
+			}
+			if !strings.Contains(err.Error(), "invalid params") {
+				t.Fatalf("error = %v, want it to mention invalid params", err)
+			}
+			if resp.Error != nil {
+				t.Fatalf("unexpected JSON-RPC response on mock transport: %+v", resp.Error)
 			}
 		})
 	}

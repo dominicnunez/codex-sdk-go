@@ -14,6 +14,17 @@ type TurnStartedNotification struct {
 	Turn     Turn   `json:"turn"`
 }
 
+func (n *TurnStartedNotification) UnmarshalJSON(data []byte) error {
+	type wire TurnStartedNotification
+	var decoded wire
+	required := []string{"threadId", "turn"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = TurnStartedNotification(decoded)
+	return nil
+}
+
 // OnTurnStarted registers a listener for turn/started notifications
 func (c *Client) OnTurnStarted(handler func(TurnStartedNotification)) {
 	if handler == nil {
@@ -36,6 +47,17 @@ func (c *Client) OnTurnStarted(handler func(TurnStartedNotification)) {
 type TurnCompletedNotification struct {
 	ThreadID string `json:"threadId"`
 	Turn     Turn   `json:"turn"`
+}
+
+func (n *TurnCompletedNotification) UnmarshalJSON(data []byte) error {
+	type wire TurnCompletedNotification
+	var decoded wire
+	required := []string{"threadId", "turn"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = TurnCompletedNotification(decoded)
+	return nil
 }
 
 // OnTurnCompleted registers a listener for turn/completed notifications
@@ -62,6 +84,17 @@ type TurnPlanUpdatedNotification struct {
 	TurnID      string         `json:"turnId"`
 	Plan        []TurnPlanStep `json:"plan"`
 	Explanation *string        `json:"explanation,omitempty"`
+}
+
+func (n *TurnPlanUpdatedNotification) UnmarshalJSON(data []byte) error {
+	type wire TurnPlanUpdatedNotification
+	var decoded wire
+	required := []string{"plan", "threadId", "turnId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = TurnPlanUpdatedNotification(decoded)
+	return nil
 }
 
 // TurnPlanStepStatus represents the status of a plan step.
@@ -102,6 +135,17 @@ type TurnDiffUpdatedNotification struct {
 	ThreadID string `json:"threadId"`
 	TurnID   string `json:"turnId"`
 	Diff     string `json:"diff"`
+}
+
+func (n *TurnDiffUpdatedNotification) UnmarshalJSON(data []byte) error {
+	type wire TurnDiffUpdatedNotification
+	var decoded wire
+	required := []string{"diff", "threadId", "turnId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = TurnDiffUpdatedNotification(decoded)
+	return nil
 }
 
 // OnTurnDiffUpdated registers a listener for turn/diff/updated notifications

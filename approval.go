@@ -41,6 +41,17 @@ type ApplyPatchApprovalParams struct {
 	Reason         *string                      `json:"reason,omitempty"`
 }
 
+func (p *ApplyPatchApprovalParams) UnmarshalJSON(data []byte) error {
+	type wire ApplyPatchApprovalParams
+	var decoded wire
+	required := []string{"callId", "conversationId", "fileChanges"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*p = ApplyPatchApprovalParams(decoded)
+	return nil
+}
+
 // FileChange is a discriminated union for file changes (add/delete/update).
 type FileChange interface {
 	fileChange()
@@ -129,6 +140,10 @@ func (u *UpdateFileChange) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements custom unmarshaling for FileChangeWrapper.
 func (w *FileChangeWrapper) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "type"); err != nil {
+		return err
+	}
+
 	var raw struct {
 		Type string `json:"type"`
 	}
@@ -138,18 +153,27 @@ func (w *FileChangeWrapper) UnmarshalJSON(data []byte) error {
 
 	switch raw.Type {
 	case fileChangeTypeAdd:
+		if err := validateRequiredObjectFields(data, "type", "content"); err != nil {
+			return err
+		}
 		var add AddFileChange
 		if err := json.Unmarshal(data, &add); err != nil {
 			return err
 		}
 		w.Value = &add
 	case fileChangeTypeDelete:
+		if err := validateRequiredObjectFields(data, "type", "content"); err != nil {
+			return err
+		}
 		var del DeleteFileChange
 		if err := json.Unmarshal(data, &del); err != nil {
 			return err
 		}
 		w.Value = &del
 	case fileChangeTypeUpdate:
+		if err := validateRequiredObjectFields(data, "type", "unified_diff"); err != nil {
+			return err
+		}
 		var upd UpdateFileChange
 		if err := json.Unmarshal(data, &upd); err != nil {
 			return err
@@ -339,6 +363,17 @@ type CommandExecutionRequestApprovalParams struct {
 	Reason                          *string                   `json:"reason,omitempty"`
 }
 
+func (p *CommandExecutionRequestApprovalParams) UnmarshalJSON(data []byte) error {
+	type wire CommandExecutionRequestApprovalParams
+	var decoded wire
+	required := []string{"itemId", "threadId", "turnId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*p = CommandExecutionRequestApprovalParams(decoded)
+	return nil
+}
+
 // CommandAction is a discriminated union for parsed command actions.
 type CommandAction interface {
 	commandAction()
@@ -436,6 +471,10 @@ func (u *UnknownCommandAction) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements custom unmarshaling for CommandActionWrapper.
 func (w *CommandActionWrapper) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "type"); err != nil {
+		return err
+	}
+
 	var raw struct {
 		Type string `json:"type"`
 	}
@@ -445,24 +484,36 @@ func (w *CommandActionWrapper) UnmarshalJSON(data []byte) error {
 
 	switch raw.Type {
 	case "read":
+		if err := validateRequiredObjectFields(data, "command", "name", "path", "type"); err != nil {
+			return err
+		}
 		var read ReadCommandAction
 		if err := json.Unmarshal(data, &read); err != nil {
 			return err
 		}
 		w.Value = &read
 	case "listFiles":
+		if err := validateRequiredObjectFields(data, "command", "type"); err != nil {
+			return err
+		}
 		var list ListFilesCommandAction
 		if err := json.Unmarshal(data, &list); err != nil {
 			return err
 		}
 		w.Value = &list
 	case "search":
+		if err := validateRequiredObjectFields(data, "command", "type"); err != nil {
+			return err
+		}
 		var search SearchCommandAction
 		if err := json.Unmarshal(data, &search); err != nil {
 			return err
 		}
 		w.Value = &search
 	default:
+		if err := validateRequiredObjectFields(data, "command", "type"); err != nil {
+			return err
+		}
 		var unknown UnknownCommandAction
 		if err := json.Unmarshal(data, &unknown); err != nil {
 			return err
@@ -482,6 +533,17 @@ func (w CommandActionWrapper) MarshalJSON() ([]byte, error) {
 type NetworkApprovalContext struct {
 	Host     string                  `json:"host"`
 	Protocol NetworkApprovalProtocol `json:"protocol"`
+}
+
+func (c *NetworkApprovalContext) UnmarshalJSON(data []byte) error {
+	type wire NetworkApprovalContext
+	var decoded wire
+	required := []string{"host", "protocol"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*c = NetworkApprovalContext(decoded)
+	return nil
 }
 
 // CommandExecutionRequestApprovalResponse represents the response to a command execution approval request.
@@ -647,6 +709,17 @@ type ExecCommandApprovalParams struct {
 	Reason         *string                `json:"reason,omitempty"`
 }
 
+func (p *ExecCommandApprovalParams) UnmarshalJSON(data []byte) error {
+	type wire ExecCommandApprovalParams
+	var decoded wire
+	required := []string{"callId", "command", "conversationId", "cwd", "parsedCmd"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*p = ExecCommandApprovalParams(decoded)
+	return nil
+}
+
 // ParsedCommand is a discriminated union for legacy parsed commands.
 type ParsedCommand interface {
 	parsedCommand()
@@ -744,6 +817,10 @@ func (u *UnknownParsedCommand) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements custom unmarshaling for ParsedCommandWrapper.
 func (w *ParsedCommandWrapper) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "type"); err != nil {
+		return err
+	}
+
 	var raw struct {
 		Type string `json:"type"`
 	}
@@ -753,24 +830,36 @@ func (w *ParsedCommandWrapper) UnmarshalJSON(data []byte) error {
 
 	switch raw.Type {
 	case "read":
+		if err := validateRequiredObjectFields(data, "cmd", "name", "path", "type"); err != nil {
+			return err
+		}
 		var read ReadParsedCommand
 		if err := json.Unmarshal(data, &read); err != nil {
 			return err
 		}
 		w.Value = &read
 	case "list_files":
+		if err := validateRequiredObjectFields(data, "cmd", "type"); err != nil {
+			return err
+		}
 		var list ListFilesParsedCommand
 		if err := json.Unmarshal(data, &list); err != nil {
 			return err
 		}
 		w.Value = &list
 	case "search":
+		if err := validateRequiredObjectFields(data, "cmd", "type"); err != nil {
+			return err
+		}
 		var search SearchParsedCommand
 		if err := json.Unmarshal(data, &search); err != nil {
 			return err
 		}
 		w.Value = &search
 	default:
+		if err := validateRequiredObjectFields(data, "cmd", "type"); err != nil {
+			return err
+		}
 		var unknown UnknownParsedCommand
 		if err := json.Unmarshal(data, &unknown); err != nil {
 			return err
@@ -805,6 +894,17 @@ type FileChangeRequestApprovalParams struct {
 	Reason    *string `json:"reason,omitempty"`
 }
 
+func (p *FileChangeRequestApprovalParams) UnmarshalJSON(data []byte) error {
+	type wire FileChangeRequestApprovalParams
+	var decoded wire
+	required := []string{"itemId", "threadId", "turnId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*p = FileChangeRequestApprovalParams(decoded)
+	return nil
+}
+
 // FileChangeRequestApprovalResponse represents the response to a file change approval request.
 type FileChangeRequestApprovalResponse struct {
 	Decision FileChangeApprovalDecision `json:"decision"`
@@ -819,6 +919,18 @@ type DynamicToolCallParams struct {
 	CallID    string      `json:"callId"`
 	ThreadID  string      `json:"threadId"`
 	TurnID    string      `json:"turnId"`
+}
+
+func (p *DynamicToolCallParams) UnmarshalJSON(data []byte) error {
+	type wire DynamicToolCallParams
+	var decoded wire
+	required := []string{"arguments", "callId", "threadId", "tool", "turnId"}
+	nonNull := []string{"callId", "threadId", "tool", "turnId"}
+	if err := unmarshalInboundObject(data, &decoded, required, nonNull); err != nil {
+		return err
+	}
+	*p = DynamicToolCallParams(decoded)
+	return nil
 }
 
 // DynamicToolCallResponse represents the response to a dynamic tool call.
@@ -930,6 +1042,17 @@ type ToolRequestUserInputParams struct {
 	Questions []ToolRequestUserInputQuestion `json:"questions"`
 }
 
+func (p *ToolRequestUserInputParams) UnmarshalJSON(data []byte) error {
+	type wire ToolRequestUserInputParams
+	var decoded wire
+	required := []string{"itemId", "questions", "threadId", "turnId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*p = ToolRequestUserInputParams(decoded)
+	return nil
+}
+
 // ToolRequestUserInputQuestion represents a question to ask the user.
 type ToolRequestUserInputQuestion struct {
 	ID       string                        `json:"id"`
@@ -940,10 +1063,32 @@ type ToolRequestUserInputQuestion struct {
 	Options  *[]ToolRequestUserInputOption `json:"options,omitempty"`
 }
 
+func (q *ToolRequestUserInputQuestion) UnmarshalJSON(data []byte) error {
+	type wire ToolRequestUserInputQuestion
+	var decoded wire
+	required := []string{"header", "id", "question"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*q = ToolRequestUserInputQuestion(decoded)
+	return nil
+}
+
 // ToolRequestUserInputOption represents a selectable option for a question.
 type ToolRequestUserInputOption struct {
 	Label       string `json:"label"`
 	Description string `json:"description"`
+}
+
+func (o *ToolRequestUserInputOption) UnmarshalJSON(data []byte) error {
+	type wire ToolRequestUserInputOption
+	var decoded wire
+	required := []string{"description", "label"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*o = ToolRequestUserInputOption(decoded)
+	return nil
 }
 
 // ToolRequestUserInputResponse represents the response containing user's answers.
@@ -962,6 +1107,17 @@ type ToolRequestUserInputAnswer struct {
 type ChatgptAuthTokensRefreshParams struct {
 	Reason            ChatgptAuthTokensRefreshReason `json:"reason"`
 	PreviousAccountID *string                        `json:"previousAccountId,omitempty"`
+}
+
+func (p *ChatgptAuthTokensRefreshParams) UnmarshalJSON(data []byte) error {
+	type wire ChatgptAuthTokensRefreshParams
+	var decoded wire
+	required := []string{"reason"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*p = ChatgptAuthTokensRefreshParams(decoded)
+	return nil
 }
 
 // ChatgptAuthTokensRefreshResponse represents the response containing new auth tokens.

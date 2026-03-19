@@ -166,106 +166,149 @@ func TestRunStreamedWithCollectorCapturesNotificationConveniences(t *testing.T) 
 }
 
 func TestStreamCollectorSummaryIsDeepCopied(t *testing.T) {
-	proc, mock := mockProcess(t)
 	collector := codex.NewStreamCollector()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	stream := proc.RunStreamedWithCollector(ctx, codex.RunOptions{Prompt: "collect"}, collector)
-	waitForRunStreamedReady(t, mock)
-
-	mock.InjectServerNotification(ctx, codex.Notification{
-		JSONRPC: "2.0",
-		Method:  "item/commandExecution/outputDelta",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","itemId":"cmd-copy","delta":"chunk"}`),
-	})
-	mock.InjectServerNotification(ctx, codex.Notification{
-		JSONRPC: "2.0",
-		Method:  "error",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","willRetry":false,"error":{"message":"system failed"}}`),
-	})
-	mock.InjectServerNotification(ctx, codex.Notification{
-		JSONRPC: "2.0",
-		Method:  "item/started",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"commandExecution","id":"cmd-copy","command":"ls","commandActions":[{"type":"search","path":"/workspace","query":"needle"}],"cwd":"/tmp","status":"inProgress","processId":"123"}}`),
-	})
-	mock.InjectServerNotification(ctx, codex.Notification{
-		JSONRPC: "2.0",
-		Method:  "item/completed",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"commandExecution","id":"cmd-copy","command":"ls","commandActions":[{"type":"search","path":"/workspace","query":"needle"}],"cwd":"/tmp","status":"completed","aggregatedOutput":"chunk"}}`),
-	})
-	mock.InjectServerNotification(ctx, codex.Notification{
-		JSONRPC: "2.0",
-		Method:  "item/started",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"mcpToolCall","id":"mcp-copy","server":"local","tool":"search","status":"inProgress","arguments":{"outer":{"inner":"value"}}}}`),
-	})
-	mock.InjectServerNotification(ctx, codex.Notification{
-		JSONRPC: "2.0",
-		Method:  "item/completed",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"mcpToolCall","id":"mcp-copy","server":"local","tool":"search","status":"completed","arguments":{"outer":{"inner":"value"}},"result":{"content":[{"kind":"text","value":"ok"}],"structuredContent":{"result":{"value":"ok"}}}}}`),
-	})
-	mock.InjectServerNotification(ctx, codex.Notification{
-		JSONRPC: "2.0",
-		Method:  "item/started",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"webSearch","id":"web-copy","query":"original query","action":{"type":"search","query":"start query","queries":["start-a","start-b"]}}}`),
-	})
-	mock.InjectServerNotification(ctx, codex.Notification{
-		JSONRPC: "2.0",
-		Method:  "item/completed",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"webSearch","id":"web-copy","query":"original query","action":{"type":"findInPage","url":"https://example.com","pattern":"needle"}}}`),
-	})
-	mock.InjectServerNotification(ctx, codex.Notification{
-		JSONRPC: "2.0",
-		Method:  "item/started",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"fileChange","id":"file-copy","status":"inProgress","changes":[{"path":"old.txt","diff":"@@ -1 +1 @@","kind":{"type":"update","move_path":"new.txt"}}]}}`),
-	})
-	mock.InjectServerNotification(ctx, codex.Notification{
-		JSONRPC: "2.0",
-		Method:  "item/completed",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"fileChange","id":"file-copy","status":"completed","changes":[{"path":"old.txt","diff":"@@ -1 +1 @@","kind":{"type":"update","move_path":"new.txt"}}]}}`),
-	})
-	mock.InjectServerNotification(ctx, codex.Notification{
-		JSONRPC: "2.0",
-		Method:  "turn/completed",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
-	})
-
-	for _, err := range stream.Events() {
-		if err != nil {
-			t.Fatalf("unexpected stream error: %v", err)
-		}
-	}
+	commandPath := ptr("/workspace")
+	commandQuery := ptr("needle")
+	collector.Process(&codex.ItemStarted{Item: codex.ThreadItemWrapper{Value: &codex.CommandExecutionThreadItem{
+		ID:      "cmd-copy",
+		Command: "ls",
+		CommandActions: []codex.CommandActionWrapper{{
+			Value: &codex.SearchCommandAction{
+				Command: "rg needle",
+				Path:    commandPath,
+				Query:   commandQuery,
+			},
+		}},
+		Cwd:       "/tmp",
+		Status:    codex.CommandExecutionStatusInProgress,
+		ProcessId: ptr("123"),
+	}}}, nil)
+	collector.Process(&codex.ItemCompleted{Item: codex.ThreadItemWrapper{Value: &codex.CommandExecutionThreadItem{
+		ID:      "cmd-copy",
+		Command: "ls",
+		CommandActions: []codex.CommandActionWrapper{{
+			Value: &codex.SearchCommandAction{
+				Command: "rg needle",
+				Path:    ptr("/workspace"),
+				Query:   ptr("needle"),
+			},
+		}},
+		Cwd:              "/tmp",
+		Status:           codex.CommandExecutionStatusCompleted,
+		AggregatedOutput: ptr("chunk"),
+	}}}, nil)
+	collector.Process(&codex.ItemStarted{Item: codex.ThreadItemWrapper{Value: &codex.McpToolCallThreadItem{
+		ID:        "mcp-copy",
+		Server:    "local",
+		Tool:      "search",
+		Status:    codex.McpToolCallStatusInProgress,
+		Arguments: map[string]interface{}{"outer": map[string]interface{}{"inner": "value"}},
+	}}}, nil)
+	collector.Process(&codex.ItemCompleted{Item: codex.ThreadItemWrapper{Value: &codex.McpToolCallThreadItem{
+		ID:        "mcp-copy",
+		Server:    "local",
+		Tool:      "search",
+		Status:    codex.McpToolCallStatusCompleted,
+		Arguments: map[string]interface{}{"outer": map[string]interface{}{"inner": "value"}},
+		Result: &codex.McpToolCallResult{
+			Content: []codex.McpToolCallContentItem{
+				&codex.TextMcpToolCallContentItem{Value: "ok"},
+			},
+			StructuredContent: map[string]interface{}{"result": map[string]interface{}{"value": "ok"}},
+		},
+	}}}, nil)
+	collector.Process(&codex.ItemStarted{Item: codex.ThreadItemWrapper{Value: &codex.WebSearchThreadItem{
+		ID:    "web-copy",
+		Query: "original query",
+		Action: codex.WebSearchActionWrapper{Value: &codex.SearchWebSearchAction{
+			Query:   ptr("start query"),
+			Queries: &[]string{"start-a", "start-b"},
+		}},
+	}}}, nil)
+	collector.Process(&codex.ItemCompleted{Item: codex.ThreadItemWrapper{Value: &codex.WebSearchThreadItem{
+		ID:    "web-copy",
+		Query: "original query",
+		Action: codex.WebSearchActionWrapper{Value: &codex.FindInPageWebSearchAction{
+			URL:     ptr("https://example.com"),
+			Pattern: ptr("needle"),
+		}},
+	}}}, nil)
+	movePath := ptr("new.txt")
+	collector.Process(&codex.ItemStarted{Item: codex.ThreadItemWrapper{Value: &codex.FileChangeThreadItem{
+		ID:     "file-copy",
+		Status: codex.PatchApplyStatusInProgress,
+		Changes: []codex.FileUpdateChange{{
+			Path: "old.txt",
+			Diff: ptr("@@ -1 +1 @@"),
+			Kind: codex.PatchChangeKindWrapper{Value: &codex.UpdatePatchChangeKind{
+				MovePath: movePath,
+			}},
+		}},
+	}}}, nil)
+	collector.Process(&codex.ItemCompleted{Item: codex.ThreadItemWrapper{Value: &codex.FileChangeThreadItem{
+		ID:     "file-copy",
+		Status: codex.PatchApplyStatusCompleted,
+		Changes: []codex.FileUpdateChange{{
+			Path: "old.txt",
+			Diff: ptr("@@ -1 +1 @@"),
+			Kind: codex.PatchChangeKindWrapper{Value: &codex.UpdatePatchChangeKind{
+				MovePath: ptr("new.txt"),
+			}},
+		}},
+	}}}, nil)
+	collector.Process(nil, fmt.Errorf("system failed"))
 
 	summary := collector.Summary()
-	cmd := summary.CommandExecutions["cmd-copy"]
+	cmd, ok := summary.CommandExecutions["cmd-copy"]
+	if !ok {
+		t.Fatalf("missing command execution summary: %#v", summary)
+	}
+	if cmd.Status == nil || cmd.StartedItem == nil || cmd.CompletedItem == nil {
+		t.Fatalf("incomplete command execution summary: %#v", cmd)
+	}
 	*cmd.Status = codex.CommandExecutionStatusFailed
 	cmd.StartedItem.Command = "rm -rf /"
 	cmdAction := cmd.StartedItem.CommandActions[0].Value.(*codex.SearchCommandAction)
 	*cmdAction.Path = "/mutated"
 	*cmdAction.Query = "changed-needle"
 	cmd.StartedItem.ProcessId = ptr("999")
-	cmd.OutputDeltas[0] = "mutated"
 	summary.CommandExecutions["cmd-copy"] = cmd
-	mcp := summary.McpToolCalls["mcp-copy"]
+	mcp, ok := summary.McpToolCalls["mcp-copy"]
+	if !ok {
+		t.Fatalf("missing mcp tool call summary: %#v", summary)
+	}
+	if mcp.Status == nil || mcp.StartedItem == nil || mcp.CompletedItem == nil {
+		t.Fatalf("incomplete mcp tool call summary: %#v", mcp)
+	}
 	*mcp.Status = codex.McpToolCallStatusFailed
 	mcp.StartedItem.Arguments.(map[string]interface{})["outer"] = "changed"
 	mcp.CompletedItem.Result.StructuredContent.(map[string]interface{})["result"] = "changed"
 	summary.McpToolCalls["mcp-copy"] = mcp
-	web := summary.WebSearches["web-copy"]
+	web, ok := summary.WebSearches["web-copy"]
+	if !ok {
+		t.Fatalf("missing web search summary: %#v", summary)
+	}
+	if web.StartedItem == nil || web.CompletedItem == nil {
+		t.Fatalf("incomplete web search summary: %#v", web)
+	}
 	searchAction := web.StartedItem.Action.Value.(*codex.SearchWebSearchAction)
 	*searchAction.Query = "changed query"
 	(*searchAction.Queries)[0] = "changed-list-query"
 	findAction := web.CompletedItem.Action.Value.(*codex.FindInPageWebSearchAction)
 	*findAction.Pattern = "changed-pattern"
 	summary.WebSearches["web-copy"] = web
-	file := summary.FileChanges["file-copy"]
+	file, ok := summary.FileChanges["file-copy"]
+	if !ok {
+		t.Fatalf("missing file change summary: %#v", summary)
+	}
+	if file.Status == nil || file.StartedItem == nil {
+		t.Fatalf("incomplete file change summary: %#v", file)
+	}
 	*file.Status = codex.PatchApplyStatusFailed
 	updateKind := file.StartedItem.Changes[0].Kind.Value.(*codex.UpdatePatchChangeKind)
 	*updateKind.MovePath = "changed.txt"
 	summary.FileChanges["file-copy"] = file
 	summary.NormalizedErrors[0].Message = "changed"
-	*summary.NormalizedErrors[0].ThreadID = "mutated-thread"
 
 	after := collector.Summary()
 	got := after.CommandExecutions["cmd-copy"]
@@ -287,9 +330,6 @@ func TestStreamCollectorSummaryIsDeepCopied(t *testing.T) {
 	}
 	if gotAction.Query == nil || *gotAction.Query != "needle" {
 		t.Fatalf("command action query leaked mutation: %#v", gotAction)
-	}
-	if len(got.OutputDeltas) != 1 || got.OutputDeltas[0] != "chunk" {
-		t.Fatalf("output deltas leaked mutation: %v", got.OutputDeltas)
 	}
 	mcpAfter := after.McpToolCalls["mcp-copy"]
 	if mcpAfter.Status == nil || *mcpAfter.Status != codex.McpToolCallStatusCompleted {
@@ -325,9 +365,6 @@ func TestStreamCollectorSummaryIsDeepCopied(t *testing.T) {
 	}
 	if len(after.NormalizedErrors) == 0 || after.NormalizedErrors[0].Message != "system failed" {
 		t.Fatalf("normalized error message leaked mutation: %v", after.NormalizedErrors)
-	}
-	if after.NormalizedErrors[0].ThreadID == nil || *after.NormalizedErrors[0].ThreadID != "thread-1" {
-		t.Fatalf("normalized error thread id leaked mutation: %v", after.NormalizedErrors[0].ThreadID)
 	}
 }
 

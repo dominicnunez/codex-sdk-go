@@ -118,6 +118,9 @@ func TestConfigReadRequirements(t *testing.T) {
 					"allowedSandboxModes":     []interface{}{"read-only", "workspace-write"},
 					"allowedWebSearchModes":   []interface{}{"cached"},
 					"enforceResidency":        "us",
+					"featureRequirements": map[string]interface{}{
+						"threads": true,
+					},
 				},
 			},
 			checkResponse: func(t *testing.T, resp codex.ConfigRequirementsReadResponse) {
@@ -129,6 +132,9 @@ func TestConfigReadRequirements(t *testing.T) {
 				}
 				if resp.Requirements.EnforceResidency == nil || *resp.Requirements.EnforceResidency != "us" {
 					t.Errorf("expected enforceResidency = us, got %v", resp.Requirements.EnforceResidency)
+				}
+				if !resp.Requirements.FeatureRequirements["threads"] {
+					t.Errorf("expected featureRequirements[threads] = true, got %v", resp.Requirements.FeatureRequirements["threads"])
 				}
 			},
 		},

@@ -18,6 +18,17 @@ type AgentMessageDeltaNotification struct {
 	TurnID   string `json:"turnId"`
 }
 
+func (n *AgentMessageDeltaNotification) UnmarshalJSON(data []byte) error {
+	type wire AgentMessageDeltaNotification
+	var decoded wire
+	required := []string{"delta", "itemId", "threadId", "turnId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = AgentMessageDeltaNotification(decoded)
+	return nil
+}
+
 // FileChangeOutputDeltaNotification is sent when file change diff is streamed.
 // Method: item/fileChange/outputDelta
 type FileChangeOutputDeltaNotification struct {
@@ -25,6 +36,17 @@ type FileChangeOutputDeltaNotification struct {
 	ItemID   string `json:"itemId"`
 	ThreadID string `json:"threadId"`
 	TurnID   string `json:"turnId"`
+}
+
+func (n *FileChangeOutputDeltaNotification) UnmarshalJSON(data []byte) error {
+	type wire FileChangeOutputDeltaNotification
+	var decoded wire
+	required := []string{"delta", "itemId", "threadId", "turnId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = FileChangeOutputDeltaNotification(decoded)
+	return nil
 }
 
 // PlanDeltaNotification is sent when plan text is streamed.
@@ -38,6 +60,17 @@ type PlanDeltaNotification struct {
 	TurnID   string `json:"turnId"`
 }
 
+func (n *PlanDeltaNotification) UnmarshalJSON(data []byte) error {
+	type wire PlanDeltaNotification
+	var decoded wire
+	required := []string{"delta", "itemId", "threadId", "turnId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = PlanDeltaNotification(decoded)
+	return nil
+}
+
 // ReasoningTextDeltaNotification is sent when reasoning content text is streamed.
 // Method: item/reasoning/textDelta
 type ReasoningTextDeltaNotification struct {
@@ -46,6 +79,17 @@ type ReasoningTextDeltaNotification struct {
 	ItemID       string `json:"itemId"`
 	ThreadID     string `json:"threadId"`
 	TurnID       string `json:"turnId"`
+}
+
+func (n *ReasoningTextDeltaNotification) UnmarshalJSON(data []byte) error {
+	type wire ReasoningTextDeltaNotification
+	var decoded wire
+	required := []string{"contentIndex", "delta", "itemId", "threadId", "turnId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = ReasoningTextDeltaNotification(decoded)
+	return nil
 }
 
 // ReasoningSummaryTextDeltaNotification is sent when reasoning summary text is streamed.
@@ -58,6 +102,17 @@ type ReasoningSummaryTextDeltaNotification struct {
 	TurnID       string `json:"turnId"`
 }
 
+func (n *ReasoningSummaryTextDeltaNotification) UnmarshalJSON(data []byte) error {
+	type wire ReasoningSummaryTextDeltaNotification
+	var decoded wire
+	required := []string{"delta", "itemId", "summaryIndex", "threadId", "turnId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = ReasoningSummaryTextDeltaNotification(decoded)
+	return nil
+}
+
 // ReasoningSummaryPartAddedNotification is sent when a new reasoning summary part is added.
 // Method: item/reasoning/summaryPartAdded
 type ReasoningSummaryPartAddedNotification struct {
@@ -65,6 +120,17 @@ type ReasoningSummaryPartAddedNotification struct {
 	SummaryIndex int64  `json:"summaryIndex"` // Index of the newly added summary part
 	ThreadID     string `json:"threadId"`
 	TurnID       string `json:"turnId"`
+}
+
+func (n *ReasoningSummaryPartAddedNotification) UnmarshalJSON(data []byte) error {
+	type wire ReasoningSummaryPartAddedNotification
+	var decoded wire
+	required := []string{"itemId", "summaryIndex", "threadId", "turnId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = ReasoningSummaryPartAddedNotification(decoded)
+	return nil
 }
 
 // ItemStartedNotification is sent when a thread item starts.
@@ -75,12 +141,34 @@ type ItemStartedNotification struct {
 	TurnID   string            `json:"turnId"`
 }
 
+func (n *ItemStartedNotification) UnmarshalJSON(data []byte) error {
+	type wire ItemStartedNotification
+	var decoded wire
+	required := []string{"item", "threadId", "turnId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = ItemStartedNotification(decoded)
+	return nil
+}
+
 // ItemCompletedNotification is sent when a thread item completes.
 // Method: item/completed
 type ItemCompletedNotification struct {
 	Item     ThreadItemWrapper `json:"item"`
 	ThreadID string            `json:"threadId"`
 	TurnID   string            `json:"turnId"`
+}
+
+func (n *ItemCompletedNotification) UnmarshalJSON(data []byte) error {
+	type wire ItemCompletedNotification
+	var decoded wire
+	required := []string{"item", "threadId", "turnId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = ItemCompletedNotification(decoded)
+	return nil
 }
 
 // Listener registration methods on Client

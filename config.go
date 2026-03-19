@@ -419,6 +419,7 @@ type ConfigRequirements struct {
 	AllowedSandboxModes     *[]SandboxMode           `json:"allowedSandboxModes,omitempty"`
 	AllowedWebSearchModes   *[]WebSearchMode         `json:"allowedWebSearchModes,omitempty"`
 	EnforceResidency        *ResidencyRequirement    `json:"enforceResidency,omitempty"`
+	FeatureRequirements     map[string]bool          `json:"featureRequirements,omitempty"`
 }
 
 // ConfigValueWriteParams represents parameters for config/value/write request
