@@ -823,6 +823,84 @@ func TestApprovalHandlerMarshalFailureReturnsError(t *testing.T) {
 	}
 }
 
+func TestApprovalHandlerRejectsInvalidResponsePayloads(t *testing.T) {
+	tests := []struct {
+		name        string
+		method      string
+		params      string
+		register    func(*codex.Client)
+		wantErrPart string
+	}{
+		{
+			name:   "dynamic tool call missing content items",
+			method: "item/tool/call",
+			params: `{"tool":"test-tool","arguments":{},"callId":"call-1","threadId":"thread-1","turnId":"turn-1"}`,
+			register: func(client *codex.Client) {
+				client.SetApprovalHandlers(codex.ApprovalHandlers{
+					OnDynamicToolCall: func(context.Context, codex.DynamicToolCallParams) (codex.DynamicToolCallResponse, error) {
+						return codex.DynamicToolCallResponse{}, nil
+					},
+				})
+			},
+			wantErrPart: "missing contentItems",
+		},
+		{
+			name:   "tool request user input missing answers map",
+			method: "item/tool/requestUserInput",
+			params: `{"itemId":"item-1","threadId":"thread-1","turnId":"turn-1","questions":[{"id":"q1","header":"Header","question":"Prompt"}]}`,
+			register: func(client *codex.Client) {
+				client.SetApprovalHandlers(codex.ApprovalHandlers{
+					OnToolRequestUserInput: func(context.Context, codex.ToolRequestUserInputParams) (codex.ToolRequestUserInputResponse, error) {
+						return codex.ToolRequestUserInputResponse{}, nil
+					},
+				})
+			},
+			wantErrPart: "missing answers",
+		},
+		{
+			name:   "tool request user input missing nested answers array",
+			method: "item/tool/requestUserInput",
+			params: `{"itemId":"item-1","threadId":"thread-1","turnId":"turn-1","questions":[{"id":"q1","header":"Header","question":"Prompt"}]}`,
+			register: func(client *codex.Client) {
+				client.SetApprovalHandlers(codex.ApprovalHandlers{
+					OnToolRequestUserInput: func(context.Context, codex.ToolRequestUserInputParams) (codex.ToolRequestUserInputResponse, error) {
+						return codex.ToolRequestUserInputResponse{
+							Answers: map[string]codex.ToolRequestUserInputAnswer{
+								"q1": {},
+							},
+						}, nil
+					},
+				})
+			},
+			wantErrPart: `answers["q1"].answers: missing answers`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			mock := NewMockTransport()
+			client := codex.NewClient(mock)
+			tt.register(client)
+
+			req := codex.Request{
+				JSONRPC: "2.0",
+				Method:  tt.method,
+				ID:      codex.RequestID{Value: float64(1)},
+				Params:  json.RawMessage(tt.params),
+			}
+
+			_, err := mock.InjectServerRequest(ctx, req)
+			if err == nil {
+				t.Fatal("expected validation error from handleRequest, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.wantErrPart) {
+				t.Fatalf("error = %v; want substring %q", err, tt.wantErrPart)
+			}
+		})
+	}
+}
+
 // TestMissingApprovalHandlerReturnsMethodNotFound verifies that when an
 // approval handler is not set, a method-not-found error is returned.
 func TestMissingApprovalHandlerReturnsMethodNotFound(t *testing.T) {

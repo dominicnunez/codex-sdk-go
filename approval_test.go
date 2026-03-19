@@ -743,3 +743,40 @@ func TestAdditionalApprovalEndToEnd(t *testing.T) {
 		}
 	})
 }
+
+func TestDynamicToolCallOutputContentItemWrapperRejectsMalformedPayloads(t *testing.T) {
+	tests := []struct {
+		name        string
+		payload     string
+		wantErrPart string
+	}{
+		{
+			name:        "missing type",
+			payload:     `{}`,
+			wantErrPart: `"type"`,
+		},
+		{
+			name:        "input text missing text",
+			payload:     `{"type":"inputText"}`,
+			wantErrPart: `"text"`,
+		},
+		{
+			name:        "input image missing imageUrl",
+			payload:     `{"type":"inputImage"}`,
+			wantErrPart: `"imageUrl"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var item codex.DynamicToolCallOutputContentItemWrapper
+			err := json.Unmarshal([]byte(tt.payload), &item)
+			if err == nil {
+				t.Fatal("expected unmarshal error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.wantErrPart) {
+				t.Fatalf("error = %v; want substring %q", err, tt.wantErrPart)
+			}
+		})
+	}
+}
