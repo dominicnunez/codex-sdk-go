@@ -445,3 +445,242 @@ func TestClientMethodsRejectMalformedSuccessResponses(t *testing.T) {
 		}
 	}
 }
+
+func TestClientMethodsRejectMalformedAbsolutePathResponses(t *testing.T) {
+	tests := []struct {
+		name         string
+		method       string
+		payload      map[string]interface{}
+		call         func(*codex.Client) error
+		wantContains string
+	}{
+		{
+			name:   "thread read rejects relative cwd",
+			method: "thread/read",
+			payload: map[string]interface{}{
+				"thread": map[string]interface{}{
+					"id":            "thread-1",
+					"cliVersion":    "1.0.0",
+					"createdAt":     int64(1700000000),
+					"cwd":           "relative/path",
+					"modelProvider": "openai",
+					"preview":       "",
+					"source":        "exec",
+					"status":        map[string]interface{}{"type": "idle"},
+					"turns":         []interface{}{},
+					"updatedAt":     int64(1700000000),
+					"ephemeral":     true,
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Read(context.Background(), codex.ThreadReadParams{ThreadID: "thread-1"})
+				return err
+			},
+			wantContains: `thread.cwd: must be an absolute path`,
+		},
+		{
+			name:   "thread read rejects non-normalized thread path",
+			method: "thread/read",
+			payload: map[string]interface{}{
+				"thread": map[string]interface{}{
+					"id":            "thread-1",
+					"cliVersion":    "1.0.0",
+					"createdAt":     int64(1700000000),
+					"cwd":           "/tmp",
+					"modelProvider": "openai",
+					"path":          "/tmp/../workspace",
+					"preview":       "",
+					"source":        "exec",
+					"status":        map[string]interface{}{"type": "idle"},
+					"turns":         []interface{}{},
+					"updatedAt":     int64(1700000000),
+					"ephemeral":     true,
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Read(context.Background(), codex.ThreadReadParams{ThreadID: "thread-1"})
+				return err
+			},
+			wantContains: `thread.path: must be normalized`,
+		},
+		{
+			name:   "thread start rejects relative readable roots",
+			method: "thread/start",
+			payload: threadLifecycleResponseWithSandbox(map[string]interface{}{
+				"type": "workspaceWrite",
+				"readOnlyAccess": map[string]interface{}{
+					"type":          "restricted",
+					"readableRoots": []interface{}{"relative/root"},
+				},
+				"writableRoots": []interface{}{"/workspace"},
+			}),
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Start(context.Background(), codex.ThreadStartParams{})
+				return err
+			},
+			wantContains: `readOnlyAccess.readableRoots[0]: must be an absolute path`,
+		},
+		{
+			name:   "thread start rejects non-normalized writable roots",
+			method: "thread/start",
+			payload: threadLifecycleResponseWithSandbox(map[string]interface{}{
+				"type": "workspaceWrite",
+				"readOnlyAccess": map[string]interface{}{
+					"type":          "restricted",
+					"readableRoots": []interface{}{"/workspace"},
+				},
+				"writableRoots": []interface{}{"/tmp/../workspace"},
+			}),
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Start(context.Background(), codex.ThreadStartParams{})
+				return err
+			},
+			wantContains: `sandboxPolicy.writableRoots[0]: must be normalized`,
+		},
+		{
+			name:   "thread start rejects non-normalized response cwd",
+			method: "thread/start",
+			payload: func() map[string]interface{} {
+				payload := validProcessThreadStartResponse(validProcessThreadPayload("thread-1"))
+				payload["cwd"] = "/tmp/../workspace"
+				return payload
+			}(),
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Start(context.Background(), codex.ThreadStartParams{})
+				return err
+			},
+			wantContains: `cwd: must be normalized`,
+		},
+		{
+			name:   "plugin list rejects relative marketplace path",
+			method: "plugin/list",
+			payload: map[string]interface{}{
+				"marketplaces": []interface{}{
+					map[string]interface{}{
+						"name": "official",
+						"path": "plugins",
+						"plugins": []interface{}{
+							map[string]interface{}{
+								"authPolicy":    "ON_INSTALL",
+								"enabled":       true,
+								"id":            "plugin-1",
+								"installPolicy": "AVAILABLE",
+								"installed":     true,
+								"name":          "calendar",
+								"source":        map[string]interface{}{"path": "/plugins/calendar", "type": "local"},
+							},
+						},
+					},
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Plugin.List(context.Background(), codex.PluginListParams{})
+				return err
+			},
+			wantContains: `plugin.marketplace.path: must be an absolute path`,
+		},
+		{
+			name:   "plugin read rejects non-normalized skill path",
+			method: "plugin/read",
+			payload: map[string]interface{}{
+				"plugin": map[string]interface{}{
+					"apps":            []interface{}{},
+					"marketplaceName": "official",
+					"marketplacePath": "/plugins",
+					"mcpServers":      []interface{}{},
+					"skills": []interface{}{
+						map[string]interface{}{
+							"description": "skill desc",
+							"name":        "book",
+							"path":        "/plugins/../skills/book",
+						},
+					},
+					"summary": map[string]interface{}{
+						"authPolicy":    "ON_USE",
+						"enabled":       true,
+						"id":            "plugin-1",
+						"installPolicy": "AVAILABLE",
+						"installed":     true,
+						"name":          "calendar",
+						"source":        map[string]interface{}{"path": "/plugins/calendar", "type": "local"},
+					},
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Plugin.Read(context.Background(), codex.PluginReadParams{
+					MarketplacePath: "/plugins",
+					PluginName:      "calendar",
+				})
+				return err
+			},
+			wantContains: `plugin.skill.path: must be normalized`,
+		},
+		{
+			name:   "config read rejects relative layer file path",
+			method: "config/read",
+			payload: map[string]interface{}{
+				"config": map[string]interface{}{},
+				"layers": []interface{}{
+					map[string]interface{}{
+						"name":    map[string]interface{}{"type": "user", "file": "config.toml"},
+						"version": "v1",
+						"config":  map[string]interface{}{},
+					},
+				},
+				"origins": map[string]interface{}{
+					"user": map[string]interface{}{
+						"name":    map[string]interface{}{"type": "user", "file": "/home/user/.codex/config.toml"},
+						"version": "v1",
+					},
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Config.Read(context.Background(), codex.ConfigReadParams{})
+				return err
+			},
+			wantContains: `config.layer.user.file: must be an absolute path`,
+		},
+		{
+			name:   "config write rejects non-normalized file path",
+			method: "config/value/write",
+			payload: map[string]interface{}{
+				"filePath": "/tmp/../config.toml",
+				"status":   "ok",
+				"version":  "v1",
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Config.Write(context.Background(), codex.ConfigValueWriteParams{
+					KeyPath:       "model",
+					MergeStrategy: codex.MergeStrategyReplace,
+					Value:         json.RawMessage(`"gpt-5"`),
+				})
+				return err
+			},
+			wantContains: `config.write.filePath: must be normalized`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := NewMockTransport()
+			client := codex.NewClient(mock)
+			if err := mock.SetResponseData(tt.method, tt.payload); err != nil {
+				t.Fatalf("SetResponseData(%q): %v", tt.method, err)
+			}
+
+			err := tt.call(client)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.wantContains) {
+				t.Fatalf("error = %q; want substring %q", err.Error(), tt.wantContains)
+			}
+		})
+	}
+}
+
+func threadLifecycleResponseWithSandbox(sandbox map[string]interface{}) map[string]interface{} {
+	payload := validProcessThreadStartResponse(validProcessThreadPayload("thread-1"))
+	payload["sandbox"] = sandbox
+	return payload
+}

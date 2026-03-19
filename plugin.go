@@ -107,14 +107,26 @@ func (p *PluginInterface) UnmarshalJSON(data []byte) error {
 	p.BrandColor = wire.BrandColor
 	p.Capabilities = *wire.Capabilities
 	p.Category = wire.Category
-	p.ComposerIcon = wire.ComposerIcon
+	validatedComposerIcon, err := validateInboundAbsolutePathPointerField("plugin.interface.composerIcon", wire.ComposerIcon)
+	if err != nil {
+		return err
+	}
+	p.ComposerIcon = validatedComposerIcon
 	p.DefaultPrompt = wire.DefaultPrompt
 	p.DeveloperName = wire.DeveloperName
 	p.DisplayName = wire.DisplayName
-	p.Logo = wire.Logo
+	validatedLogo, err := validateInboundAbsolutePathPointerField("plugin.interface.logo", wire.Logo)
+	if err != nil {
+		return err
+	}
+	p.Logo = validatedLogo
 	p.LongDescription = wire.LongDescription
 	p.PrivacyPolicyURL = wire.PrivacyPolicyURL
-	p.Screenshots = *wire.Screenshots
+	validatedScreenshots, err := validateInboundAbsolutePathSliceField("plugin.interface.screenshots", *wire.Screenshots)
+	if err != nil {
+		return err
+	}
+	p.Screenshots = validatedScreenshots
 	p.ShortDescription = wire.ShortDescription
 	p.TermsOfServiceURL = wire.TermsOfServiceURL
 	p.WebsiteURL = wire.WebsiteURL
@@ -144,7 +156,11 @@ func (p *PluginSource) UnmarshalJSON(data []byte) error {
 		return errors.New("missing plugin.source.type")
 	}
 
-	p.Path = *wire.Path
+	validatedPath, err := validateInboundAbsolutePathField("plugin.source.path", *wire.Path)
+	if err != nil {
+		return err
+	}
+	p.Path = validatedPath
 	p.Type = *wire.Type
 	if err := validatePluginSourceTypeField("plugin.source.type", p.Type); err != nil {
 		return err
@@ -232,6 +248,11 @@ func (p *PluginMarketplaceEntry) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	validatedPath, err := validateInboundAbsolutePathField("plugin.marketplace.path", decoded.Path)
+	if err != nil {
+		return err
+	}
+	decoded.Path = validatedPath
 	*p = PluginMarketplaceEntry(decoded)
 	return nil
 }
@@ -336,7 +357,11 @@ func (s *SkillSummary) UnmarshalJSON(data []byte) error {
 	s.Description = *wire.Description
 	s.Interface = wire.Interface
 	s.Name = *wire.Name
-	s.Path = *wire.Path
+	validatedPath, err := validateInboundAbsolutePathField("plugin.skill.path", *wire.Path)
+	if err != nil {
+		return err
+	}
+	s.Path = validatedPath
 	s.ShortDescription = wire.ShortDescription
 	return nil
 }
@@ -385,7 +410,11 @@ func (p *PluginDetail) UnmarshalJSON(data []byte) error {
 	p.Apps = *wire.Apps
 	p.Description = wire.Description
 	p.MarketplaceName = *wire.MarketplaceName
-	p.MarketplacePath = *wire.MarketplacePath
+	validatedMarketplacePath, err := validateInboundAbsolutePathField("plugin.marketplacePath", *wire.MarketplacePath)
+	if err != nil {
+		return err
+	}
+	p.MarketplacePath = validatedMarketplacePath
 	p.McpServers = *wire.McpServers
 	p.Skills = *wire.Skills
 	p.Summary = *wire.Summary

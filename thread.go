@@ -90,7 +90,11 @@ func (t *Thread) UnmarshalJSON(data []byte) error {
 	t.ID = *wire.ID
 	t.CLIVersion = *wire.CLIVersion
 	t.CreatedAt = *wire.CreatedAt
-	t.Cwd = *wire.Cwd
+	validatedCwd, err := validateInboundAbsolutePathField("thread.cwd", *wire.Cwd)
+	if err != nil {
+		return err
+	}
+	t.Cwd = validatedCwd
 	t.ModelProvider = *wire.ModelProvider
 	t.Preview = *wire.Preview
 	t.Source = *wire.Source
@@ -102,7 +106,10 @@ func (t *Thread) UnmarshalJSON(data []byte) error {
 	t.AgentRole = wire.AgentRole
 	t.GitInfo = wire.GitInfo
 	t.Name = wire.Name
-	t.Path = wire.Path
+	t.Path, err = validateInboundAbsolutePathPointerField("thread.path", wire.Path)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -725,7 +732,10 @@ func (w *ReadOnlyAccessWrapper) UnmarshalJSON(data []byte) error {
 		if err := json.Unmarshal(data, &v); err != nil {
 			return err
 		}
-		w.Value = v
+		w.Value, err = validateInboundReadOnlyAccessField("readOnlyAccess", v)
+		if err != nil {
+			return err
+		}
 	case "fullAccess":
 		w.Value = ReadOnlyAccessFullAccess{}
 	default:
@@ -814,7 +824,10 @@ func (s *SandboxPolicyWrapper) UnmarshalJSON(data []byte) error {
 		if err := json.Unmarshal(data, &policy); err != nil {
 			return err
 		}
-		s.Value = policy
+		s.Value, err = validateInboundSandboxPolicyField("sandboxPolicy", policy)
+		if err != nil {
+			return err
+		}
 	case "externalSandbox":
 		var policy SandboxPolicyExternalSandbox
 		if err := validateRequiredTaggedObjectFields(data); err != nil {
@@ -832,7 +845,10 @@ func (s *SandboxPolicyWrapper) UnmarshalJSON(data []byte) error {
 		if err := json.Unmarshal(data, &policy); err != nil {
 			return err
 		}
-		s.Value = policy
+		s.Value, err = validateInboundSandboxPolicyField("sandboxPolicy", policy)
+		if err != nil {
+			return err
+		}
 	default:
 		s.Value = UnknownSandboxPolicy{Type: typeField, Raw: append(json.RawMessage(nil), data...)}
 	}
@@ -948,6 +964,11 @@ func (r *ThreadStartResponse) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	validatedCwd, err := validateInboundAbsolutePathField("cwd", decoded.Cwd)
+	if err != nil {
+		return err
+	}
+	decoded.Cwd = validatedCwd
 	*r = ThreadStartResponse(decoded)
 	return nil
 }
@@ -1168,6 +1189,11 @@ func (r *ThreadResumeResponse) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	validatedCwd, err := validateInboundAbsolutePathField("cwd", decoded.Cwd)
+	if err != nil {
+		return err
+	}
+	decoded.Cwd = validatedCwd
 	*r = ThreadResumeResponse(decoded)
 	return nil
 }
@@ -1233,6 +1259,11 @@ func (r *ThreadForkResponse) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	validatedCwd, err := validateInboundAbsolutePathField("cwd", decoded.Cwd)
+	if err != nil {
+		return err
+	}
+	decoded.Cwd = validatedCwd
 	*r = ThreadForkResponse(decoded)
 	return nil
 }

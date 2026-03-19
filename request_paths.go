@@ -38,6 +38,40 @@ func normalizeAbsolutePathSliceField(field string, values []string) ([]string, e
 	return normalized, nil
 }
 
+func validateInboundAbsolutePathField(field, value string) (string, error) {
+	normalized, err := normalizeAbsolutePath(value)
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", field, err)
+	}
+	if normalized != value {
+		return "", fmt.Errorf("%s: must be normalized, got %q", field, value)
+	}
+	return normalized, nil
+}
+
+func validateInboundAbsolutePathPointerField(field string, value *string) (*string, error) {
+	if value == nil {
+		return value, nil
+	}
+	validated, err := validateInboundAbsolutePathField(field, *value)
+	if err != nil {
+		return nil, err
+	}
+	return &validated, nil
+}
+
+func validateInboundAbsolutePathSliceField(field string, values []string) ([]string, error) {
+	validated := make([]string, len(values))
+	for i, value := range values {
+		path, err := validateInboundAbsolutePathField(fmt.Sprintf("%s[%d]", field, i), value)
+		if err != nil {
+			return nil, err
+		}
+		validated[i] = path
+	}
+	return validated, nil
+}
+
 func normalizeAdditionalFileSystemPermissionsField(
 	field string,
 	value *AdditionalFileSystemPermissions,
@@ -240,6 +274,33 @@ func normalizeReadOnlyAccessField(field string, value ReadOnlyAccess) (ReadOnlyA
 	}
 }
 
+func validateInboundReadOnlyAccessWrapperField(field string, value *ReadOnlyAccessWrapper) (*ReadOnlyAccessWrapper, error) {
+	if value == nil {
+		return value, nil
+	}
+	validated, err := validateInboundReadOnlyAccessField(field, value.Value)
+	if err != nil {
+		return nil, err
+	}
+	return &ReadOnlyAccessWrapper{Value: validated}, nil
+}
+
+func validateInboundReadOnlyAccessField(field string, value ReadOnlyAccess) (ReadOnlyAccess, error) {
+	switch v := normalizeReadOnlyAccess(value).(type) {
+	case nil:
+		return value, nil
+	case ReadOnlyAccessRestricted:
+		var err error
+		v.ReadableRoots, err = validateInboundAbsolutePathSliceField(field+".readableRoots", v.ReadableRoots)
+		if err != nil {
+			return nil, err
+		}
+		return v, nil
+	default:
+		return v, nil
+	}
+}
+
 func normalizeSandboxPolicyWrapperField(field string, value *SandboxPolicyWrapper) (*SandboxPolicyWrapper, error) {
 	if value == nil {
 		return value, nil
@@ -281,6 +342,33 @@ func normalizeSandboxPolicyField(field string, value SandboxPolicy) (SandboxPoli
 			return nil, err
 		}
 		v.WritableRoots, err = normalizeAbsolutePathSliceField(field+".writableRoots", v.WritableRoots)
+		if err != nil {
+			return nil, err
+		}
+		return v, nil
+	default:
+		return v, nil
+	}
+}
+
+func validateInboundSandboxPolicyField(field string, value SandboxPolicy) (SandboxPolicy, error) {
+	switch v := normalizeSandboxPolicy(value).(type) {
+	case nil:
+		return value, nil
+	case SandboxPolicyReadOnly:
+		var err error
+		v.Access, err = validateInboundReadOnlyAccessWrapperField(field+".access", v.Access)
+		if err != nil {
+			return nil, err
+		}
+		return v, nil
+	case SandboxPolicyWorkspaceWrite:
+		var err error
+		v.ReadOnlyAccess, err = validateInboundReadOnlyAccessWrapperField(field+".readOnlyAccess", v.ReadOnlyAccess)
+		if err != nil {
+			return nil, err
+		}
+		v.WritableRoots, err = validateInboundAbsolutePathSliceField(field+".writableRoots", v.WritableRoots)
 		if err != nil {
 			return nil, err
 		}

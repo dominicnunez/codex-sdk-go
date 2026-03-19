@@ -210,6 +210,11 @@ func (s *SystemConfigLayerSource) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	validatedFile, err := validateInboundAbsolutePathField("config.layer.system.file", decoded.File)
+	if err != nil {
+		return err
+	}
+	decoded.File = validatedFile
 	*s = SystemConfigLayerSource(decoded)
 	return nil
 }
@@ -237,6 +242,11 @@ func (s *UserConfigLayerSource) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	validatedFile, err := validateInboundAbsolutePathField("config.layer.user.file", decoded.File)
+	if err != nil {
+		return err
+	}
+	decoded.File = validatedFile
 	*s = UserConfigLayerSource(decoded)
 	return nil
 }
@@ -264,6 +274,11 @@ func (s *ProjectConfigLayerSource) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	validatedFolder, err := validateInboundAbsolutePathField("config.layer.project.dotCodexFolder", decoded.DotCodexFolder)
+	if err != nil {
+		return err
+	}
+	decoded.DotCodexFolder = validatedFolder
 	*s = ProjectConfigLayerSource(decoded)
 	return nil
 }
@@ -302,6 +317,11 @@ func (s *LegacyManagedConfigTomlFromFileConfigLayerSource) UnmarshalJSON(data []
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	validatedFile, err := validateInboundAbsolutePathField("config.layer.legacyManagedConfigTomlFromFile.file", decoded.File)
+	if err != nil {
+		return err
+	}
+	decoded.File = validatedFile
 	*s = LegacyManagedConfigTomlFromFileConfigLayerSource(decoded)
 	return nil
 }
@@ -463,6 +483,11 @@ func (r *ConfigWriteResponse) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	validatedFilePath, err := validateInboundAbsolutePathField("config.write.filePath", decoded.FilePath)
+	if err != nil {
+		return err
+	}
+	decoded.FilePath = validatedFilePath
 	if err := validateWriteStatusField("status", decoded.Status); err != nil {
 		return err
 	}
