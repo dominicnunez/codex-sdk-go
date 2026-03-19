@@ -16,6 +16,18 @@ const (
 	ExperimentalFeatureStageRemoved          ExperimentalFeatureStage = "removed"
 )
 
+var validExperimentalFeatureStages = map[ExperimentalFeatureStage]struct{}{
+	ExperimentalFeatureStageBeta:             {},
+	ExperimentalFeatureStageUnderDevelopment: {},
+	ExperimentalFeatureStageStable:           {},
+	ExperimentalFeatureStageDeprecated:       {},
+	ExperimentalFeatureStageRemoved:          {},
+}
+
+func (s *ExperimentalFeatureStage) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "experimentalFeature.stage", validExperimentalFeatureStages, s)
+}
+
 // ExperimentalFeature represents a single experimental feature flag
 type ExperimentalFeature struct {
 	// Stable key used in config.toml and CLI flag toggles

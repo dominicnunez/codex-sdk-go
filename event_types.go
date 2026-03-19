@@ -52,6 +52,15 @@ const (
 	MessagePhaseFinalAnswer MessagePhase = "final_answer" // Terminal answer text for the current turn
 )
 
+var validMessagePhases = map[MessagePhase]struct{}{
+	MessagePhaseCommentary:  {},
+	MessagePhaseFinalAnswer: {},
+}
+
+func (p *MessagePhase) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "agentMessage.phase", validMessagePhases, p)
+}
+
 // CommandExecutionStatus represents the status of a command execution.
 type CommandExecutionStatus string
 
@@ -61,6 +70,17 @@ const (
 	CommandExecutionStatusFailed     CommandExecutionStatus = "failed"
 	CommandExecutionStatusDeclined   CommandExecutionStatus = "declined"
 )
+
+var validCommandExecutionStatuses = map[CommandExecutionStatus]struct{}{
+	CommandExecutionStatusInProgress: {},
+	CommandExecutionStatusCompleted:  {},
+	CommandExecutionStatusFailed:     {},
+	CommandExecutionStatusDeclined:   {},
+}
+
+func (s *CommandExecutionStatus) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "commandExecution.status", validCommandExecutionStatuses, s)
+}
 
 // PatchApplyStatus represents the status of applying a code patch.
 type PatchApplyStatus string
@@ -72,6 +92,17 @@ const (
 	PatchApplyStatusDeclined   PatchApplyStatus = "declined"
 )
 
+var validPatchApplyStatuses = map[PatchApplyStatus]struct{}{
+	PatchApplyStatusInProgress: {},
+	PatchApplyStatusCompleted:  {},
+	PatchApplyStatusFailed:     {},
+	PatchApplyStatusDeclined:   {},
+}
+
+func (s *PatchApplyStatus) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "fileChange.status", validPatchApplyStatuses, s)
+}
+
 // McpToolCallStatus represents the status of an MCP tool call.
 type McpToolCallStatus string
 
@@ -81,6 +112,16 @@ const (
 	McpToolCallStatusFailed     McpToolCallStatus = "failed"
 )
 
+var validMcpToolCallStatuses = map[McpToolCallStatus]struct{}{
+	McpToolCallStatusInProgress: {},
+	McpToolCallStatusCompleted:  {},
+	McpToolCallStatusFailed:     {},
+}
+
+func (s *McpToolCallStatus) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "mcpToolCall.status", validMcpToolCallStatuses, s)
+}
+
 // DynamicToolCallStatus represents the status of a dynamic tool call.
 type DynamicToolCallStatus string
 
@@ -89,6 +130,16 @@ const (
 	DynamicToolCallStatusCompleted  DynamicToolCallStatus = "completed"
 	DynamicToolCallStatusFailed     DynamicToolCallStatus = "failed"
 )
+
+var validDynamicToolCallStatuses = map[DynamicToolCallStatus]struct{}{
+	DynamicToolCallStatusInProgress: {},
+	DynamicToolCallStatusCompleted:  {},
+	DynamicToolCallStatusFailed:     {},
+}
+
+func (s *DynamicToolCallStatus) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "dynamicToolCall.status", validDynamicToolCallStatuses, s)
+}
 
 // CollabAgentStatus represents the status of a collaboration agent.
 type CollabAgentStatus string
@@ -128,6 +179,18 @@ const (
 	CollabAgentToolCloseAgent  CollabAgentTool = "closeAgent"
 )
 
+var validCollabAgentTools = map[CollabAgentTool]struct{}{
+	CollabAgentToolSpawnAgent:  {},
+	CollabAgentToolSendInput:   {},
+	CollabAgentToolResumeAgent: {},
+	CollabAgentToolWait:        {},
+	CollabAgentToolCloseAgent:  {},
+}
+
+func (t *CollabAgentTool) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "collabAgentToolCall.tool", validCollabAgentTools, t)
+}
+
 // CollabAgentToolCallStatus represents the status of a collab agent tool call.
 type CollabAgentToolCallStatus string
 
@@ -136,6 +199,16 @@ const (
 	CollabAgentToolCallStatusCompleted  CollabAgentToolCallStatus = "completed"
 	CollabAgentToolCallStatusFailed     CollabAgentToolCallStatus = "failed"
 )
+
+var validCollabAgentToolCallStatuses = map[CollabAgentToolCallStatus]struct{}{
+	CollabAgentToolCallStatusInProgress: {},
+	CollabAgentToolCallStatusCompleted:  {},
+	CollabAgentToolCallStatusFailed:     {},
+}
+
+func (s *CollabAgentToolCallStatus) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "collabAgentToolCall.status", validCollabAgentToolCallStatuses, s)
+}
 
 // CollabAgentState represents the current state of a collaboration agent.
 type CollabAgentState struct {

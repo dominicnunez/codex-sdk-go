@@ -15,6 +15,17 @@ const (
 	MigrationItemTypeMcpServerConfig ExternalAgentConfigMigrationItemType = "MCP_SERVER_CONFIG"
 )
 
+var validExternalAgentConfigMigrationItemTypes = map[ExternalAgentConfigMigrationItemType]struct{}{
+	MigrationItemTypeAgentsMd:        {},
+	MigrationItemTypeConfig:          {},
+	MigrationItemTypeSkills:          {},
+	MigrationItemTypeMcpServerConfig: {},
+}
+
+func (t *ExternalAgentConfigMigrationItemType) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "externalAgentConfig.itemType", validExternalAgentConfigMigrationItemTypes, t)
+}
+
 // ExternalAgentConfigMigrationItem represents a detected or imported migration item.
 // Null or empty Cwd means home-scoped migration; non-empty means repo-scoped migration.
 type ExternalAgentConfigMigrationItem struct {

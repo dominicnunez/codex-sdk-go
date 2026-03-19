@@ -16,6 +16,17 @@ const (
 	McpAuthStatusOAuth       McpAuthStatus = "oAuth"
 )
 
+var validMcpAuthStatuses = map[McpAuthStatus]struct{}{
+	McpAuthStatusUnsupported: {},
+	McpAuthStatusNotLoggedIn: {},
+	McpAuthStatusBearerToken: {},
+	McpAuthStatusOAuth:       {},
+}
+
+func (s *McpAuthStatus) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "mcpServerStatus.authStatus", validMcpAuthStatuses, s)
+}
+
 // Resource represents a resource exposed by an MCP server.
 type Resource struct {
 	Name        string      `json:"name"`
