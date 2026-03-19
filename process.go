@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -106,18 +107,31 @@ var errNilProcessClient = errors.New("process client must not be nil")
 
 const approvalModeFullAuto = "full-auto"
 
-var defaultChildEnvKeys = []string{
+var commonChildEnvKeys = []string{
 	"HOME",
 	"LANG",
 	"LC_ALL",
 	"LC_CTYPE",
 	"PATH",
-	"SHELL",
-	"SYSTEMROOT",
-	"TMP",
 	"TEMP",
+	"TMP",
 	"TMPDIR",
+}
+
+var unixChildEnvKeys = []string{
+	"SHELL",
 	"USER",
+}
+
+var windowsChildEnvKeys = []string{
+	"APPDATA",
+	"LOCALAPPDATA",
+	"PATHEXT",
+	"PROGRAMDATA",
+	"SYSTEMDRIVE",
+	"SYSTEMROOT",
+	"USERPROFILE",
+	"USERNAME",
 }
 
 // rejectedExecArgFlagAliases canonicalizes all blocked safety flags (including
@@ -320,13 +334,28 @@ func resolveProcessEnv(opts *ProcessOptions) []string {
 }
 
 func minimalChildEnv() []string {
-	env := make([]string, 0, len(defaultChildEnvKeys))
-	for _, key := range defaultChildEnvKeys {
-		if val, ok := os.LookupEnv(key); ok {
+	return minimalChildEnvForGOOS(runtime.GOOS, os.LookupEnv)
+}
+
+func minimalChildEnvForGOOS(goos string, lookupEnv func(string) (string, bool)) []string {
+	keys := defaultChildEnvKeysForGOOS(goos)
+	env := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if val, ok := lookupEnv(key); ok {
 			env = append(env, key+"="+val)
 		}
 	}
 	return env
+}
+
+func defaultChildEnvKeysForGOOS(goos string) []string {
+	keys := append([]string{}, commonChildEnvKeys...)
+	switch goos {
+	case "windows":
+		return append(keys, windowsChildEnvKeys...)
+	default:
+		return append(keys, unixChildEnvKeys...)
+	}
 }
 
 func stopStartedCommand(cmd *exec.Cmd) {

@@ -94,6 +94,124 @@ func TestBuildArgsEmitFlagsAcceptedByCodexCLI(t *testing.T) {
 	}
 }
 
+func TestDefaultChildEnvKeysForGOOS(t *testing.T) {
+	tests := []struct {
+		name       string
+		goos       string
+		wantKeys   []string
+		rejectKeys []string
+	}{
+		{
+			name:       "unix baseline",
+			goos:       "linux",
+			wantKeys:   []string{"HOME", "PATH", "TMPDIR", "SHELL", "USER"},
+			rejectKeys: []string{"APPDATA", "LOCALAPPDATA", "USERPROFILE"},
+		},
+		{
+			name:       "windows baseline",
+			goos:       "windows",
+			wantKeys:   []string{"HOME", "PATH", "APPDATA", "LOCALAPPDATA", "USERPROFILE", "SYSTEMROOT"},
+			rejectKeys: []string{"SHELL", "USER"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			keys := defaultChildEnvKeysForGOOS(tt.goos)
+			keySet := make(map[string]struct{}, len(keys))
+			for _, key := range keys {
+				keySet[key] = struct{}{}
+			}
+
+			for _, key := range tt.wantKeys {
+				if _, ok := keySet[key]; !ok {
+					t.Fatalf("defaultChildEnvKeysForGOOS(%q) missing %q", tt.goos, key)
+				}
+			}
+			for _, key := range tt.rejectKeys {
+				if _, ok := keySet[key]; ok {
+					t.Fatalf("defaultChildEnvKeysForGOOS(%q) unexpectedly includes %q", tt.goos, key)
+				}
+			}
+		})
+	}
+}
+
+func TestMinimalChildEnvForGOOSUsesPlatformAllowlist(t *testing.T) {
+	lookupFrom := func(values map[string]string) func(string) (string, bool) {
+		return func(key string) (string, bool) {
+			value, ok := values[key]
+			return value, ok
+		}
+	}
+
+	t.Run("windows preserves profile and appdata", func(t *testing.T) {
+		values := map[string]string{
+			"PATH":         `C:\Windows\System32`,
+			"USERPROFILE":  `C:\Users\kai`,
+			"APPDATA":      `C:\Users\kai\AppData\Roaming`,
+			"LOCALAPPDATA": `C:\Users\kai\AppData\Local`,
+			"SECRET_TOKEN": "redact-me",
+		}
+
+		env := minimalChildEnvForGOOS("windows", lookupFrom(values))
+		got := make(map[string]string, len(env))
+		for _, entry := range env {
+			key, value, ok := strings.Cut(entry, "=")
+			if !ok {
+				t.Fatalf("malformed env entry %q", entry)
+			}
+			got[key] = value
+		}
+
+		for key, want := range map[string]string{
+			"PATH":         values["PATH"],
+			"USERPROFILE":  values["USERPROFILE"],
+			"APPDATA":      values["APPDATA"],
+			"LOCALAPPDATA": values["LOCALAPPDATA"],
+		} {
+			if got[key] != want {
+				t.Fatalf("%s = %q; want %q", key, got[key], want)
+			}
+		}
+		if _, ok := got["SECRET_TOKEN"]; ok {
+			t.Fatal("minimal child env should not include non-allowlisted variables")
+		}
+	})
+
+	t.Run("unix preserves home and tmpdir", func(t *testing.T) {
+		values := map[string]string{
+			"HOME":         "/home/kai",
+			"PATH":         "/usr/bin:/bin",
+			"TMPDIR":       "/tmp/codex",
+			"SECRET_TOKEN": "redact-me",
+		}
+
+		env := minimalChildEnvForGOOS("linux", lookupFrom(values))
+		got := make(map[string]string, len(env))
+		for _, entry := range env {
+			key, value, ok := strings.Cut(entry, "=")
+			if !ok {
+				t.Fatalf("malformed env entry %q", entry)
+			}
+			got[key] = value
+		}
+
+		for key, want := range map[string]string{
+			"HOME":   values["HOME"],
+			"PATH":   values["PATH"],
+			"TMPDIR": values["TMPDIR"],
+		} {
+			if got[key] != want {
+				t.Fatalf("%s = %q; want %q", key, got[key], want)
+			}
+		}
+		if _, ok := got["SECRET_TOKEN"]; ok {
+			t.Fatal("minimal child env should not include non-allowlisted variables")
+		}
+	})
+}
+
 type errCloser struct {
 	err   error
 	calls int

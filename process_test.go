@@ -1,6 +1,7 @@
 package codex_test
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -17,6 +18,73 @@ import (
 
 	codex "github.com/dominicnunez/codex-sdk-go"
 )
+
+func writeEnvDumpBinary(t *testing.T, dir, envFile string) string {
+	t.Helper()
+
+	var (
+		binaryPath string
+		script     string
+	)
+
+	if runtime.GOOS == "windows" {
+		binaryPath = filepath.Join(dir, "fake-codex.cmd")
+		script = "@echo off\r\nset > \"" + envFile + "\"\r\nexit /b 0\r\n"
+	} else {
+		binaryPath = filepath.Join(dir, "fake-codex")
+		script = "#!/bin/sh\nenv > \"" + envFile + "\"\nexit 0\n"
+	}
+
+	if err := os.WriteFile(binaryPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake binary: %v", err)
+	}
+
+	return binaryPath
+}
+
+func readEnvFile(t *testing.T, envFile string) map[string]string {
+	t.Helper()
+
+	file, err := os.Open(envFile)
+	if err != nil {
+		t.Fatalf("open env file: %v", err)
+	}
+	defer func() { _ = file.Close() }()
+
+	values := make(map[string]string)
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		values[key] = value
+	}
+	if err := scanner.Err(); err != nil {
+		t.Fatalf("scan env file: %v", err)
+	}
+	return values
+}
+
+func requiredMinimalEnvForRuntime(t *testing.T) map[string]string {
+	t.Helper()
+
+	required := map[string]string{
+		"PATH": os.Getenv("PATH"),
+	}
+
+	if runtime.GOOS == "windows" {
+		required["USERPROFILE"] = filepath.Join(t.TempDir(), "profile")
+		required["APPDATA"] = filepath.Join(t.TempDir(), "appdata")
+		required["LOCALAPPDATA"] = filepath.Join(t.TempDir(), "localappdata")
+		return required
+	}
+
+	required["HOME"] = filepath.Join(t.TempDir(), "home")
+	required["TMPDIR"] = filepath.Join(t.TempDir(), "tmp")
+	return required
+}
 
 // TestStartProcess verifies that StartProcess spawns a child process,
 // creates a working Client, and Close cleans up properly.
@@ -491,22 +559,15 @@ func TestStartProcessRejectsRelativeBinaryPath(t *testing.T) {
 }
 
 func TestStartProcessMinimalEnvByDefault(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("process test requires unix shell script")
-	}
-
 	t.Setenv("CODEX_SDK_GO_TEST_SECRET", "should-not-leak")
+	requiredEnv := requiredMinimalEnvForRuntime(t)
+	for key, value := range requiredEnv {
+		t.Setenv(key, value)
+	}
 
 	dir := t.TempDir()
-	fakeBinary := filepath.Join(dir, "fake-codex")
 	envFile := filepath.Join(dir, "env.txt")
-	script := `#!/bin/sh
-env > ` + envFile + `
-exit 0
-`
-	if err := os.WriteFile(fakeBinary, []byte(script), 0o755); err != nil {
-		t.Fatalf("write fake binary: %v", err)
-	}
+	fakeBinary := writeEnvDumpBinary(t, dir, envFile)
 
 	proc, err := codex.StartProcess(context.Background(), &codex.ProcessOptions{
 		BinaryPath: fakeBinary,
@@ -518,32 +579,23 @@ exit 0
 	_ = proc.Wait()
 	_ = proc.Close()
 
-	data, err := os.ReadFile(envFile)
-	if err != nil {
-		t.Fatalf("read env file: %v", err)
-	}
-	if strings.Contains(string(data), "CODEX_SDK_GO_TEST_SECRET=should-not-leak") {
+	values := readEnvFile(t, envFile)
+	if values["CODEX_SDK_GO_TEST_SECRET"] == "should-not-leak" {
 		t.Fatal("child inherited secret env var by default")
+	}
+	for key, want := range requiredEnv {
+		if got := values[key]; got != want {
+			t.Fatalf("%s = %q; want %q", key, got, want)
+		}
 	}
 }
 
 func TestStartProcessCanInheritParentEnv(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("process test requires unix shell script")
-	}
-
 	t.Setenv("CODEX_SDK_GO_TEST_SECRET", "expected-leak")
 
 	dir := t.TempDir()
-	fakeBinary := filepath.Join(dir, "fake-codex")
 	envFile := filepath.Join(dir, "env.txt")
-	script := `#!/bin/sh
-env > ` + envFile + `
-exit 0
-`
-	if err := os.WriteFile(fakeBinary, []byte(script), 0o755); err != nil {
-		t.Fatalf("write fake binary: %v", err)
-	}
+	fakeBinary := writeEnvDumpBinary(t, dir, envFile)
 
 	proc, err := codex.StartProcess(context.Background(), &codex.ProcessOptions{
 		BinaryPath:       fakeBinary,
@@ -556,11 +608,8 @@ exit 0
 	_ = proc.Wait()
 	_ = proc.Close()
 
-	data, err := os.ReadFile(envFile)
-	if err != nil {
-		t.Fatalf("read env file: %v", err)
-	}
-	if !strings.Contains(string(data), "CODEX_SDK_GO_TEST_SECRET=expected-leak") {
+	values := readEnvFile(t, envFile)
+	if values["CODEX_SDK_GO_TEST_SECRET"] != "expected-leak" {
 		t.Fatal("child should inherit parent env when InheritParentEnv is true")
 	}
 }
