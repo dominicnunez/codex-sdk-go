@@ -605,6 +605,9 @@ func handleApproval[P any, R any](ctx context.Context, req Request, handler func
 	if err != nil {
 		return Response{}, fmt.Errorf("approval handler %s failed: %w", req.Method, err)
 	}
+	if err := validateDecodedResponse(result); err != nil {
+		return Response{}, fmt.Errorf("validate %s result: %w", req.Method, err)
+	}
 
 	resultJSON, err := marshalForWire(&result)
 	if err != nil {

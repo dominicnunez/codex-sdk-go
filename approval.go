@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 )
 
@@ -939,6 +940,18 @@ type DynamicToolCallResponse struct {
 	ContentItems []DynamicToolCallOutputContentItemWrapper `json:"contentItems"`
 }
 
+func (r DynamicToolCallResponse) validate() error {
+	if r.ContentItems == nil {
+		return errors.New("missing contentItems")
+	}
+	for i, item := range r.ContentItems {
+		if err := item.validateForResponse(); err != nil {
+			return fmt.Errorf("contentItems[%d]: %w", i, err)
+		}
+	}
+	return nil
+}
+
 // DynamicToolCallOutputContentItem is a discriminated union for tool output content.
 type DynamicToolCallOutputContentItem interface {
 	dynamicToolCallOutputContentItem()
@@ -981,6 +994,22 @@ func (i *InputTextDynamicToolCallOutputContentItem) MarshalJSON() ([]byte, error
 	})
 }
 
+func (i *InputTextDynamicToolCallOutputContentItem) UnmarshalJSON(data []byte) error {
+	type wire struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	}
+	var decoded wire
+	if err := unmarshalInboundObject(data, &decoded, []string{"type", "text"}, []string{"type", "text"}); err != nil {
+		return err
+	}
+	if decoded.Type != "inputText" {
+		return fmt.Errorf("invalid dynamic tool output content item type %q", decoded.Type)
+	}
+	i.Text = decoded.Text
+	return nil
+}
+
 // InputImageDynamicToolCallOutputContentItem represents image output.
 type InputImageDynamicToolCallOutputContentItem struct {
 	ImageURL string `json:"imageUrl"`
@@ -998,16 +1027,30 @@ func (i *InputImageDynamicToolCallOutputContentItem) MarshalJSON() ([]byte, erro
 	})
 }
 
+func (i *InputImageDynamicToolCallOutputContentItem) UnmarshalJSON(data []byte) error {
+	type wire struct {
+		Type     string `json:"type"`
+		ImageURL string `json:"imageUrl"`
+	}
+	var decoded wire
+	if err := unmarshalInboundObject(data, &decoded, []string{"imageUrl", "type"}, []string{"imageUrl", "type"}); err != nil {
+		return err
+	}
+	if decoded.Type != "inputImage" {
+		return fmt.Errorf("invalid dynamic tool output content item type %q", decoded.Type)
+	}
+	i.ImageURL = decoded.ImageURL
+	return nil
+}
+
 // UnmarshalJSON implements custom unmarshaling for DynamicToolCallOutputContentItemWrapper.
 func (w *DynamicToolCallOutputContentItemWrapper) UnmarshalJSON(data []byte) error {
-	var raw struct {
-		Type string `json:"type"`
-	}
-	if err := json.Unmarshal(data, &raw); err != nil {
+	itemType, err := decodeRequiredObjectTypeField(data, "dynamic tool output content item")
+	if err != nil {
 		return err
 	}
 
-	switch raw.Type {
+	switch itemType {
 	case "inputText":
 		var text InputTextDynamicToolCallOutputContentItem
 		if err := json.Unmarshal(data, &text); err != nil {
@@ -1021,7 +1064,7 @@ func (w *DynamicToolCallOutputContentItemWrapper) UnmarshalJSON(data []byte) err
 		}
 		w.Value = &image
 	default:
-		w.Value = &UnknownDynamicToolCallOutputContentItem{Type: raw.Type, Raw: append(json.RawMessage(nil), data...)}
+		w.Value = &UnknownDynamicToolCallOutputContentItem{Type: itemType, Raw: append(json.RawMessage(nil), data...)}
 	}
 
 	return nil
@@ -1030,6 +1073,30 @@ func (w *DynamicToolCallOutputContentItemWrapper) UnmarshalJSON(data []byte) err
 // MarshalJSON implements custom marshaling for DynamicToolCallOutputContentItemWrapper.
 func (w DynamicToolCallOutputContentItemWrapper) MarshalJSON() ([]byte, error) {
 	return json.Marshal(w.Value)
+}
+
+func (w DynamicToolCallOutputContentItemWrapper) validateForResponse() error {
+	switch value := w.Value.(type) {
+	case nil:
+		return errors.New("missing content item")
+	case *InputTextDynamicToolCallOutputContentItem:
+		if value == nil {
+			return errors.New("missing content item")
+		}
+		return nil
+	case *InputImageDynamicToolCallOutputContentItem:
+		if value == nil {
+			return errors.New("missing content item")
+		}
+		return nil
+	case *UnknownDynamicToolCallOutputContentItem:
+		if value == nil {
+			return errors.New("missing content item")
+		}
+		return fmt.Errorf("unsupported content item type %q", value.Type)
+	default:
+		return fmt.Errorf("unsupported content item type %T", w.Value)
+	}
 }
 
 // ========== ToolRequestUserInput (EXPERIMENTAL) ==========
@@ -1094,6 +1161,18 @@ func (o *ToolRequestUserInputOption) UnmarshalJSON(data []byte) error {
 // ToolRequestUserInputResponse represents the response containing user's answers.
 type ToolRequestUserInputResponse struct {
 	Answers map[string]ToolRequestUserInputAnswer `json:"answers"` // question ID → answer
+}
+
+func (r ToolRequestUserInputResponse) validate() error {
+	if r.Answers == nil {
+		return errors.New("missing answers")
+	}
+	for questionID, answer := range r.Answers {
+		if answer.Answers == nil {
+			return fmt.Errorf("answers[%q].answers: missing answers", questionID)
+		}
+	}
+	return nil
 }
 
 // ToolRequestUserInputAnswer represents an answer to a question.
