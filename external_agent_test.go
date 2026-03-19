@@ -289,3 +289,79 @@ func TestExternalAgentConfigDetectRejectsInvalidItemType(t *testing.T) {
 		t.Fatalf("ConfigDetect error = %v; want invalid item type failure", err)
 	}
 }
+
+func TestExternalAgentConfigImportPreparesRequestParams(t *testing.T) {
+	tests := []struct {
+		name    string
+		params  codex.ExternalAgentConfigImportParams
+		wantErr string
+		wantCwd string
+	}{
+		{
+			name:    "nil migration items",
+			params:  codex.ExternalAgentConfigImportParams{},
+			wantErr: "migrationItems must not be null",
+		},
+		{
+			name: "normalizes repo cwd",
+			params: codex.ExternalAgentConfigImportParams{
+				MigrationItems: []codex.ExternalAgentConfigMigrationItem{{
+					Cwd:         ptr("/repo/./subdir/.."),
+					Description: "Project skills",
+					ItemType:    codex.MigrationItemTypeSkills,
+				}},
+			},
+			wantCwd: "/repo",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := NewMockTransport()
+			_ = mock.SetResponseData("externalAgentConfig/import", map[string]interface{}{})
+			client := codex.NewClient(mock)
+
+			_, err := client.ExternalAgent.ConfigImport(context.Background(), tt.params)
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatal("expected invalid params error")
+				}
+				if !strings.Contains(err.Error(), "invalid params") {
+					t.Fatalf("error = %v, want invalid params context", err)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("error = %v, want substring %q", err, tt.wantErr)
+				}
+				if got := mock.CallCount(); got != 0 {
+					t.Fatalf("transport recorded %d requests, want 0", got)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("ConfigImport() error = %v", err)
+			}
+
+			req := mock.GetSentRequest(0)
+			if req == nil {
+				t.Fatal("no request sent")
+				return
+			}
+
+			var got struct {
+				MigrationItems []struct {
+					Cwd string `json:"cwd"`
+				} `json:"migrationItems"`
+			}
+			if err := json.Unmarshal(req.Params, &got); err != nil {
+				t.Fatalf("request params decode failed: %v", err)
+			}
+			if len(got.MigrationItems) != 1 {
+				t.Fatalf("migrationItems length = %d, want 1", len(got.MigrationItems))
+			}
+			if got.MigrationItems[0].Cwd != tt.wantCwd {
+				t.Fatalf("migrationItems[0].cwd = %q, want %q", got.MigrationItems[0].Cwd, tt.wantCwd)
+			}
+		})
+	}
+}

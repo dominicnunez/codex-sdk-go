@@ -584,6 +584,25 @@ func TestConfigBatchWrite_RPCError_ReturnsRPCError(t *testing.T) {
 	}
 }
 
+func TestConfigBatchWriteRejectsNilEditsBeforeSending(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+
+	_, err := client.Config.BatchWrite(context.Background(), codex.ConfigBatchWriteParams{})
+	if err == nil {
+		t.Fatal("expected invalid params error")
+	}
+	if !strings.Contains(err.Error(), "invalid params") {
+		t.Fatalf("error = %v, want invalid params context", err)
+	}
+	if !strings.Contains(err.Error(), "edits must not be null") {
+		t.Fatalf("error = %v, want edits validation error", err)
+	}
+	if got := mock.CallCount(); got != 0 {
+		t.Fatalf("transport recorded %d requests, want 0", got)
+	}
+}
+
 func TestConfigWarningNotification(t *testing.T) {
 	mock := NewMockTransport()
 	client := codex.NewClient(mock)

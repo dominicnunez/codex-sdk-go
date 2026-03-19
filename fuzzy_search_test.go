@@ -396,3 +396,77 @@ func TestFuzzyFileSearchServiceSearch(t *testing.T) {
 		})
 	}
 }
+
+func TestFuzzyFileSearchServicePreparesRequestParams(t *testing.T) {
+	tests := []struct {
+		name    string
+		params  codex.FuzzyFileSearchParams
+		wantErr string
+	}{
+		{
+			name: "nil roots",
+			params: codex.FuzzyFileSearchParams{
+				Query: "main.go",
+			},
+			wantErr: "roots must not be null",
+		},
+		{
+			name: "non-normalized root",
+			params: codex.FuzzyFileSearchParams{
+				Query: "main.go",
+				Roots: []string{"/workspace/./project/../project"},
+			},
+			wantErr: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := NewMockTransport()
+			_ = mock.SetResponseData("fuzzyFileSearch", map[string]interface{}{"files": []interface{}{}})
+			client := codex.NewClient(mock)
+
+			_, err := client.FuzzyFileSearch.Search(context.Background(), tt.params)
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatal("expected invalid params error")
+				}
+				if !strings.Contains(err.Error(), "invalid params") {
+					t.Fatalf("error = %v, want invalid params context", err)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("error = %v, want substring %q", err, tt.wantErr)
+				}
+				if got := mock.CallCount(); got != 0 {
+					t.Fatalf("transport recorded %d requests, want 0", got)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("Search() error = %v", err)
+			}
+
+			req := mock.GetSentRequest(0)
+			if req == nil {
+				t.Fatal("no request sent")
+				return
+			}
+
+			var got map[string]interface{}
+			if err := json.Unmarshal(req.Params, &got); err != nil {
+				t.Fatalf("request params decode failed: %v", err)
+			}
+			if got["roots"] == nil {
+				t.Fatal("roots missing from request payload")
+			}
+			roots, ok := got["roots"].([]interface{})
+			if !ok || len(roots) != 1 {
+				t.Fatalf("roots = %#v, want single normalized path", got["roots"])
+			}
+			if roots[0] != "/workspace/project" {
+				t.Fatalf("roots[0] = %#v, want %q", roots[0], "/workspace/project")
+			}
+		})
+	}
+}

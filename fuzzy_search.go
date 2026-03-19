@@ -13,6 +13,19 @@ type FuzzyFileSearchParams struct {
 	CancellationToken *string  `json:"cancellationToken,omitempty"`
 }
 
+func (p FuzzyFileSearchParams) prepareRequest() (interface{}, error) {
+	if p.Roots == nil {
+		return nil, invalidParamsError("roots must not be null")
+	}
+
+	var err error
+	p.Roots, err = normalizeAbsolutePathSliceField("roots", p.Roots)
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
 // FuzzyFileSearchResponse represents the response containing search results.
 type FuzzyFileSearchResponse struct {
 	Files []FuzzyFileSearchResult `json:"files"`

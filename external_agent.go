@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 )
 
 // ExternalAgentConfigMigrationItemType represents the type of external agent config migration item.
@@ -74,6 +75,30 @@ func (r *ExternalAgentConfigDetectResponse) UnmarshalJSON(data []byte) error {
 // ExternalAgentConfigImportParams contains parameters for importing external agent configurations.
 type ExternalAgentConfigImportParams struct {
 	MigrationItems []ExternalAgentConfigMigrationItem `json:"migrationItems"`
+}
+
+func (p ExternalAgentConfigImportParams) prepareRequest() (interface{}, error) {
+	if p.MigrationItems == nil {
+		return nil, invalidParamsError("migrationItems must not be null")
+	}
+
+	for i := range p.MigrationItems {
+		cwd := p.MigrationItems[i].Cwd
+		if cwd == nil || *cwd == "" {
+			continue
+		}
+
+		normalized, err := normalizeAbsolutePathField(
+			fmt.Sprintf("migrationItems[%d].cwd", i),
+			*cwd,
+		)
+		if err != nil {
+			return nil, err
+		}
+		p.MigrationItems[i].Cwd = &normalized
+	}
+
+	return p, nil
 }
 
 // ExternalAgentConfigImportResponse is an empty response from config import.

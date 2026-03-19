@@ -466,6 +466,13 @@ type ConfigEdit struct {
 	Value         json.RawMessage `json:"value"`
 }
 
+func (p ConfigBatchWriteParams) prepareRequest() (interface{}, error) {
+	if p.Edits == nil {
+		return nil, invalidParamsError("edits must not be null")
+	}
+	return p, nil
+}
+
 // ConfigWriteResponse represents response from config write operations
 type ConfigWriteResponse struct {
 	FilePath           string              `json:"filePath"`
