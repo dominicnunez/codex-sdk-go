@@ -26,12 +26,14 @@ const (
 	inboundRequestWorkers              = 8
 	inboundRequestQueueSize            = 64
 	inboundNotificationWorkers         = 8
+	streamingNotificationWorkers       = 8
 	protectedNotificationWorkers       = 8
 	criticalNotificationWorkers        = 2
 	turnScopedNotificationWorkers      = 8
 	maxTurnScopedNotificationQueueSize = 256
 	maxTurnScopedNotificationQueues    = 128
 	inboundNotifQueueSize              = 128
+	streamingNotifQueueSize            = 256
 	protectedNotifQueueSize            = 128
 	criticalNotifQueueSize             = 64
 	outboundWriteQueueSize             = 256
@@ -47,7 +49,9 @@ const (
 	errInvalidResponseJSONRPC = `invalid response: jsonrpc must be "2.0"`
 	requestIDKeyPrefixNumber  = "n:"
 	requestIDKeyPrefixString  = "s:"
-	transportClosedErrorData  = `{"transport":"closed","origin":"client"}`
+	transportStateClosed      = "closed"
+	transportStateFailed      = "failed"
+	transportFailureOrigin    = "client"
 )
 
 type writeEnvelope struct {
@@ -60,6 +64,13 @@ type turnScopedNotificationQueue struct {
 	threadKey string
 	queue     []Notification
 	scheduled bool
+}
+
+type transportFailureMetadata struct {
+	Transport string          `json:"transport"`
+	Origin    string          `json:"origin"`
+	Cause     string          `json:"cause,omitempty"`
+	Detail    json.RawMessage `json:"detail,omitempty"`
 }
 
 type inboundFrame struct {
@@ -166,6 +177,7 @@ type StdioTransport struct {
 	turnNotifReady      []*turnScopedNotificationQueue
 	turnNotifReadyCond  *sync.Cond
 	turnNotifReadyOnce  sync.Once
+	streamingNotifQueue chan Notification
 	protectedNotifQueue chan Notification
 	criticalNotifQueue  chan Notification
 	notifQueue          chan Notification
@@ -255,6 +267,7 @@ func NewStdioTransport(reader io.ReadCloser, writer io.Writer) *StdioTransport {
 		pendingReqs:         make(map[string]pendingReq),
 		requestQueue:        make(chan Request, inboundRequestQueueSize),
 		turnNotifQueues:     make(map[string]*turnScopedNotificationQueue),
+		streamingNotifQueue: make(chan Notification, streamingNotifQueueSize),
 		protectedNotifQueue: make(chan Notification, protectedNotifQueueSize),
 		criticalNotifQueue:  make(chan Notification, criticalNotifQueueSize),
 		notifQueue:          make(chan Notification, inboundNotifQueueSize),
@@ -269,6 +282,9 @@ func NewStdioTransport(reader io.ReadCloser, writer io.Writer) *StdioTransport {
 	}
 	for range inboundNotificationWorkers {
 		go t.notificationWorker()
+	}
+	for range streamingNotificationWorkers {
+		go t.streamingNotificationWorker()
 	}
 	for range protectedNotificationWorkers {
 		go t.protectedNotificationWorker()
@@ -414,7 +430,7 @@ func (t *StdioTransport) OnPanic(handler func(v any)) {
 
 // Close shuts down the transport. Safe to call multiple times.
 func (t *StdioTransport) Close() error {
-	t.closeWithFailure(nil, errTransportClosed.Error(), json.RawMessage(transportClosedErrorData))
+	t.closeWithFailure(nil, errTransportClosed, nil)
 	return nil
 }
 
@@ -464,7 +480,7 @@ func (t *StdioTransport) transportStopError(op string) error {
 	return NewTransportError(op, errTransportClosed)
 }
 
-func (t *StdioTransport) closeWithFailure(scanErr error, message string, data json.RawMessage) {
+func (t *StdioTransport) closeWithFailure(scanErr error, cause error, detail json.RawMessage) {
 	t.mu.Lock()
 	if scanErr != nil && t.scanErr == nil {
 		t.scanErr = scanErr
@@ -491,11 +507,7 @@ func (t *StdioTransport) closeWithFailure(scanErr error, message string, data js
 		resp := Response{
 			JSONRPC: jsonrpcVersion,
 			ID:      pendingReq.id,
-			Error: &Error{
-				Code:    ErrCodeInternalError,
-				Message: message,
-				Data:    data,
-			},
+			Error:   localTransportFailureError(cause, detail),
 		}
 		select {
 		case pendingReq.ch <- resp:
@@ -510,7 +522,7 @@ func (t *StdioTransport) handleWriteFailure(err error) {
 	if err == nil {
 		return
 	}
-	t.closeWithFailure(err, "transport writer failed", nil)
+	t.closeWithFailure(err, err, nil)
 }
 
 // writeRawMessage writes a pre-marshaled JSON-RPC message and trailing newline.
@@ -655,6 +667,16 @@ func (t *StdioTransport) requestWorker() {
 func (t *StdioTransport) notificationWorker() {
 	for {
 		notif, ok := recvWhileRunning(t.ctx, t.notifQueue)
+		if !ok {
+			return
+		}
+		t.handleNotification(notif)
+	}
+}
+
+func (t *StdioTransport) streamingNotificationWorker() {
+	for {
+		notif, ok := recvWhileRunning(t.ctx, t.streamingNotifQueue)
 		if !ok {
 			return
 		}
@@ -957,6 +979,10 @@ func (t *StdioTransport) enqueueNotification(notif Notification) {
 		t.enqueueTurnScopedNotification(notif)
 		return
 	}
+	if isStreamingNotificationMethod(notif.Method) {
+		t.enqueueStreamingNotification(notif)
+		return
+	}
 	if isProtectedNotificationMethod(notif.Method) {
 		t.enqueueProtectedNotification(notif)
 		return
@@ -997,7 +1023,7 @@ func (t *StdioTransport) enqueueTurnScopedNotification(notif Notification) {
 			t.turnNotifQueuesMu.Unlock()
 			t.closeWithFailure(
 				errTurnScopedNotificationQueueLimit,
-				errTurnScopedNotificationQueueLimit.Error(),
+				errTurnScopedNotificationQueueLimit,
 				notificationOverflowData("turn-scoped-limit", notif),
 			)
 			return
@@ -1012,7 +1038,7 @@ func (t *StdioTransport) enqueueTurnScopedNotification(notif Notification) {
 		queue.mu.Unlock()
 		t.closeWithFailure(
 			errTurnScopedNotificationQueueOverflow,
-			errTurnScopedNotificationQueueOverflow.Error(),
+			errTurnScopedNotificationQueueOverflow,
 			json.RawMessage(fmt.Sprintf(`{"threadId":%q}`, queue.threadKey)),
 		)
 		return
@@ -1082,7 +1108,6 @@ func (t *StdioTransport) removeTurnScopedNotificationQueue(threadKey string, que
 func (t *StdioTransport) enqueueLosslessNotification(
 	queue chan Notification,
 	notif Notification,
-	scanErr error,
 	queueName string,
 ) {
 	select {
@@ -1092,7 +1117,15 @@ func (t *StdioTransport) enqueueLosslessNotification(
 		return
 	default:
 	}
-	t.closeWithFailure(scanErr, scanErr.Error(), notificationOverflowData(queueName, notif))
+	t.closeWithFailure(errNotificationQueueOverflow, errNotificationQueueOverflow, notificationOverflowData(queueName, notif))
+}
+
+func (t *StdioTransport) enqueueStreamingNotification(notif Notification) {
+	select {
+	case <-t.ctx.Done():
+		return
+	case t.streamingNotifQueue <- notif:
+	}
 }
 
 func notificationOverflowData(queueName string, notif Notification) json.RawMessage {
@@ -1109,11 +1142,11 @@ func notificationOverflowData(queueName string, notif Notification) json.RawMess
 }
 
 func (t *StdioTransport) enqueueProtectedNotification(notif Notification) {
-	t.enqueueLosslessNotification(t.protectedNotifQueue, notif, errNotificationQueueOverflow, "protected")
+	t.enqueueLosslessNotification(t.protectedNotifQueue, notif, "protected")
 }
 
 func (t *StdioTransport) enqueueCriticalNotification(notif Notification) {
-	t.enqueueLosslessNotification(t.criticalNotifQueue, notif, errNotificationQueueOverflow, "critical")
+	t.enqueueLosslessNotification(t.criticalNotifQueue, notif, "critical")
 }
 
 func isCriticalNotificationMethod(method string) bool {
@@ -1125,7 +1158,7 @@ func isCriticalNotificationMethod(method string) bool {
 	}
 }
 
-func isProtectedNotificationMethod(method string) bool {
+func isStreamingNotificationMethod(method string) bool {
 	switch method {
 	case notifyAgentMessageDelta,
 		notifyFileChangeOutputDelta,
@@ -1133,7 +1166,18 @@ func isProtectedNotificationMethod(method string) bool {
 		notifyReasoningTextDelta,
 		notifyReasoningSummaryTextDelta,
 		notifyReasoningSummaryPartAdded,
-		notifyItemStarted,
+		notifyRealtimeOutputAudioDelta,
+		notifyCommandExecutionOutputDelta,
+		notifyCommandExecOutputDelta:
+		return true
+	default:
+		return false
+	}
+}
+
+func isProtectedNotificationMethod(method string) bool {
+	switch method {
+	case notifyItemStarted,
 		notifyThreadStarted,
 		notifyThreadClosed,
 		notifyThreadArchived,
@@ -1150,7 +1194,6 @@ func isProtectedNotificationMethod(method string) bool {
 		notifyRealtimeStarted,
 		notifyRealtimeClosed,
 		notifyRealtimeItemAdded,
-		notifyRealtimeOutputAudioDelta,
 		notifyWindowsSandboxSetupCompleted,
 		notifyWindowsWorldWritableWarning,
 		notifyThreadCompacted,
@@ -1162,8 +1205,6 @@ func isProtectedNotificationMethod(method string) bool {
 		notifyModelRerouted,
 		notifyFuzzyFileSearchSessionCompleted,
 		notifyFuzzyFileSearchSessionUpdated,
-		notifyCommandExecutionOutputDelta,
-		notifyCommandExecOutputDelta,
 		notifyAppListUpdated,
 		notifyConfigWarning,
 		notifySkillsChanged,
@@ -1175,6 +1216,40 @@ func isProtectedNotificationMethod(method string) bool {
 	default:
 		return false
 	}
+}
+
+func localTransportFailureError(cause error, detail json.RawMessage) *Error {
+	message := errTransportClosed.Error()
+	transportState := transportStateClosed
+	if cause != nil && !errors.Is(cause, errTransportClosed) {
+		message = cause.Error()
+		transportState = transportStateFailed
+	}
+	return &Error{
+		Code:    ErrCodeInternalError,
+		Message: message,
+		Data:    marshalTransportFailureMetadata(transportState, cause, detail),
+	}
+}
+
+func marshalTransportFailureMetadata(
+	transportState string,
+	cause error,
+	detail json.RawMessage,
+) json.RawMessage {
+	metadata := transportFailureMetadata{
+		Transport: transportState,
+		Origin:    transportFailureOrigin,
+		Detail:    detail,
+	}
+	if cause != nil {
+		metadata.Cause = cause.Error()
+	}
+	data, err := json.Marshal(metadata)
+	if err != nil {
+		return nil
+	}
+	return data
 }
 
 func isTurnScopedNotification(notif Notification) bool {

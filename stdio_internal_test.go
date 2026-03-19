@@ -1009,6 +1009,125 @@ func TestStdioBestEffortFloodStillDeliversProtectedNotification(t *testing.T) {
 	close(release)
 }
 
+func TestStdioStreamingFloodBackpressuresWithoutClosingTransport(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	_, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	totalFlood := streamingNotificationWorkers + streamingNotifQueueSize + 32
+	release := make(chan struct{})
+	streamingSeen := make(chan struct{}, 1)
+	turnCompletedSeen := make(chan struct{}, 1)
+	followupSeen := make(chan struct{}, 1)
+	var streamingHandled atomic.Int32
+	transport.OnNotify(func(_ context.Context, notif Notification) {
+		switch notif.Method {
+		case notifyCommandExecOutputDelta:
+			streamingHandled.Add(1)
+			select {
+			case streamingSeen <- struct{}{}:
+			default:
+			}
+			<-release
+		case notifyTurnCompleted:
+			select {
+			case turnCompletedSeen <- struct{}{}:
+			default:
+			}
+		case notifyConfigWarning:
+			select {
+			case followupSeen <- struct{}{}:
+			default:
+			}
+		}
+	})
+
+	streaming := Notification{
+		JSONRPC: jsonrpcVersion,
+		Method:  notifyCommandExecOutputDelta,
+		Params:  json.RawMessage(`{"callId":"call-1","processId":"proc-1","stream":"stdout","chunk":"x"}`),
+	}
+	streamingBytes, err := json.Marshal(streaming)
+	if err != nil {
+		t.Fatalf("marshal streaming notification: %v", err)
+	}
+
+	turnCompleted := Notification{
+		JSONRPC: jsonrpcVersion,
+		Method:  notifyTurnCompleted,
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	}
+	turnCompletedBytes, err := json.Marshal(turnCompleted)
+	if err != nil {
+		t.Fatalf("marshal turn/completed notification: %v", err)
+	}
+
+	writeErrCh := make(chan error, 1)
+	go func() {
+		for range totalFlood {
+			if _, err := serverWriter.Write(append(streamingBytes, '\n')); err != nil {
+				writeErrCh <- fmt.Errorf("write streaming notification: %w", err)
+				return
+			}
+		}
+		if _, err := serverWriter.Write(append(turnCompletedBytes, '\n')); err != nil {
+			writeErrCh <- fmt.Errorf("write turn/completed notification: %w", err)
+			return
+		}
+		writeErrCh <- nil
+	}()
+
+	select {
+	case <-streamingSeen:
+	case <-time.After(2 * time.Second):
+		t.Fatal("streaming notification was not delivered")
+	}
+
+	time.Sleep(100 * time.Millisecond)
+	if err := transport.ScanErr(); err != nil {
+		t.Fatalf("ScanErr = %v; want nil while streaming queue is under pressure", err)
+	}
+
+	close(release)
+
+	deadline := time.Now().Add(2 * time.Second)
+	for streamingHandled.Load() < int32(totalFlood) && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if got := streamingHandled.Load(); got != int32(totalFlood) {
+		t.Fatalf("handled %d streaming notifications; want %d", got, totalFlood)
+	}
+
+	select {
+	case err := <-writeErrCh:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for streaming flood to drain")
+	}
+
+	select {
+	case <-turnCompletedSeen:
+	case <-time.After(2 * time.Second):
+		t.Fatal("turn/completed notification was not delivered after streaming backpressure")
+	}
+	if _, err := serverWriter.Write([]byte(`{"jsonrpc":"2.0","method":"configWarning","params":{"message":"warn","severity":"medium"}}` + "\n")); err != nil {
+		t.Fatalf("write follow-up notification: %v", err)
+	}
+
+	select {
+	case <-followupSeen:
+	case <-time.After(2 * time.Second):
+		t.Fatal("follow-up notification was not delivered after streaming flood")
+	}
+}
+
 func TestStdioCloseStopsReaderForClosableReader(t *testing.T) {
 	reader := newBlockingReadCloser()
 	transport := NewStdioTransport(reader, &safeBuffer{})

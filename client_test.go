@@ -254,6 +254,41 @@ func TestClientSendTransportCloseReturnsTransportError(t *testing.T) {
 	}
 }
 
+func TestClientSendLocalTransportFailureResponseReturnsTransportError(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+
+	mock.SetResponse("test.transport.failure", codex.Response{
+		JSONRPC: "2.0",
+		Error: &codex.Error{
+			Code:    codex.ErrCodeInternalError,
+			Message: "notification queue overflow",
+			Data:    json.RawMessage(`{"transport":"failed","origin":"client","cause":"notification queue overflow"}`),
+		},
+	})
+
+	_, err := client.Send(context.Background(), codex.Request{
+		JSONRPC: "2.0",
+		ID:      codex.RequestID{Value: "overflow"},
+		Method:  "test.transport.failure",
+	})
+	if err == nil {
+		t.Fatal("expected transport error from Send")
+	}
+
+	var transportErr *codex.TransportError
+	if !errors.As(err, &transportErr) {
+		t.Fatalf("expected TransportError, got %T: %v", err, err)
+	}
+	var rpcErr *codex.RPCError
+	if errors.As(err, &rpcErr) {
+		t.Fatalf("expected no RPCError wrapping for local transport failure, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "notification queue overflow") {
+		t.Fatalf("error = %v; want notification queue overflow", err)
+	}
+}
+
 // TestClientMultipleListeners verifies that multiple listeners for different methods work.
 func TestClientMultipleListeners(t *testing.T) {
 	mock := NewMockTransport()
