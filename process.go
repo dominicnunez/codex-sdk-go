@@ -567,16 +567,6 @@ func (p *Process) doWait() {
 	})
 }
 
-// isSignalError returns true if the error is an exec.ExitError caused by a signal
-// (as opposed to a non-zero exit code).
-func isSignalError(err error) bool {
-	var exitErr *exec.ExitError
-	if !errors.As(err, &exitErr) {
-		return false
-	}
-	return exitErr.ProcessState != nil && !exitErr.Exited()
-}
-
 func isExpectedProcessStopError(err error) bool {
 	return errors.Is(err, os.ErrProcessDone) || errors.Is(err, syscall.ESRCH)
 }

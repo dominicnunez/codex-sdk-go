@@ -18,19 +18,27 @@ import (
 	"time"
 )
 
-func TestIsSignalError(t *testing.T) {
+func isSignalExitError(err error) bool {
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		return false
+	}
+	return exitErr.ProcessState != nil && !exitErr.Exited()
+}
+
+func TestSignalExitErrorDetection(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("signal-based exit errors require unix")
 	}
 
 	t.Run("nil error", func(t *testing.T) {
-		if isSignalError(nil) {
+		if isSignalExitError(nil) {
 			t.Error("nil error should not be a signal error")
 		}
 	})
 
 	t.Run("non-ExitError", func(t *testing.T) {
-		if isSignalError(errors.New("something broke")) {
+		if isSignalExitError(errors.New("something broke")) {
 			t.Error("plain error should not be a signal error")
 		}
 	})
@@ -52,7 +60,7 @@ func TestIsSignalError(t *testing.T) {
 			t.Fatal("expected error from killed process")
 		}
 
-		if !isSignalError(err) {
+		if !isSignalExitError(err) {
 			t.Errorf("signal-killed process error should be detected: %v", err)
 		}
 	})
@@ -64,7 +72,7 @@ func TestIsSignalError(t *testing.T) {
 			t.Fatal("expected error from exit 1")
 		}
 
-		if isSignalError(err) {
+		if isSignalExitError(err) {
 			t.Errorf("normal exit(1) should not be a signal error: %v", err)
 		}
 	})
@@ -93,7 +101,7 @@ func TestProcessExitErrorSurfacesUnexpectedSignalExit(t *testing.T) {
 
 	if err := proc.processExitError(); err == nil {
 		t.Fatal("processExitError() = nil, want unexpected signal exit")
-	} else if !isSignalError(err) {
+	} else if !isSignalExitError(err) {
 		t.Fatalf("processExitError() = %v, want signal exit error", err)
 	}
 }
