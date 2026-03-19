@@ -107,7 +107,12 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 		_, _ = client.ExternalAgent.ConfigDetect(context.Background(), codex.ExternalAgentConfigDetectParams{})
 	})
 	verified["externalAgentConfig/import"] = verifyMethod(t, transport, "externalAgentConfig/import", func() {
-		_, _ = client.ExternalAgent.ConfigImport(context.Background(), codex.ExternalAgentConfigImportParams{})
+		_, _ = client.ExternalAgent.ConfigImport(context.Background(), codex.ExternalAgentConfigImportParams{
+			MigrationItems: []codex.ExternalAgentConfigMigrationItem{{
+				Description: "Import repo config",
+				ItemType:    codex.MigrationItemTypeConfig,
+			}},
+		})
 	})
 
 	// Verify Feedback service
@@ -140,7 +145,10 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 
 	// Verify FuzzyFileSearch service
 	verified["fuzzyFileSearch"] = verifyMethod(t, transport, "fuzzyFileSearch", func() {
-		_, _ = client.FuzzyFileSearch.Search(context.Background(), codex.FuzzyFileSearchParams{})
+		_, _ = client.FuzzyFileSearch.Search(context.Background(), codex.FuzzyFileSearchParams{
+			Query: "main.go",
+			Roots: []string{"/tmp/project"},
+		})
 	})
 
 	// Verify MCP service
@@ -158,7 +166,12 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 
 	// Verify Review service
 	verified["review/start"] = verifyMethod(t, transport, "review/start", func() {
-		_, _ = client.Review.Start(context.Background(), codex.ReviewStartParams{})
+		_, _ = client.Review.Start(context.Background(), codex.ReviewStartParams{
+			ThreadID: "thread-1",
+			Target: codex.ReviewTargetWrapper{
+				Value: &codex.UncommittedChangesReviewTarget{},
+			},
+		})
 	})
 
 	// Verify Plugin service
@@ -360,5 +373,78 @@ func TestRepresentativeRequestMethodOutcomes(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "cannot unmarshal") {
 		t.Fatalf("Account.Get() error = %q, want decode failure context", err)
+	}
+}
+
+func TestRequestValidationRejectsMalformedParamsBeforeSending(t *testing.T) {
+	tests := []struct {
+		name string
+		call func(*codex.Client) error
+	}{
+		{
+			name: "review start zero value params",
+			call: func(client *codex.Client) error {
+				_, err := client.Review.Start(context.Background(), codex.ReviewStartParams{})
+				return err
+			},
+		},
+		{
+			name: "fuzzy search zero value params",
+			call: func(client *codex.Client) error {
+				_, err := client.FuzzyFileSearch.Search(context.Background(), codex.FuzzyFileSearchParams{})
+				return err
+			},
+		},
+		{
+			name: "external agent import zero value params",
+			call: func(client *codex.Client) error {
+				_, err := client.ExternalAgent.ConfigImport(context.Background(), codex.ExternalAgentConfigImportParams{})
+				return err
+			},
+		},
+		{
+			name: "turn start nil input",
+			call: func(client *codex.Client) error {
+				_, err := client.Turn.Start(context.Background(), codex.TurnStartParams{
+					ThreadID: "thread-1",
+				})
+				return err
+			},
+		},
+		{
+			name: "turn steer nil input",
+			call: func(client *codex.Client) error {
+				_, err := client.Turn.Steer(context.Background(), codex.TurnSteerParams{
+					ThreadID:       "thread-1",
+					ExpectedTurnID: "turn-1",
+				})
+				return err
+			},
+		},
+		{
+			name: "config batch write zero value params",
+			call: func(client *codex.Client) error {
+				_, err := client.Config.BatchWrite(context.Background(), codex.ConfigBatchWriteParams{})
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := NewMockTransport()
+			client := codex.NewClient(transport)
+
+			err := tt.call(client)
+			if err == nil {
+				t.Fatal("expected invalid params error")
+			}
+			if !strings.Contains(err.Error(), "invalid params") {
+				t.Fatalf("error = %v, want invalid params context", err)
+			}
+			if got := transport.CallCount(); got != 0 {
+				t.Fatalf("transport recorded %d requests, want 0", got)
+			}
+		})
 	}
 }
