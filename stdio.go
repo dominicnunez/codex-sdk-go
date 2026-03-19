@@ -471,6 +471,9 @@ func (t *StdioTransport) transportStopError(op string) error {
 
 func (t *StdioTransport) transportStopCauseLocked() error {
 	if t.scanErr != nil {
+		if errors.Is(t.scanErr, errOversizedInboundFrame) {
+			return errTransportReaderStopped
+		}
 		return t.scanErr
 	}
 	if t.readerEOF {
@@ -481,12 +484,12 @@ func (t *StdioTransport) transportStopCauseLocked() error {
 
 func (t *StdioTransport) closeWithFailure(scanErr error, cause error, detail json.RawMessage) {
 	t.mu.Lock()
-	if scanErr != nil && t.scanErr == nil {
-		t.scanErr = scanErr
-	}
 	if t.closed {
 		t.mu.Unlock()
 		return
+	}
+	if scanErr != nil && t.scanErr == nil {
+		t.scanErr = scanErr
 	}
 	t.closed = true
 	t.readerEOF = false
@@ -592,10 +595,7 @@ func (t *StdioTransport) enqueueWrite(ctx context.Context, msg interface{}, op s
 	if watchReaderStop {
 		select {
 		case err := <-env.done:
-			if err != nil {
-				return err
-			}
-			return nil
+			return t.normalizeWriteCompletionError(op, err)
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-t.ctx.Done():
@@ -607,14 +607,33 @@ func (t *StdioTransport) enqueueWrite(ctx context.Context, msg interface{}, op s
 
 	select {
 	case err := <-env.done:
-		if err != nil {
-			return err
-		}
-		return nil
+		return t.normalizeWriteCompletionError(op, err)
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-t.ctx.Done():
 		return NewTransportError(op, errTransportClosed)
+	}
+}
+
+func (t *StdioTransport) normalizeWriteCompletionError(op string, err error) error {
+	if err == nil {
+		return nil
+	}
+
+	t.mu.Lock()
+	closed := t.closed
+	t.mu.Unlock()
+	if closed {
+		return t.transportStopError(op)
+	}
+
+	select {
+	case <-t.readerStopped:
+		return t.transportStopError(op)
+	case <-t.ctx.Done():
+		return t.transportStopError(op)
+	default:
+		return err
 	}
 }
 
@@ -645,11 +664,12 @@ func (t *StdioTransport) writeLoop() {
 		}
 
 		err := t.writeRawMessage(env.payload)
-		env.done <- err
 		if err != nil {
 			t.handleWriteFailure(err)
+			env.done <- err
 			return
 		}
+		env.done <- nil
 	}
 }
 
