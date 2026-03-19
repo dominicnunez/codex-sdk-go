@@ -1496,14 +1496,19 @@ func TestStdioExactInboundMessageLimitIsAccepted(t *testing.T) {
 	}
 	_, _ = serverWriter.Write(append(followupJSON, '\n'))
 
-	for _, wantMethod := range []string{exactLimitMethod, followupMethod} {
+	wantMethods := map[string]bool{
+		exactLimitMethod: true,
+		followupMethod:   true,
+	}
+	for range wantMethods {
 		select {
 		case gotMethod := <-received:
-			if gotMethod != wantMethod {
-				t.Fatalf("received notification %q, want %q", gotMethod, wantMethod)
+			if !wantMethods[gotMethod] {
+				t.Fatalf("received unexpected notification %q", gotMethod)
 			}
+			delete(wantMethods, gotMethod)
 		case <-time.After(3 * time.Second):
-			t.Fatalf("timeout waiting for notification %q", wantMethod)
+			t.Fatalf("timeout waiting for notifications %v", wantMethods)
 		}
 	}
 
