@@ -8,7 +8,7 @@ import (
 )
 
 func TestPrePushHookRunsRaceAndLintChecks(t *testing.T) {
-	scriptPath := filepath.Join("scripts", "hooks", "pre-push.sh")
+	scriptPath := filepath.Join(".githooks", "pre-push")
 	data, err := os.ReadFile(scriptPath)
 	if err != nil {
 		t.Fatalf("read %s: %v", scriptPath, err)
@@ -29,6 +29,27 @@ func TestPrePushHookRunsRaceAndLintChecks(t *testing.T) {
 
 	if strings.Contains(script, `"$runner" go vet ./...`) {
 		t.Fatalf("%s still runs go vet instead of the documented lint lane", scriptPath)
+	}
+}
+
+func TestPreCommitHookFormatsAndLintsStagedGoFiles(t *testing.T) {
+	scriptPath := filepath.Join(".githooks", "pre-commit")
+	data, err := os.ReadFile(scriptPath)
+	if err != nil {
+		t.Fatalf("read %s: %v", scriptPath, err)
+	}
+
+	script := string(data)
+	requiredSnippets := []string{
+		`git diff --cached --name-only --diff-filter=ACM -- '*.go'`,
+		`"$runner" gofmt -w "${staged[@]}"`,
+		`git add -- "${staged[@]}"`,
+		`"$runner" golangci-lint run --new`,
+	}
+	for _, snippet := range requiredSnippets {
+		if !strings.Contains(script, snippet) {
+			t.Fatalf("%s is missing required snippet %q", scriptPath, snippet)
+		}
 	}
 }
 

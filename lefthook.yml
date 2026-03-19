@@ -1,9 +1,0 @@
-pre-commit:
-  commands:
-    gofmt-and-lint:
-      run: scripts/hooks/pre-commit.sh
-
-pre-push:
-  commands:
-    verify:
-      run: scripts/hooks/pre-push.sh

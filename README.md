@@ -85,18 +85,18 @@ Issues and PRs welcome on GitHub.
 
 ### Local Hooks
 
-This repo uses `lefthook` for shared local Git hooks.
+This repo uses shared Git hooks in `.githooks/`.
 
 Install hooks once after cloning:
 
 ```bash
-./scripts/setup-hooks.sh
+git config --local core.hooksPath .githooks
 ```
 
-Or, if you are already in the dev shell:
+Verify the setting:
 
 ```bash
-lefthook install
+git config --local --get core.hooksPath
 ```
 
 Hook behavior:
