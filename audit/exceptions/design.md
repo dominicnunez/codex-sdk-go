@@ -21,19 +21,6 @@ Embedding these types without their custom marshaler would lose the discriminato
 to any Go type with custom marshaling and is not specific to this code. The pattern is used
 consistently across all UserInput variants and matches other union types in the codebase.
 
-### normalizeID relies on float64 precision for JSON number IDs
-
-**Location:** `stdio.go:39-63` — normalizeID function
-**Date:** 2026-02-27
-
-**Reason:** JSON numbers unmarshal as float64 in Go's encoding/json, which
-loses precision for integers above 2^53. Two distinct large IDs could
-collide. However, JSON-RPC servers use small sequential integers or strings
-for request IDs — values above 2^53 are not realistic. Fixing this would
-require raw JSON token parsing to bypass float64, which is disproportionate
-to the near-zero probability. The standard Go JSON number handling is the
-correct default for this protocol.
-
 ### ReviewDecisionWrapper and CommandExecutionApprovalDecisionWrapper use untyped interface{} for Value
 
 **Location:** `approval.go:154-156`, `approval.go:419-421` — Value fields
@@ -233,19 +220,6 @@ will gain fields and the unmarshal call must be added — but that's a spec chan
 requires code updates regardless. The current code is correct for the current spec and
 avoids unnecessary work.
 
-### RunResult.Thread reflects thread metadata at turn start, not post-turn live state
-
-**Location:** `turn_lifecycle.go:87` — buildRunResult receives thread snapshot from turnLifecycleParams
-**Date:** 2026-02-28
-
-**Reason:** `RunResult.Thread` provides the thread metadata context (ID, config, cwd, model, etc.)
-captured when the conversation was started or last completed. The `RunResult.Turn` field carries
-the actual turn data from the server's `turn/completed` notification, which is always current.
-Updating `RunResult.Thread` from the server response would require the `turn/completed`
-notification to carry the full `Thread` object — which it doesn't (it only carries the `Turn`).
-The current behavior is consistent: the Thread field is stable metadata, the Turn field is live
-per-turn data. Callers who need post-turn thread state use `Conversation.Thread()`.
-
 ### AgentTracker signals on every collab event including empty state updates
 
 **Location:** `collab_tracker.go:71-72` — unconditional close(t.updated) signal
@@ -270,18 +244,6 @@ changing the API contract (for example immutable views or incremental subscripti
 an architectural shift disproportionate to this low-severity finding. The current behavior is
 correct by design and prioritized for data isolation and thread safety.
 
-### security_test.go tests documentation content rather than security behavior
-
-**Location:** `security_test.go` — all tests
-**Date:** 2026-03-01
-
-**Reason:** These tests verify that SECURITY.md exists and contains required sections (reporting
-guidance, security scope, dependency policy). They are documentation enforcement tests, not
-security behavior tests. This is intentional — actual security behavior (credential redaction,
-wire protocol safety) is tested in `credential_redact_test.go` and the transport tests.
-The documentation tests ensure the security policy file stays complete and accurate as the
-project evolves.
-
 ### Internal notification listeners dispatched synchronously in handleNotification
 
 **Location:** `client.go:192-209` — handleNotification dispatches public + internal listeners sequentially
@@ -305,18 +267,6 @@ as constants, so the test is tautological — it can only fail if someone change
 the test. This is intentional documentation-as-test: the test serves as executable documentation that
 the constants match the JSON-RPC 2.0 spec values. The alternative (deleting the test) loses the
 documentation value with no practical benefit.
-
-### cloneThreadItemWrapper uses JSON round-trip for deep copy
-
-**Location:** `conversation.go:82-96` — JSON marshal/unmarshal clone
-**Date:** 2026-03-01
-
-**Reason:** The JSON round-trip is a correctness-first design choice. ThreadItemWrapper contains
-a discriminated union of many concrete types, each with custom MarshalJSON/UnmarshalJSON. A manual
-Clone() method would need to match every variant (and be updated for every new one), creating a
-maintenance burden and potential for subtle bugs. The JSON round-trip is O(n) in serialized size
-but automatically correct for all variants. The error path now panics (instead of silently returning
-the original), ensuring the deep-copy guarantee is never silently broken.
 
 ### executeStreamedTurn emits TurnCompleted before the terminal error event
 

@@ -29,6 +29,27 @@ responses. `buildRunResult` therefore is not overlooking a real fallback source 
 which satisfies the current validation logic. A fresh `go test ./...` passes in this checkout, so
 the reported suite-breaking failure is stale and does not reflect the current code.
 
+### Intentional transport shutdown leaks internal pipe errors to callers
+
+**Location:** `stdio.go:485` — `closeWithFailure` and `stdio.go:1767` — `stopAfterReaderTermination`
+
+**Reason:** This behavior does not occur in the current transport. `closeWithFailure` sets
+`t.closed = true` under the mutex before it closes the reader. When the read loop wakes up,
+`stopAfterReaderTermination` checks `t.closed` at `stdio.go:1769-1771` and returns immediately,
+so it never overwrites `scanErr` with the pipe-close error from an intentional shutdown. The
+reported reproductions are also stale in this checkout: `go test -run TestStdioConcurrentSendAndClose -count=50 ./...`,
+`go test -race ./...`, and `go test -coverprofile=/tmp/c.out ./...` all pass.
+
+### Pre-push checks miss race-enabled transport regressions
+
+**Location:** `scripts/hooks/pre-push.sh:7`
+
+**Reason:** The current pre-push hook already runs the race and lint lanes the finding says are
+missing. `scripts/hooks/pre-push.sh` contains `go test -race ./...` at line 11 and
+`golangci-lint run ./...` at line 14, and it no longer runs `go vet ./...`. The repo also has a
+dedicated guard test, `TestPrePushHookRunsRaceAndLintChecks`, and `go test -run TestPrePushHookRunsRaceAndLintChecks ./...`
+passes in this checkout.
+
 ### The malformed-request test is not exercising dead code
 
 **Location:** `stdio_internal_test.go:17` — invalid request object handling
@@ -258,6 +279,27 @@ that `tracker.Agents()` remains empty. The exact test the finding requests alrea
 
 ### TurnStartParams SandboxPolicy marshal finding is a duplicate of existing design exception
 
+### The approval dispatch test does not use an invalid MCP elicitation URL-mode request
+
+**Location:** `approval_test.go:517` — MCP elicitation fixture in `TestApprovalHandlerDispatch`
+
+**Reason:** The checked-in fixture already includes all required URL-mode fields:
+`elicitationId`, `message`, `mode`, and `url`. The request payload at
+`approval_test.go:517` includes `"elicitationId":"e1"`, so the test is not
+failing due to invalid params. A focused run of `go test -count=1 -run
+'^TestApprovalHandlerDispatch$' ./...` passes in this checkout.
+
+### The realtime started notification tests already include the required version field
+
+**Location:** `realtime_test.go:18` — `TestThreadRealtimeStartedNotification`
+
+**Reason:** The current test fixtures already include `"version"` in both direct
+unmarshal cases and in the listener-dispatch payload. The production type also
+requires `threadId` and `version` in `ThreadRealtimeStartedNotification.UnmarshalJSON`
+at `realtime.go:25-33`, so a missing-version fixture would fail immediately, but
+that stale fixture is not present in this tree. A focused run of `go test -count=1
+-run '^TestThreadRealtimeStartedNotification$' ./...` passes.
+
 **Location:** `turn.go:22-33` — TurnStartParams.SandboxPolicy field
 **Date:** 2026-02-28
 
@@ -373,17 +415,16 @@ appends a Turn to the returned snapshot, then calls `conv.Thread()` again and as
 is unchanged — verifying that the Conversation's internal state is unaffected by mutations to
 the snapshot.
 
-### normalizeID uint64 overflow described as new finding but covered by existing precision exception
+### normalizeID uint64 overflow described as a new defect
 
 **Location:** `stdio.go:47-51` — normalizeID float64 to uint64 cast
 **Date:** 2026-03-01
 
 **Reason:** The audit claims float64 values near `math.MaxUint64` produce undefined behavior in the
-uint64 cast. This is a subset of the existing exception "normalizeID relies on float64 precision for
-JSON number IDs" — values near `math.MaxUint64` are even more unrealistic than values above 2^53.
-JSON-RPC IDs are small sequential integers; the existing round-trip check `v == float64(u)` at
-lines 49-50 already guards against precision loss. The overflow edge case is not reachable in any
-realistic protocol usage.
+uint64 cast. That does not match the current code. `normalizeID` already uses a round-trip guard:
+it casts to `uint64`, then only takes the integer fast path when `v == float64(u)`. Values that
+cannot be represented exactly fall through to the generic string formatting path instead of being
+silently truncated. JSON-RPC IDs near `math.MaxUint64` are also not realistic protocol inputs.
 
 ### handleApproval pointer-to-value wireMarshaler dispatch re-flagged as new finding
 
@@ -925,18 +966,6 @@ which matches the format expected by `UnmarshalJSON` (line 213 checks for key `"
 checks for key `"thread_spawn"`). The round-trip is correct. This is also a duplicate of the known
 exception "SessionSourceSubAgent relies on implicit marshaling for SubAgentSource variants."
 
-### security_test.go described as testing documentation content instead of security behavior
-
-**Location:** `security_test.go` — all tests
-**Date:** 2026-03-01
-
-**Reason:** These tests verify that SECURITY.md exists and contains required sections (reporting
-guidance, security scope, dependency policy). They are documentation enforcement tests, not
-security behavior tests. This is intentional — actual security behavior (credential redaction,
-wire protocol safety) is tested in `credential_redact_test.go` and the transport tests.
-The documentation tests ensure the security policy file stays complete and accurate as the
-project evolves.
-
 ### readLoop silently drops malformed JSON lines described as a new finding
 
 **Location:** `stdio.go:307` — readLoop JSON unmarshal failure path
@@ -1003,17 +1032,16 @@ marshals correctly.
 of wrapper type" at `thread.go:538` et al. covers this field. `ThreadStartParams.ApprovalPolicy`
 is explicitly listed in the exception's location set.
 
-### normalizeID loses precision for large float64 IDs described as a new finding
+### normalizeID large-float precision concern described as a new defect
 
 **Location:** `stdio.go:57-69` — normalizeID float64 precision
 **Date:** 2026-03-01
 
-**Reason:** Duplicate of the known exception "normalizeID relies on float64 precision for JSON
-number IDs." Additionally, the finding describes the `float64(u) != v` fallthrough as a problem,
-but this IS the precision guard — the code at lines 59-62 does `u := uint64(v)` then checks
-`v == float64(u)`, falling through to `fmt.Sprintf("%v", v)` when precision is lost. The code
-correctly handles the edge case the finding describes. The exception documents that values above
-2^53 are not realistic for JSON-RPC IDs.
+**Reason:** The finding describes the `float64(u) != v` fallthrough as a bug, but that branch is
+the guard against precision loss. `normalizeID` only uses the integer path when the float64 value
+round-trips exactly through `uint64`; otherwise it falls back to `fmt.Sprintf("%v", v)`. The code
+already behaves the way the finding recommends. Values above the exact float64 integer range are
+also not realistic JSON-RPC request IDs in this SDK.
 
 ### Conversation.TurnStreamed concurrent call rejection claimed to be untested
 
@@ -1191,18 +1219,6 @@ handler per test case in isolation, and verifies the **response has no error** (
 individual dispatch correctness). These are complementary: one tests all handlers working together,
 the other tests each handler in isolation.
 
-### security_test.go described as testing markdown content instead of SDK security behavior
-
-**Location:** `security_test.go:9-109` — all tests
-**Date:** 2026-03-01
-
-**Reason:** The audit says these tests "provide a false sense of security test coverage" and should
-be deleted. They are documentation enforcement tests, not security behavior tests — and that is
-intentional. They verify that SECURITY.md exists and contains required sections (reporting guidance,
-security scope, dependency policy). Actual security behavior (credential redaction, wire protocol
-safety) is tested in `credential_redact_test.go` and transport tests. The documentation tests ensure
-the security policy file stays complete as the project evolves.
-
 ### Thread() deep-copy does not have a gap in Turn field cloning
 
 **Location:** `conversation.go:68-81` — Thread() clone logic
@@ -1300,3 +1316,13 @@ not drive real turn lifecycles. The current test suite already includes
 `TestRunStreamedCompletesWithAllItemsUnderTurnNotificationBacklog`, all backed by the real stdio
 transport via `serveBurstLifecycleOverStdio`. Those tests exercise the user-facing turn flows
 under heavy same-thread completion backlog and assert that items and turn completion are preserved.
+
+### Plugin validation tests are stale and currently break the default test suite
+
+**Location:** `plugin_test.go:290` — `TestPluginRequiredFieldValidation`
+
+**Reason:** The audit is stale against the current test file. The checked-in assertions at
+`plugin_test.go:327-354` already expect `required field "appsNeedingAuth"` and
+`required field "authPolicy"`, not the legacy `missing appsNeedingAuth` / `missing authPolicy`
+strings described in the report. The described red-suite behavior does not occur in this checkout:
+`go test -run TestPluginRequiredFieldValidation ./...` and `go test ./...` both pass.
