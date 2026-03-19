@@ -682,7 +682,15 @@ func testStructFields(t *testing.T) {
 	}
 
 	definitionStructs := []definitionStructEntry{
+		{"specs/v2/AppsListResponse.json", "AppInfo", reflect.TypeOf(AppInfo{})},
+		{"specs/v2/AppsListResponse.json", "AppBranding", reflect.TypeOf(AppBranding{})},
+		{"specs/v2/AppsListResponse.json", "AppMetadata", reflect.TypeOf(AppMetadata{})},
+		{"specs/v2/AppsListResponse.json", "AppReview", reflect.TypeOf(AppReview{})},
+		{"specs/v2/AppsListResponse.json", "AppScreenshot", reflect.TypeOf(AppScreenshot{})},
 		{"specs/v2/ConfigRequirementsReadResponse.json", "ConfigRequirements", reflect.TypeOf(ConfigRequirements{})},
+		{"specs/v2/HookStartedNotification.json", "HookOutputEntry", reflect.TypeOf(HookOutputEntry{})},
+		{"specs/v2/HookStartedNotification.json", "HookRunSummary", reflect.TypeOf(HookRunSummary{})},
+		{"specs/v2/ItemGuardianApprovalReviewStartedNotification.json", "GuardianApprovalReview", reflect.TypeOf(GuardianApprovalReview{})},
 		{"specs/v2/ThreadRealtimeOutputAudioDeltaNotification.json", "ThreadRealtimeAudioChunk", reflect.TypeOf(ThreadRealtimeAudioChunk{})},
 	}
 
@@ -764,6 +772,65 @@ func testEnumValues(t *testing.T) {
 			defName:  "CancelLoginAccountStatus",
 			goValues: enumStrings(
 				CancelLoginAccountStatusCanceled, CancelLoginAccountStatusNotFound,
+			),
+		},
+		{
+			specPath: "specs/v2/HookStartedNotification.json",
+			defName:  "HookEventName",
+			goValues: enumStrings(
+				HookEventNameSessionStart, HookEventNameUserPromptSubmit, HookEventNameStop,
+			),
+		},
+		{
+			specPath: "specs/v2/HookStartedNotification.json",
+			defName:  "HookExecutionMode",
+			goValues: enumStrings(
+				HookExecutionModeSync, HookExecutionModeAsync,
+			),
+		},
+		{
+			specPath: "specs/v2/HookStartedNotification.json",
+			defName:  "HookHandlerType",
+			goValues: enumStrings(
+				HookHandlerTypeCommand, HookHandlerTypePrompt, HookHandlerTypeAgent,
+			),
+		},
+		{
+			specPath: "specs/v2/HookStartedNotification.json",
+			defName:  "HookOutputEntryKind",
+			goValues: enumStrings(
+				HookOutputEntryKindWarning, HookOutputEntryKindStop, HookOutputEntryKindFeedback,
+				HookOutputEntryKindContext, HookOutputEntryKindError,
+			),
+		},
+		{
+			specPath: "specs/v2/HookStartedNotification.json",
+			defName:  "HookRunStatus",
+			goValues: enumStrings(
+				HookRunStatusRunning, HookRunStatusCompleted, HookRunStatusFailed,
+				HookRunStatusBlocked, HookRunStatusStopped,
+			),
+		},
+		{
+			specPath: "specs/v2/HookStartedNotification.json",
+			defName:  "HookScope",
+			goValues: enumStrings(
+				HookScopeThread, HookScopeTurn,
+			),
+		},
+		{
+			specPath: "specs/v2/ItemGuardianApprovalReviewStartedNotification.json",
+			defName:  "GuardianApprovalReviewStatus",
+			goValues: enumStrings(
+				GuardianApprovalReviewStatusInProgress, GuardianApprovalReviewStatusApproved,
+				GuardianApprovalReviewStatusDenied, GuardianApprovalReviewStatusAborted,
+			),
+		},
+		{
+			specPath: "specs/v2/ItemGuardianApprovalReviewStartedNotification.json",
+			defName:  "GuardianRiskLevel",
+			goValues: enumStrings(
+				GuardianRiskLevelLow, GuardianRiskLevelMedium, GuardianRiskLevelHigh,
 			),
 		},
 
