@@ -125,7 +125,7 @@ func (c *Client) OnThreadUnarchived(handler func(ThreadUnarchivedNotification)) 
 	})
 }
 
-// OnThreadNameUpdated registers a listener for thread/nameUpdated notifications
+// OnThreadNameUpdated registers a listener for thread/name/updated notifications
 func (c *Client) OnThreadNameUpdated(handler func(ThreadNameUpdatedNotification)) {
 	if handler == nil {
 		c.OnNotification(notifyThreadNameUpdated, nil)
@@ -141,7 +141,7 @@ func (c *Client) OnThreadNameUpdated(handler func(ThreadNameUpdatedNotification)
 	})
 }
 
-// OnThreadStatusChanged registers a listener for thread/statusChanged notifications
+// OnThreadStatusChanged registers a listener for thread/status/changed notifications
 func (c *Client) OnThreadStatusChanged(handler func(ThreadStatusChangedNotification)) {
 	if handler == nil {
 		c.OnNotification(notifyThreadStatusChanged, nil)

@@ -49,7 +49,7 @@ func (c *Client) OnAccountUpdated(handler func(AccountUpdatedNotification)) {
 	})
 }
 
-// OnAccountLoginCompleted registers a listener for account/loginCompleted notifications
+// OnAccountLoginCompleted registers a listener for account/login/completed notifications
 func (c *Client) OnAccountLoginCompleted(handler func(AccountLoginCompletedNotification)) {
 	if handler == nil {
 		c.OnNotification(notifyAccountLoginCompleted, nil)
@@ -65,7 +65,7 @@ func (c *Client) OnAccountLoginCompleted(handler func(AccountLoginCompletedNotif
 	})
 }
 
-// OnAccountRateLimitsUpdated registers a listener for account/rateLimitsUpdated notifications
+// OnAccountRateLimitsUpdated registers a listener for account/rateLimits/updated notifications
 func (c *Client) OnAccountRateLimitsUpdated(handler func(AccountRateLimitsUpdatedNotification)) {
 	if handler == nil {
 		c.OnNotification(notifyAccountRateLimitsUpdated, nil)

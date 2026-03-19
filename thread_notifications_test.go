@@ -453,7 +453,7 @@ func TestThreadNotificationListenerRegistration(t *testing.T) {
 		})
 
 		if !called {
-			t.Error("thread/nameUpdated listener was not called")
+			t.Error("thread/name/updated listener was not called")
 		}
 		if receivedNotification.ThreadID != "thread-202" {
 			t.Errorf("expected thread ID 'thread-202', got %q", receivedNotification.ThreadID)
@@ -476,7 +476,7 @@ func TestThreadNotificationListenerRegistration(t *testing.T) {
 		})
 
 		if !called {
-			t.Error("thread/statusChanged listener was not called")
+			t.Error("thread/status/changed listener was not called")
 		}
 		if receivedNotification.ThreadID != "thread-303" {
 			t.Errorf("expected thread ID 'thread-303', got %q", receivedNotification.ThreadID)

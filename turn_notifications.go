@@ -79,7 +79,7 @@ type TurnPlanStep struct {
 	Status TurnPlanStepStatus `json:"status"`
 }
 
-// OnTurnPlanUpdated registers a listener for turn/planUpdated notifications
+// OnTurnPlanUpdated registers a listener for turn/plan/updated notifications
 func (c *Client) OnTurnPlanUpdated(handler func(TurnPlanUpdatedNotification)) {
 	if handler == nil {
 		c.OnNotification(notifyTurnPlanUpdated, nil)
@@ -104,7 +104,7 @@ type TurnDiffUpdatedNotification struct {
 	Diff     string `json:"diff"`
 }
 
-// OnTurnDiffUpdated registers a listener for turn/diffUpdated notifications
+// OnTurnDiffUpdated registers a listener for turn/diff/updated notifications
 func (c *Client) OnTurnDiffUpdated(handler func(TurnDiffUpdatedNotification)) {
 	if handler == nil {
 		c.OnNotification(notifyTurnDiffUpdated, nil)

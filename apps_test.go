@@ -200,7 +200,7 @@ func TestAppsList(t *testing.T) {
 	})
 }
 
-// TestAppListUpdatedNotification verifies the app/listUpdated notification dispatch.
+// TestAppListUpdatedNotification verifies the app/list/updated notification dispatch.
 func TestAppListUpdatedNotification(t *testing.T) {
 	mock := NewMockTransport()
 	client := codex.NewClient(mock)
