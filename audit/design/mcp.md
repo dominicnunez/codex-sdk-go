@@ -1,0 +1,21 @@
+# Design
+
+> Findings that describe behavior which is correct by design.
+> Managed by sfk willie. Follow the entry format below.
+>
+> Entry format:
+> ### Plain language description
+> **Location:** `file/path:line` — optional context
+> **Date:** YYYY-MM-DD
+> **Reason:** Explanation (can be multiple lines)
+
+### AuthorizationUrl field uses spec casing instead of Go acronym convention
+
+**Location:** `mcp.go:83` — McpServerOauthLoginResponse.AuthorizationUrl
+**Date:** 2026-02-27
+
+**Reason:** The spec schema (`McpServerOauthLoginResponse.json`) defines the wire field as
+`"authorizationUrl"`. The Go field name `AuthorizationUrl` mirrors the spec. Renaming to
+`AuthorizationURL` would be more idiomatic Go, but the project's spec compliance rules
+prohibit renaming public fields that map to spec schemas. The JSON struct tag preserves
+wire compatibility regardless.
