@@ -16,6 +16,28 @@ func TestProtocolEnumsRejectInvalidMarshalAndUnmarshal(t *testing.T) {
 		wantErr   string
 	}{
 		{
+			name: "personality",
+			marshal: func() ([]byte, error) {
+				return json.Marshal(codex.Personality("totally-invalid"))
+			},
+			unmarshal: func(data []byte) error {
+				var value codex.Personality
+				return json.Unmarshal(data, &value)
+			},
+			wantErr: `invalid personality "totally-invalid"`,
+		},
+		{
+			name: "approvals reviewer",
+			marshal: func() ([]byte, error) {
+				return json.Marshal(codex.ApprovalsReviewer("totally-invalid"))
+			},
+			unmarshal: func(data []byte) error {
+				var value codex.ApprovalsReviewer
+				return json.Unmarshal(data, &value)
+			},
+			wantErr: `invalid approvalsReviewer "totally-invalid"`,
+		},
+		{
 			name: "service tier",
 			marshal: func() ([]byte, error) {
 				return json.Marshal(codex.ServiceTier("totally-invalid"))
@@ -25,6 +47,28 @@ func TestProtocolEnumsRejectInvalidMarshalAndUnmarshal(t *testing.T) {
 				return json.Unmarshal(data, &value)
 			},
 			wantErr: `invalid serviceTier "totally-invalid"`,
+		},
+		{
+			name: "mode kind",
+			marshal: func() ([]byte, error) {
+				return json.Marshal(codex.ModeKind("totally-invalid"))
+			},
+			unmarshal: func(data []byte) error {
+				var value codex.ModeKind
+				return json.Unmarshal(data, &value)
+			},
+			wantErr: `invalid mode "totally-invalid"`,
+		},
+		{
+			name: "merge strategy",
+			marshal: func() ([]byte, error) {
+				return json.Marshal(codex.MergeStrategy("totally-invalid"))
+			},
+			unmarshal: func(data []byte) error {
+				var value codex.MergeStrategy
+				return json.Unmarshal(data, &value)
+			},
+			wantErr: `invalid mergeStrategy "totally-invalid"`,
 		},
 		{
 			name: "verbosity",
@@ -60,6 +104,28 @@ func TestProtocolEnumsRejectInvalidMarshalAndUnmarshal(t *testing.T) {
 			wantErr: `invalid webSearchMode "totally-invalid"`,
 		},
 		{
+			name: "thread sort key",
+			marshal: func() ([]byte, error) {
+				return json.Marshal(codex.ThreadSortKey("totally-invalid"))
+			},
+			unmarshal: func(data []byte) error {
+				var value codex.ThreadSortKey
+				return json.Unmarshal(data, &value)
+			},
+			wantErr: `invalid sortKey "totally-invalid"`,
+		},
+		{
+			name: "thread source kind",
+			marshal: func() ([]byte, error) {
+				return json.Marshal(codex.ThreadSourceKind("totally-invalid"))
+			},
+			unmarshal: func(data []byte) error {
+				var value codex.ThreadSourceKind
+				return json.Unmarshal(data, &value)
+			},
+			wantErr: `invalid sourceKinds "totally-invalid"`,
+		},
+		{
 			name: "forced login method",
 			marshal: func() ([]byte, error) {
 				return json.Marshal(codex.ForcedLoginMethod("totally-invalid"))
@@ -69,6 +135,39 @@ func TestProtocolEnumsRejectInvalidMarshalAndUnmarshal(t *testing.T) {
 				return json.Unmarshal(data, &value)
 			},
 			wantErr: `invalid forcedLoginMethod "totally-invalid"`,
+		},
+		{
+			name: "reasoning effort",
+			marshal: func() ([]byte, error) {
+				return json.Marshal(codex.ReasoningEffort("totally-invalid"))
+			},
+			unmarshal: func(data []byte) error {
+				var value codex.ReasoningEffort
+				return json.Unmarshal(data, &value)
+			},
+			wantErr: `invalid reasoningEffort "totally-invalid"`,
+		},
+		{
+			name: "reasoning summary mode",
+			marshal: func() ([]byte, error) {
+				return json.Marshal(codex.ReasoningSummaryMode("totally-invalid"))
+			},
+			unmarshal: func(data []byte) error {
+				var value codex.ReasoningSummaryMode
+				return json.Unmarshal(data, &value)
+			},
+			wantErr: `invalid reasoningSummary "totally-invalid"`,
+		},
+		{
+			name: "review delivery",
+			marshal: func() ([]byte, error) {
+				return json.Marshal(codex.ReviewDelivery("totally-invalid"))
+			},
+			unmarshal: func(data []byte) error {
+				var value codex.ReviewDelivery
+				return json.Unmarshal(data, &value)
+			},
+			wantErr: `invalid delivery "totally-invalid"`,
 		},
 		{
 			name: "residency requirement",

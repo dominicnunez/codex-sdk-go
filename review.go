@@ -16,6 +16,19 @@ const (
 	ReviewDeliveryDetached ReviewDelivery = "detached"
 )
 
+var validReviewDeliveries = map[ReviewDelivery]struct{}{
+	ReviewDeliveryInline:   {},
+	ReviewDeliveryDetached: {},
+}
+
+func (d ReviewDelivery) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("delivery", d, validReviewDeliveries)
+}
+
+func (d *ReviewDelivery) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "delivery", validReviewDeliveries, d)
+}
+
 const (
 	reviewTargetTypeUncommittedChanges = "uncommittedChanges"
 	reviewTargetTypeBaseBranch         = "baseBranch"

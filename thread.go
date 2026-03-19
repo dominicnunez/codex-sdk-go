@@ -996,14 +996,10 @@ func validateThreadLifecycleResponseFields(
 }
 
 func validateApprovalsReviewer(reviewer ApprovalsReviewer) error {
-	switch reviewer {
-	case "":
+	if reviewer == "" {
 		return errors.New("missing approvalsReviewer")
-	case ApprovalsReviewerUser, ApprovalsReviewerGuardianSubagent:
-		return nil
-	default:
-		return fmt.Errorf("invalid approvalsReviewer %q", reviewer)
 	}
+	return validateEnumValue("approvalsReviewer", reviewer, validApprovalsReviewers)
 }
 
 func (r ThreadStartResponse) validate() error {

@@ -44,6 +44,20 @@ const (
 	PersonalityPragmatic Personality = "pragmatic"
 )
 
+var validPersonalities = map[Personality]struct{}{
+	PersonalityNone:      {},
+	PersonalityFriendly:  {},
+	PersonalityPragmatic: {},
+}
+
+func (p Personality) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("personality", p, validPersonalities)
+}
+
+func (p *Personality) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "personality", validPersonalities, p)
+}
+
 // ApprovalsReviewer controls who reviews approval requests.
 type ApprovalsReviewer string
 
@@ -51,6 +65,19 @@ const (
 	ApprovalsReviewerUser             ApprovalsReviewer = "user"
 	ApprovalsReviewerGuardianSubagent ApprovalsReviewer = "guardian_subagent"
 )
+
+var validApprovalsReviewers = map[ApprovalsReviewer]struct{}{
+	ApprovalsReviewerUser:             {},
+	ApprovalsReviewerGuardianSubagent: {},
+}
+
+func (r ApprovalsReviewer) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("approvalsReviewer", r, validApprovalsReviewers)
+}
+
+func (r *ApprovalsReviewer) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "approvalsReviewer", validApprovalsReviewers, r)
+}
 
 // ServiceTier selects the runtime service tier.
 type ServiceTier string
@@ -81,6 +108,19 @@ const (
 	ModeKindDefault ModeKind = "default"
 )
 
+var validModeKinds = map[ModeKind]struct{}{
+	ModeKindPlan:    {},
+	ModeKindDefault: {},
+}
+
+func (m ModeKind) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("mode", m, validModeKinds)
+}
+
+func (m *ModeKind) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "mode", validModeKinds, m)
+}
+
 // MergeStrategy represents the merge strategy for config writes.
 type MergeStrategy string
 
@@ -88,6 +128,19 @@ const (
 	MergeStrategyReplace MergeStrategy = "replace"
 	MergeStrategyUpsert  MergeStrategy = "upsert"
 )
+
+var validMergeStrategies = map[MergeStrategy]struct{}{
+	MergeStrategyReplace: {},
+	MergeStrategyUpsert:  {},
+}
+
+func (m MergeStrategy) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("mergeStrategy", m, validMergeStrategies)
+}
+
+func (m *MergeStrategy) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "mergeStrategy", validMergeStrategies, m)
+}
 
 // Verbosity controls output length/detail on models via the Responses API.
 type Verbosity string
@@ -283,6 +336,19 @@ const (
 	ThreadSortKeyUpdatedAt ThreadSortKey = "updated_at"
 )
 
+var validThreadSortKeys = map[ThreadSortKey]struct{}{
+	ThreadSortKeyCreatedAt: {},
+	ThreadSortKeyUpdatedAt: {},
+}
+
+func (k ThreadSortKey) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("sortKey", k, validThreadSortKeys)
+}
+
+func (k *ThreadSortKey) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "sortKey", validThreadSortKeys, k)
+}
+
 // ThreadSourceKind represents the origin of a thread.
 type ThreadSourceKind string
 
@@ -298,6 +364,27 @@ const (
 	ThreadSourceKindSubAgentOther       ThreadSourceKind = "subAgentOther"
 	ThreadSourceKindUnknown             ThreadSourceKind = "unknown"
 )
+
+var validThreadSourceKinds = map[ThreadSourceKind]struct{}{
+	ThreadSourceKindCLI:                 {},
+	ThreadSourceKindVSCode:              {},
+	ThreadSourceKindExec:                {},
+	ThreadSourceKindAppServer:           {},
+	ThreadSourceKindSubAgent:            {},
+	ThreadSourceKindSubAgentReview:      {},
+	ThreadSourceKindSubAgentCompact:     {},
+	ThreadSourceKindSubAgentThreadSpawn: {},
+	ThreadSourceKindSubAgentOther:       {},
+	ThreadSourceKindUnknown:             {},
+}
+
+func (k ThreadSourceKind) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("sourceKinds", k, validThreadSourceKinds)
+}
+
+func (k *ThreadSourceKind) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "sourceKinds", validThreadSourceKinds, k)
+}
 
 // ForcedLoginMethod represents the forced login method for account authentication.
 type ForcedLoginMethod string
@@ -405,6 +492,10 @@ var validReasoningEfforts = map[ReasoningEffort]struct{}{
 	ReasoningEffortXHigh:   {},
 }
 
+func (r ReasoningEffort) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("reasoningEffort", r, validReasoningEfforts)
+}
+
 func (r *ReasoningEffort) UnmarshalJSON(data []byte) error {
 	return unmarshalEnumString(data, "reasoningEffort", validReasoningEfforts, r)
 }
@@ -437,3 +528,18 @@ const (
 	ReasoningSummaryModeDetailed ReasoningSummaryMode = "detailed"
 	ReasoningSummaryModeNone     ReasoningSummaryMode = "none"
 )
+
+var validReasoningSummaryModes = map[ReasoningSummaryMode]struct{}{
+	ReasoningSummaryModeAuto:     {},
+	ReasoningSummaryModeConcise:  {},
+	ReasoningSummaryModeDetailed: {},
+	ReasoningSummaryModeNone:     {},
+}
+
+func (m ReasoningSummaryMode) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("reasoningSummary", m, validReasoningSummaryModes)
+}
+
+func (m *ReasoningSummaryMode) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "reasoningSummary", validReasoningSummaryModes, m)
+}

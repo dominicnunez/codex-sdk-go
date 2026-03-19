@@ -76,11 +76,11 @@ type ReasoningSummaryWrapper struct {
 }
 
 func (w *ReasoningSummaryWrapper) UnmarshalJSON(data []byte) error {
-	var str string
-	if err := json.Unmarshal(data, &str); err != nil {
-		return fmt.Errorf("unsupported ReasoningSummary type: expected string, got %.200s", data)
+	var mode ReasoningSummaryMode
+	if err := json.Unmarshal(data, &mode); err != nil {
+		return fmt.Errorf("unsupported ReasoningSummary type: %w", err)
 	}
-	w.Value = ReasoningSummaryMode(str)
+	w.Value = mode
 	return nil
 }
 
@@ -89,7 +89,7 @@ func (w ReasoningSummaryWrapper) MarshalJSON() ([]byte, error) {
 		return []byte("null"), nil
 	}
 	if mode, ok := w.Value.(ReasoningSummaryMode); ok {
-		return json.Marshal(string(mode))
+		return json.Marshal(mode)
 	}
 	return nil, fmt.Errorf("unknown ReasoningSummary type: %T", w.Value)
 }

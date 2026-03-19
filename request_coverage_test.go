@@ -76,10 +76,20 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 		_, _ = client.Config.ReadRequirements(context.Background())
 	})
 	verified["config/value/write"] = verifyMethod(t, transport, "config/value/write", func() {
-		_, _ = client.Config.Write(context.Background(), codex.ConfigValueWriteParams{})
+		_, _ = client.Config.Write(context.Background(), codex.ConfigValueWriteParams{
+			KeyPath:       "model",
+			MergeStrategy: codex.MergeStrategyReplace,
+			Value:         json.RawMessage(`"gpt-5"`),
+		})
 	})
 	verified["config/batchWrite"] = verifyMethod(t, transport, "config/batchWrite", func() {
-		_, _ = client.Config.BatchWrite(context.Background(), codex.ConfigBatchWriteParams{})
+		_, _ = client.Config.BatchWrite(context.Background(), codex.ConfigBatchWriteParams{
+			Edits: []codex.ConfigEdit{{
+				KeyPath:       "model",
+				MergeStrategy: codex.MergeStrategyReplace,
+				Value:         json.RawMessage(`"gpt-5"`),
+			}},
+		})
 	})
 	verified["config/mcpServer/reload"] = verifyMethod(t, transport, "config/mcpServer/reload", func() {
 		_, _ = client.Mcp.Refresh(context.Background())
