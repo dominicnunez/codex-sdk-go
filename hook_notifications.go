@@ -68,6 +68,17 @@ type HookOutputEntry struct {
 	Text string              `json:"text"`
 }
 
+func (e *HookOutputEntry) UnmarshalJSON(data []byte) error {
+	type wire HookOutputEntry
+	var decoded wire
+	required := []string{"kind", "text"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*e = HookOutputEntry(decoded)
+	return nil
+}
+
 // HookRunSummary describes a hook execution.
 type HookRunSummary struct {
 	CompletedAt   *int64            `json:"completedAt,omitempty"`
@@ -85,6 +96,28 @@ type HookRunSummary struct {
 	StatusMessage *string           `json:"statusMessage,omitempty"`
 }
 
+func (s *HookRunSummary) UnmarshalJSON(data []byte) error {
+	type wire HookRunSummary
+	var decoded wire
+	required := []string{
+		"displayOrder",
+		"entries",
+		"eventName",
+		"executionMode",
+		"handlerType",
+		"id",
+		"scope",
+		"sourcePath",
+		"startedAt",
+		"status",
+	}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*s = HookRunSummary(decoded)
+	return nil
+}
+
 // HookStartedNotification is sent when a hook run starts.
 type HookStartedNotification struct {
 	Run      HookRunSummary `json:"run"`
@@ -92,11 +125,33 @@ type HookStartedNotification struct {
 	TurnID   *string        `json:"turnId,omitempty"`
 }
 
+func (n *HookStartedNotification) UnmarshalJSON(data []byte) error {
+	type wire HookStartedNotification
+	var decoded wire
+	required := []string{"run", "threadId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = HookStartedNotification(decoded)
+	return nil
+}
+
 // HookCompletedNotification is sent when a hook run completes.
 type HookCompletedNotification struct {
 	Run      HookRunSummary `json:"run"`
 	ThreadID string         `json:"threadId"`
 	TurnID   *string        `json:"turnId,omitempty"`
+}
+
+func (n *HookCompletedNotification) UnmarshalJSON(data []byte) error {
+	type wire HookCompletedNotification
+	var decoded wire
+	required := []string{"run", "threadId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = HookCompletedNotification(decoded)
+	return nil
 }
 
 // GuardianApprovalReviewStatus is the lifecycle status of a guardian review.
@@ -126,6 +181,17 @@ type GuardianApprovalReview struct {
 	Status    GuardianApprovalReviewStatus `json:"status"`
 }
 
+func (r *GuardianApprovalReview) UnmarshalJSON(data []byte) error {
+	type wire GuardianApprovalReview
+	var decoded wire
+	required := []string{"status"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*r = GuardianApprovalReview(decoded)
+	return nil
+}
+
 // ItemGuardianApprovalReviewStartedNotification is sent when guardian review begins.
 type ItemGuardianApprovalReviewStartedNotification struct {
 	Action       interface{}            `json:"action,omitempty"`
@@ -135,6 +201,17 @@ type ItemGuardianApprovalReviewStartedNotification struct {
 	TurnID       string                 `json:"turnId"`
 }
 
+func (n *ItemGuardianApprovalReviewStartedNotification) UnmarshalJSON(data []byte) error {
+	type wire ItemGuardianApprovalReviewStartedNotification
+	var decoded wire
+	required := []string{"review", "targetItemId", "threadId", "turnId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = ItemGuardianApprovalReviewStartedNotification(decoded)
+	return nil
+}
+
 // ItemGuardianApprovalReviewCompletedNotification is sent when guardian review finishes.
 type ItemGuardianApprovalReviewCompletedNotification struct {
 	Action       interface{}            `json:"action,omitempty"`
@@ -142,6 +219,17 @@ type ItemGuardianApprovalReviewCompletedNotification struct {
 	TargetItemID string                 `json:"targetItemId"`
 	ThreadID     string                 `json:"threadId"`
 	TurnID       string                 `json:"turnId"`
+}
+
+func (n *ItemGuardianApprovalReviewCompletedNotification) UnmarshalJSON(data []byte) error {
+	type wire ItemGuardianApprovalReviewCompletedNotification
+	var decoded wire
+	required := []string{"review", "targetItemId", "threadId", "turnId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = ItemGuardianApprovalReviewCompletedNotification(decoded)
+	return nil
 }
 
 // OnHookStarted registers a listener for hook/started notifications.
