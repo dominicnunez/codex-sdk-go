@@ -605,5 +605,5 @@ func (p *Process) Wait() error {
 		return nil
 	}
 	p.doWait()
-	return p.waitErr
+	return p.processExitError()
 }

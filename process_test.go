@@ -557,9 +557,38 @@ while true; do sleep 1; done
 	}
 
 	select {
-	case <-waitErrCh:
+	case err := <-waitErrCh:
+		if err != nil {
+			t.Fatalf("Wait() after Close returned %v, want nil", err)
+		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("timeout waiting for process exit after Close")
+	}
+}
+
+func TestProcessWaitReturnsNilAfterSuccessfulClose(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("process test requires unix signal semantics")
+	}
+
+	dir := t.TempDir()
+	fakeBinary := writeProcessScriptBinary(t, dir, `#!/bin/sh
+trap 'exit 0' INT
+while true; do sleep 1; done
+`)
+
+	proc, err := codex.StartProcess(context.Background(), &codex.ProcessOptions{
+		BinaryPath: fakeBinary,
+	})
+	if err != nil {
+		t.Fatalf("StartProcess: %v", err)
+	}
+
+	if err := proc.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if err := proc.Wait(); err != nil {
+		t.Fatalf("Wait() after Close = %v, want nil", err)
 	}
 }
 
