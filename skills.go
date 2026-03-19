@@ -135,6 +135,33 @@ type SkillsListParams struct {
 	PerCwdExtraUserRoots []SkillsListExtraRootsForCwd `json:"perCwdExtraUserRoots,omitempty"`
 }
 
+func (p SkillsListParams) prepareRequest() (interface{}, error) {
+	var err error
+	p.Cwds, err = normalizeAbsolutePathSliceField("cwds", p.Cwds)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range p.PerCwdExtraUserRoots {
+		p.PerCwdExtraUserRoots[i].Cwd, err = normalizeAbsolutePathField(
+			fmt.Sprintf("perCwdExtraUserRoots[%d].cwd", i),
+			p.PerCwdExtraUserRoots[i].Cwd,
+		)
+		if err != nil {
+			return nil, err
+		}
+		p.PerCwdExtraUserRoots[i].ExtraUserRoots, err = normalizeAbsolutePathSliceField(
+			fmt.Sprintf("perCwdExtraUserRoots[%d].extraUserRoots", i),
+			p.PerCwdExtraUserRoots[i].ExtraUserRoots,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return p, nil
+}
+
 // SkillsListEntry represents skills and errors for a single cwd
 type SkillsListEntry struct {
 	Cwd    string           `json:"cwd"`
@@ -177,6 +204,15 @@ func (r *SkillsListResponse) UnmarshalJSON(data []byte) error {
 type SkillsConfigWriteParams struct {
 	Path    string `json:"path"`
 	Enabled bool   `json:"enabled"`
+}
+
+func (p SkillsConfigWriteParams) prepareRequest() (interface{}, error) {
+	var err error
+	p.Path, err = normalizeAbsolutePathField("path", p.Path)
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
 }
 
 // SkillsConfigWriteResponse contains the effective enabled state after write

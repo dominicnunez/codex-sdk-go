@@ -15,17 +15,33 @@ type inboundObjectField struct {
 	index []int
 }
 
+type objectValidationErrors struct {
+	notObject func(error) error
+	missing   func(string) error
+	null      func(string) error
+}
+
 var inboundObjectFieldCache sync.Map
 
 func validateInboundObjectFields(data []byte, requiredFields []string, nonNullFields []string) error {
-	return decodeInboundObject(data, nil, requiredFields, nonNullFields)
+	return decodeObjectWithValidation(data, nil, requiredFields, nonNullFields, inboundObjectValidationErrors())
 }
 
 func unmarshalInboundObject(data []byte, dest interface{}, requiredFields []string, nonNullFields []string) error {
-	return decodeInboundObject(data, dest, requiredFields, nonNullFields)
+	return decodeObjectWithValidation(data, dest, requiredFields, nonNullFields, inboundObjectValidationErrors())
 }
 
-func decodeInboundObject(data []byte, dest interface{}, requiredFields []string, nonNullFields []string) error {
+func unmarshalResponseObject(data []byte, dest interface{}, requiredFields []string, nonNullFields []string) error {
+	return decodeObjectWithValidation(data, dest, requiredFields, nonNullFields, responseObjectValidationErrors())
+}
+
+func decodeObjectWithValidation(
+	data []byte,
+	dest interface{},
+	requiredFields []string,
+	nonNullFields []string,
+	validation objectValidationErrors,
+) error {
 	required, nonNull := inboundObjectValidation(requiredFields, nonNullFields)
 
 	destValue, fields, handled, err := resolveInboundObjectDestination(data, dest)
@@ -38,26 +54,54 @@ func decodeInboundObject(data []byte, dest interface{}, requiredFields []string,
 
 	decoder := newInboundObjectDecoder(data)
 	if err := expectInboundObjectStart(decoder); err != nil {
-		return err
+		return validation.notObject(err)
 	}
 
 	for decoder.More() {
-		if err := decodeInboundObjectField(decoder, required, nonNull, destValue, fields); err != nil {
+		if err := decodeInboundObjectField(decoder, required, nonNull, destValue, fields, validation); err != nil {
 			return err
 		}
 	}
 
 	if err := expectInboundObjectEnd(decoder); err != nil {
-		return err
+		return validation.notObject(err)
 	}
-	if err := validateRequiredInboundObjectFields(required); err != nil {
+	if err := validateRequiredInboundObjectFields(required, validation); err != nil {
 		return err
 	}
 	if err := expectNoTrailingInboundObjectData(decoder); err != nil {
-		return err
+		return validation.notObject(err)
 	}
 
 	return nil
+}
+
+func inboundObjectValidationErrors() objectValidationErrors {
+	return objectValidationErrors{
+		notObject: func(err error) error {
+			return err
+		},
+		missing: func(field string) error {
+			return fmt.Errorf("missing required field %q", field)
+		},
+		null: func(field string) error {
+			return fmt.Errorf("required field %q must not be null", field)
+		},
+	}
+}
+
+func responseObjectValidationErrors() objectValidationErrors {
+	return objectValidationErrors{
+		notObject: func(err error) error {
+			return fmt.Errorf("%w: %w", ErrResultNotObject, err)
+		},
+		missing: func(field string) error {
+			return fmt.Errorf("%w %q", ErrMissingResultField, field)
+		},
+		null: func(field string) error {
+			return fmt.Errorf("%w %q", ErrNullResultField, field)
+		},
+	}
 }
 
 func inboundObjectFields(typ reflect.Type) map[string]inboundObjectField {
@@ -165,26 +209,27 @@ func decodeInboundObjectField(
 	nonNull map[string]struct{},
 	destValue reflect.Value,
 	fields map[string]inboundObjectField,
+	validation objectValidationErrors,
 ) error {
 	keyToken, err := decoder.Token()
 	if err != nil {
-		return err
+		return validation.notObject(err)
 	}
 	key, ok := keyToken.(string)
 	if !ok {
-		return fmt.Errorf("expected object field name")
+		return validation.notObject(fmt.Errorf("expected object field name"))
 	}
 
 	var raw json.RawMessage
 	if err := decoder.Decode(&raw); err != nil {
-		return err
+		return validation.notObject(err)
 	}
 
 	if _, ok := required[key]; ok {
 		required[key] = true
 	}
 	if _, mustBeNonNull := nonNull[key]; mustBeNonNull && isNullJSONValue(raw) {
-		return fmt.Errorf("required field %q must not be null", key)
+		return validation.null(key)
 	}
 	if !destValue.IsValid() {
 		return nil
@@ -209,10 +254,10 @@ func expectInboundObjectEnd(decoder *json.Decoder) error {
 	return nil
 }
 
-func validateRequiredInboundObjectFields(required map[string]bool) error {
+func validateRequiredInboundObjectFields(required map[string]bool, validation objectValidationErrors) error {
 	for field, seen := range required {
 		if !seen {
-			return fmt.Errorf("missing required field %q", field)
+			return validation.missing(field)
 		}
 	}
 	return nil

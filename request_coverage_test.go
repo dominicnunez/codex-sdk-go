@@ -193,7 +193,10 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 		_, _ = client.Skills.List(context.Background(), codex.SkillsListParams{})
 	})
 	verified["skills/config/write"] = verifyMethod(t, transport, "skills/config/write", func() {
-		_, _ = client.Skills.ConfigWrite(context.Background(), codex.SkillsConfigWriteParams{})
+		_, _ = client.Skills.ConfigWrite(context.Background(), codex.SkillsConfigWriteParams{
+			Path:    "/tmp/skill",
+			Enabled: true,
+		})
 	})
 
 	// Verify Thread service
@@ -371,8 +374,8 @@ func TestRepresentativeRequestMethodOutcomes(t *testing.T) {
 	if err == nil {
 		t.Fatal("Account.Get() expected decode error from invalid response payload")
 	}
-	if !strings.Contains(err.Error(), "cannot unmarshal") {
-		t.Fatalf("Account.Get() error = %q, want decode failure context", err)
+	if !strings.Contains(err.Error(), "server returned non-object result") {
+		t.Fatalf("Account.Get() error = %q, want non-object result context", err)
 	}
 }
 

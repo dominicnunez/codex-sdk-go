@@ -12,6 +12,15 @@ type ConfigReadParams struct {
 	IncludeLayers *bool   `json:"includeLayers,omitempty"`
 }
 
+func (p ConfigReadParams) prepareRequest() (interface{}, error) {
+	var err error
+	p.Cwd, err = normalizeOptionalAbsolutePathField("cwd", p.Cwd)
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
 // ConfigReadResponse represents response from config/read request
 type ConfigReadResponse struct {
 	Config  *Config                        `json:"config"`
@@ -20,15 +29,10 @@ type ConfigReadResponse struct {
 }
 
 func (r *ConfigReadResponse) UnmarshalJSON(data []byte) error {
-	if err := validateRequiredObjectFields(data, "config"); err != nil {
-		return err
-	}
-	if err := validateRequiredObjectFields(data, "origins"); err != nil {
-		return err
-	}
 	type wire ConfigReadResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	required := []string{"config", "origins"}
+	if err := unmarshalResponseObject(data, &decoded, required, required); err != nil {
 		return err
 	}
 	*r = ConfigReadResponse(decoded)
@@ -451,6 +455,15 @@ type ConfigValueWriteParams struct {
 	ExpectedVersion *string         `json:"expectedVersion,omitempty"`
 }
 
+func (p ConfigValueWriteParams) prepareRequest() (interface{}, error) {
+	var err error
+	p.FilePath, err = normalizeOptionalAbsolutePathField("filePath", p.FilePath)
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
 // ConfigBatchWriteParams represents parameters for config/batchWrite request.
 type ConfigBatchWriteParams struct {
 	Edits            []ConfigEdit `json:"edits"`
@@ -469,6 +482,11 @@ type ConfigEdit struct {
 func (p ConfigBatchWriteParams) prepareRequest() (interface{}, error) {
 	if p.Edits == nil {
 		return nil, invalidParamsError("edits must not be null")
+	}
+	var err error
+	p.FilePath, err = normalizeOptionalAbsolutePathField("filePath", p.FilePath)
+	if err != nil {
+		return nil, err
 	}
 	return p, nil
 }

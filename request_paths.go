@@ -54,12 +54,45 @@ func validateRequiredJSONObjectField(field string, value interface{}) error {
 	return nil
 }
 
+func validateOptionalRawJSONObjectField(field string, value json.RawMessage) error {
+	if value == nil {
+		return nil
+	}
+
+	trimmed := bytes.TrimSpace(value)
+	if len(trimmed) == 0 {
+		return invalidParamsError("%s must be a JSON object or null", field)
+	}
+	if bytes.Equal(trimmed, []byte("null")) {
+		return nil
+	}
+	if !json.Valid(trimmed) {
+		return invalidParamsError("%s must be valid JSON", field)
+	}
+	if trimmed[0] != '{' {
+		return invalidParamsError("%s must be a JSON object or null", field)
+	}
+	return nil
+}
+
 func normalizeAbsolutePathField(field, value string) (string, error) {
 	normalized, err := normalizeAbsolutePath(value)
 	if err != nil {
 		return "", fmt.Errorf("%w: %s: %w", errInvalidParams, field, err)
 	}
 	return normalized, nil
+}
+
+func normalizeOptionalAbsolutePathField(field string, value *string) (*string, error) {
+	if value == nil {
+		return value, nil
+	}
+
+	normalized, err := normalizeAbsolutePathField(field, *value)
+	if err != nil {
+		return nil, err
+	}
+	return &normalized, nil
 }
 
 func normalizeAbsolutePathSliceField(field string, values []string) ([]string, error) {
@@ -520,6 +553,10 @@ func (p CommandExecParams) prepareRequest() (interface{}, error) {
 	}
 
 	var err error
+	p.Cwd, err = normalizeOptionalAbsolutePathField("cwd", p.Cwd)
+	if err != nil {
+		return nil, err
+	}
 	p.SandboxPolicy, err = normalizeSandboxPolicyWrapperField("sandboxPolicy", p.SandboxPolicy)
 	if err != nil {
 		return nil, err
@@ -591,6 +628,27 @@ func (p TurnSteerParams) prepareRequest() (interface{}, error) {
 	return p, nil
 }
 
+func (p ThreadStartParams) prepareRequest() (interface{}, error) {
+	if err := validateOptionalRawJSONObjectField("config", p.Config); err != nil {
+		return nil, err
+	}
+	var err error
+	p.Cwd, err = normalizeOptionalAbsolutePathField("cwd", p.Cwd)
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (p ThreadListParams) prepareRequest() (interface{}, error) {
+	var err error
+	p.Cwd, err = normalizeOptionalAbsolutePathField("cwd", p.Cwd)
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
 func (p ThreadReadParams) prepareRequest() (interface{}, error) {
 	if err := validateThreadScopedRequest(p.ThreadID); err != nil {
 		return nil, err
@@ -602,11 +660,27 @@ func (p ThreadResumeParams) prepareRequest() (interface{}, error) {
 	if err := validateThreadScopedRequest(p.ThreadID); err != nil {
 		return nil, err
 	}
+	if err := validateOptionalRawJSONObjectField("config", p.Config); err != nil {
+		return nil, err
+	}
+	var err error
+	p.Cwd, err = normalizeOptionalAbsolutePathField("cwd", p.Cwd)
+	if err != nil {
+		return nil, err
+	}
 	return p, nil
 }
 
 func (p ThreadForkParams) prepareRequest() (interface{}, error) {
 	if err := validateThreadScopedRequest(p.ThreadID); err != nil {
+		return nil, err
+	}
+	if err := validateOptionalRawJSONObjectField("config", p.Config); err != nil {
+		return nil, err
+	}
+	var err error
+	p.Cwd, err = normalizeOptionalAbsolutePathField("cwd", p.Cwd)
+	if err != nil {
 		return nil, err
 	}
 	return p, nil
@@ -662,12 +736,10 @@ func (p ThreadCompactStartParams) prepareRequest() (interface{}, error) {
 }
 
 func (p WindowsSandboxSetupStartParams) prepareRequest() (interface{}, error) {
-	if p.Cwd != nil {
-		normalized, err := normalizeAbsolutePathField("cwd", *p.Cwd)
-		if err != nil {
-			return nil, err
-		}
-		p.Cwd = &normalized
+	var err error
+	p.Cwd, err = normalizeOptionalAbsolutePathField("cwd", p.Cwd)
+	if err != nil {
+		return nil, err
 	}
 	return p, nil
 }

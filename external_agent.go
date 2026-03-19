@@ -54,6 +54,19 @@ type ExternalAgentConfigDetectParams struct {
 	IncludeHome *bool     `json:"includeHome,omitempty"`
 }
 
+func (p ExternalAgentConfigDetectParams) prepareRequest() (interface{}, error) {
+	if p.Cwds == nil {
+		return p, nil
+	}
+
+	normalized, err := normalizeAbsolutePathSliceField("cwds", *p.Cwds)
+	if err != nil {
+		return nil, err
+	}
+	p.Cwds = &normalized
+	return p, nil
+}
+
 // ExternalAgentConfigDetectResponse contains the result of config detection.
 type ExternalAgentConfigDetectResponse struct {
 	Items []ExternalAgentConfigMigrationItem `json:"items"`
