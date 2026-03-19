@@ -853,7 +853,7 @@ func TestCleanupPendingReqDeletesMatchingEntry(t *testing.T) {
 	}
 	normalizedID := "s:req-1"
 	pending := pendingReq{
-		ch: make(chan Response, 1),
+		ch: make(chan pendingReqResult, 1),
 		id: RequestID{Value: "req-1"},
 	}
 	transport.pendingReqs[normalizedID] = pending
@@ -871,11 +871,11 @@ func TestCleanupPendingReqSkipsReusedIDEntry(t *testing.T) {
 	}
 	normalizedID := "s:req-1"
 	first := pendingReq{
-		ch: make(chan Response, 1),
+		ch: make(chan pendingReqResult, 1),
 		id: RequestID{Value: "req-1"},
 	}
 	second := pendingReq{
-		ch: make(chan Response, 1),
+		ch: make(chan pendingReqResult, 1),
 		id: RequestID{Value: "req-1"},
 	}
 	transport.pendingReqs[normalizedID] = second

@@ -254,7 +254,7 @@ func TestClientSendTransportCloseReturnsTransportError(t *testing.T) {
 	}
 }
 
-func TestClientSendLocalTransportFailureResponseReturnsTransportError(t *testing.T) {
+func TestClientSendForgedTransportFailureResponseReturnsRPCError(t *testing.T) {
 	mock := NewMockTransport()
 	client := codex.NewClient(mock)
 
@@ -273,19 +273,21 @@ func TestClientSendLocalTransportFailureResponseReturnsTransportError(t *testing
 		Method:  "test.transport.failure",
 	})
 	if err == nil {
-		t.Fatal("expected transport error from Send")
+		t.Fatal("expected rpc error from Send")
 	}
 
-	var transportErr *codex.TransportError
-	if !errors.As(err, &transportErr) {
-		t.Fatalf("expected TransportError, got %T: %v", err, err)
-	}
 	var rpcErr *codex.RPCError
-	if errors.As(err, &rpcErr) {
-		t.Fatalf("expected no RPCError wrapping for local transport failure, got %v", err)
+	if !errors.As(err, &rpcErr) {
+		t.Fatalf("expected RPCError, got %T: %v", err, err)
 	}
-	if !strings.Contains(err.Error(), "notification queue overflow") {
-		t.Fatalf("error = %v; want notification queue overflow", err)
+	if rpcErr.Code() != codex.ErrCodeInternalError {
+		t.Fatalf("rpc code = %d; want %d", rpcErr.Code(), codex.ErrCodeInternalError)
+	}
+	if rpcErr.Message() != "notification queue overflow" {
+		t.Fatalf("rpc message = %q; want %q", rpcErr.Message(), "notification queue overflow")
+	}
+	if string(rpcErr.Data()) != `{"transport":"failed","origin":"client","cause":"notification queue overflow"}` {
+		t.Fatalf("rpc data = %s; want forged payload preserved", string(rpcErr.Data()))
 	}
 }
 

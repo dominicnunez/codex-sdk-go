@@ -335,53 +335,10 @@ func (c *Client) Send(ctx context.Context, req Request) (Response, error) {
 
 	// Check if the response contains an error
 	if resp.Error != nil {
-		if cause, ok := localTransportFailureCause(resp.Error); ok {
-			return Response{}, NewTransportError("failed to send request", cause)
-		}
 		return Response{}, NewRPCError(resp.Error)
 	}
 
 	return resp, nil
-}
-
-func localTransportFailureCause(errResp *Error) (error, bool) {
-	if errResp == nil {
-		return nil, false
-	}
-	if errResp.Code != ErrCodeInternalError {
-		return nil, false
-	}
-
-	metadata, ok := parseTransportFailureMetadata(errResp.Data)
-	if !ok {
-		return nil, false
-	}
-	if metadata.Origin != transportFailureOrigin {
-		return nil, false
-	}
-
-	switch metadata.Transport {
-	case transportStateClosed:
-		return errTransportClosed, true
-	case transportStateFailed:
-		if metadata.Cause != "" {
-			return errors.New(metadata.Cause), true
-		}
-		if errResp.Message != "" {
-			return errors.New(errResp.Message), true
-		}
-		return errors.New("transport failed"), true
-	default:
-		return nil, false
-	}
-}
-
-func parseTransportFailureMetadata(data json.RawMessage) (transportFailureMetadata, bool) {
-	var metadata transportFailureMetadata
-	if json.Unmarshal(data, &metadata) != nil {
-		return transportFailureMetadata{}, false
-	}
-	return metadata, true
 }
 
 // OnNotification registers a listener for incoming notifications with the given method.

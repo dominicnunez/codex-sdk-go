@@ -15,8 +15,13 @@ import (
 
 // pendingReq holds a pending request's response channel and original ID.
 type pendingReq struct {
-	ch chan Response
+	ch chan pendingReqResult
 	id RequestID
+}
+
+type pendingReqResult struct {
+	resp Response
+	err  error
 }
 
 // inbound/outbound queue sizing. These are intentionally conservative defaults:
@@ -49,9 +54,6 @@ const (
 	errInvalidResponseJSONRPC = `invalid response: jsonrpc must be "2.0"`
 	requestIDKeyPrefixNumber  = "n:"
 	requestIDKeyPrefixString  = "s:"
-	transportStateClosed      = "closed"
-	transportStateFailed      = "failed"
-	transportFailureOrigin    = "client"
 )
 
 type writeEnvelope struct {
@@ -64,13 +66,6 @@ type turnScopedNotificationQueue struct {
 	threadKey string
 	queue     []Notification
 	scheduled bool
-}
-
-type transportFailureMetadata struct {
-	Transport string          `json:"transport"`
-	Origin    string          `json:"origin"`
-	Cause     string          `json:"cause,omitempty"`
-	Detail    json.RawMessage `json:"detail,omitempty"`
 }
 
 type inboundFrame struct {
@@ -336,7 +331,7 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 		t.mu.Unlock()
 		return Response{}, NewTransportError("send failed", fmt.Errorf("duplicate request ID: %v", req.ID.Value))
 	}
-	respChan := make(chan Response, 1)
+	respChan := make(chan pendingReqResult, 1)
 	pending := pendingReq{ch: respChan, id: req.ID}
 	t.pendingReqs[normalizedID] = pending
 	t.mu.Unlock()
@@ -352,16 +347,22 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 
 	// Wait for response or context cancellation
 	select {
-	case resp := <-respChan:
-		return resp, nil
+	case result := <-respChan:
+		if result.err != nil {
+			return Response{}, result.err
+		}
+		return result.resp, nil
 	case <-ctx.Done():
 		return Response{}, ctx.Err()
 	case <-t.readerStopped:
 		// Prefer a response already delivered to this request over the generic
 		// reader-stopped error; both can become ready at nearly the same time.
 		select {
-		case resp := <-respChan:
-			return resp, nil
+		case result := <-respChan:
+			if result.err != nil {
+				return Response{}, result.err
+			}
+			return result.resp, nil
 		default:
 		}
 		return Response{}, t.transportStopError("send failed")
@@ -505,14 +506,11 @@ func (t *StdioTransport) closeWithFailure(scanErr error, cause error, detail jso
 		_ = readerCloser.Close()
 	}
 
+	_ = detail
+	pendingErr := pendingRequestTransportError("send failed", cause)
 	for _, pendingReq := range pending {
-		resp := Response{
-			JSONRPC: jsonrpcVersion,
-			ID:      pendingReq.id,
-			Error:   localTransportFailureError(cause, detail),
-		}
 		select {
-		case pendingReq.ch <- resp:
+		case pendingReq.ch <- pendingReqResult{err: pendingErr}:
 		default:
 		}
 	}
@@ -903,12 +901,14 @@ func (t *StdioTransport) failPendingWithInvalidProtocolVersion(idField inboundID
 	t.mu.Unlock()
 
 	if ok {
-		pending.ch <- Response{
-			JSONRPC: jsonrpcVersion,
-			ID:      pending.id,
-			Error: &Error{
-				Code:    ErrCodeInvalidRequest,
-				Message: errInvalidResponseJSONRPC,
+		pending.ch <- pendingReqResult{
+			resp: Response{
+				JSONRPC: jsonrpcVersion,
+				ID:      pending.id,
+				Error: &Error{
+					Code:    ErrCodeInvalidRequest,
+					Message: errInvalidResponseJSONRPC,
+				},
 			},
 		}
 	}
@@ -1237,38 +1237,19 @@ func isProtectedNotificationMethod(method string) bool {
 	}
 }
 
-func localTransportFailureError(cause error, detail json.RawMessage) *Error {
-	message := errTransportClosed.Error()
-	transportState := transportStateClosed
-	if cause != nil && !errors.Is(cause, errTransportClosed) {
-		message = cause.Error()
-		transportState = transportStateFailed
+func pendingRequestTransportError(op string, cause error) error {
+	if cause == nil {
+		return NewTransportError(op, errTransportClosed)
 	}
-	return &Error{
-		Code:    ErrCodeInternalError,
-		Message: message,
-		Data:    marshalTransportFailureMetadata(transportState, cause, detail),
-	}
-}
 
-func marshalTransportFailureMetadata(
-	transportState string,
-	cause error,
-	detail json.RawMessage,
-) json.RawMessage {
-	metadata := transportFailureMetadata{
-		Transport: transportState,
-		Origin:    transportFailureOrigin,
-		Detail:    detail,
+	var transportErr *TransportError
+	if errors.As(cause, &transportErr) {
+		if unwrapped := transportErr.Unwrap(); unwrapped != nil {
+			return NewTransportError(op, unwrapped)
+		}
 	}
-	if cause != nil {
-		metadata.Cause = cause.Error()
-	}
-	data, err := json.Marshal(metadata)
-	if err != nil {
-		return nil
-	}
-	return data
+
+	return NewTransportError(op, cause)
 }
 
 func isTurnScopedNotification(notif Notification) bool {
@@ -1352,7 +1333,7 @@ func (t *StdioTransport) handleResponse(resp Response) {
 	t.mu.Unlock()
 
 	if ok {
-		pending.ch <- resp // safe: buffer 1, only one sender claims via delete
+		pending.ch <- pendingReqResult{resp: resp} // safe: buffer 1, only one sender claims via delete
 	}
 }
 
@@ -1394,12 +1375,14 @@ func (t *StdioTransport) handleMalformedFrame(data []byte) {
 	t.mu.Unlock()
 
 	if ok {
-		pending.ch <- Response{
-			JSONRPC: jsonrpcVersion,
-			ID:      pending.id,
-			Error: &Error{
-				Code:    ErrCodeParseError,
-				Message: "failed to parse server response",
+		pending.ch <- pendingReqResult{
+			resp: Response{
+				JSONRPC: jsonrpcVersion,
+				ID:      pending.id,
+				Error: &Error{
+					Code:    ErrCodeParseError,
+					Message: "failed to parse server response",
+				},
 			},
 		}
 	}
@@ -1438,12 +1421,14 @@ func (t *StdioTransport) handleMalformedResponse(data []byte) {
 	t.mu.Unlock()
 
 	if ok {
-		pending.ch <- Response{
-			JSONRPC: jsonrpcVersion,
-			ID:      pending.id,
-			Error: &Error{
-				Code:    ErrCodeParseError,
-				Message: "failed to parse server response",
+		pending.ch <- pendingReqResult{
+			resp: Response{
+				JSONRPC: jsonrpcVersion,
+				ID:      pending.id,
+				Error: &Error{
+					Code:    ErrCodeParseError,
+					Message: "failed to parse server response",
+				},
 			},
 		}
 	}
@@ -1471,12 +1456,14 @@ func (t *StdioTransport) handleOversizedFrame(info oversizedFrameInfo) {
 	t.mu.Unlock()
 
 	if ok {
-		pending.ch <- Response{
-			JSONRPC: jsonrpcVersion,
-			ID:      pending.id,
-			Error: &Error{
-				Code:    ErrCodeParseError,
-				Message: "oversized server response frame",
+		pending.ch <- pendingReqResult{
+			resp: Response{
+				JSONRPC: jsonrpcVersion,
+				ID:      pending.id,
+				Error: &Error{
+					Code:    ErrCodeParseError,
+					Message: "oversized server response frame",
+				},
 			},
 		}
 	}
