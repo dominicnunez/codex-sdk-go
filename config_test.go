@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go"
@@ -395,5 +396,60 @@ func TestConfigWarningNotification(t *testing.T) {
 	}
 	if receivedNotif.Path == nil || *receivedNotif.Path != "/home/user/.claude/config.toml" {
 		t.Errorf("expected Path to config file, got %v", receivedNotif.Path)
+	}
+}
+
+func TestConfigWarningNotificationRejectsMissingRequiredFields(t *testing.T) {
+	t.Run("missing summary", func(t *testing.T) {
+		var notif codex.ConfigWarningNotification
+		err := json.Unmarshal([]byte(`{"details":"oops"}`), &notif)
+		if err == nil || !strings.Contains(err.Error(), "missing required field") {
+			t.Fatalf("json.Unmarshal error = %v; want missing required field failure", err)
+		}
+	})
+
+	t.Run("range requires end position", func(t *testing.T) {
+		var notif codex.ConfigWarningNotification
+		err := json.Unmarshal([]byte(`{
+			"summary":"bad config",
+			"range":{"start":{"line":1,"column":2}}
+		}`), &notif)
+		if err == nil || !strings.Contains(err.Error(), "missing required field") {
+			t.Fatalf("json.Unmarshal error = %v; want missing required field failure", err)
+		}
+	})
+}
+
+func TestConfigWarningMissingSummaryReportsHandlerError(t *testing.T) {
+	mock := NewMockTransport()
+
+	var (
+		gotMethod string
+		gotErr    error
+	)
+	client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+		gotMethod = method
+		gotErr = err
+	}))
+
+	var called bool
+	client.OnConfigWarning(func(codex.ConfigWarningNotification) {
+		called = true
+	})
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "configWarning",
+		Params:  json.RawMessage(`{"details":"oops"}`),
+	})
+
+	if called {
+		t.Fatal("handler should not be called for malformed payload")
+	}
+	if gotMethod != "configWarning" {
+		t.Fatalf("handler error method = %q; want %q", gotMethod, "configWarning")
+	}
+	if gotErr == nil || !strings.Contains(gotErr.Error(), "missing required field") {
+		t.Fatalf("handler error = %v; want missing required field failure", gotErr)
 	}
 }

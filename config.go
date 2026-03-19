@@ -495,16 +495,49 @@ type ConfigWarningNotification struct {
 	Range   *TextRange `json:"range,omitempty"`
 }
 
+func (n *ConfigWarningNotification) UnmarshalJSON(data []byte) error {
+	type wire ConfigWarningNotification
+	var decoded wire
+	required := []string{"summary"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = ConfigWarningNotification(decoded)
+	return nil
+}
+
 // TextRange represents a range in a text file
 type TextRange struct {
 	Start TextPosition `json:"start"`
 	End   TextPosition `json:"end"`
 }
 
+func (r *TextRange) UnmarshalJSON(data []byte) error {
+	type wire TextRange
+	var decoded wire
+	required := []string{"end", "start"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*r = TextRange(decoded)
+	return nil
+}
+
 // TextPosition represents a position in a text file
 type TextPosition struct {
 	Line   uint `json:"line"`   // 1-based
 	Column uint `json:"column"` // 1-based
+}
+
+func (p *TextPosition) UnmarshalJSON(data []byte) error {
+	type wire TextPosition
+	var decoded wire
+	required := []string{"column", "line"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*p = TextPosition(decoded)
+	return nil
 }
 
 // ConfigService provides config-related operations
