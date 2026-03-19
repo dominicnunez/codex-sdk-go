@@ -405,6 +405,64 @@ func TestClientInitializeTreatsOptOutNotificationMethodsAsASet(t *testing.T) {
 	}
 }
 
+func TestClientInitializeCanonicalizesOptOutNotificationMethods(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+
+	_ = mock.SetResponseData("initialize", codex.InitializeResponse{
+		PlatformFamily: "unix",
+		PlatformOS:     "linux",
+		UserAgent:      "codex-server/1.0.0",
+	})
+
+	first := codex.InitializeParams{
+		ClientInfo: codex.ClientInfo{Name: "test-client", Version: "1.0.0"},
+		Capabilities: &codex.InitializeCapabilities{
+			OptOutNotificationMethods: []string{
+				"thread/started",
+				"thread/closed",
+				"thread/started",
+			},
+		},
+	}
+	second := codex.InitializeParams{
+		ClientInfo: codex.ClientInfo{Name: "test-client", Version: "1.0.0"},
+		Capabilities: &codex.InitializeCapabilities{
+			OptOutNotificationMethods: []string{
+				"thread/closed",
+				"thread/started",
+			},
+		},
+	}
+
+	if _, err := client.Initialize(context.Background(), first); err != nil {
+		t.Fatalf("first Initialize failed: %v", err)
+	}
+	if _, err := client.Initialize(context.Background(), second); err != nil {
+		t.Fatalf("second Initialize failed: %v", err)
+	}
+
+	if got := mock.MethodCallCount("initialize"); got != 1 {
+		t.Fatalf("initialize call count = %d, want 1", got)
+	}
+
+	sentReq := mock.GetSentRequest(0)
+	if sentReq == nil {
+		t.Fatal("no initialize request was sent")
+	}
+
+	var sentParams codex.InitializeParams
+	if err := json.Unmarshal(sentReq.Params, &sentParams); err != nil {
+		t.Fatalf("failed to unmarshal sent params: %v", err)
+	}
+
+	got := sentParams.Capabilities.OptOutNotificationMethods
+	want := []string{"thread/closed", "thread/started"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("optOutNotificationMethods = %v, want %v", got, want)
+	}
+}
+
 // TestClientInitializeError verifies error handling in Initialize.
 func TestClientInitializeError(t *testing.T) {
 	mock := NewMockTransport()

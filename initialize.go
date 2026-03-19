@@ -181,7 +181,7 @@ func (c *Client) Initialize(ctx context.Context, params InitializeParams) (Initi
 		c.initializeMu.Unlock()
 
 		var result InitializeResponse
-		err := c.sendRequest(ctx, methodInitialize, params, &result)
+		err := c.sendRequest(ctx, methodInitialize, requested, &result)
 
 		c.initializeMu.Lock()
 		if err == nil {
