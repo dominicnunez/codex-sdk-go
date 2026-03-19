@@ -148,6 +148,158 @@ func TestCommandExecRejectsMissingRequiredFields(t *testing.T) {
 	}
 }
 
+func TestCommandExecRejectsInvalidOutboundParams(t *testing.T) {
+	size := &codex.CommandExecTerminalSize{Cols: 80, Rows: 24}
+
+	tests := []struct {
+		name   string
+		params codex.CommandExecParams
+		want   string
+	}{
+		{
+			name:   "empty command",
+			params: codex.CommandExecParams{},
+			want:   "command array must not be empty",
+		},
+		{
+			name: "disable output cap conflict",
+			params: codex.CommandExecParams{
+				Command:          []string{"echo", "hello"},
+				DisableOutputCap: ptr(true),
+				OutputBytesCap:   ptr(uint64(128)),
+			},
+			want: "disableOutputCap",
+		},
+		{
+			name: "disable timeout conflict",
+			params: codex.CommandExecParams{
+				Command:        []string{"echo", "hello"},
+				DisableTimeout: ptr(true),
+				TimeoutMs:      ptr(int64(1000)),
+			},
+			want: "disableTimeout",
+		},
+		{
+			name: "size without tty",
+			params: codex.CommandExecParams{
+				Command: []string{"echo", "hello"},
+				Size:    size,
+			},
+			want: "size requires tty",
+		},
+		{
+			name: "tty without process id",
+			params: codex.CommandExecParams{
+				Command: []string{"echo", "hello"},
+				TTY:     ptr(true),
+			},
+			want: "processId is required",
+		},
+		{
+			name: "stream stdin without process id",
+			params: codex.CommandExecParams{
+				Command:     []string{"echo", "hello"},
+				StreamStdin: ptr(true),
+			},
+			want: "processId is required",
+		},
+		{
+			name: "stream stdout stderr without process id",
+			params: codex.CommandExecParams{
+				Command:            []string{"echo", "hello"},
+				StreamStdoutStderr: ptr(true),
+			},
+			want: "processId is required",
+		},
+		{
+			name: "empty process id",
+			params: codex.CommandExecParams{
+				Command:   []string{"echo", "hello"},
+				ProcessID: ptr(""),
+			},
+			want: "processId must not be empty",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := NewMockTransport()
+			client := codex.NewClient(transport)
+
+			_, err := client.Command.Exec(context.Background(), tt.params)
+			if err == nil {
+				t.Fatal("expected invalid params error")
+			}
+			if !strings.Contains(err.Error(), "invalid params") {
+				t.Fatalf("error = %v; want invalid params context", err)
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v; want to mention %q", err, tt.want)
+			}
+			if transport.CallCount() != 0 {
+				t.Fatalf("CallCount() = %d; want 0", transport.CallCount())
+			}
+		})
+	}
+}
+
+func TestCommandFollowUpRequestsRejectEmptyProcessID(t *testing.T) {
+	tests := []struct {
+		name string
+		call func(*codex.Client) error
+	}{
+		{
+			name: "write",
+			call: func(client *codex.Client) error {
+				_, err := client.Command.Write(context.Background(), codex.CommandExecWriteParams{
+					ProcessID: "",
+				})
+				return err
+			},
+		},
+		{
+			name: "resize",
+			call: func(client *codex.Client) error {
+				_, err := client.Command.Resize(context.Background(), codex.CommandExecResizeParams{
+					ProcessID: "",
+					Size:      codex.CommandExecTerminalSize{Cols: 80, Rows: 24},
+				})
+				return err
+			},
+		},
+		{
+			name: "terminate",
+			call: func(client *codex.Client) error {
+				_, err := client.Command.Terminate(context.Background(), codex.CommandExecTerminateParams{
+					ProcessID: "",
+				})
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := NewMockTransport()
+			client := codex.NewClient(transport)
+
+			err := tt.call(client)
+			if err == nil {
+				t.Fatal("expected invalid params error")
+			}
+			if !strings.Contains(err.Error(), "invalid params") {
+				t.Fatalf("error = %v; want invalid params context", err)
+			}
+			if !strings.Contains(err.Error(), "processId must not be empty") {
+				t.Fatalf("error = %v; want processId validation", err)
+			}
+			if transport.CallCount() != 0 {
+				t.Fatalf("CallCount() = %d; want 0", transport.CallCount())
+			}
+		})
+	}
+}
+
 func TestCommandExecutionOutputDeltaNotification(t *testing.T) {
 	mock := NewMockTransport()
 	client := codex.NewClient(mock)
@@ -371,7 +523,7 @@ func TestCommandExecOutputDeltaInvalidStreamReportsHandlerError(t *testing.T) {
 	}
 }
 
-func TestCommandExec_RPCError_ReturnsRPCError(t *testing.T) {
+func TestCommandExecRPCErrorReturnsRPCError(t *testing.T) {
 	mock := NewMockTransport()
 	client := codex.NewClient(mock)
 
@@ -379,12 +531,12 @@ func TestCommandExec_RPCError_ReturnsRPCError(t *testing.T) {
 		JSONRPC: "2.0",
 		Error: &codex.Error{
 			Code:    codex.ErrCodeInvalidParams,
-			Message: "command array must not be empty",
+			Message: "server rejected request",
 		},
 	})
 
 	_, err := client.Command.Exec(context.Background(), codex.CommandExecParams{
-		Command: []string{},
+		Command: []string{"echo", "hello"},
 	})
 	if err == nil {
 		t.Fatal("expected error, got nil")

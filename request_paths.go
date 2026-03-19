@@ -473,9 +473,34 @@ func (p PluginInstallParams) prepareRequest() (interface{}, error) {
 }
 
 func (p CommandExecParams) prepareRequest() (interface{}, error) {
+	if err := validateCommandExecParams(p); err != nil {
+		return nil, err
+	}
+
 	var err error
 	p.SandboxPolicy, err = normalizeSandboxPolicyWrapperField("sandboxPolicy", p.SandboxPolicy)
 	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (p CommandExecWriteParams) prepareRequest() (interface{}, error) {
+	if err := validateRequiredNonEmptyStringField("processId", p.ProcessID); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (p CommandExecTerminateParams) prepareRequest() (interface{}, error) {
+	if err := validateRequiredNonEmptyStringField("processId", p.ProcessID); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (p CommandExecResizeParams) prepareRequest() (interface{}, error) {
+	if err := validateRequiredNonEmptyStringField("processId", p.ProcessID); err != nil {
 		return nil, err
 	}
 	return p, nil
@@ -499,4 +524,53 @@ func (p WindowsSandboxSetupStartParams) prepareRequest() (interface{}, error) {
 		p.Cwd = &normalized
 	}
 	return p, nil
+}
+
+func validateCommandExecParams(params CommandExecParams) error {
+	if len(params.Command) == 0 {
+		return invalidParamsError("command array must not be empty")
+	}
+	if err := validateOptionalNonEmptyStringField("processId", params.ProcessID); err != nil {
+		return err
+	}
+	if boolPointerValue(params.DisableOutputCap) && params.OutputBytesCap != nil {
+		return invalidParamsError("disableOutputCap cannot be combined with outputBytesCap")
+	}
+	if boolPointerValue(params.DisableTimeout) && params.TimeoutMs != nil {
+		return invalidParamsError("disableTimeout cannot be combined with timeoutMs")
+	}
+
+	ttyEnabled := boolPointerValue(params.TTY)
+	if params.Size != nil && !ttyEnabled {
+		return invalidParamsError("size requires tty")
+	}
+	if ttyEnabled || boolPointerValue(params.StreamStdin) || boolPointerValue(params.StreamStdoutStderr) {
+		if params.ProcessID == nil {
+			return invalidParamsError("processId is required when tty, streamStdin, or streamStdoutStderr is enabled")
+		}
+	}
+
+	return nil
+}
+
+func validateOptionalNonEmptyStringField(field string, value *string) error {
+	if value == nil {
+		return nil
+	}
+	return validateRequiredNonEmptyStringField(field, *value)
+}
+
+func validateRequiredNonEmptyStringField(field, value string) error {
+	if value == "" {
+		return invalidParamsError("%s must not be empty", field)
+	}
+	return nil
+}
+
+func boolPointerValue(value *bool) bool {
+	return value != nil && *value
+}
+
+func invalidParamsError(format string, args ...interface{}) error {
+	return fmt.Errorf("%w: %s", errInvalidParams, fmt.Sprintf(format, args...))
 }
