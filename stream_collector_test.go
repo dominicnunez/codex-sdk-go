@@ -75,6 +75,99 @@ func TestStreamCollectorProcessLifecycleAndPlan(t *testing.T) {
 	}
 }
 
+func TestStreamCollectorScopesRepeatedItemIDsByThreadAndTurn(t *testing.T) {
+	collector := codex.NewStreamCollector()
+
+	collector.Process(&codex.ItemStarted{
+		ThreadID: "thread-1",
+		TurnID:   "turn-1",
+		Item: codex.ThreadItemWrapper{
+			Value: &codex.CommandExecutionThreadItem{
+				ID:             "cmd-1",
+				Command:        "ls",
+				CommandActions: []codex.CommandActionWrapper{},
+				Cwd:            "/tmp/one",
+				Status:         codex.CommandExecutionStatusInProgress,
+			},
+		},
+	}, nil)
+	collector.Process(&codex.ItemCompleted{
+		ThreadID: "thread-1",
+		TurnID:   "turn-1",
+		Item: codex.ThreadItemWrapper{
+			Value: &codex.CommandExecutionThreadItem{
+				ID:               "cmd-1",
+				Command:          "ls",
+				CommandActions:   []codex.CommandActionWrapper{},
+				Cwd:              "/tmp/one",
+				Status:           codex.CommandExecutionStatusCompleted,
+				AggregatedOutput: ptr("first output"),
+			},
+		},
+	}, nil)
+	collector.Process(&codex.ItemStarted{
+		ThreadID: "thread-2",
+		TurnID:   "turn-2",
+		Item: codex.ThreadItemWrapper{
+			Value: &codex.CommandExecutionThreadItem{
+				ID:             "cmd-1",
+				Command:        "pwd",
+				CommandActions: []codex.CommandActionWrapper{},
+				Cwd:            "/tmp/two",
+				Status:         codex.CommandExecutionStatusInProgress,
+			},
+		},
+	}, nil)
+
+	summary := collector.Summary()
+	if got := len(summary.CommandExecutions); got != 2 {
+		t.Fatalf("command execution count = %d, want 2", got)
+	}
+
+	var (
+		first       codex.CommandExecutionLifecycle
+		second      codex.CommandExecutionLifecycle
+		firstFound  bool
+		secondFound bool
+	)
+	for _, lifecycle := range summary.CommandExecutions {
+		switch {
+		case lifecycle.ThreadID == "thread-1" && lifecycle.TurnID == "turn-1":
+			first = lifecycle
+			firstFound = true
+		case lifecycle.ThreadID == "thread-2" && lifecycle.TurnID == "turn-2":
+			second = lifecycle
+			secondFound = true
+		}
+	}
+
+	if !firstFound {
+		t.Fatal("missing lifecycle for thread-1/turn-1")
+	}
+	if !first.Started || !first.Completed {
+		t.Fatalf("first lifecycle started/completed = %v/%v, want true/true", first.Started, first.Completed)
+	}
+	if first.CompletedItem == nil || first.CompletedItem.Command != "ls" {
+		t.Fatalf("first completed item = %+v, want ls", first.CompletedItem)
+	}
+	if first.AggregatedOutput != "first output" {
+		t.Fatalf("first aggregated output = %q, want first output", first.AggregatedOutput)
+	}
+
+	if !secondFound {
+		t.Fatal("missing lifecycle for thread-2/turn-2")
+	}
+	if !second.Started || second.Completed {
+		t.Fatalf("second lifecycle started/completed = %v/%v, want true/false", second.Started, second.Completed)
+	}
+	if second.StartedItem == nil || second.StartedItem.Command != "pwd" {
+		t.Fatalf("second started item = %+v, want pwd", second.StartedItem)
+	}
+	if second.AggregatedOutput != "" {
+		t.Fatalf("second aggregated output = %q, want empty", second.AggregatedOutput)
+	}
+}
+
 func TestRunStreamedWithCollectorCapturesNotificationConveniences(t *testing.T) {
 	proc, mock := mockProcess(t)
 	collector := codex.NewStreamCollector()
