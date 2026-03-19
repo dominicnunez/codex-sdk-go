@@ -102,6 +102,6 @@ lefthook install
 Hook behavior:
 
 - `pre-commit`: runs `gofmt` on staged Go files, re-stages them, then runs `golangci-lint run --new`
-- `pre-push`: runs `go test ./...`, `golangci-lint run ./...`, and `go mod tidy -diff`
+- `pre-push`: runs `go test ./...`, `go test -race ./...`, `golangci-lint run ./...`, and `go mod tidy -diff`
 
 To bypass hooks intentionally for a one-off operation, use Git's standard `--no-verify` flag.
