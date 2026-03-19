@@ -232,7 +232,6 @@ func waitForTurnCompletion(ctx context.Context, done <-chan TurnCompletedNotific
 }
 
 func completeTurnLifecycle(p turnLifecycleParams, completed Turn, items []ThreadItemWrapper) *RunResult {
-	completedTurn := turnWithItems(completed, items)
 	thread := p.thread
 	if p.client != nil {
 		if snapshot, ok := p.client.threadStateSnapshot(p.threadID); ok {
@@ -240,7 +239,7 @@ func completeTurnLifecycle(p turnLifecycleParams, completed Turn, items []Thread
 		}
 	}
 
-	result := buildRunResult(thread, completedTurn, items)
+	result := buildRunResult(thread, completed, items)
 	if p.client != nil {
 		p.client.cacheThreadState(result.Thread)
 	}

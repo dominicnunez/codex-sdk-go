@@ -106,8 +106,9 @@ func buildRunResult(thread Thread, turn Turn, items []ThreadItemWrapper) *RunRes
 }
 
 func turnWithItems(turn Turn, items []ThreadItemWrapper) Turn {
-	cp := cloneTurn(turn)
+	cp := turn
 	cp.Items = cloneThreadItems(items)
+	cp.Error = cloneTurnError(turn.Error)
 	return cp
 }
 

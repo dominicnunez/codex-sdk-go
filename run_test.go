@@ -135,6 +135,71 @@ func TestRunSuccess(t *testing.T) {
 	}
 }
 
+func TestRunResultSnapshotsAreIndependent(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	type runResult struct {
+		result *codex.RunResult
+		err    error
+	}
+	ch := make(chan runResult, 1)
+
+	go func() {
+		r, err := proc.Run(ctx, codex.RunOptions{
+			Prompt: "Say hello",
+		})
+		ch <- runResult{r, err}
+	}()
+
+	waitForMethodCallCount(t, mock, "turn/start", 1)
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-1","text":"Hello there!"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	result := <-ch
+	if result.err != nil {
+		t.Fatalf("Run() error: %v", result.err)
+	}
+
+	itemsMsg, ok := result.result.Items[0].Value.(*codex.AgentMessageThreadItem)
+	if !ok {
+		t.Fatalf("result.Items[0] type = %T, want *AgentMessageThreadItem", result.result.Items[0].Value)
+	}
+	itemsMsg.Text = "mutated"
+
+	turnMsg, ok := result.result.Turn.Items[0].Value.(*codex.AgentMessageThreadItem)
+	if !ok {
+		t.Fatalf("result.Turn.Items[0] type = %T, want *AgentMessageThreadItem", result.result.Turn.Items[0].Value)
+	}
+	if turnMsg.Text != "Hello there!" {
+		t.Fatalf("result.Turn.Items[0].Text = %q, want %q", turnMsg.Text, "Hello there!")
+	}
+
+	threadMsg, ok := result.result.Thread.Turns[0].Items[0].Value.(*codex.AgentMessageThreadItem)
+	if !ok {
+		t.Fatalf("result.Thread.Turns[0].Items[0] type = %T, want *AgentMessageThreadItem", result.result.Thread.Turns[0].Items[0].Value)
+	}
+	if threadMsg.Text != "Hello there!" {
+		t.Fatalf("result.Thread.Turns[0].Items[0].Text = %q, want %q", threadMsg.Text, "Hello there!")
+	}
+
+	result.result.Turn.Items = append(result.result.Turn.Items, codex.ThreadItemWrapper{})
+	if got := len(result.result.Thread.Turns[0].Items); got != 1 {
+		t.Fatalf("len(result.Thread.Turns[0].Items) = %d, want 1", got)
+	}
+}
+
 func TestRunContextCancellation(t *testing.T) {
 	proc, _ := mockProcess(t)
 
