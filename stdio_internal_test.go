@@ -570,8 +570,43 @@ func TestReadLoopNonEOFFailureCancelsTransportAndWakesWaitingTurnScopedWorkers(t
 	}
 	if err := transport.Notify(context.Background(), Notification{JSONRPC: "2.0", Method: "test/read-failure"}); err == nil {
 		t.Fatal("expected notify to fail after reader failure")
-	} else if !strings.Contains(err.Error(), errTransportReaderStopped.Error()) {
-		t.Fatalf("Notify() error = %v, want reader stopped error", err)
+	} else if !errors.Is(err, reader.err) {
+		t.Fatalf("Notify() error = %v, want wrapped read failure %v", err, reader.err)
+	}
+}
+
+func TestSendAfterReaderFailureReturnsUnderlyingError(t *testing.T) {
+	reader := newErrorReadCloser(errors.New("read failed"))
+	transport := NewStdioTransport(reader, io.Discard)
+	defer func() { _ = transport.Close() }()
+	transport.ensureReadLoopStarted()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	errCh := make(chan error, 1)
+	go func() {
+		_, err := transport.Send(ctx, Request{
+			JSONRPC: jsonrpcVersion,
+			ID:      RequestID{Value: "read-failure"},
+			Method:  "test/pending",
+		})
+		errCh <- err
+	}()
+
+	time.Sleep(25 * time.Millisecond)
+	reader.Release()
+
+	select {
+	case err := <-errCh:
+		if err == nil {
+			t.Fatal("expected error from Send after reader failure")
+		}
+		if !errors.Is(err, reader.err) {
+			t.Fatalf("Send() error = %v, want wrapped read failure %v", err, reader.err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for Send to observe reader failure")
 	}
 }
 

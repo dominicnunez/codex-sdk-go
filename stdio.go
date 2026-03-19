@@ -185,7 +185,7 @@ type StdioTransport struct {
 	readerStopped       chan struct{}
 	once                sync.Once
 	startReadLoopOnce   sync.Once
-	scanErr             error // set by readLoop when an unrecoverable read error occurs
+	scanErr             error // terminal transport I/O error, if any
 	malformedCount      atomic.Uint64
 	panicHandler        func(v any)
 	ctx                 context.Context
@@ -322,12 +322,8 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 
 	t.mu.Lock()
 	if t.closed {
-		readerEOF := t.readerEOF
 		t.mu.Unlock()
-		if readerEOF {
-			return Response{}, NewTransportError("send failed", errTransportReaderStopped)
-		}
-		return Response{}, NewTransportError("send failed", errTransportClosed)
+		return Response{}, t.transportStopError("send failed")
 	}
 
 	// Create response channel and store with normalized ID for matching
@@ -368,7 +364,7 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 			return resp, nil
 		default:
 		}
-		return Response{}, NewTransportError("send failed", errTransportReaderStopped)
+		return Response{}, t.transportStopError("send failed")
 	}
 }
 
@@ -381,12 +377,8 @@ func (t *StdioTransport) Notify(ctx context.Context, notif Notification) error {
 
 	t.mu.Lock()
 	if t.closed {
-		readerEOF := t.readerEOF
 		t.mu.Unlock()
-		if readerEOF {
-			return NewTransportError("notify failed", errTransportReaderStopped)
-		}
-		return NewTransportError("notify failed", errTransportClosed)
+		return t.transportStopError("notify failed")
 	}
 	t.mu.Unlock()
 
@@ -472,12 +464,19 @@ func (t *StdioTransport) wakeTurnScopedNotificationWorkers() {
 
 func (t *StdioTransport) transportStopError(op string) error {
 	t.mu.Lock()
-	readerEOF := t.readerEOF
+	cause := t.transportStopCauseLocked()
 	t.mu.Unlock()
-	if readerEOF {
-		return NewTransportError(op, errTransportReaderStopped)
+	return NewTransportError(op, cause)
+}
+
+func (t *StdioTransport) transportStopCauseLocked() error {
+	if t.scanErr != nil {
+		return t.scanErr
 	}
-	return NewTransportError(op, errTransportClosed)
+	if t.readerEOF {
+		return errTransportReaderStopped
+	}
+	return errTransportClosed
 }
 
 func (t *StdioTransport) closeWithFailure(scanErr error, cause error, detail json.RawMessage) {
@@ -577,7 +576,7 @@ func (t *StdioTransport) enqueueWrite(ctx context.Context, msg interface{}, op s
 		case <-t.ctx.Done():
 			return t.transportStopError(op)
 		case <-t.readerStopped:
-			return NewTransportError(op, errTransportReaderStopped)
+			return t.transportStopError(op)
 		case t.writeQueue <- env:
 		}
 	} else {
@@ -602,7 +601,7 @@ func (t *StdioTransport) enqueueWrite(ctx context.Context, msg interface{}, op s
 		case <-t.ctx.Done():
 			return t.transportStopError(op)
 		case <-t.readerStopped:
-			return NewTransportError(op, errTransportReaderStopped)
+			return t.transportStopError(op)
 		}
 	}
 
