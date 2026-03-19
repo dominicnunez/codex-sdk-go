@@ -1231,6 +1231,37 @@ func TestEnsureInitConcurrentCallers(t *testing.T) {
 	}
 }
 
+func TestStartConversationAfterManualInitializeDoesNotReinitialize(t *testing.T) {
+	mock := NewMockTransport()
+	_ = mock.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
+	_ = mock.SetResponseData("thread/start", validProcessThreadStartResponse(validProcessThreadPayload("thread-1")))
+
+	client := codex.NewClient(mock, codex.WithRequestTimeout(2*time.Second))
+	proc := codex.NewProcessFromClient(client)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if _, err := proc.Client.Initialize(ctx, codex.InitializeParams{
+		ClientInfo: codex.ClientInfo{Name: "test-client", Version: "1.0.0"},
+	}); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+	defer func() { _ = conv.Close() }()
+
+	if conv.ThreadID() != "thread-1" {
+		t.Fatalf("ThreadID() = %q, want %q", conv.ThreadID(), "thread-1")
+	}
+	if got := mock.MethodCallCount("initialize"); got != 1 {
+		t.Fatalf("initialize call count = %d, want 1", got)
+	}
+}
+
 // TestRunAfterTransportClose verifies that calling Run on a Process whose
 // transport has been closed produces a clear error.
 func TestRunAfterTransportClose(t *testing.T) {

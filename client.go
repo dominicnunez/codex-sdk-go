@@ -193,6 +193,14 @@ type Client struct {
 	// Request timeout (optional, can be overridden per-request via context)
 	requestTimeout time.Duration
 
+	// Initialize handshake state. Successful initialize responses are cached so
+	// direct Client.Initialize calls and Process helper methods share the same
+	// one-time protocol handshake.
+	initializeMu   sync.Mutex
+	initializeDone bool
+	initializeWait chan struct{}
+	initializeResp InitializeResponse
+
 	// Notification listeners: method → handler function (public, replacement semantics)
 	notificationListeners map[string]NotificationHandler
 	// Internal notification listeners: method → list of listeners (append semantics)

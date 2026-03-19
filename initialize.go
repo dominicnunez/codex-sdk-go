@@ -49,11 +49,50 @@ func (r InitializeResponse) validate() error {
 }
 
 // Initialize sends an initialize request to the server.
-// This is the v1 handshake that must be performed before using v2 protocol methods.
+// This is the one-time handshake that must be performed before using v2
+// protocol methods. Successful calls are cached so repeated callers share the
+// same initialized session, while failures are not latched and can be retried.
 func (c *Client) Initialize(ctx context.Context, params InitializeParams) (InitializeResponse, error) {
-	var result InitializeResponse
-	if err := c.sendRequest(ctx, methodInitialize, params, &result); err != nil {
+	if err := validateContext(ctx); err != nil {
 		return InitializeResponse{}, err
 	}
-	return result, nil
+
+	for {
+		c.initializeMu.Lock()
+		if c.initializeDone {
+			resp := c.initializeResp
+			c.initializeMu.Unlock()
+			return resp, nil
+		}
+		if wait := c.initializeWait; wait != nil {
+			c.initializeMu.Unlock()
+			select {
+			case <-wait:
+				continue
+			case <-ctx.Done():
+				return InitializeResponse{}, ctx.Err()
+			}
+		}
+
+		wait := make(chan struct{})
+		c.initializeWait = wait
+		c.initializeMu.Unlock()
+
+		var result InitializeResponse
+		err := c.sendRequest(ctx, methodInitialize, params, &result)
+
+		c.initializeMu.Lock()
+		if err == nil {
+			c.initializeDone = true
+			c.initializeResp = result
+		}
+		c.initializeWait = nil
+		close(wait)
+		c.initializeMu.Unlock()
+
+		if err != nil {
+			return InitializeResponse{}, err
+		}
+		return result, nil
+	}
 }

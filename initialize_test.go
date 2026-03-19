@@ -230,6 +230,39 @@ func TestClientInitialize(t *testing.T) {
 	}
 }
 
+func TestClientInitializeCachesSuccessfulHandshake(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+
+	_ = mock.SetResponseData("initialize", codex.InitializeResponse{
+		PlatformFamily: "unix",
+		PlatformOS:     "linux",
+		UserAgent:      "codex-server/1.0.0",
+	})
+
+	ctx := context.Background()
+	first, err := client.Initialize(ctx, codex.InitializeParams{
+		ClientInfo: codex.ClientInfo{Name: "test-client", Version: "1.0.0"},
+	})
+	if err != nil {
+		t.Fatalf("first Initialize failed: %v", err)
+	}
+
+	second, err := client.Initialize(ctx, codex.InitializeParams{
+		ClientInfo: codex.ClientInfo{Name: "other-client", Version: "2.0.0"},
+	})
+	if err != nil {
+		t.Fatalf("second Initialize failed: %v", err)
+	}
+
+	if first != second {
+		t.Fatalf("cached Initialize response = %+v, want %+v", second, first)
+	}
+	if got := mock.MethodCallCount("initialize"); got != 1 {
+		t.Fatalf("initialize call count = %d, want 1", got)
+	}
+}
+
 // TestClientInitializeError verifies error handling in Initialize.
 func TestClientInitializeError(t *testing.T) {
 	mock := NewMockTransport()
