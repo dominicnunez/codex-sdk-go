@@ -1766,12 +1766,12 @@ func (t *StdioTransport) stopAfterReaderEOF() {
 
 func (t *StdioTransport) stopAfterReaderTermination(scanErr error) {
 	t.mu.Lock()
-	if t.scanErr == nil {
-		t.scanErr = scanErr
-	}
 	if t.closed {
 		t.mu.Unlock()
 		return
+	}
+	if t.scanErr == nil {
+		t.scanErr = scanErr
 	}
 	t.closed = true
 	t.readerEOF = true

@@ -170,6 +170,35 @@ func TestStdioInboundRequestDispatchIsBounded(t *testing.T) {
 	}
 }
 
+func TestStdioCloseDoesNotRecordSelfInducedReaderFailure(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := NewStdioTransport(clientReader, clientWriter)
+
+	if err := transport.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	select {
+	case <-transport.readerStopped:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for reader to stop")
+	}
+
+	if got := transport.ScanErr(); got != nil {
+		t.Fatalf("ScanErr() = %v; want nil after explicit Close", got)
+	}
+
+	if err := transport.transportStopError("send failed"); !errors.Is(err, errTransportClosed) {
+		t.Fatalf("transportStopError() = %v; want cause %v", err, errTransportClosed)
+	}
+}
+
 func TestNotifyCanceledContextDoesNotAttemptWrite(t *testing.T) {
 	reader, _ := io.Pipe()
 	bw := &writeCountWriter{}
