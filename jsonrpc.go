@@ -40,6 +40,7 @@ type Notification struct {
 	JSONRPC string          `json:"jsonrpc"`
 	Method  string          `json:"method"`
 	Params  json.RawMessage `json:"params,omitempty"`
+	turnKey string          `json:"-"`
 }
 
 // Error represents a JSON-RPC 2.0 error object.

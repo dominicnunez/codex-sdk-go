@@ -159,6 +159,9 @@ type StdioTransport struct {
 	scanErr            error // set by readLoop when an unrecoverable read error occurs
 	malformedCount     atomic.Uint64
 	panicHandler       func(v any)
+	notifOrderMu       sync.Mutex
+	notifOrderCond     *sync.Cond
+	pendingTurnItems   map[string]uint64
 	ctx                context.Context
 	cancelCtx          context.CancelFunc
 }
@@ -238,9 +241,11 @@ func NewStdioTransport(reader io.ReadCloser, writer io.Writer) *StdioTransport {
 		notifQueue:         make(chan Notification, inboundNotifQueueSize),
 		writeQueue:         make(chan writeEnvelope, outboundWriteQueueSize),
 		readerStopped:      make(chan struct{}),
+		pendingTurnItems:   make(map[string]uint64),
 		ctx:                ctx,
 		cancelCtx:          cancel,
 	}
+	t.notifOrderCond = sync.NewCond(&t.notifOrderMu)
 	for range inboundRequestWorkers {
 		go t.requestWorker()
 	}
@@ -419,6 +424,9 @@ func (t *StdioTransport) closeWithFailure(scanErr error, message string, data js
 	t.mu.Unlock()
 
 	cancel()
+	t.notifOrderMu.Lock()
+	t.notifOrderCond.Broadcast()
+	t.notifOrderMu.Unlock()
 	if readerCloser != nil {
 		_ = readerCloser.Close()
 	}
@@ -605,6 +613,7 @@ func (t *StdioTransport) criticalNotificationWorker() {
 			return
 		}
 		t.handleNotification(notif)
+		t.markCriticalNotificationHandled(notif)
 	}
 }
 
@@ -614,8 +623,53 @@ func (t *StdioTransport) terminalNotificationWorker() {
 		if !ok {
 			return
 		}
+		t.waitForPriorCriticalNotifications(notif)
 		t.handleNotification(notif)
+		t.finishTerminalNotification(notif)
 	}
+}
+
+func (t *StdioTransport) markCriticalNotificationHandled(notif Notification) {
+	if notif.Method != notifyItemCompleted || notif.turnKey == "" {
+		return
+	}
+
+	t.notifOrderMu.Lock()
+	if pending := t.pendingTurnItems[notif.turnKey]; pending > 1 {
+		t.pendingTurnItems[notif.turnKey] = pending - 1
+	} else {
+		delete(t.pendingTurnItems, notif.turnKey)
+	}
+	t.notifOrderCond.Broadcast()
+	t.notifOrderMu.Unlock()
+}
+
+func (t *StdioTransport) waitForPriorCriticalNotifications(notif Notification) {
+	if notif.Method != notifyTurnCompleted || notif.turnKey == "" {
+		return
+	}
+
+	t.notifOrderMu.Lock()
+	defer t.notifOrderMu.Unlock()
+
+	for t.pendingTurnItems[notif.turnKey] > 0 {
+		select {
+		case <-t.ctx.Done():
+			return
+		default:
+		}
+		t.notifOrderCond.Wait()
+	}
+}
+
+func (t *StdioTransport) finishTerminalNotification(notif Notification) {
+	if notif.Method != notifyTurnCompleted || notif.turnKey == "" {
+		return
+	}
+
+	t.notifOrderMu.Lock()
+	delete(t.pendingTurnItems, notif.turnKey)
+	t.notifOrderMu.Unlock()
 }
 
 // readLoop continuously reads newline-delimited JSON messages from the reader
@@ -856,6 +910,7 @@ func (t *StdioTransport) enqueueRequest(req Request) {
 }
 
 func (t *StdioTransport) enqueueNotification(notif Notification) {
+	t.annotateNotificationOrdering(&notif)
 	if isTerminalNotificationMethod(notif.Method) {
 		t.enqueueTerminalNotification(notif)
 		return
@@ -876,34 +931,44 @@ func (t *StdioTransport) enqueueNotification(notif Notification) {
 }
 
 func (t *StdioTransport) enqueueTerminalNotification(notif Notification) {
-	t.enqueueBoundedNotification(t.terminalNotifQueue, notif)
+	t.enqueueBoundedNotification(t.terminalNotifQueue, notif, nil, nil)
 }
 
-func (t *StdioTransport) enqueueBoundedNotification(queue chan Notification, notif Notification) {
+func (t *StdioTransport) enqueueBoundedNotification(queue chan Notification, notif Notification, onEnqueue func(Notification), onDrop func(Notification)) {
 	select {
 	case <-t.ctx.Done():
 		return
 	case queue <- notif:
+		if onEnqueue != nil {
+			onEnqueue(notif)
+		}
 		return
 	default:
 	}
 
 	// Queue is full: drop oldest and enqueue newest to preserve read-loop
 	// liveness under sustained notification pressure.
+	var dropped Notification
 	select {
-	case <-queue:
+	case dropped = <-queue:
+		if onDrop != nil {
+			onDrop(dropped)
+		}
 	default:
 	}
 
 	select {
 	case <-t.ctx.Done():
 	case queue <- notif:
+		if onEnqueue != nil {
+			onEnqueue(notif)
+		}
 	default:
 	}
 }
 
 func (t *StdioTransport) enqueueCriticalNotification(notif Notification) {
-	t.enqueueBoundedNotification(t.criticalNotifQueue, notif)
+	t.enqueueBoundedNotification(t.criticalNotifQueue, notif, t.trackCriticalNotificationEnqueue, t.trackCriticalNotificationDrop)
 }
 
 func isCriticalNotificationMethod(method string) bool {
@@ -917,6 +982,39 @@ func isCriticalNotificationMethod(method string) bool {
 
 func isTerminalNotificationMethod(method string) bool {
 	return method == notifyTurnCompleted
+}
+
+func (t *StdioTransport) trackCriticalNotificationEnqueue(notif Notification) {
+	if notif.Method != notifyItemCompleted || notif.turnKey == "" {
+		return
+	}
+
+	t.notifOrderMu.Lock()
+	t.pendingTurnItems[notif.turnKey]++
+	t.notifOrderMu.Unlock()
+}
+
+func (t *StdioTransport) trackCriticalNotificationDrop(notif Notification) {
+	if notif.Method != notifyItemCompleted || notif.turnKey == "" {
+		return
+	}
+
+	t.notifOrderMu.Lock()
+	if pending := t.pendingTurnItems[notif.turnKey]; pending > 1 {
+		t.pendingTurnItems[notif.turnKey] = pending - 1
+	} else {
+		delete(t.pendingTurnItems, notif.turnKey)
+	}
+	t.notifOrderMu.Unlock()
+}
+
+func (t *StdioTransport) annotateNotificationOrdering(notif *Notification) {
+	switch notif.Method {
+	case notifyItemCompleted:
+		notif.turnKey = itemCompletedTurnKey(notif.Params)
+	case notifyTurnCompleted:
+		notif.turnKey = turnCompletedTurnKey(notif.Params)
+	}
 }
 
 func (t *StdioTransport) rejectRequestForOverload(req Request) {

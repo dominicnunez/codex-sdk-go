@@ -1032,6 +1032,49 @@ func TestStdioApprovalInvalidParamsReturnsErrorCode(t *testing.T) {
 	}
 }
 
+func TestStdioApprovalMissingRequiredFieldReturnsInvalidParams(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	client := codex.NewClient(transport)
+	client.SetApprovalHandlers(codex.ApprovalHandlers{
+		OnFileChangeRequestApproval: func(ctx context.Context, p codex.FileChangeRequestApprovalParams) (codex.FileChangeRequestApprovalResponse, error) {
+			return codex.FileChangeRequestApprovalResponse{Decision: "accept"}, nil
+		},
+	})
+
+	responseChan := make(chan codex.Response, 1)
+	go func() {
+		scanner := bufio.NewScanner(serverReader)
+		for scanner.Scan() {
+			var resp codex.Response
+			if err := json.Unmarshal(scanner.Bytes(), &resp); err == nil && resp.Error != nil {
+				responseChan <- resp
+				return
+			}
+		}
+	}()
+
+	req := `{"jsonrpc":"2.0","id":"missing-required","method":"item/fileChange/requestApproval","params":{"threadId":"t1","turnId":"u1"}}` + "\n"
+	_, _ = serverWriter.Write([]byte(req))
+
+	select {
+	case resp := <-responseChan:
+		if resp.Error.Code != codex.ErrCodeInvalidParams {
+			t.Errorf("error code = %d; want %d (ErrCodeInvalidParams)", resp.Error.Code, codex.ErrCodeInvalidParams)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for error response")
+	}
+}
+
 // TestStdioApprovalHandlerErrorReturnsErrorCode verifies that when an approval
 // handler returns a non-nil error, the wire response has code -32603.
 func TestStdioApprovalHandlerErrorReturnsErrorCode(t *testing.T) {
@@ -1724,7 +1767,7 @@ func TestStdioErrorNotificationsUseCriticalQueue(t *testing.T) {
 	}
 }
 
-func TestStdioTurnCompletedDeliveredWhenCriticalQueueIsSaturated(t *testing.T) {
+func TestStdioTurnCompletedWaitsForEarlierSameTurnItems(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()
 	defer func() { _ = clientReader.Close() }()
@@ -1790,10 +1833,16 @@ func TestStdioTurnCompletedDeliveredWhenCriticalQueueIsSaturated(t *testing.T) {
 
 	select {
 	case <-turnCompletedSeen:
-	case <-time.After(2 * time.Second):
-		t.Fatal("expected turn/completed to be delivered under critical queue pressure")
+		t.Fatal("turn/completed should wait for earlier same-turn item/completed handling")
+	case <-time.After(150 * time.Millisecond):
 	}
 	close(blockCritical)
+
+	select {
+	case <-turnCompletedSeen:
+	case <-time.After(2 * time.Second):
+		t.Fatal("expected turn/completed after earlier same-turn items drained")
+	}
 }
 
 func TestStdioRejectsInvalidJSONRPCRequestVersion(t *testing.T) {

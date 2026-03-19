@@ -1,14 +1,127 @@
 package codex_test
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"testing"
 	"time"
 
 	codex "github.com/dominicnunez/codex-sdk-go"
 )
+
+func writeStdioResult(enc *json.Encoder, id codex.RequestID, result interface{}) error {
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		return fmt.Errorf("marshal result: %w", err)
+	}
+	if err := enc.Encode(codex.Response{
+		JSONRPC: "2.0",
+		ID:      id,
+		Result:  resultJSON,
+	}); err != nil {
+		return fmt.Errorf("encode response: %w", err)
+	}
+	return nil
+}
+
+func writeStdioNotification(enc *json.Encoder, method string, params interface{}) error {
+	paramsJSON, err := json.Marshal(params)
+	if err != nil {
+		return fmt.Errorf("marshal notification params: %w", err)
+	}
+	if err := enc.Encode(codex.Notification{
+		JSONRPC: "2.0",
+		Method:  method,
+		Params:  paramsJSON,
+	}); err != nil {
+		return fmt.Errorf("encode notification: %w", err)
+	}
+	return nil
+}
+
+func serveLifecycleOverStdio(serverReader io.Reader, serverWriter io.Writer, threadID, turnID, itemID, itemText string) error {
+	scanner := bufio.NewScanner(serverReader)
+	enc := json.NewEncoder(serverWriter)
+
+	for scanner.Scan() {
+		var req codex.Request
+		if err := json.Unmarshal(scanner.Bytes(), &req); err != nil {
+			return fmt.Errorf("unmarshal request: %w", err)
+		}
+
+		switch req.Method {
+		case "initialize":
+			if err := writeStdioResult(enc, req.ID, validInitializeResponseData("codex-test/1.0")); err != nil {
+				return err
+			}
+		case "thread/start":
+			if err := writeStdioResult(enc, req.ID, map[string]interface{}{
+				"approvalPolicy": "never",
+				"cwd":            "/tmp",
+				"model":          "o3",
+				"modelProvider":  "openai",
+				"sandbox":        map[string]interface{}{"type": "readOnly"},
+				"thread": map[string]interface{}{
+					"id":            threadID,
+					"cliVersion":    "1.0.0",
+					"createdAt":     1700000000,
+					"cwd":           "/tmp",
+					"modelProvider": "openai",
+					"preview":       "",
+					"source":        "exec",
+					"status":        map[string]interface{}{"type": "idle"},
+					"turns":         []interface{}{},
+					"updatedAt":     1700000000,
+					"ephemeral":     true,
+				},
+			}); err != nil {
+				return err
+			}
+		case "turn/start":
+			if err := writeStdioResult(enc, req.ID, map[string]interface{}{
+				"turn": map[string]interface{}{
+					"id":     turnID,
+					"status": "inProgress",
+					"items":  []interface{}{},
+				},
+			}); err != nil {
+				return err
+			}
+			if err := writeStdioNotification(enc, "item/completed", map[string]interface{}{
+				"threadId": threadID,
+				"turnId":   turnID,
+				"item": map[string]interface{}{
+					"type": "agentMessage",
+					"id":   itemID,
+					"text": itemText,
+				},
+			}); err != nil {
+				return err
+			}
+			if err := writeStdioNotification(enc, "turn/completed", map[string]interface{}{
+				"threadId": threadID,
+				"turn": map[string]interface{}{
+					"id":     turnID,
+					"status": "completed",
+					"items":  []interface{}{},
+				},
+			}); err != nil {
+				return err
+			}
+			return nil
+		default:
+			return fmt.Errorf("unexpected method %q", req.Method)
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("scanner error: %w", err)
+	}
+	return nil
+}
 
 // notifyDuringSendTransport wraps a MockTransport and fires a turn/completed
 // notification during the turn/start RPC — before returning the response.
@@ -391,5 +504,199 @@ func TestConversationTurnStreamedIgnoresUnattributableMalformedCompletionOnReuse
 	}
 	if result.Response != "response for turn-2" {
 		t.Fatalf("Turn 2 streamed response = %q; want %q", result.Response, "response for turn-2")
+	}
+}
+
+func TestRunWaitsForBlockedItemCompletedHandler(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	const (
+		threadID = "thread-1"
+		turnID   = "turn-1"
+		itemID   = "item-1"
+		itemText = "final answer"
+	)
+
+	serverErrCh := make(chan error, 1)
+	go func() {
+		serverErrCh <- serveLifecycleOverStdio(serverReader, serverWriter, threadID, turnID, itemID, itemText)
+	}()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	client := codex.NewClient(transport, codex.WithRequestTimeout(5*time.Second))
+	itemHandlingStarted := make(chan struct{}, 1)
+	releaseItem := make(chan struct{})
+	client.OnItemCompleted(func(codex.ItemCompletedNotification) {
+		select {
+		case itemHandlingStarted <- struct{}{}:
+		default:
+		}
+		<-releaseItem
+	})
+
+	proc := codex.NewProcessFromClient(client)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	resultCh := make(chan *codex.RunResult, 1)
+	errCh := make(chan error, 1)
+	go func() {
+		result, err := proc.Run(ctx, codex.RunOptions{Prompt: "hello"})
+		if err != nil {
+			errCh <- err
+			return
+		}
+		resultCh <- result
+	}()
+
+	select {
+	case <-itemHandlingStarted:
+	case err := <-serverErrCh:
+		t.Fatalf("stdio server error: %v", err)
+	case err := <-errCh:
+		t.Fatalf("Run() returned early with error: %v", err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for item/completed handler to block")
+	}
+
+	select {
+	case result := <-resultCh:
+		t.Fatalf("Run() finished before item handler was released: %#v", result)
+	case err := <-errCh:
+		t.Fatalf("Run() failed before item handler was released: %v", err)
+	case <-time.After(150 * time.Millisecond):
+	}
+
+	close(releaseItem)
+
+	select {
+	case err := <-errCh:
+		t.Fatalf("Run() error: %v", err)
+	case result := <-resultCh:
+		if result.Response != itemText {
+			t.Fatalf("Response = %q; want %q", result.Response, itemText)
+		}
+		if len(result.Items) != 1 {
+			t.Fatalf("len(Items) = %d; want 1", len(result.Items))
+		}
+		if len(result.Turn.Items) != 1 {
+			t.Fatalf("len(Turn.Items) = %d; want 1", len(result.Turn.Items))
+		}
+		select {
+		case err := <-serverErrCh:
+			if err != nil {
+				t.Fatalf("stdio server error: %v", err)
+			}
+		default:
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for Run() to finish")
+	}
+}
+
+func TestRunStreamedWaitsForBlockedItemCompletedHandler(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	const (
+		threadID = "thread-1"
+		turnID   = "turn-1"
+		itemID   = "item-1"
+		itemText = "streamed answer"
+	)
+
+	serverErrCh := make(chan error, 1)
+	go func() {
+		serverErrCh <- serveLifecycleOverStdio(serverReader, serverWriter, threadID, turnID, itemID, itemText)
+	}()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	client := codex.NewClient(transport, codex.WithRequestTimeout(5*time.Second))
+	itemHandlingStarted := make(chan struct{}, 1)
+	releaseItem := make(chan struct{})
+	client.OnItemCompleted(func(codex.ItemCompletedNotification) {
+		select {
+		case itemHandlingStarted <- struct{}{}:
+		default:
+		}
+		<-releaseItem
+	})
+
+	proc := codex.NewProcessFromClient(client)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "hello"})
+	streamResultCh := make(chan *codex.RunResult, 1)
+	streamErrCh := make(chan error, 1)
+	go func() {
+		for _, err := range stream.Events() {
+			if err != nil {
+				streamErrCh <- err
+				return
+			}
+		}
+		streamResultCh <- stream.Result()
+	}()
+
+	select {
+	case <-itemHandlingStarted:
+	case err := <-serverErrCh:
+		t.Fatalf("stdio server error: %v", err)
+	case err := <-streamErrCh:
+		t.Fatalf("RunStreamed() returned early with error: %v", err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for streamed item/completed handler to block")
+	}
+
+	select {
+	case result := <-streamResultCh:
+		t.Fatalf("RunStreamed() finished before item handler was released: %#v", result)
+	case err := <-streamErrCh:
+		t.Fatalf("RunStreamed() failed before item handler was released: %v", err)
+	case <-time.After(150 * time.Millisecond):
+	}
+
+	close(releaseItem)
+
+	select {
+	case err := <-streamErrCh:
+		t.Fatalf("RunStreamed() error: %v", err)
+	case result := <-streamResultCh:
+		if result == nil {
+			t.Fatal("Result() returned nil")
+			return
+		}
+		if result.Response != itemText {
+			t.Fatalf("Response = %q; want %q", result.Response, itemText)
+		}
+		if len(result.Items) != 1 {
+			t.Fatalf("len(Items) = %d; want 1", len(result.Items))
+		}
+		if len(result.Turn.Items) != 1 {
+			t.Fatalf("len(Turn.Items) = %d; want 1", len(result.Turn.Items))
+		}
+		select {
+		case err := <-serverErrCh:
+			if err != nil {
+				t.Fatalf("stdio server error: %v", err)
+			}
+		default:
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for RunStreamed() to finish")
 	}
 }
