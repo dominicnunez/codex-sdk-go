@@ -62,6 +62,30 @@ func TestConcurrentInternalListeners(t *testing.T) {
 	wg.Wait()
 }
 
+func TestHandleNotificationRunsInternalListenersBeforePublicHandler(t *testing.T) {
+	transport := &mockInternalTransport{}
+	c := NewClient(transport)
+
+	order := make(chan string, 2)
+	c.addNotificationListener("test/order", func(_ context.Context, _ Notification) {
+		order <- "internal"
+	})
+	c.OnNotification("test/order", func(_ context.Context, _ Notification) {
+		order <- "public"
+	})
+
+	c.handleNotification(context.Background(), Notification{
+		JSONRPC: "2.0",
+		Method:  "test/order",
+	})
+
+	first := <-order
+	second := <-order
+	if first != "internal" || second != "public" {
+		t.Fatalf("listener order = %q, %q; want internal before public", first, second)
+	}
+}
+
 // mockInternalTransport satisfies the Transport interface for internal tests.
 type mockInternalTransport struct{}
 

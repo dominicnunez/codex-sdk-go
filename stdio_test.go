@@ -1621,8 +1621,8 @@ func TestStdioOversizeResponseAtEOFFailsPendingSend(t *testing.T) {
 	}
 }
 
-// TestStdioTerminalNotificationsDoNotBlockReadLoop verifies that a full
-// terminal notification queue does not block response processing.
+// TestStdioTerminalNotificationsDoNotBlockReadLoop verifies that a backlog of
+// turn-completed notifications does not block response processing.
 func TestStdioTerminalNotificationsDoNotBlockReadLoop(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()
@@ -1642,7 +1642,7 @@ func TestStdioTerminalNotificationsDoNotBlockReadLoop(t *testing.T) {
 	})
 	defer close(block)
 
-	// Capture outbound request then flood critical notifications.
+	// Capture the outbound request, then flood turn-completed notifications.
 	outbound := make(chan struct{}, 1)
 	go func() {
 		scanner := bufio.NewScanner(serverReader)

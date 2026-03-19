@@ -37,10 +37,10 @@ type Response struct {
 
 // Notification represents a JSON-RPC 2.0 notification (request without id).
 type Notification struct {
-	JSONRPC string          `json:"jsonrpc"`
-	Method  string          `json:"method"`
-	Params  json.RawMessage `json:"params,omitempty"`
-	turnKey string          `json:"-"`
+	JSONRPC   string          `json:"jsonrpc"`
+	Method    string          `json:"method"`
+	Params    json.RawMessage `json:"params,omitempty"`
+	threadKey string          `json:"-"`
 }
 
 // Error represents a JSON-RPC 2.0 error object.

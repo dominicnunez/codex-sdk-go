@@ -27,10 +27,8 @@ const (
 	inboundRequestQueueSize     = 64
 	inboundNotificationWorkers  = 8
 	criticalNotificationWorkers = 2
-	terminalNotificationWorkers = 2
 	inboundNotifQueueSize       = 128
 	criticalNotifQueueSize      = 64
-	terminalNotifQueueSize      = 64
 	outboundWriteQueueSize      = 256
 	readBufferSizeBytes         = 64 * 1024
 	maxInboundMessageSizeBytes  = 10 * 1024 * 1024
@@ -50,6 +48,12 @@ const (
 type writeEnvelope struct {
 	payload []byte
 	done    chan error
+}
+
+type turnScopedNotificationQueue struct {
+	mu      sync.Mutex
+	queue   []Notification
+	running bool
 }
 
 type inboundFrame struct {
@@ -149,8 +153,9 @@ type StdioTransport struct {
 	pendingReqHandler  []Request
 	pendingNotifHandle []Notification
 	requestQueue       chan Request
+	turnNotifQueuesMu  sync.Mutex
+	turnNotifQueues    map[string]*turnScopedNotificationQueue
 	criticalNotifQueue chan Notification
-	terminalNotifQueue chan Notification
 	notifQueue         chan Notification
 	writeQueue         chan writeEnvelope
 	readerStopped      chan struct{}
@@ -159,9 +164,6 @@ type StdioTransport struct {
 	scanErr            error // set by readLoop when an unrecoverable read error occurs
 	malformedCount     atomic.Uint64
 	panicHandler       func(v any)
-	notifOrderMu       sync.Mutex
-	notifOrderCond     *sync.Cond
-	pendingTurnItems   map[string]uint64
 	ctx                context.Context
 	cancelCtx          context.CancelFunc
 }
@@ -236,16 +238,14 @@ func NewStdioTransport(reader io.ReadCloser, writer io.Writer) *StdioTransport {
 		writer:             writer,
 		pendingReqs:        make(map[string]pendingReq),
 		requestQueue:       make(chan Request, inboundRequestQueueSize),
+		turnNotifQueues:    make(map[string]*turnScopedNotificationQueue),
 		criticalNotifQueue: make(chan Notification, criticalNotifQueueSize),
-		terminalNotifQueue: make(chan Notification, terminalNotifQueueSize),
 		notifQueue:         make(chan Notification, inboundNotifQueueSize),
 		writeQueue:         make(chan writeEnvelope, outboundWriteQueueSize),
 		readerStopped:      make(chan struct{}),
-		pendingTurnItems:   make(map[string]uint64),
 		ctx:                ctx,
 		cancelCtx:          cancel,
 	}
-	t.notifOrderCond = sync.NewCond(&t.notifOrderMu)
 	for range inboundRequestWorkers {
 		go t.requestWorker()
 	}
@@ -254,9 +254,6 @@ func NewStdioTransport(reader io.ReadCloser, writer io.Writer) *StdioTransport {
 	}
 	for range criticalNotificationWorkers {
 		go t.criticalNotificationWorker()
-	}
-	for range terminalNotificationWorkers {
-		go t.terminalNotificationWorker()
 	}
 	go t.writeLoop()
 	t.ensureReadLoopStarted()
@@ -424,9 +421,6 @@ func (t *StdioTransport) closeWithFailure(scanErr error, message string, data js
 	t.mu.Unlock()
 
 	cancel()
-	t.notifOrderMu.Lock()
-	t.notifOrderCond.Broadcast()
-	t.notifOrderMu.Unlock()
 	if readerCloser != nil {
 		_ = readerCloser.Close()
 	}
@@ -613,63 +607,7 @@ func (t *StdioTransport) criticalNotificationWorker() {
 			return
 		}
 		t.handleNotification(notif)
-		t.markCriticalNotificationHandled(notif)
 	}
-}
-
-func (t *StdioTransport) terminalNotificationWorker() {
-	for {
-		notif, ok := recvWhileRunning(t.ctx, t.terminalNotifQueue)
-		if !ok {
-			return
-		}
-		t.waitForPriorCriticalNotifications(notif)
-		t.handleNotification(notif)
-		t.finishTerminalNotification(notif)
-	}
-}
-
-func (t *StdioTransport) markCriticalNotificationHandled(notif Notification) {
-	if notif.Method != notifyItemCompleted || notif.turnKey == "" {
-		return
-	}
-
-	t.notifOrderMu.Lock()
-	if pending := t.pendingTurnItems[notif.turnKey]; pending > 1 {
-		t.pendingTurnItems[notif.turnKey] = pending - 1
-	} else {
-		delete(t.pendingTurnItems, notif.turnKey)
-	}
-	t.notifOrderCond.Broadcast()
-	t.notifOrderMu.Unlock()
-}
-
-func (t *StdioTransport) waitForPriorCriticalNotifications(notif Notification) {
-	if notif.Method != notifyTurnCompleted || notif.turnKey == "" {
-		return
-	}
-
-	t.notifOrderMu.Lock()
-	defer t.notifOrderMu.Unlock()
-
-	for t.pendingTurnItems[notif.turnKey] > 0 {
-		select {
-		case <-t.ctx.Done():
-			return
-		default:
-		}
-		t.notifOrderCond.Wait()
-	}
-}
-
-func (t *StdioTransport) finishTerminalNotification(notif Notification) {
-	if notif.Method != notifyTurnCompleted || notif.turnKey == "" {
-		return
-	}
-
-	t.notifOrderMu.Lock()
-	delete(t.pendingTurnItems, notif.turnKey)
-	t.notifOrderMu.Unlock()
 }
 
 // readLoop continuously reads newline-delimited JSON messages from the reader
@@ -910,9 +848,9 @@ func (t *StdioTransport) enqueueRequest(req Request) {
 }
 
 func (t *StdioTransport) enqueueNotification(notif Notification) {
-	t.annotateNotificationOrdering(&notif)
-	if isTerminalNotificationMethod(notif.Method) {
-		t.enqueueTerminalNotification(notif)
+	t.annotateTurnScopedNotification(&notif)
+	if isTurnScopedNotification(notif) {
+		t.enqueueTurnScopedNotification(notif)
 		return
 	}
 	if isCriticalNotificationMethod(notif.Method) {
@@ -930,90 +868,132 @@ func (t *StdioTransport) enqueueNotification(notif Notification) {
 	}
 }
 
-func (t *StdioTransport) enqueueTerminalNotification(notif Notification) {
-	t.enqueueBoundedNotification(t.terminalNotifQueue, notif, nil, nil)
+func (t *StdioTransport) enqueueTurnScopedNotification(notif Notification) {
+	if notif.threadKey == "" {
+		select {
+		case <-t.ctx.Done():
+			return
+		case t.notifQueue <- notif:
+		default:
+			// Non-attributable notifications remain best-effort.
+		}
+		return
+	}
+
+	t.turnNotifQueuesMu.Lock()
+	queue := t.turnNotifQueues[notif.threadKey]
+	if queue == nil {
+		queue = &turnScopedNotificationQueue{}
+		t.turnNotifQueues[notif.threadKey] = queue
+	}
+	t.turnNotifQueuesMu.Unlock()
+
+	queue.mu.Lock()
+	queue.queue = append(queue.queue, notif)
+	if queue.running {
+		queue.mu.Unlock()
+		return
+	}
+	queue.running = true
+	queue.mu.Unlock()
+
+	go t.turnScopedNotificationWorker(notif.threadKey, queue)
 }
 
-func (t *StdioTransport) enqueueBoundedNotification(queue chan Notification, notif Notification, onEnqueue func(Notification), onDrop func(Notification)) {
+func (t *StdioTransport) turnScopedNotificationWorker(threadKey string, queue *turnScopedNotificationQueue) {
+	for {
+		queue.mu.Lock()
+		if len(queue.queue) == 0 {
+			queue.running = false
+			queue.mu.Unlock()
+			t.removeTurnScopedNotificationQueue(threadKey, queue)
+			return
+		}
+		notif := queue.queue[0]
+		queue.queue[0] = Notification{}
+		queue.queue = queue.queue[1:]
+		queue.mu.Unlock()
+
+		if t.ctx.Err() != nil {
+			queue.mu.Lock()
+			queue.queue = nil
+			queue.running = false
+			queue.mu.Unlock()
+			t.removeTurnScopedNotificationQueue(threadKey, queue)
+			return
+		}
+		t.handleNotification(notif)
+	}
+}
+
+func (t *StdioTransport) removeTurnScopedNotificationQueue(threadKey string, queue *turnScopedNotificationQueue) {
+	t.turnNotifQueuesMu.Lock()
+	defer t.turnNotifQueuesMu.Unlock()
+
+	current, ok := t.turnNotifQueues[threadKey]
+	if !ok || current != queue {
+		return
+	}
+
+	queue.mu.Lock()
+	empty := len(queue.queue) == 0 && !queue.running
+	queue.mu.Unlock()
+	if empty {
+		delete(t.turnNotifQueues, threadKey)
+	}
+}
+
+func (t *StdioTransport) enqueueBoundedNotification(queue chan Notification, notif Notification) {
 	select {
 	case <-t.ctx.Done():
 		return
 	case queue <- notif:
-		if onEnqueue != nil {
-			onEnqueue(notif)
-		}
 		return
 	default:
 	}
 
 	// Queue is full: drop oldest and enqueue newest to preserve read-loop
 	// liveness under sustained notification pressure.
-	var dropped Notification
 	select {
-	case dropped = <-queue:
-		if onDrop != nil {
-			onDrop(dropped)
-		}
+	case <-queue:
 	default:
 	}
 
 	select {
 	case <-t.ctx.Done():
 	case queue <- notif:
-		if onEnqueue != nil {
-			onEnqueue(notif)
-		}
 	default:
 	}
 }
 
 func (t *StdioTransport) enqueueCriticalNotification(notif Notification) {
-	t.enqueueBoundedNotification(t.criticalNotifQueue, notif, t.trackCriticalNotificationEnqueue, t.trackCriticalNotificationDrop)
+	t.enqueueBoundedNotification(t.criticalNotifQueue, notif)
 }
 
 func isCriticalNotificationMethod(method string) bool {
 	switch method {
-	case notifyItemCompleted, notifyError, notifyRealtimeError:
+	case notifyError, notifyRealtimeError:
 		return true
 	default:
 		return false
 	}
 }
 
-func isTerminalNotificationMethod(method string) bool {
-	return method == notifyTurnCompleted
+func isTurnScopedNotification(notif Notification) bool {
+	switch notif.Method {
+	case notifyItemCompleted, notifyTurnCompleted:
+		return notif.threadKey != ""
+	default:
+		return false
+	}
 }
 
-func (t *StdioTransport) trackCriticalNotificationEnqueue(notif Notification) {
-	if notif.Method != notifyItemCompleted || notif.turnKey == "" {
-		return
-	}
-
-	t.notifOrderMu.Lock()
-	t.pendingTurnItems[notif.turnKey]++
-	t.notifOrderMu.Unlock()
-}
-
-func (t *StdioTransport) trackCriticalNotificationDrop(notif Notification) {
-	if notif.Method != notifyItemCompleted || notif.turnKey == "" {
-		return
-	}
-
-	t.notifOrderMu.Lock()
-	if pending := t.pendingTurnItems[notif.turnKey]; pending > 1 {
-		t.pendingTurnItems[notif.turnKey] = pending - 1
-	} else {
-		delete(t.pendingTurnItems, notif.turnKey)
-	}
-	t.notifOrderMu.Unlock()
-}
-
-func (t *StdioTransport) annotateNotificationOrdering(notif *Notification) {
+func (t *StdioTransport) annotateTurnScopedNotification(notif *Notification) {
 	switch notif.Method {
 	case notifyItemCompleted:
-		notif.turnKey = itemCompletedTurnKey(notif.Params)
+		notif.threadKey = itemCompletedThreadKey(notif.Params)
 	case notifyTurnCompleted:
-		notif.turnKey = turnCompletedTurnKey(notif.Params)
+		notif.threadKey = turnCompletedThreadKey(notif.Params)
 	}
 }
 

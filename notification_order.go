@@ -2,22 +2,18 @@ package codex
 
 import "encoding/json"
 
-func itemCompletedTurnKey(params json.RawMessage) string {
+func itemCompletedThreadKey(params json.RawMessage) string {
 	carrier, ok := unmarshalThreadIDCarrier(params)
-	if !ok || carrier.ThreadID == "" || carrier.TurnID == "" {
+	if !ok || carrier.ThreadID == "" {
 		return ""
 	}
-	return carrier.ThreadID + "\x00" + carrier.TurnID
+	return carrier.ThreadID
 }
 
-func turnCompletedTurnKey(params json.RawMessage) string {
+func turnCompletedThreadKey(params json.RawMessage) string {
 	carrier, ok := unmarshalTurnCompletedCarrier(params)
 	if !ok || carrier.ThreadID == "" {
 		return ""
 	}
-	turnID := extractRawTurnCompletedID(carrier.Turn)
-	if turnID == "" {
-		return ""
-	}
-	return carrier.ThreadID + "\x00" + turnID
+	return carrier.ThreadID
 }

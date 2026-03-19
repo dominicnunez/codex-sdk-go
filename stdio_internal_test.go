@@ -330,13 +330,6 @@ func TestNotificationWorkerSkipsBufferedNotificationsAfterCancellation(t *testin
 			}(),
 			worker: (*StdioTransport).criticalNotificationWorker,
 		},
-		{
-			name: "terminal",
-			queue: func() chan Notification {
-				return make(chan Notification, 1)
-			}(),
-			worker: (*StdioTransport).terminalNotificationWorker,
-		},
 	}
 
 	for _, tt := range tests {
@@ -345,7 +338,6 @@ func TestNotificationWorkerSkipsBufferedNotificationsAfterCancellation(t *testin
 			transport := &StdioTransport{
 				notifQueue:         tt.queue,
 				criticalNotifQueue: tt.queue,
-				terminalNotifQueue: tt.queue,
 				ctx:                ctx,
 				cancelCtx:          cancel,
 			}
@@ -363,6 +355,36 @@ func TestNotificationWorkerSkipsBufferedNotificationsAfterCancellation(t *testin
 				t.Fatalf("notification handler invoked %d times after cancellation; want 0", got)
 			}
 		})
+	}
+}
+
+func TestTurnScopedNotificationWorkerSkipsBufferedNotificationsAfterCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	transport := &StdioTransport{
+		turnNotifQueues: make(map[string]*turnScopedNotificationQueue),
+		ctx:             ctx,
+		cancelCtx:       cancel,
+	}
+
+	var handled atomic.Int32
+	transport.OnNotify(func(_ context.Context, _ Notification) {
+		handled.Add(1)
+	})
+
+	queue := &turnScopedNotificationQueue{
+		queue: []Notification{{Method: notifyTurnCompleted, threadKey: "thread-1"}},
+	}
+	queue.running = true
+	transport.turnNotifQueues["thread-1"] = queue
+
+	cancel()
+	transport.turnScopedNotificationWorker("thread-1", queue)
+
+	if got := handled.Load(); got != 0 {
+		t.Fatalf("notification handler invoked %d times after cancellation; want 0", got)
+	}
+	if _, ok := transport.turnNotifQueues["thread-1"]; ok {
+		t.Fatal("turn-scoped queue was not removed after worker shutdown")
 	}
 }
 

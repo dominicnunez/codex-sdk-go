@@ -366,8 +366,9 @@ func (c *Client) safeCallNotificationHandler(method string, fn func()) {
 }
 
 // handleNotification is the internal handler registered with the transport.
-// It routes incoming notifications to the appropriate registered listener,
-// then dispatches to all internal listeners for the same method.
+// It dispatches internal listeners before the public listener so lifecycle
+// bookkeeping cannot be stalled behind user callbacks for the same
+// notification.
 // Each handler is called in isolation so a panic in one does not prevent others
 // from executing.
 func (c *Client) handleNotification(ctx context.Context, notif Notification) {
@@ -380,15 +381,15 @@ func (c *Client) handleNotification(ctx context.Context, notif Notification) {
 	copy(internals, src)
 	c.listenersMu.RUnlock()
 
-	if handler != nil {
-		c.safeCallNotificationHandler(notif.Method, func() {
-			handler(ctx, notif)
-		})
-	}
-
 	for _, il := range internals {
 		c.safeCallNotificationHandler(notif.Method, func() {
 			il.handler(ctx, notif)
+		})
+	}
+
+	if handler != nil {
+		c.safeCallNotificationHandler(notif.Method, func() {
+			handler(ctx, notif)
 		})
 	}
 }
