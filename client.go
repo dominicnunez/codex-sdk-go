@@ -119,6 +119,44 @@ func validateRequiredObjectFields(data []byte, requiredFields ...string) error {
 	return validateObjectFields(data, requiredFields, requiredFields)
 }
 
+func validateTaggedObjectFields(
+	data []byte,
+	requiredFields []string,
+	nonNullFields []string,
+) error {
+	required := make([]string, 0, len(requiredFields)+1)
+	required = append(required, "type")
+	required = append(required, requiredFields...)
+
+	nonNull := make([]string, 0, len(nonNullFields)+1)
+	nonNull = append(nonNull, "type")
+	nonNull = append(nonNull, nonNullFields...)
+
+	return validateObjectFields(data, required, nonNull)
+}
+
+func validateRequiredTaggedObjectFields(data []byte, requiredFields ...string) error {
+	return validateTaggedObjectFields(data, requiredFields, requiredFields)
+}
+
+func decodeRequiredObjectTypeField(data []byte, context string) (string, error) {
+	if err := validateRequiredObjectFields(data, "type"); err != nil {
+		return "", err
+	}
+
+	var raw struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return "", err
+	}
+	if raw.Type == "" {
+		return "", fmt.Errorf("%s: missing or empty type field", context)
+	}
+
+	return raw.Type, nil
+}
+
 func validateDecodedResponse(result interface{}) error {
 	validator, ok := result.(responseValidator)
 	if !ok {

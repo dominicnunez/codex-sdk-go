@@ -336,144 +336,147 @@ func (u *UnknownThreadItem) MarshalJSON() ([]byte, error) {
 	return u.Raw, nil
 }
 
+type threadItemDecoder func([]byte) (ThreadItem, error)
+
+var threadItemDecoders = map[string]threadItemDecoder{
+	"userMessage":         decodeUserMessageThreadItem,
+	"agentMessage":        decodeAgentMessageThreadItem,
+	"plan":                decodePlanThreadItem,
+	"reasoning":           decodeReasoningThreadItem,
+	"commandExecution":    decodeCommandExecutionThreadItem,
+	"fileChange":          decodeFileChangeThreadItem,
+	"mcpToolCall":         decodeMcpToolCallThreadItem,
+	"dynamicToolCall":     decodeDynamicToolCallThreadItem,
+	"collabAgentToolCall": decodeCollabAgentToolCallThreadItem,
+	"webSearch":           decodeWebSearchThreadItem,
+	"imageView":           decodeImageViewThreadItem,
+	"enteredReviewMode":   decodeEnteredReviewModeThreadItem,
+	"exitedReviewMode":    decodeExitedReviewModeThreadItem,
+	"contextCompaction":   decodeContextCompactionThreadItem,
+}
+
+func decodeThreadItemInto(data []byte, dest ThreadItem, requiredFields ...string) (ThreadItem, error) {
+	return decodeThreadItemIntoWithValidation(data, dest, requiredFields, requiredFields)
+}
+
+func decodeThreadItemIntoWithValidation(
+	data []byte,
+	dest ThreadItem,
+	requiredFields []string,
+	nonNullFields []string,
+) (ThreadItem, error) {
+	if err := validateTaggedObjectFields(data, requiredFields, nonNullFields); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(data, dest); err != nil {
+		return nil, err
+	}
+	return dest, nil
+}
+
+func decodeUserMessageThreadItem(data []byte) (ThreadItem, error) {
+	var raw struct {
+		ID      string            `json:"id"`
+		Content []json.RawMessage `json:"content"`
+	}
+	if err := validateRequiredTaggedObjectFields(data, "id", "content"); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nil, err
+	}
+	inputs, err := unmarshalUserInputSlice(raw.Content)
+	if err != nil {
+		return nil, err
+	}
+	return &UserMessageThreadItem{ID: raw.ID, Content: inputs}, nil
+}
+
+func decodeAgentMessageThreadItem(data []byte) (ThreadItem, error) {
+	return decodeThreadItemInto(data, &AgentMessageThreadItem{}, "id", "text")
+}
+
+func decodePlanThreadItem(data []byte) (ThreadItem, error) {
+	return decodeThreadItemInto(data, &PlanThreadItem{}, "id", "text")
+}
+
+func decodeReasoningThreadItem(data []byte) (ThreadItem, error) {
+	return decodeThreadItemInto(data, &ReasoningThreadItem{}, "id")
+}
+
+func decodeCommandExecutionThreadItem(data []byte) (ThreadItem, error) {
+	return decodeThreadItemInto(data, &CommandExecutionThreadItem{}, "command", "commandActions", "cwd", "id", "status")
+}
+
+func decodeFileChangeThreadItem(data []byte) (ThreadItem, error) {
+	return decodeThreadItemInto(data, &FileChangeThreadItem{}, "changes", "id", "status")
+}
+
+func decodeMcpToolCallThreadItem(data []byte) (ThreadItem, error) {
+	return decodeThreadItemIntoWithValidation(
+		data,
+		&McpToolCallThreadItem{},
+		[]string{"arguments", "id", "server", "status", "tool"},
+		[]string{"id", "server", "status", "tool"},
+	)
+}
+
+func decodeDynamicToolCallThreadItem(data []byte) (ThreadItem, error) {
+	return decodeThreadItemIntoWithValidation(
+		data,
+		&DynamicToolCallThreadItem{},
+		[]string{"arguments", "id", "status", "tool"},
+		[]string{"id", "status", "tool"},
+	)
+}
+
+func decodeCollabAgentToolCallThreadItem(data []byte) (ThreadItem, error) {
+	return decodeThreadItemInto(data, &CollabAgentToolCallThreadItem{}, "agentsStates", "id", "receiverThreadIds", "senderThreadId", "status", "tool")
+}
+
+func decodeWebSearchThreadItem(data []byte) (ThreadItem, error) {
+	return decodeThreadItemInto(data, &WebSearchThreadItem{}, "id", "query")
+}
+
+func decodeImageViewThreadItem(data []byte) (ThreadItem, error) {
+	return decodeThreadItemInto(data, &ImageViewThreadItem{}, "id", "path")
+}
+
+func decodeEnteredReviewModeThreadItem(data []byte) (ThreadItem, error) {
+	return decodeThreadItemInto(data, &EnteredReviewModeThreadItem{}, "id", "review")
+}
+
+func decodeExitedReviewModeThreadItem(data []byte) (ThreadItem, error) {
+	return decodeThreadItemInto(data, &ExitedReviewModeThreadItem{}, "id", "review")
+}
+
+func decodeContextCompactionThreadItem(data []byte) (ThreadItem, error) {
+	return decodeThreadItemInto(data, &ContextCompactionThreadItem{}, "id")
+}
+
 // ThreadItemWrapper wraps the ThreadItem discriminated union for JSON marshaling/unmarshaling.
 type ThreadItemWrapper struct {
 	Value ThreadItem
 }
 
 func (w *ThreadItemWrapper) UnmarshalJSON(data []byte) error {
-	var typeCheck struct {
-		Type string `json:"type"`
-	}
-	if err := json.Unmarshal(data, &typeCheck); err != nil {
+	typeField, err := decodeRequiredObjectTypeField(data, "thread item")
+	if err != nil {
 		return err
 	}
 
-	switch typeCheck.Type {
-	case "userMessage":
-		// UserMessageThreadItem needs custom unmarshal for []UserInput.
-		var raw struct {
-			ID      string            `json:"id"`
-			Content []json.RawMessage `json:"content"`
-		}
-		if err := json.Unmarshal(data, &raw); err != nil {
-			return err
-		}
-		inputs, err := unmarshalUserInputSlice(raw.Content)
-		if err != nil {
-			return err
-		}
-		w.Value = &UserMessageThreadItem{ID: raw.ID, Content: inputs}
-		return nil
-
-	case "agentMessage":
-		var v AgentMessageThreadItem
-		if err := json.Unmarshal(data, &v); err != nil {
-			return err
-		}
-		w.Value = &v
-		return nil
-
-	case "plan":
-		var v PlanThreadItem
-		if err := json.Unmarshal(data, &v); err != nil {
-			return err
-		}
-		w.Value = &v
-		return nil
-
-	case "reasoning":
-		var v ReasoningThreadItem
-		if err := json.Unmarshal(data, &v); err != nil {
-			return err
-		}
-		w.Value = &v
-		return nil
-
-	case "commandExecution":
-		var v CommandExecutionThreadItem
-		if err := json.Unmarshal(data, &v); err != nil {
-			return err
-		}
-		w.Value = &v
-		return nil
-
-	case "fileChange":
-		var v FileChangeThreadItem
-		if err := json.Unmarshal(data, &v); err != nil {
-			return err
-		}
-		w.Value = &v
-		return nil
-
-	case "mcpToolCall":
-		var v McpToolCallThreadItem
-		if err := json.Unmarshal(data, &v); err != nil {
-			return err
-		}
-		w.Value = &v
-		return nil
-
-	case "dynamicToolCall":
-		var v DynamicToolCallThreadItem
-		if err := json.Unmarshal(data, &v); err != nil {
-			return err
-		}
-		w.Value = &v
-		return nil
-
-	case "collabAgentToolCall":
-		var v CollabAgentToolCallThreadItem
-		if err := json.Unmarshal(data, &v); err != nil {
-			return err
-		}
-		w.Value = &v
-		return nil
-
-	case "webSearch":
-		var v WebSearchThreadItem
-		if err := json.Unmarshal(data, &v); err != nil {
-			return err
-		}
-		w.Value = &v
-		return nil
-
-	case "imageView":
-		var v ImageViewThreadItem
-		if err := json.Unmarshal(data, &v); err != nil {
-			return err
-		}
-		w.Value = &v
-		return nil
-
-	case "enteredReviewMode":
-		var v EnteredReviewModeThreadItem
-		if err := json.Unmarshal(data, &v); err != nil {
-			return err
-		}
-		w.Value = &v
-		return nil
-
-	case "exitedReviewMode":
-		var v ExitedReviewModeThreadItem
-		if err := json.Unmarshal(data, &v); err != nil {
-			return err
-		}
-		w.Value = &v
-		return nil
-
-	case "contextCompaction":
-		var v ContextCompactionThreadItem
-		if err := json.Unmarshal(data, &v); err != nil {
-			return err
-		}
-		w.Value = &v
-		return nil
-
-	default:
-		w.Value = &UnknownThreadItem{Type: typeCheck.Type, Raw: append(json.RawMessage(nil), data...)}
+	decoder, ok := threadItemDecoders[typeField]
+	if !ok {
+		w.Value = &UnknownThreadItem{Type: typeField, Raw: append(json.RawMessage(nil), data...)}
 		return nil
 	}
+
+	value, err := decoder(data)
+	if err != nil {
+		return err
+	}
+	w.Value = value
+	return nil
 }
 
 func (w ThreadItemWrapper) MarshalJSON() ([]byte, error) {

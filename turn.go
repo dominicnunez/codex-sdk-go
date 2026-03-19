@@ -371,45 +371,58 @@ func (u *UnknownUserInput) MarshalJSON() ([]byte, error) {
 
 // UnmarshalUserInput unmarshals a UserInput from JSON based on the "type" field
 func UnmarshalUserInput(data []byte) (UserInput, error) {
-	var typeField struct {
-		Type string `json:"type"`
-	}
-	if err := json.Unmarshal(data, &typeField); err != nil {
+	typeField, err := decodeRequiredObjectTypeField(data, "user input")
+	if err != nil {
 		return nil, err
 	}
 
-	switch typeField.Type {
+	switch typeField {
 	case "text":
 		var input TextUserInput
+		if err := validateRequiredTaggedObjectFields(data, "text"); err != nil {
+			return nil, err
+		}
 		if err := json.Unmarshal(data, &input); err != nil {
 			return nil, err
 		}
 		return &input, nil
 	case "image":
 		var input ImageUserInput
+		if err := validateRequiredTaggedObjectFields(data, "url"); err != nil {
+			return nil, err
+		}
 		if err := json.Unmarshal(data, &input); err != nil {
 			return nil, err
 		}
 		return &input, nil
 	case "localImage":
 		var input LocalImageUserInput
+		if err := validateRequiredTaggedObjectFields(data, "path"); err != nil {
+			return nil, err
+		}
 		if err := json.Unmarshal(data, &input); err != nil {
 			return nil, err
 		}
 		return &input, nil
 	case "skill":
 		var input SkillUserInput
+		if err := validateRequiredTaggedObjectFields(data, "name", "path"); err != nil {
+			return nil, err
+		}
 		if err := json.Unmarshal(data, &input); err != nil {
 			return nil, err
 		}
 		return &input, nil
 	case "mention":
 		var input MentionUserInput
+		if err := validateRequiredTaggedObjectFields(data, "name", "path"); err != nil {
+			return nil, err
+		}
 		if err := json.Unmarshal(data, &input); err != nil {
 			return nil, err
 		}
 		return &input, nil
 	default:
-		return &UnknownUserInput{Type: typeField.Type, Raw: append(json.RawMessage(nil), data...)}, nil
+		return &UnknownUserInput{Type: typeField, Raw: append(json.RawMessage(nil), data...)}, nil
 	}
 }

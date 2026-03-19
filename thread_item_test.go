@@ -198,6 +198,22 @@ func TestThreadItemRoundTrip(t *testing.T) {
 			},
 		},
 		{
+			name:  "dynamicToolCall with null arguments",
+			input: `{"type":"dynamicToolCall","id":"d2","tool":"mytool","status":"failed","arguments":null,"success":false}`,
+			checkFn: func(t *testing.T, w codex.ThreadItemWrapper) {
+				v, ok := w.Value.(*codex.DynamicToolCallThreadItem)
+				if !ok {
+					t.Fatalf("expected *DynamicToolCallThreadItem, got %T", w.Value)
+				}
+				if v.Arguments != nil {
+					t.Errorf("Arguments = %#v, want nil", v.Arguments)
+				}
+				if v.Success == nil || *v.Success {
+					t.Errorf("Success = %v", v.Success)
+				}
+			},
+		},
+		{
 			name:  "collabAgentToolCall",
 			input: `{"type":"collabAgentToolCall","id":"ca1","tool":"spawnAgent","status":"completed","agentsStates":{"agent-1":{"status":"running"}},"receiverThreadIds":["t1"],"senderThreadId":"t0","prompt":"do stuff"}`,
 			checkFn: func(t *testing.T, w codex.ThreadItemWrapper) {
@@ -387,6 +403,74 @@ func TestThreadItemRejectsMalformedNestedPayloads(t *testing.T) {
 			err := json.Unmarshal([]byte(tt.input), &item)
 			if !errors.Is(err, codex.ErrMissingResultField) {
 				t.Fatalf("error = %v; want ErrMissingResultField", err)
+			}
+		})
+	}
+}
+
+func TestThreadItemRejectsMissingTopLevelRequiredFields(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{
+			name:  "user message missing id",
+			input: `{"type":"userMessage","content":[]}`,
+		},
+		{
+			name:  "agent message missing text",
+			input: `{"type":"agentMessage","id":"a1"}`,
+		},
+		{
+			name:  "web search missing query",
+			input: `{"type":"webSearch","id":"w1"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var item codex.ThreadItemWrapper
+			err := json.Unmarshal([]byte(tt.input), &item)
+			if !errors.Is(err, codex.ErrMissingResultField) {
+				t.Fatalf("error = %v; want ErrMissingResultField", err)
+			}
+		})
+	}
+}
+
+func TestThreadItemRejectsMissingOrEmptyType(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr error
+	}{
+		{
+			name:    "missing type",
+			input:   `{"id":"a1","text":"response"}`,
+			wantErr: codex.ErrMissingResultField,
+		},
+		{
+			name:    "empty type",
+			input:   `{"type":"","id":"a1","text":"response"}`,
+			wantErr: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var item codex.ThreadItemWrapper
+			err := json.Unmarshal([]byte(tt.input), &item)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("error = %v; want %v", err, tt.wantErr)
+				}
+				return
+			}
+			if err.Error() != "thread item: missing or empty type field" {
+				t.Fatalf("error = %v; want empty type failure", err)
 			}
 		})
 	}
