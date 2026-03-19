@@ -619,7 +619,11 @@ func (s *AccountService) Login(ctx context.Context, params LoginAccountParams) (
 	if err != nil {
 		return nil, err
 	}
-	return UnmarshalLoginAccountResponse(respData)
+	resp, err := UnmarshalLoginAccountResponse(respData)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", methodAccountLoginStart, err)
+	}
+	return resp, nil
 }
 
 func isNilLoginParams(params LoginAccountParams) bool {

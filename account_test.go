@@ -451,8 +451,8 @@ func TestAccountLoginRejectsMissingType(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for login result without type")
 	}
-	if !strings.Contains(err.Error(), "missing type") {
-		t.Fatalf("error = %v; want missing type context", err)
+	if !strings.Contains(err.Error(), "account/login/start: login response missing type") {
+		t.Fatalf("error = %v; want method-prefixed missing type context", err)
 	}
 }
 
@@ -487,6 +487,9 @@ func TestAccountLoginRejectsMalformedResult(t *testing.T) {
 	_, err := client.Account.Login(context.Background(), &codex.ChatgptLoginAccountParams{})
 	if err == nil {
 		t.Fatal("expected error for malformed login result")
+	}
+	if !strings.Contains(err.Error(), "account/login/start:") {
+		t.Fatalf("error = %v; want account/login/start prefix", err)
 	}
 }
 
