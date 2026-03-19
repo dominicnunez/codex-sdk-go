@@ -227,6 +227,93 @@ func TestTurnSteer(t *testing.T) {
 	}
 }
 
+func TestTurnRequestsRejectEmptyRequiredIDs(t *testing.T) {
+	tests := []struct {
+		name    string
+		call    func(*codex.Client) error
+		wantErr string
+	}{
+		{
+			name: "start rejects empty thread id",
+			call: func(client *codex.Client) error {
+				_, err := client.Turn.Start(context.Background(), codex.TurnStartParams{
+					ThreadID: "",
+					Input:    []codex.UserInput{&codex.TextUserInput{Text: "Hello"}},
+				})
+				return err
+			},
+			wantErr: "threadId must not be empty",
+		},
+		{
+			name: "interrupt rejects empty thread id",
+			call: func(client *codex.Client) error {
+				_, err := client.Turn.Interrupt(context.Background(), codex.TurnInterruptParams{
+					ThreadID: "",
+					TurnID:   "turn-456",
+				})
+				return err
+			},
+			wantErr: "threadId must not be empty",
+		},
+		{
+			name: "interrupt rejects empty turn id",
+			call: func(client *codex.Client) error {
+				_, err := client.Turn.Interrupt(context.Background(), codex.TurnInterruptParams{
+					ThreadID: "thread-123",
+					TurnID:   "",
+				})
+				return err
+			},
+			wantErr: "turnId must not be empty",
+		},
+		{
+			name: "steer rejects empty thread id",
+			call: func(client *codex.Client) error {
+				_, err := client.Turn.Steer(context.Background(), codex.TurnSteerParams{
+					ThreadID:       "",
+					ExpectedTurnID: "turn-456",
+					Input:          []codex.UserInput{&codex.TextUserInput{Text: "Actually, do this instead"}},
+				})
+				return err
+			},
+			wantErr: "threadId must not be empty",
+		},
+		{
+			name: "steer rejects empty expected turn id",
+			call: func(client *codex.Client) error {
+				_, err := client.Turn.Steer(context.Background(), codex.TurnSteerParams{
+					ThreadID:       "thread-123",
+					ExpectedTurnID: "",
+					Input:          []codex.UserInput{&codex.TextUserInput{Text: "Actually, do this instead"}},
+				})
+				return err
+			},
+			wantErr: "expectedTurnId must not be empty",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := NewMockTransport()
+			client := codex.NewClient(transport)
+
+			err := tt.call(client)
+			if err == nil {
+				t.Fatal("expected invalid params error")
+			}
+			if !strings.Contains(err.Error(), "invalid params") {
+				t.Fatalf("error = %v, want invalid params context", err)
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %v, want substring %q", err, tt.wantErr)
+			}
+			if transport.CallCount() != 0 {
+				t.Fatalf("CallCount() = %d, want 0", transport.CallCount())
+			}
+		})
+	}
+}
+
 // TestTurnStartedNotification tests TurnStartedNotification dispatch
 func TestTurnStartedNotification(t *testing.T) {
 	mockTransport := NewMockTransport()

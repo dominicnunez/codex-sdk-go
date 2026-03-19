@@ -188,7 +188,7 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 		_, _ = client.Thread.Start(context.Background(), codex.ThreadStartParams{})
 	})
 	verified["thread/read"] = verifyMethod(t, transport, "thread/read", func() {
-		_, _ = client.Thread.Read(context.Background(), codex.ThreadReadParams{})
+		_, _ = client.Thread.Read(context.Background(), codex.ThreadReadParams{ThreadID: "thread-1"})
 	})
 	verified["thread/list"] = verifyMethod(t, transport, "thread/list", func() {
 		_, _ = client.Thread.List(context.Background(), codex.ThreadListParams{})
@@ -197,42 +197,49 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 		_, _ = client.Thread.LoadedList(context.Background(), codex.ThreadLoadedListParams{})
 	})
 	verified["thread/resume"] = verifyMethod(t, transport, "thread/resume", func() {
-		_, _ = client.Thread.Resume(context.Background(), codex.ThreadResumeParams{})
+		_, _ = client.Thread.Resume(context.Background(), codex.ThreadResumeParams{ThreadID: "thread-1"})
 	})
 	verified["thread/fork"] = verifyMethod(t, transport, "thread/fork", func() {
-		_, _ = client.Thread.Fork(context.Background(), codex.ThreadForkParams{})
+		_, _ = client.Thread.Fork(context.Background(), codex.ThreadForkParams{ThreadID: "thread-1"})
 	})
 	verified["thread/rollback"] = verifyMethod(t, transport, "thread/rollback", func() {
-		_, _ = client.Thread.Rollback(context.Background(), codex.ThreadRollbackParams{})
+		_, _ = client.Thread.Rollback(context.Background(), codex.ThreadRollbackParams{ThreadID: "thread-1", NumTurns: 1})
 	})
 	verified["thread/name/set"] = verifyMethod(t, transport, "thread/name/set", func() {
-		_, _ = client.Thread.SetName(context.Background(), codex.ThreadSetNameParams{})
+		_, _ = client.Thread.SetName(context.Background(), codex.ThreadSetNameParams{ThreadID: "thread-1", Name: "thread"})
 	})
 	verified["thread/metadata/update"] = verifyMethod(t, transport, "thread/metadata/update", func() {
 		_, _ = client.Thread.MetadataUpdate(context.Background(), codex.ThreadMetadataUpdateParams{ThreadID: "thread-1"})
 	})
 	verified["thread/archive"] = verifyMethod(t, transport, "thread/archive", func() {
-		_, _ = client.Thread.Archive(context.Background(), codex.ThreadArchiveParams{})
+		_, _ = client.Thread.Archive(context.Background(), codex.ThreadArchiveParams{ThreadID: "thread-1"})
 	})
 	verified["thread/unarchive"] = verifyMethod(t, transport, "thread/unarchive", func() {
-		_, _ = client.Thread.Unarchive(context.Background(), codex.ThreadUnarchiveParams{})
+		_, _ = client.Thread.Unarchive(context.Background(), codex.ThreadUnarchiveParams{ThreadID: "thread-1"})
 	})
 	verified["thread/unsubscribe"] = verifyMethod(t, transport, "thread/unsubscribe", func() {
-		_, _ = client.Thread.Unsubscribe(context.Background(), codex.ThreadUnsubscribeParams{})
+		_, _ = client.Thread.Unsubscribe(context.Background(), codex.ThreadUnsubscribeParams{ThreadID: "thread-1"})
 	})
 	verified["thread/compact/start"] = verifyMethod(t, transport, "thread/compact/start", func() {
-		_, _ = client.Thread.CompactStart(context.Background(), codex.ThreadCompactStartParams{})
+		_, _ = client.Thread.CompactStart(context.Background(), codex.ThreadCompactStartParams{ThreadID: "thread-1"})
 	})
 
 	// Verify Turn service
 	verified["turn/start"] = verifyMethod(t, transport, "turn/start", func() {
-		_, _ = client.Turn.Start(context.Background(), codex.TurnStartParams{})
+		_, _ = client.Turn.Start(context.Background(), codex.TurnStartParams{
+			ThreadID: "thread-1",
+			Input:    []codex.UserInput{&codex.TextUserInput{Text: "hello"}},
+		})
 	})
 	verified["turn/interrupt"] = verifyMethod(t, transport, "turn/interrupt", func() {
-		_, _ = client.Turn.Interrupt(context.Background(), codex.TurnInterruptParams{})
+		_, _ = client.Turn.Interrupt(context.Background(), codex.TurnInterruptParams{ThreadID: "thread-1", TurnID: "turn-1"})
 	})
 	verified["turn/steer"] = verifyMethod(t, transport, "turn/steer", func() {
-		_, _ = client.Turn.Steer(context.Background(), codex.TurnSteerParams{})
+		_, _ = client.Turn.Steer(context.Background(), codex.TurnSteerParams{
+			ThreadID:       "thread-1",
+			ExpectedTurnID: "turn-1",
+			Input:          []codex.UserInput{&codex.TextUserInput{Text: "hello"}},
+		})
 	})
 
 	// Verify System service

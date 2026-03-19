@@ -507,9 +507,97 @@ func (p CommandExecResizeParams) prepareRequest() (interface{}, error) {
 }
 
 func (p TurnStartParams) prepareRequest() (interface{}, error) {
+	if err := validateThreadScopedRequest(p.ThreadID); err != nil {
+		return nil, err
+	}
+
 	var err error
 	p.SandboxPolicy, err = normalizeSandboxPolicyPointerField("sandboxPolicy", p.SandboxPolicy)
 	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (p TurnInterruptParams) prepareRequest() (interface{}, error) {
+	if err := validateTurnScopedRequest(p.ThreadID, p.TurnID); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (p TurnSteerParams) prepareRequest() (interface{}, error) {
+	if err := validateExpectedTurnScopedRequest(p.ThreadID, p.ExpectedTurnID); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (p ThreadReadParams) prepareRequest() (interface{}, error) {
+	if err := validateThreadScopedRequest(p.ThreadID); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (p ThreadResumeParams) prepareRequest() (interface{}, error) {
+	if err := validateThreadScopedRequest(p.ThreadID); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (p ThreadForkParams) prepareRequest() (interface{}, error) {
+	if err := validateThreadScopedRequest(p.ThreadID); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (p ThreadRollbackParams) prepareRequest() (interface{}, error) {
+	if err := validateThreadScopedRequest(p.ThreadID); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (p ThreadSetNameParams) prepareRequest() (interface{}, error) {
+	if err := validateThreadScopedRequest(p.ThreadID); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (p ThreadMetadataUpdateParams) prepareRequest() (interface{}, error) {
+	if err := validateThreadScopedRequest(p.ThreadID); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (p ThreadArchiveParams) prepareRequest() (interface{}, error) {
+	if err := validateThreadScopedRequest(p.ThreadID); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (p ThreadUnarchiveParams) prepareRequest() (interface{}, error) {
+	if err := validateThreadScopedRequest(p.ThreadID); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (p ThreadUnsubscribeParams) prepareRequest() (interface{}, error) {
+	if err := validateThreadScopedRequest(p.ThreadID); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (p ThreadCompactStartParams) prepareRequest() (interface{}, error) {
+	if err := validateThreadScopedRequest(p.ThreadID); err != nil {
 		return nil, err
 	}
 	return p, nil
@@ -558,6 +646,24 @@ func validateOptionalNonEmptyStringField(field string, value *string) error {
 		return nil
 	}
 	return validateRequiredNonEmptyStringField(field, *value)
+}
+
+func validateThreadScopedRequest(threadID string) error {
+	return validateRequiredNonEmptyStringField("threadId", threadID)
+}
+
+func validateTurnScopedRequest(threadID, turnID string) error {
+	if err := validateThreadScopedRequest(threadID); err != nil {
+		return err
+	}
+	return validateRequiredNonEmptyStringField("turnId", turnID)
+}
+
+func validateExpectedTurnScopedRequest(threadID, expectedTurnID string) error {
+	if err := validateThreadScopedRequest(threadID); err != nil {
+		return err
+	}
+	return validateRequiredNonEmptyStringField("expectedTurnId", expectedTurnID)
 }
 
 func validateRequiredNonEmptyStringField(field, value string) error {

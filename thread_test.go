@@ -194,6 +194,120 @@ func TestThreadRead(t *testing.T) {
 	})
 }
 
+func TestThreadRequestsRejectEmptyRequiredIDs(t *testing.T) {
+	tests := []struct {
+		name    string
+		call    func(*codex.Client) error
+		wantErr string
+	}{
+		{
+			name: "read rejects empty thread id",
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Read(context.Background(), codex.ThreadReadParams{})
+				return err
+			},
+			wantErr: "threadId must not be empty",
+		},
+		{
+			name: "resume rejects empty thread id",
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Resume(context.Background(), codex.ThreadResumeParams{})
+				return err
+			},
+			wantErr: "threadId must not be empty",
+		},
+		{
+			name: "fork rejects empty thread id",
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Fork(context.Background(), codex.ThreadForkParams{})
+				return err
+			},
+			wantErr: "threadId must not be empty",
+		},
+		{
+			name: "rollback rejects empty thread id",
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Rollback(context.Background(), codex.ThreadRollbackParams{
+					NumTurns: 1,
+				})
+				return err
+			},
+			wantErr: "threadId must not be empty",
+		},
+		{
+			name: "set name rejects empty thread id",
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.SetName(context.Background(), codex.ThreadSetNameParams{
+					Name: "name",
+				})
+				return err
+			},
+			wantErr: "threadId must not be empty",
+		},
+		{
+			name: "metadata update rejects empty thread id",
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.MetadataUpdate(context.Background(), codex.ThreadMetadataUpdateParams{})
+				return err
+			},
+			wantErr: "threadId must not be empty",
+		},
+		{
+			name: "archive rejects empty thread id",
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Archive(context.Background(), codex.ThreadArchiveParams{})
+				return err
+			},
+			wantErr: "threadId must not be empty",
+		},
+		{
+			name: "unarchive rejects empty thread id",
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Unarchive(context.Background(), codex.ThreadUnarchiveParams{})
+				return err
+			},
+			wantErr: "threadId must not be empty",
+		},
+		{
+			name: "unsubscribe rejects empty thread id",
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Unsubscribe(context.Background(), codex.ThreadUnsubscribeParams{})
+				return err
+			},
+			wantErr: "threadId must not be empty",
+		},
+		{
+			name: "compact start rejects empty thread id",
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.CompactStart(context.Background(), codex.ThreadCompactStartParams{})
+				return err
+			},
+			wantErr: "threadId must not be empty",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := NewMockTransport()
+			client := codex.NewClient(transport)
+
+			err := tt.call(client)
+			if err == nil {
+				t.Fatal("expected invalid params error")
+			}
+			if !strings.Contains(err.Error(), "invalid params") {
+				t.Fatalf("error = %v, want invalid params context", err)
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %v, want substring %q", err, tt.wantErr)
+			}
+			if transport.CallCount() != 0 {
+				t.Fatalf("CallCount() = %d, want 0", transport.CallCount())
+			}
+		})
+	}
+}
+
 func TestThreadResponsesRejectMissingRequiredThreadFields(t *testing.T) {
 	tests := []struct {
 		name    string
