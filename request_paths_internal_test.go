@@ -30,9 +30,19 @@ func TestNormalizeAbsolutePath(t *testing.T) {
 			want:  `\\server\share\calendar`,
 		},
 		{
+			name:  "windows unc share root is preserved",
+			input: `\\server\share`,
+			want:  `\\server\share`,
+		},
+		{
 			name:  "windows extended path is cleaned",
 			input: `\\?\Volume{1234}\plugins\..\calendar`,
 			want:  `\\?\Volume{1234}\calendar`,
+		},
+		{
+			name:  "windows extended unc share root is preserved",
+			input: `\\?\UNC\server\share`,
+			want:  `\\?\UNC\server\share`,
 		},
 		{
 			name:    "relative path is rejected",

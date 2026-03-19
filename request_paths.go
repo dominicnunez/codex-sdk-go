@@ -265,6 +265,12 @@ func splitWindowsExtendedAbsolutePath(value string) (string, string, bool) {
 }
 
 func normalizeWindowsPath(prefix, rest string, rootNeedsSeparator bool) string {
+	if rest == "" {
+		if rootNeedsSeparator {
+			return prefix + `\`
+		}
+		return prefix
+	}
 	cleaned := pathpkg.Clean(strings.ReplaceAll(rest, `\`, "/"))
 	if cleaned == "/" {
 		if rootNeedsSeparator {
