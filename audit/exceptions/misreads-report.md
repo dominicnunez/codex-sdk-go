@@ -69,3 +69,22 @@ shell-handler path where `SIGINT` triggers cleanup and exits with status `130`.
 The test initializes a fake child, traps `INT`, exits `130`, and asserts that
 `Process.Close()` succeeds after the final notification is drained. The reported
 testing gap is stale against the current suite.
+
+### Streamed validation failures already populate the collector summary
+
+**Location:** `run_streamed.go:250`, `run_streamed_test.go:154` — synchronous validation path and regression coverage
+
+**Reason:** The current `runStreamedWithCollector` path already routes synchronous
+validation failures through `newCollectedErrorStream`, which records the error in
+the collector before returning the terminal error stream. The checked-in tests
+cover both nil-context and empty-prompt collector cases and assert that
+`Summary().NormalizedErrors` contains the validation error. The finding is stale
+against the current implementation and test suite.
+
+### CI already enforces module tidiness
+
+**Location:** `.github/workflows/ci.yml:43`, `tooling_checks_test.go:45` — workflow gate and tooling test
+
+**Reason:** The current GitHub Actions workflow already runs `go mod tidy -diff`
+in the main CI job, and the tooling test still verifies the same rule under the
+optional tooling lane. The finding no longer matches the checked-in workflow.
