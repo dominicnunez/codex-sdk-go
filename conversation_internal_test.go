@@ -6,6 +6,18 @@ import (
 	"testing"
 )
 
+func newConversationForTest(thread Thread) *Conversation {
+	return &Conversation{state: newConversationState(thread)}
+}
+
+func storedConversationThread(t *testing.T, conv *Conversation) Thread {
+	t.Helper()
+	if conv == nil || conv.state == nil {
+		t.Fatal("conversation state is nil")
+	}
+	return conv.state.snapshot()
+}
+
 type uncloneableThreadItem struct {
 	Fn func()
 }
@@ -62,18 +74,16 @@ func (uncloneableWebSearchAction) webSearchAction() {}
 
 func TestThreadCloneAdditionalDetails(t *testing.T) {
 	details := "retry after 30s"
-	conv := &Conversation{
-		thread: Thread{
-			Turns: []Turn{{
-				ID:     "t1",
-				Status: "completed",
-				Error: &TurnError{
-					Message:           "rate limited",
-					AdditionalDetails: &details,
-				},
-			}},
-		},
-	}
+	conv := newConversationForTest(Thread{
+		Turns: []Turn{{
+			ID:     "t1",
+			Status: "completed",
+			Error: &TurnError{
+				Message:           "rate limited",
+				AdditionalDetails: &details,
+			},
+		}},
+	})
 
 	snap := conv.Thread()
 	if snap.Turns[0].Error.AdditionalDetails == nil {
@@ -87,29 +97,31 @@ func TestThreadCloneAdditionalDetails(t *testing.T) {
 	*snap.Turns[0].Error.AdditionalDetails = "mutated"
 
 	// Original must be unchanged.
-	if *conv.thread.Turns[0].Error.AdditionalDetails != "retry after 30s" {
+	original := storedConversationThread(t, conv)
+	if *original.Turns[0].Error.AdditionalDetails != "retry after 30s" {
 		t.Errorf("AdditionalDetails = %q, want %q — mutation leaked through shallow copy",
-			*conv.thread.Turns[0].Error.AdditionalDetails, "retry after 30s")
+			*original.Turns[0].Error.AdditionalDetails, "retry after 30s")
 	}
 }
 
-func TestConversationThreadFallsBackToPinnedLatestSnapshotAfterEvictionPressure(t *testing.T) {
+func TestConversationThreadRetainsLatestSnapshotAfterCacheEvictionPressure(t *testing.T) {
 	client := &Client{
-		threadStates:    make(map[string]Thread),
-		threadStatePins: make(map[string]int),
+		threadStates:         make(map[string]Thread),
+		threadStateListeners: make(map[string][]threadStateListener),
 	}
 	process := &Process{Client: client}
 	conv := &Conversation{
 		process:  process,
 		threadID: "thread-1",
-		thread: Thread{
+		state: newConversationState(Thread{
 			ID:     "thread-1",
 			Status: ThreadStatusWrapper{Value: ThreadStatusIdle{}},
-		},
+		}),
 	}
+	unsubscribe := client.addThreadStateListener(conv.threadID, conv.state.storeSnapshot)
+	defer unsubscribe()
 
-	client.cacheThreadState(conv.thread)
-	client.pinThreadState(conv.threadID)
+	client.cacheThreadState(storedConversationThread(t, conv))
 
 	name := "renamed"
 	client.mutateThreadState(conv.threadID, func(thread *Thread) {
@@ -137,27 +149,25 @@ func TestConversationThreadFallsBackToPinnedLatestSnapshotAfterEvictionPressure(
 }
 
 func TestThreadCloneSourceIsolation(t *testing.T) {
-	conv := &Conversation{
-		thread: Thread{
-			Source: SessionSourceWrapper{
-				Value: SessionSourceSubAgent{
-					SubAgent: SubAgentSourceThreadSpawn{
-						ThreadSpawn: struct {
-							AgentNickname  string `json:"agent_nickname"`
-							AgentRole      string `json:"agent_role"`
-							Depth          uint32 `json:"depth"`
-							ParentThreadID string `json:"parent_thread_id"`
-						}{
-							AgentNickname:  "helper",
-							AgentRole:      "assistant",
-							Depth:          1,
-							ParentThreadID: "parent-1",
-						},
+	conv := newConversationForTest(Thread{
+		Source: SessionSourceWrapper{
+			Value: SessionSourceSubAgent{
+				SubAgent: SubAgentSourceThreadSpawn{
+					ThreadSpawn: struct {
+						AgentNickname  string `json:"agent_nickname"`
+						AgentRole      string `json:"agent_role"`
+						Depth          uint32 `json:"depth"`
+						ParentThreadID string `json:"parent_thread_id"`
+					}{
+						AgentNickname:  "helper",
+						AgentRole:      "assistant",
+						Depth:          1,
+						ParentThreadID: "parent-1",
 					},
 				},
 			},
 		},
-	}
+	})
 
 	snap := conv.Thread()
 	sub, ok := snap.Source.Value.(SessionSourceSubAgent)
@@ -172,7 +182,7 @@ func TestThreadCloneSourceIsolation(t *testing.T) {
 		t.Errorf("snapshot has wrong value: got %q, want %q", ts.ThreadSpawn.AgentNickname, "helper")
 	}
 
-	origSub, ok := conv.thread.Source.Value.(SessionSourceSubAgent)
+	origSub, ok := storedConversationThread(t, conv).Source.Value.(SessionSourceSubAgent)
 	if !ok {
 		t.Fatal("expected original SessionSourceSubAgent")
 	}
@@ -186,15 +196,13 @@ func TestThreadCloneSourceIsolation(t *testing.T) {
 }
 
 func TestThreadCloneStatusIsolation(t *testing.T) {
-	conv := &Conversation{
-		thread: Thread{
-			Status: ThreadStatusWrapper{
-				Value: ThreadStatusActive{
-					ActiveFlags: []ThreadActiveFlag{"running", "streaming"},
-				},
+	conv := newConversationForTest(Thread{
+		Status: ThreadStatusWrapper{
+			Value: ThreadStatusActive{
+				ActiveFlags: []ThreadActiveFlag{"running", "streaming"},
 			},
 		},
-	}
+	})
 
 	snap := conv.Thread()
 	active, ok := snap.Status.Value.(ThreadStatusActive)
@@ -205,7 +213,7 @@ func TestThreadCloneStatusIsolation(t *testing.T) {
 	// Mutate the snapshot's ActiveFlags slice.
 	active.ActiveFlags[0] = "mutated"
 
-	origActive, ok := conv.thread.Status.Value.(ThreadStatusActive)
+	origActive, ok := storedConversationThread(t, conv).Status.Value.(ThreadStatusActive)
 	if !ok {
 		t.Fatal("expected original ThreadStatusActive")
 	}
@@ -271,41 +279,39 @@ func TestCloneThreadItemWrapperRoundTrip(t *testing.T) {
 func TestThreadCloneNestedItemIsolation(t *testing.T) {
 	path := "/tmp"
 	placeholder := "file-path"
-	conv := &Conversation{
-		thread: Thread{
-			Turns: []Turn{{
-				ID:     "t1",
-				Status: TurnStatusCompleted,
-				Items: []ThreadItemWrapper{
-					{
-						Value: &UserMessageThreadItem{
-							ID: "u1",
-							Content: []UserInput{
-								&TextUserInput{
-									Text: "hello",
-									TextElements: []TextElement{{
-										ByteRange:   ByteRange{Start: 0, End: 5},
-										Placeholder: &placeholder,
-									}},
-								},
-							},
-						},
-					},
-					{
-						Value: &CommandExecutionThreadItem{
-							ID:      "cmd-1",
-							Command: "rg",
-							Cwd:     "/tmp",
-							Status:  CommandExecutionStatusCompleted,
-							CommandActions: []CommandActionWrapper{
-								{Value: &SearchCommandAction{Command: "rg", Path: &path}},
+	conv := newConversationForTest(Thread{
+		Turns: []Turn{{
+			ID:     "t1",
+			Status: TurnStatusCompleted,
+			Items: []ThreadItemWrapper{
+				{
+					Value: &UserMessageThreadItem{
+						ID: "u1",
+						Content: []UserInput{
+							&TextUserInput{
+								Text: "hello",
+								TextElements: []TextElement{{
+									ByteRange:   ByteRange{Start: 0, End: 5},
+									Placeholder: &placeholder,
+								}},
 							},
 						},
 					},
 				},
-			}},
-		},
-	}
+				{
+					Value: &CommandExecutionThreadItem{
+						ID:      "cmd-1",
+						Command: "rg",
+						Cwd:     "/tmp",
+						Status:  CommandExecutionStatusCompleted,
+						CommandActions: []CommandActionWrapper{
+							{Value: &SearchCommandAction{Command: "rg", Path: &path}},
+						},
+					},
+				},
+			},
+		}},
+	})
 
 	snap := conv.Thread()
 	user := snap.Turns[0].Items[0].Value.(*UserMessageThreadItem)
@@ -316,13 +322,14 @@ func TestThreadCloneNestedItemIsolation(t *testing.T) {
 	search := cmd.CommandActions[0].Value.(*SearchCommandAction)
 	*search.Path = "/changed"
 
-	origUser := conv.thread.Turns[0].Items[0].Value.(*UserMessageThreadItem)
+	original := storedConversationThread(t, conv)
+	origUser := original.Turns[0].Items[0].Value.(*UserMessageThreadItem)
 	origText := origUser.Content[0].(*TextUserInput)
 	if *origText.TextElements[0].Placeholder != "file-path" {
 		t.Fatalf("placeholder mutation leaked: got %q, want %q", *origText.TextElements[0].Placeholder, "file-path")
 	}
 
-	origCmd := conv.thread.Turns[0].Items[1].Value.(*CommandExecutionThreadItem)
+	origCmd := original.Turns[0].Items[1].Value.(*CommandExecutionThreadItem)
 	origSearch := origCmd.CommandActions[0].Value.(*SearchCommandAction)
 	if *origSearch.Path != "/tmp" {
 		t.Fatalf("command action path mutation leaked: got %q, want %q", *origSearch.Path, "/tmp")
@@ -333,27 +340,25 @@ func TestThreadCloneCollabToolCallPointerIsolation(t *testing.T) {
 	model := "gpt-5"
 	effort := ReasoningEffortHigh
 	prompt := "delegate this"
-	conv := &Conversation{
-		thread: Thread{
-			Turns: []Turn{{
-				ID:     "t1",
-				Status: TurnStatusCompleted,
-				Items: []ThreadItemWrapper{{
-					Value: &CollabAgentToolCallThreadItem{
-						ID:                "collab-1",
-						Tool:              CollabAgentToolSpawnAgent,
-						Status:            CollabAgentToolCallStatusCompleted,
-						AgentsStates:      map[string]CollabAgentState{"worker": {Status: CollabAgentStatusCompleted}},
-						Model:             &model,
-						ReceiverThreadIds: []string{"thread-2"},
-						ReasoningEffort:   &effort,
-						SenderThreadId:    "thread-1",
-						Prompt:            &prompt,
-					},
-				}},
+	conv := newConversationForTest(Thread{
+		Turns: []Turn{{
+			ID:     "t1",
+			Status: TurnStatusCompleted,
+			Items: []ThreadItemWrapper{{
+				Value: &CollabAgentToolCallThreadItem{
+					ID:                "collab-1",
+					Tool:              CollabAgentToolSpawnAgent,
+					Status:            CollabAgentToolCallStatusCompleted,
+					AgentsStates:      map[string]CollabAgentState{"worker": {Status: CollabAgentStatusCompleted}},
+					Model:             &model,
+					ReceiverThreadIds: []string{"thread-2"},
+					ReasoningEffort:   &effort,
+					SenderThreadId:    "thread-1",
+					Prompt:            &prompt,
+				},
 			}},
-		},
-	}
+		}},
+	})
 
 	snap := conv.Thread()
 	item, ok := snap.Turns[0].Items[0].Value.(*CollabAgentToolCallThreadItem)
@@ -365,7 +370,7 @@ func TestThreadCloneCollabToolCallPointerIsolation(t *testing.T) {
 	*item.ReasoningEffort = ReasoningEffortLow
 	*item.Prompt = "mutated"
 
-	orig, ok := conv.thread.Turns[0].Items[0].Value.(*CollabAgentToolCallThreadItem)
+	orig, ok := storedConversationThread(t, conv).Turns[0].Items[0].Value.(*CollabAgentToolCallThreadItem)
 	if !ok {
 		t.Fatal("expected original CollabAgentToolCallThreadItem")
 	}
@@ -381,24 +386,22 @@ func TestThreadCloneCollabToolCallPointerIsolation(t *testing.T) {
 }
 
 func TestThreadCloneDoesNotPanicOnUnmarshalableDynamicArguments(t *testing.T) {
-	conv := &Conversation{
-		thread: Thread{
-			Turns: []Turn{{
-				ID:     "t1",
-				Status: TurnStatusCompleted,
-				Items: []ThreadItemWrapper{
-					{
-						Value: &DynamicToolCallThreadItem{
-							ID:        "dyn-1",
-							Tool:      "tool",
-							Status:    DynamicToolCallStatusCompleted,
-							Arguments: func() {},
-						},
+	conv := newConversationForTest(Thread{
+		Turns: []Turn{{
+			ID:     "t1",
+			Status: TurnStatusCompleted,
+			Items: []ThreadItemWrapper{
+				{
+					Value: &DynamicToolCallThreadItem{
+						ID:        "dyn-1",
+						Tool:      "tool",
+						Status:    DynamicToolCallStatusCompleted,
+						Arguments: func() {},
 					},
 				},
-			}},
-		},
-	}
+			},
+		}},
+	})
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -448,19 +451,17 @@ func TestCloneFallbacksDropUncloneableValues(t *testing.T) {
 		t.Fatalf("cloneJSONValue returned %#v, want nil for uncloneable input", got)
 	}
 
-	conv := &Conversation{
-		thread: Thread{
-			Source: SessionSourceWrapper{Value: uncloneableSessionSource{}},
-			Status: ThreadStatusWrapper{Value: uncloneableThreadStatus{}},
-			Turns: []Turn{{
-				ID:     "turn-1",
-				Status: TurnStatusCompleted,
-				Items: []ThreadItemWrapper{
-					{Value: &uncloneableThreadItem{}},
-				},
-			}},
-		},
-	}
+	conv := newConversationForTest(Thread{
+		Source: SessionSourceWrapper{Value: uncloneableSessionSource{}},
+		Status: ThreadStatusWrapper{Value: uncloneableThreadStatus{}},
+		Turns: []Turn{{
+			ID:     "turn-1",
+			Status: TurnStatusCompleted,
+			Items: []ThreadItemWrapper{
+				{Value: &uncloneableThreadItem{}},
+			},
+		}},
+	})
 
 	snap := conv.Thread()
 	if snap.Source.Value != nil {

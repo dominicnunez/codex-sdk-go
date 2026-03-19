@@ -33,12 +33,55 @@ var errTurnInProgress = errors.New("a turn is already in progress on this conver
 // Concurrent Turn or TurnStreamed calls on the same Conversation are
 // not supported — the second call returns errTurnInProgress.
 type Conversation struct {
-	process                  *Process
-	threadID                 string
-	thread                   Thread
+	process  *Process
+	threadID string
+	state    *conversationState
+}
+
+type conversationState struct {
 	mu                       sync.Mutex
+	thread                   Thread
 	activeTurn               bool
 	hasCompletedTerminalTurn bool
+}
+
+func newConversationState(thread Thread) *conversationState {
+	return &conversationState{thread: cloneThreadState(thread)}
+}
+
+func (s *conversationState) snapshot() Thread {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return cloneThreadState(s.thread)
+}
+
+func (s *conversationState) storeSnapshot(thread Thread) {
+	s.mu.Lock()
+	s.thread = cloneThreadState(thread)
+	s.mu.Unlock()
+}
+
+func (s *conversationState) startTurn() (Thread, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.activeTurn {
+		return Thread{}, false, errTurnInProgress
+	}
+	s.activeTurn = true
+	return cloneThreadState(s.thread), !s.hasCompletedTerminalTurn, nil
+}
+
+func (s *conversationState) finishTurn() {
+	s.mu.Lock()
+	s.activeTurn = false
+	s.mu.Unlock()
+}
+
+func (s *conversationState) applyCompletedThread(thread Thread) {
+	s.mu.Lock()
+	s.thread = cloneThreadState(thread)
+	s.hasCompletedTerminalTurn = true
+	s.mu.Unlock()
 }
 
 // ThreadID returns the underlying thread ID.
@@ -46,38 +89,23 @@ func (c *Conversation) ThreadID() string {
 	return c.threadID
 }
 
-// Thread returns a deep-copy snapshot of the latest thread state known to the
-// client. The snapshot reflects thread metadata cached from thread service
-// responses, thread lifecycle notifications, and turns completed through this
-// Conversation. When no client-backed snapshot is available, it falls back to
-// the Conversation's locally tracked state. The returned Thread is fully
-// isolated from internal state, so mutating the snapshot does not affect the
-// Conversation or client cache.
+// Thread returns a deep-copy snapshot of the latest thread state tracked by
+// this conversation. The snapshot is kept current from thread service
+// responses, metadata notifications, and turns completed through the
+// Conversation. The returned Thread is fully isolated from internal state, so
+// mutating the snapshot does not affect the Conversation or client cache.
 func (c *Conversation) Thread() Thread {
-	if c.process != nil && c.process.Client != nil {
-		if snapshot, ok := c.process.Client.threadStateSnapshot(c.threadID); ok {
-			return snapshot
-		}
+	if c == nil || c.state == nil {
+		return Thread{}
 	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return cloneThreadState(c.thread)
-}
-
-func (c *Conversation) latestThreadStateLocked() Thread {
-	if c.process != nil && c.process.Client != nil {
-		if snapshot, ok := c.process.Client.threadStateSnapshot(c.threadID); ok {
-			return snapshot
-		}
-	}
-	return cloneThreadState(c.thread)
+	return c.state.snapshot()
 }
 
 func (c *Conversation) applyCompletedThread(thread Thread) {
-	c.mu.Lock()
-	c.thread = cloneThreadState(thread)
-	c.hasCompletedTerminalTurn = true
-	c.mu.Unlock()
+	if c == nil || c.state == nil {
+		return
+	}
+	c.state.applyCompletedThread(thread)
 }
 
 func cloneThreadState(thread Thread) Thread {
@@ -648,19 +676,21 @@ func (p *Process) StartConversation(ctx context.Context, opts ConversationOption
 		return nil, fmt.Errorf("thread/start: %w", err)
 	}
 
-	p.Client.pinThreadState(resp.Thread.ID)
-
+	state := newConversationState(resp.Thread)
 	conv := &Conversation{
 		process:  p,
 		threadID: resp.Thread.ID,
-		thread:   resp.Thread,
+		state:    state,
 	}
-	runtime.SetFinalizer(conv, func(c *Conversation) {
-		if c == nil || c.process == nil || c.process.Client == nil {
-			return
+	unsubscribe := p.Client.addThreadStateListener(resp.Thread.ID, state.storeSnapshot)
+	if snapshot, ok := p.Client.threadStateSnapshot(resp.Thread.ID); ok {
+		state.storeSnapshot(snapshot)
+	}
+	runtime.AddCleanup(conv, func(unsub func()) {
+		if unsub != nil {
+			unsub()
 		}
-		c.process.Client.unpinThreadState(c.threadID)
-	})
+	}, unsubscribe)
 
 	return conv, nil
 }
@@ -697,20 +727,13 @@ func (c *Conversation) Turn(ctx context.Context, opts TurnOptions) (*RunResult, 
 		return nil, err
 	}
 
-	c.mu.Lock()
-	if c.activeTurn {
-		c.mu.Unlock()
-		return nil, errTurnInProgress
+	thread, allowMissingInitialTurnID, err := c.state.startTurn()
+	if err != nil {
+		return nil, err
 	}
-	c.activeTurn = true
-	thread := c.latestThreadStateLocked()
-	allowMissingInitialTurnID := !c.hasCompletedTerminalTurn
-	c.mu.Unlock()
 
 	defer func() {
-		c.mu.Lock()
-		c.activeTurn = false
-		c.mu.Unlock()
+		c.state.finishTurn()
 	}()
 
 	return executeTurn(ctx, turnLifecycleParams{
@@ -755,21 +778,14 @@ func (c *Conversation) turnStreamedLifecycle(ctx context.Context, opts TurnOptio
 		return
 	}
 
-	c.mu.Lock()
-	if c.activeTurn {
-		c.mu.Unlock()
-		streamSendErr(g, errTurnInProgress)
+	thread, allowMissingInitialTurnID, err := c.state.startTurn()
+	if err != nil {
+		streamSendErr(g, err)
 		return
 	}
-	c.activeTurn = true
-	thread := c.latestThreadStateLocked()
-	allowMissingInitialTurnID := !c.hasCompletedTerminalTurn
-	c.mu.Unlock()
 
 	defer func() {
-		c.mu.Lock()
-		c.activeTurn = false
-		c.mu.Unlock()
+		c.state.finishTurn()
 	}()
 
 	executeStreamedTurn(ctx, turnLifecycleParams{

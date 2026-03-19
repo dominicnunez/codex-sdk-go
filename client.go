@@ -172,6 +172,11 @@ type internalListener struct {
 	handler NotificationHandler
 }
 
+type threadStateListener struct {
+	id      uint64
+	handler func(Thread)
+}
+
 // Client is the main entry point for interacting with the Codex JSON-RPC server.
 // It uses a Transport for bidirectional communication and provides typed methods
 // for all protocol operations.
@@ -190,15 +195,16 @@ type Client struct {
 
 	// Best-effort latest thread snapshots keyed by thread ID. This is updated
 	// from thread-bearing responses and thread metadata notifications so
-	// Conversation.Thread can return current metadata without per-conversation
-	// listener registration. The cache is bounded to avoid retaining snapshots
-	// for every thread a long-lived client has ever touched. Active
-	// Conversations pin their thread snapshot so cache eviction cannot regress
-	// their metadata between turns.
-	threadStates     map[string]Thread
-	threadStateOrder []string
-	threadStatePins  map[string]int
-	threadStateMu    sync.RWMutex
+	// conversations and direct thread APIs can share recent snapshots. The
+	// cache is bounded to avoid retaining snapshots for every thread a
+	// long-lived client has ever touched. Active conversations subscribe to
+	// updates for their own thread so cache eviction cannot regress their local
+	// state between turns.
+	threadStates           map[string]Thread
+	threadStateOrder       []string
+	threadStateListeners   map[string][]threadStateListener
+	threadStateListenerSeq uint64
+	threadStateMu          sync.RWMutex
 
 	// Approval handlers for server→client requests
 	approvalHandlers ApprovalHandlers
@@ -262,7 +268,7 @@ func NewClient(transport Transport, opts ...ClientOption) *Client {
 		notificationListeners: make(map[string]NotificationHandler),
 		internalListeners:     make(map[string][]internalListener),
 		threadStates:          make(map[string]Thread),
-		threadStatePins:       make(map[string]int),
+		threadStateListeners:  make(map[string][]threadStateListener),
 	}
 
 	// Apply options

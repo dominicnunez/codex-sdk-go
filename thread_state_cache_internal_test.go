@@ -7,8 +7,7 @@ import (
 
 func TestCacheThreadStateEvictsLeastRecentlyUpdatedThread(t *testing.T) {
 	client := &Client{
-		threadStates:    make(map[string]Thread),
-		threadStatePins: make(map[string]int),
+		threadStates: make(map[string]Thread),
 	}
 
 	for i := range maxCachedThreadStates {
@@ -34,8 +33,7 @@ func TestCacheThreadStateEvictsLeastRecentlyUpdatedThread(t *testing.T) {
 
 func TestMutateThreadStateRefreshesThreadRecency(t *testing.T) {
 	client := &Client{
-		threadStates:    make(map[string]Thread),
-		threadStatePins: make(map[string]int),
+		threadStates: make(map[string]Thread),
 	}
 
 	for i := range maxCachedThreadStates {
@@ -60,52 +58,82 @@ func TestMutateThreadStateRefreshesThreadRecency(t *testing.T) {
 	}
 }
 
-func TestPinnedThreadStateSurvivesEvictionPressure(t *testing.T) {
+func TestThreadStateListenersReceiveCacheAndMutationUpdates(t *testing.T) {
 	client := &Client{
-		threadStates:    make(map[string]Thread),
-		threadStatePins: make(map[string]int),
+		threadStates:         make(map[string]Thread),
+		threadStateListeners: make(map[string][]threadStateListener),
 	}
 
-	client.cacheThreadState(Thread{ID: "thread-pinned"})
-	client.pinThreadState("thread-pinned")
+	var snapshots []Thread
+	unsubscribe := client.addThreadStateListener("thread-1", func(thread Thread) {
+		snapshots = append(snapshots, thread)
+	})
+	defer unsubscribe()
+
+	client.cacheThreadState(Thread{ID: "thread-1"})
+	name := "renamed"
+	client.mutateThreadState("thread-1", func(thread *Thread) {
+		thread.Name = &name
+	})
+
+	if got := len(snapshots); got != 2 {
+		t.Fatalf("listener snapshots = %d, want 2", got)
+	}
+	if snapshots[0].ID != "thread-1" {
+		t.Fatalf("first snapshot ID = %q, want thread-1", snapshots[0].ID)
+	}
+	if snapshots[1].Name == nil || *snapshots[1].Name != name {
+		t.Fatalf("second snapshot Name = %v, want %q", snapshots[1].Name, name)
+	}
+}
+
+func TestObservedThreadStateSurvivesEvictionPressure(t *testing.T) {
+	client := &Client{
+		threadStates:         make(map[string]Thread),
+		threadStateListeners: make(map[string][]threadStateListener),
+	}
+
+	client.cacheThreadState(Thread{ID: "thread-observed"})
+	unsubscribe := client.addThreadStateListener("thread-observed", func(Thread) {})
+	defer unsubscribe()
 
 	for i := range maxCachedThreadStates + 10 {
 		client.cacheThreadState(Thread{ID: fmt.Sprintf("thread-%02d", i)})
 	}
 
-	if _, ok := client.threadStateSnapshot("thread-pinned"); !ok {
-		t.Fatal("expected pinned thread to remain cached")
+	if _, ok := client.threadStateSnapshot("thread-observed"); !ok {
+		t.Fatal("expected observed thread to remain cached")
 	}
-	if got := client.cachedUnpinnedThreadStatesForTest(); got != maxCachedThreadStates {
-		t.Fatalf("cached unpinned thread count = %d, want %d", got, maxCachedThreadStates)
+	if got := client.cachedThreadStatesWithoutListenersForTest(); got != maxCachedThreadStates {
+		t.Fatalf("cached thread count without listeners = %d, want %d", got, maxCachedThreadStates)
 	}
 }
 
-func TestUnpinThreadStateAllowsDeferredEviction(t *testing.T) {
+func TestRemovingThreadStateListenerAllowsDeferredEviction(t *testing.T) {
 	client := &Client{
-		threadStates:    make(map[string]Thread),
-		threadStatePins: make(map[string]int),
+		threadStates:         make(map[string]Thread),
+		threadStateListeners: make(map[string][]threadStateListener),
 	}
 
-	client.cacheThreadState(Thread{ID: "thread-pinned"})
-	client.pinThreadState("thread-pinned")
+	client.cacheThreadState(Thread{ID: "thread-observed"})
+	unsubscribe := client.addThreadStateListener("thread-observed", func(Thread) {})
 
 	for i := range maxCachedThreadStates + 1 {
 		client.cacheThreadState(Thread{ID: fmt.Sprintf("thread-%02d", i)})
 	}
-	if _, ok := client.threadStateSnapshot("thread-pinned"); !ok {
-		t.Fatal("expected pinned thread to remain cached before unpin")
+	if _, ok := client.threadStateSnapshot("thread-observed"); !ok {
+		t.Fatal("expected observed thread to remain cached before listener removal")
 	}
 
-	client.unpinThreadState("thread-pinned")
+	unsubscribe()
 
-	if _, ok := client.threadStateSnapshot("thread-pinned"); ok {
-		t.Fatal("expected formerly pinned thread to be evicted after unpin")
+	if _, ok := client.threadStateSnapshot("thread-observed"); ok {
+		t.Fatal("expected formerly observed thread to be evicted after listener removal")
 	}
 }
 
-func (c *Client) cachedUnpinnedThreadStatesForTest() int {
+func (c *Client) cachedThreadStatesWithoutListenersForTest() int {
 	c.threadStateMu.RLock()
 	defer c.threadStateMu.RUnlock()
-	return c.cachedUnpinnedThreadStatesLocked()
+	return c.cachedThreadStatesWithoutListenersLocked()
 }
