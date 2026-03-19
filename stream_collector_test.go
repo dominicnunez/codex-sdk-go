@@ -211,8 +211,8 @@ func TestStreamCollectorSummaryIsDeepCopied(t *testing.T) {
 		Status:    codex.McpToolCallStatusCompleted,
 		Arguments: map[string]interface{}{"outer": map[string]interface{}{"inner": "value"}},
 		Result: &codex.McpToolCallResult{
-			Content: []codex.McpToolCallContentItem{
-				&codex.TextMcpToolCallContentItem{Value: "ok"},
+			Content: []interface{}{
+				map[string]interface{}{"kind": "text", "value": "ok"},
 			},
 			StructuredContent: map[string]interface{}{"result": map[string]interface{}{"value": "ok"}},
 		},
@@ -220,7 +220,7 @@ func TestStreamCollectorSummaryIsDeepCopied(t *testing.T) {
 	collector.Process(&codex.ItemStarted{Item: codex.ThreadItemWrapper{Value: &codex.WebSearchThreadItem{
 		ID:    "web-copy",
 		Query: "original query",
-		Action: codex.WebSearchActionWrapper{Value: &codex.SearchWebSearchAction{
+		Action: &codex.WebSearchActionWrapper{Value: &codex.SearchWebSearchAction{
 			Query:   ptr("start query"),
 			Queries: &[]string{"start-a", "start-b"},
 		}},
@@ -228,7 +228,7 @@ func TestStreamCollectorSummaryIsDeepCopied(t *testing.T) {
 	collector.Process(&codex.ItemCompleted{Item: codex.ThreadItemWrapper{Value: &codex.WebSearchThreadItem{
 		ID:    "web-copy",
 		Query: "original query",
-		Action: codex.WebSearchActionWrapper{Value: &codex.FindInPageWebSearchAction{
+		Action: &codex.WebSearchActionWrapper{Value: &codex.FindInPageWebSearchAction{
 			URL:     ptr("https://example.com"),
 			Pattern: ptr("needle"),
 		}},
@@ -239,7 +239,7 @@ func TestStreamCollectorSummaryIsDeepCopied(t *testing.T) {
 		Status: codex.PatchApplyStatusInProgress,
 		Changes: []codex.FileUpdateChange{{
 			Path: "old.txt",
-			Diff: ptr("@@ -1 +1 @@"),
+			Diff: "@@ -1 +1 @@",
 			Kind: codex.PatchChangeKindWrapper{Value: &codex.UpdatePatchChangeKind{
 				MovePath: movePath,
 			}},
@@ -250,7 +250,7 @@ func TestStreamCollectorSummaryIsDeepCopied(t *testing.T) {
 		Status: codex.PatchApplyStatusCompleted,
 		Changes: []codex.FileUpdateChange{{
 			Path: "old.txt",
-			Diff: ptr("@@ -1 +1 @@"),
+			Diff: "@@ -1 +1 @@",
 			Kind: codex.PatchChangeKindWrapper{Value: &codex.UpdatePatchChangeKind{
 				MovePath: ptr("new.txt"),
 			}},
