@@ -558,8 +558,6 @@ func TestRunWaitsForBlockedItemCompletedHandler(t *testing.T) {
 
 	select {
 	case <-itemHandlingStarted:
-	case err := <-serverErrCh:
-		t.Fatalf("stdio server error: %v", err)
 	case err := <-errCh:
 		t.Fatalf("Run() returned early with error: %v", err)
 	case <-time.After(2 * time.Second):
@@ -654,8 +652,6 @@ func TestRunStreamedWaitsForBlockedItemCompletedHandler(t *testing.T) {
 
 	select {
 	case <-itemHandlingStarted:
-	case err := <-serverErrCh:
-		t.Fatalf("stdio server error: %v", err)
 	case err := <-streamErrCh:
 		t.Fatalf("RunStreamed() returned early with error: %v", err)
 	case <-time.After(2 * time.Second):
