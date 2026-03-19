@@ -1324,7 +1324,7 @@ func TestStdioOversizeResponseUnblocksPendingSend(t *testing.T) {
 	}
 }
 
-func TestStdioOversizeResponseWithLateIDClosesTransport(t *testing.T) {
+func TestStdioOversizeResponseWithLateIDUnblocksPendingSend(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()
 	defer func() { _ = clientReader.Close() }()
@@ -1363,17 +1363,16 @@ func TestStdioOversizeResponseWithLateIDClosesTransport(t *testing.T) {
 	select {
 	case result := <-resultCh:
 		if result.err != nil {
-			assertTransportFailure(t, result.err)
-			break
+			t.Fatalf("Send returned unexpected error: %v", result.err)
 		}
 		if result.resp.Error == nil {
 			t.Fatal("Send returned nil response error")
 		}
-		if result.resp.Error.Code != codex.ErrCodeInternalError {
-			t.Fatalf("response error code = %d; want %d", result.resp.Error.Code, codex.ErrCodeInternalError)
+		if result.resp.Error.Code != codex.ErrCodeParseError {
+			t.Fatalf("response error code = %d; want %d", result.resp.Error.Code, codex.ErrCodeParseError)
 		}
 		if !strings.Contains(result.resp.Error.Message, "oversized") {
-			t.Fatalf("response error message = %q; want oversized transport error", result.resp.Error.Message)
+			t.Fatalf("response error message = %q; want oversized parse error", result.resp.Error.Message)
 		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("timeout waiting for oversized response handling")

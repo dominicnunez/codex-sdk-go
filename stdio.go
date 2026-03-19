@@ -929,7 +929,7 @@ func readLimitedLine(r *bufio.Reader, limit int) ([]byte, *oversizedFrameInfo, e
 		frag, err := r.ReadSlice('\n')
 		line = append(line, frag...)
 		if len(line) > limit {
-			return handleOversizedLine(err, line)
+			return handleOversizedLine(r, err, line)
 		}
 		switch {
 		case err == nil:
@@ -952,7 +952,7 @@ func readLimitedLine(r *bufio.Reader, limit int) ([]byte, *oversizedFrameInfo, e
 		case err == nil:
 			line = append(line, b)
 			if len(line) > limit {
-				return handleOversizedLine(bufio.ErrBufferFull, line)
+				return handleOversizedLine(r, bufio.ErrBufferFull, line)
 			}
 			if b == '\n' {
 				return bytes.TrimSuffix(line, []byte{'\n'}), nil, nil
@@ -968,8 +968,8 @@ func readLimitedLine(r *bufio.Reader, limit int) ([]byte, *oversizedFrameInfo, e
 	}
 }
 
-func handleOversizedLine(readErr error, line []byte) ([]byte, *oversizedFrameInfo, error) {
-	info := extractOversizedFrameInfo(line, readErr)
+func handleOversizedLine(reader *bufio.Reader, readErr error, line []byte) ([]byte, *oversizedFrameInfo, error) {
+	info := extractOversizedFrameInfo(line, reader)
 	switch {
 	case readErr == nil:
 		return nil, &info, nil
@@ -1534,78 +1534,323 @@ func extractTopLevelIDAndMethodFromReader(reader io.Reader) (RequestID, bool, bo
 	return id, hasID, hasMethod, nil
 }
 
-func extractOversizedFrameInfo(line []byte, readErr error) oversizedFrameInfo {
-	_ = readErr
-	return inspectOversizedFramePrefix(line)
+func extractOversizedFrameInfo(prefix []byte, reader *bufio.Reader) oversizedFrameInfo {
+	scanner := newOversizedFrameScanner(prefix, reader)
+	return scanner.scan()
 }
 
-func inspectOversizedFramePrefix(data []byte) oversizedFrameInfo {
+type oversizedFrameScanner struct {
+	reader *bufio.Reader
+}
+
+func newOversizedFrameScanner(prefix []byte, reader *bufio.Reader) oversizedFrameScanner {
+	source := io.Reader(bytes.NewReader(prefix))
+	if reader != nil && !bytes.HasSuffix(prefix, []byte{'\n'}) {
+		source = io.MultiReader(bytes.NewReader(prefix), &newlineTerminatedReader{reader: reader})
+	}
+	return oversizedFrameScanner{reader: bufio.NewReader(source)}
+}
+
+func (s *oversizedFrameScanner) scan() oversizedFrameInfo {
 	var info oversizedFrameInfo
 
-	i := skipJSONWhitespace(data, 0)
-	if i >= len(data) || data[i] != '{' {
+	start, ok := s.nextNonWhitespaceByte()
+	if !ok || start != '{' {
 		return info
 	}
-	i++
 
-	for i < len(data) {
-		i = skipJSONWhitespace(data, i)
-		if i >= len(data) {
-			return info
-		}
-		switch data[i] {
-		case ',':
-			i++
-			continue
-		case '}':
-			return info
-		case '"':
-		default:
-			return info
-		}
-
-		key, next, ok := consumeJSONString(data, i)
+	for {
+		next, ok := s.nextNonWhitespaceByte()
 		if !ok {
 			return info
 		}
-		i = skipJSONWhitespace(data, next)
-		if i >= len(data) || data[i] != ':' {
+		switch next {
+		case ',':
+			continue
+		case '}':
 			return info
+		default:
+			if next != '"' {
+				return info
+			}
 		}
-		i = skipJSONWhitespace(data, i+1)
-		if i >= len(data) {
+
+		key, ok := s.readJSONString()
+		if !ok || !s.consumeColon() {
 			return info
 		}
 
 		switch key {
 		case "id":
-			id, valueEnd, ok := consumeRequestIDValue(data, i)
+			id, hasID, ok := s.readRequestID()
 			if !ok {
 				return info
 			}
 			info.id = id
-			info.hasID = id.Value != nil
-			i = valueEnd
+			info.hasID = hasID
 		case "method":
-			_, _, ok := consumeJSONString(data, i)
-			if !ok {
+			if !s.skipJSONValue() {
 				return info
 			}
 			info.hasMethod = true
-			return info
 		case "result", "error":
 			info.hasResponseFields = true
-			return info
-		default:
-			valueEnd, ok := consumeJSONValue(data, i)
-			if !ok {
+			if !s.skipJSONValue() {
 				return info
 			}
-			i = valueEnd
+		default:
+			if !s.skipJSONValue() {
+				return info
+			}
+		}
+	}
+}
+
+type newlineTerminatedReader struct {
+	reader *bufio.Reader
+	done   bool
+}
+
+func (r *newlineTerminatedReader) Read(p []byte) (int, error) {
+	if r.done {
+		return 0, io.EOF
+	}
+	if len(p) == 0 {
+		return 0, nil
+	}
+
+	n := 0
+	for n < len(p) {
+		b, err := r.reader.ReadByte()
+		if err != nil {
+			r.done = true
+			if n > 0 {
+				return n, nil
+			}
+			return 0, err
+		}
+		p[n] = b
+		n++
+		if b == '\n' {
+			r.done = true
+			return n, nil
+		}
+	}
+	return n, nil
+}
+
+func (s *oversizedFrameScanner) nextNonWhitespaceByte() (byte, bool) {
+	for {
+		b, err := s.reader.ReadByte()
+		if err != nil {
+			return 0, false
+		}
+		switch b {
+		case ' ', '\n', '\r', '\t':
+			continue
+		default:
+			return b, true
+		}
+	}
+}
+
+func (s *oversizedFrameScanner) consumeColon() bool {
+	b, ok := s.nextNonWhitespaceByte()
+	return ok && b == ':'
+}
+
+func (s *oversizedFrameScanner) readJSONString() (string, bool) {
+	raw, ok := s.readRawJSONString('"')
+	if !ok {
+		return "", false
+	}
+	var value string
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return "", false
+	}
+	return value, true
+}
+
+func (s *oversizedFrameScanner) readRawJSONString(opening byte) ([]byte, bool) {
+	if opening != '"' {
+		return nil, false
+	}
+
+	var raw bytes.Buffer
+	raw.WriteByte('"')
+	escaped := false
+	for {
+		b, err := s.reader.ReadByte()
+		if err != nil {
+			return nil, false
+		}
+		raw.WriteByte(b)
+		if escaped {
+			escaped = false
+			continue
+		}
+		switch b {
+		case '\\':
+			escaped = true
+		case '"':
+			return raw.Bytes(), true
+		}
+	}
+}
+
+func (s *oversizedFrameScanner) skipJSONValue() bool {
+	first, ok := s.nextNonWhitespaceByte()
+	if !ok {
+		return false
+	}
+
+	switch first {
+	case '"':
+		return s.skipJSONStringBody()
+	case '{':
+		return s.skipJSONObjectBody()
+	case '[':
+		return s.skipJSONArrayBody()
+	default:
+		return s.skipJSONScalar(first)
+	}
+}
+
+func (s *oversizedFrameScanner) skipJSONStringBody() bool {
+	escaped := false
+	for {
+		b, err := s.reader.ReadByte()
+		if err != nil {
+			return false
+		}
+		if escaped {
+			escaped = false
+			continue
+		}
+		switch b {
+		case '\\':
+			escaped = true
+		case '"':
+			return true
+		}
+	}
+}
+
+func (s *oversizedFrameScanner) skipJSONObjectBody() bool {
+	return s.skipCompositeJSONValue('}')
+}
+
+func (s *oversizedFrameScanner) skipJSONArrayBody() bool {
+	return s.skipCompositeJSONValue(']')
+}
+
+func (s *oversizedFrameScanner) skipCompositeJSONValue(close byte) bool {
+	stack := []byte{close}
+	for len(stack) > 0 {
+		b, err := s.reader.ReadByte()
+		if err != nil {
+			return false
+		}
+		switch b {
+		case '"':
+			if !s.skipJSONStringBody() {
+				return false
+			}
+		case '{':
+			stack = append(stack, '}')
+		case '[':
+			stack = append(stack, ']')
+		case '}', ']':
+			if b != stack[len(stack)-1] {
+				return false
+			}
+			stack = stack[:len(stack)-1]
+		}
+	}
+	return true
+}
+
+func (s *oversizedFrameScanner) skipJSONScalar(first byte) bool {
+	if isJSONScalarTerminator(first) {
+		return false
+	}
+	for {
+		b, err := s.reader.ReadByte()
+		if err != nil {
+			return errors.Is(err, io.EOF)
+		}
+		if isJSONScalarTerminator(b) {
+			if err := s.reader.UnreadByte(); err != nil {
+				return false
+			}
+			return true
+		}
+	}
+}
+
+func (s *oversizedFrameScanner) readRequestID() (RequestID, bool, bool) {
+	first, ok := s.nextNonWhitespaceByte()
+	if !ok {
+		return RequestID{}, false, false
+	}
+
+	var raw []byte
+	switch first {
+	case '"':
+		var ok bool
+		raw, ok = s.readRawJSONString(first)
+		if !ok {
+			return RequestID{}, false, false
+		}
+	case '{', '[':
+		return RequestID{}, false, false
+	default:
+		var ok bool
+		raw, ok = s.readJSONScalar(first)
+		if !ok {
+			return RequestID{}, false, false
 		}
 	}
 
-	return info
+	var id RequestID
+	if err := json.Unmarshal(raw, &id); err != nil {
+		return RequestID{}, false, false
+	}
+	return id, id.Value != nil, true
+}
+
+func (s *oversizedFrameScanner) readJSONScalar(first byte) ([]byte, bool) {
+	if isJSONScalarTerminator(first) {
+		return nil, false
+	}
+
+	var raw bytes.Buffer
+	raw.WriteByte(first)
+	for {
+		b, err := s.reader.ReadByte()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return raw.Bytes(), true
+			}
+			return nil, false
+		}
+		if isJSONScalarTerminator(b) {
+			if err := s.reader.UnreadByte(); err != nil {
+				return nil, false
+			}
+			return raw.Bytes(), true
+		}
+		raw.WriteByte(b)
+	}
+}
+
+func isJSONScalarTerminator(b byte) bool {
+	switch b {
+	case ',', '}', ']', ' ', '\n', '\r', '\t':
+		return true
+	default:
+		return false
+	}
 }
 
 func skipJSONWhitespace(data []byte, start int) int {
