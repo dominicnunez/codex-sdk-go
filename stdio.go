@@ -23,18 +23,19 @@ type pendingReq struct {
 // large enough for normal bursts, bounded to prevent untrusted-peer DoS via
 // unbounded goroutine or memory growth.
 const (
-	inboundRequestWorkers           = 8
-	inboundRequestQueueSize         = 64
-	inboundNotificationWorkers      = 8
-	criticalNotificationWorkers     = 2
-	turnScopedNotificationWorkers   = 8
-	maxTurnScopedNotificationQueues = 128
-	inboundNotifQueueSize           = 128
-	criticalNotifQueueSize          = 64
-	outboundWriteQueueSize          = 256
-	readBufferSizeBytes             = 64 * 1024
-	maxInboundMessageSizeBytes      = 10 * 1024 * 1024
-	defaultSendTimeout              = 5 * time.Minute
+	inboundRequestWorkers              = 8
+	inboundRequestQueueSize            = 64
+	inboundNotificationWorkers         = 8
+	criticalNotificationWorkers        = 2
+	turnScopedNotificationWorkers      = 8
+	maxTurnScopedNotificationQueueSize = 256
+	maxTurnScopedNotificationQueues    = 128
+	inboundNotifQueueSize              = 128
+	criticalNotifQueueSize             = 64
+	outboundWriteQueueSize             = 256
+	readBufferSizeBytes                = 64 * 1024
+	maxInboundMessageSizeBytes         = 10 * 1024 * 1024
+	defaultSendTimeout                 = 5 * time.Minute
 )
 
 const (
@@ -180,6 +181,7 @@ type StdioTransport struct {
 var errUnexpectedIDType = errors.New("unexpected ID type")
 var errTransportClosed = errors.New("transport closed")
 var errOversizedInboundFrame = errors.New("oversized inbound frame exceeded maximum size")
+var errTurnScopedNotificationQueueOverflow = errors.New("turn-scoped notification queue overflow")
 
 // errNullID is returned when normalizeID encounters a nil (JSON null) ID.
 // JSON-RPC 2.0 responses with "id": null indicate the server could not
@@ -956,6 +958,15 @@ func (t *StdioTransport) enqueueTurnScopedNotification(notif Notification) {
 	t.turnNotifQueuesMu.Unlock()
 
 	queue.mu.Lock()
+	if len(queue.queue) >= maxTurnScopedNotificationQueueSize {
+		queue.mu.Unlock()
+		t.closeWithFailure(
+			errTurnScopedNotificationQueueOverflow,
+			errTurnScopedNotificationQueueOverflow.Error(),
+			json.RawMessage(fmt.Sprintf(`{"threadId":%q}`, queue.threadKey)),
+		)
+		return
+	}
 	queue.queue = append(queue.queue, notif)
 	if queue.scheduled {
 		queue.mu.Unlock()

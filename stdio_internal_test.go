@@ -424,6 +424,41 @@ func TestEnqueueTurnScopedNotificationSchedulesDistinctQueuesOnce(t *testing.T) 
 	}
 }
 
+func TestEnqueueTurnScopedNotificationOverflowClosesTransport(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	transport := &StdioTransport{
+		pendingReqs:     make(map[string]pendingReq),
+		turnNotifQueues: make(map[string]*turnScopedNotificationQueue),
+		readerStopped:   make(chan struct{}),
+		ctx:             ctx,
+		cancelCtx:       cancel,
+	}
+	transport.initTurnScopedScheduler()
+
+	for i := 0; i < maxTurnScopedNotificationQueueSize; i++ {
+		transport.enqueueTurnScopedNotification(Notification{
+			Method:    notifyTurnCompleted,
+			threadKey: "thread-1",
+		})
+	}
+
+	transport.enqueueTurnScopedNotification(Notification{
+		Method:    notifyTurnCompleted,
+		threadKey: "thread-1",
+	})
+
+	if !errors.Is(transport.ScanErr(), errTurnScopedNotificationQueueOverflow) {
+		t.Fatalf("ScanErr() = %v, want %v", transport.ScanErr(), errTurnScopedNotificationQueueOverflow)
+	}
+
+	select {
+	case <-transport.readerStopped:
+	default:
+		t.Fatal("expected transport to stop after queue overflow")
+	}
+}
 func TestEnqueueTurnScopedNotificationCapsTrackedQueues(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
