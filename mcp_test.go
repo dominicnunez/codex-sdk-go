@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/dominicnunez/codex-sdk-go"
@@ -251,6 +252,40 @@ func TestMcpOauthLoginCompletedNotification(t *testing.T) {
 	}
 }
 
+func TestMcpOauthLoginCompletedMissingRequiredFieldReportsHandlerError(t *testing.T) {
+	mock := NewMockTransport()
+
+	var (
+		gotMethod string
+		gotErr    error
+	)
+	client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+		gotMethod = method
+		gotErr = err
+	}))
+
+	var called bool
+	client.OnMcpServerOauthLoginCompleted(func(codex.McpServerOauthLoginCompletedNotification) {
+		called = true
+	})
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "mcpServer/oauthLogin/completed",
+		Params:  json.RawMessage(`{"success":true}`),
+	})
+
+	if called {
+		t.Fatal("handler should not be called for malformed payload")
+	}
+	if gotMethod != "mcpServer/oauthLogin/completed" {
+		t.Fatalf("handler error method = %q; want %q", gotMethod, "mcpServer/oauthLogin/completed")
+	}
+	if gotErr == nil || !strings.Contains(gotErr.Error(), "missing required field") {
+		t.Fatalf("handler error = %v; want missing required field failure", gotErr)
+	}
+}
+
 func TestMcpToolCallProgressNotification(t *testing.T) {
 	mock := NewMockTransport()
 	client := codex.NewClient(mock)
@@ -292,6 +327,40 @@ func TestMcpToolCallProgressNotification(t *testing.T) {
 	}
 	if receivedNotif.Message != "Processing tool call..." {
 		t.Errorf("got message=%q, want %q", receivedNotif.Message, "Processing tool call...")
+	}
+}
+
+func TestMcpToolCallProgressMissingRequiredFieldReportsHandlerError(t *testing.T) {
+	mock := NewMockTransport()
+
+	var (
+		gotMethod string
+		gotErr    error
+	)
+	client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+		gotMethod = method
+		gotErr = err
+	}))
+
+	var called bool
+	client.OnMcpToolCallProgress(func(codex.McpToolCallProgressNotification) {
+		called = true
+	})
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/mcpToolCall/progress",
+		Params:  json.RawMessage(`{"itemId":"item123","threadId":"thread456","turnId":"turn789"}`),
+	})
+
+	if called {
+		t.Fatal("handler should not be called for malformed payload")
+	}
+	if gotMethod != "item/mcpToolCall/progress" {
+		t.Fatalf("handler error method = %q; want %q", gotMethod, "item/mcpToolCall/progress")
+	}
+	if gotErr == nil || !strings.Contains(gotErr.Error(), "missing required field") {
+		t.Fatalf("handler error = %v; want missing required field failure", gotErr)
 	}
 }
 

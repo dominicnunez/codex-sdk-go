@@ -188,6 +188,40 @@ func TestCommandExecutionOutputDeltaNotification(t *testing.T) {
 	}
 }
 
+func TestCommandExecutionOutputDeltaMissingRequiredFieldReportsHandlerError(t *testing.T) {
+	mock := NewMockTransport()
+
+	var (
+		gotMethod string
+		gotErr    error
+	)
+	client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+		gotMethod = method
+		gotErr = err
+	}))
+
+	var called bool
+	client.OnCommandExecutionOutputDelta(func(codex.CommandExecutionOutputDeltaNotification) {
+		called = true
+	})
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/commandExecution/outputDelta",
+		Params:  json.RawMessage(`{"threadId":"thread-123","turnId":"turn-456","delta":"output line\n"}`),
+	})
+
+	if called {
+		t.Fatal("handler should not be called for malformed payload")
+	}
+	if gotMethod != "item/commandExecution/outputDelta" {
+		t.Fatalf("handler error method = %q; want %q", gotMethod, "item/commandExecution/outputDelta")
+	}
+	if gotErr == nil || !strings.Contains(gotErr.Error(), "missing required field") {
+		t.Fatalf("handler error = %v; want missing required field failure", gotErr)
+	}
+}
+
 func TestCommandExecOutputDeltaNotification(t *testing.T) {
 	mock := NewMockTransport()
 	client := codex.NewClient(mock)
@@ -266,6 +300,40 @@ func TestCommandExecOutputDeltaMalformedNotificationReportsHandlerError(t *testi
 	}
 	if gotErr == nil || !strings.Contains(gotErr.Error(), "unmarshal command/exec/outputDelta") {
 		t.Fatalf("handler error = %v; want unmarshal failure", gotErr)
+	}
+}
+
+func TestCommandExecOutputDeltaMissingRequiredFieldReportsHandlerError(t *testing.T) {
+	mock := NewMockTransport()
+
+	var (
+		gotMethod string
+		gotErr    error
+	)
+	client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+		gotMethod = method
+		gotErr = err
+	}))
+
+	var called bool
+	client.OnCommandExecOutputDelta(func(codex.CommandExecOutputDeltaNotification) {
+		called = true
+	})
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "command/exec/outputDelta",
+		Params:  json.RawMessage(`{"capReached":true,"deltaBase64":"bW9yZQ==","stream":"stderr"}`),
+	})
+
+	if called {
+		t.Fatal("handler should not be called for malformed payload")
+	}
+	if gotMethod != "command/exec/outputDelta" {
+		t.Fatalf("handler error method = %q; want %q", gotMethod, "command/exec/outputDelta")
+	}
+	if gotErr == nil || !strings.Contains(gotErr.Error(), "missing required field") {
+		t.Fatalf("handler error = %v; want missing required field failure", gotErr)
 	}
 }
 

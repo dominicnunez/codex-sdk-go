@@ -415,6 +415,26 @@ func TestAccountLoginRejectsMissingType(t *testing.T) {
 	}
 }
 
+func TestAccountLoginRejectsChatgptVariantMissingRequiredFields(t *testing.T) {
+	transport := NewMockTransport()
+	client := codex.NewClient(transport)
+	transport.SetResponse("account/login/start", codex.Response{
+		JSONRPC: "2.0",
+		Result:  json.RawMessage(`{"type":"chatgpt"}`),
+	})
+
+	_, err := client.Account.Login(context.Background(), &codex.ChatgptLoginAccountParams{})
+	if err == nil {
+		t.Fatal("expected error for incomplete chatgpt login result")
+	}
+	if !errors.Is(err, codex.ErrMissingResultField) {
+		t.Fatalf("error = %v; want ErrMissingResultField", err)
+	}
+	if !strings.Contains(err.Error(), "authUrl") {
+		t.Fatalf("error = %v; want missing authUrl context", err)
+	}
+}
+
 func TestAccountLoginRejectsMalformedResult(t *testing.T) {
 	transport := NewMockTransport()
 	client := codex.NewClient(transport)

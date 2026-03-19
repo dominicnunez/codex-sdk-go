@@ -3,6 +3,7 @@ package codex_test
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/dominicnunez/codex-sdk-go"
@@ -17,13 +18,15 @@ func TestThreadRealtimeStartedNotification(t *testing.T) {
 			name: "with sessionId",
 			jsonData: `{
 				"threadId": "thread_abc123",
-				"sessionId": "session_xyz789"
+				"sessionId": "session_xyz789",
+				"version": "v2"
 			}`,
 		},
 		{
 			name: "without sessionId",
 			jsonData: `{
-				"threadId": "thread_abc123"
+				"threadId": "thread_abc123",
+				"version": "v1"
 			}`,
 		},
 	}
@@ -53,6 +56,9 @@ func TestThreadRealtimeStartedNotification(t *testing.T) {
 			if notif.ThreadID != notif2.ThreadID {
 				t.Error("ThreadID mismatch after round-trip")
 			}
+			if notif.Version != notif2.Version {
+				t.Error("Version mismatch after round-trip")
+			}
 		})
 	}
 
@@ -72,7 +78,8 @@ func TestThreadRealtimeStartedNotification(t *testing.T) {
 			Method:  "thread/realtime/started",
 			Params: json.RawMessage(`{
 				"threadId": "thread_test",
-				"sessionId": "session_test"
+				"sessionId": "session_test",
+				"version": "v2"
 			}`),
 		})
 
@@ -85,7 +92,44 @@ func TestThreadRealtimeStartedNotification(t *testing.T) {
 		if received.SessionID == nil || *received.SessionID != "session_test" {
 			t.Error("expected SessionID session_test")
 		}
+		if received.Version != codex.RealtimeConversationVersionV2 {
+			t.Errorf("expected Version v2, got %q", received.Version)
+		}
 	})
+}
+
+func TestThreadRealtimeStartedMissingRequiredFieldReportsHandlerError(t *testing.T) {
+	mock := NewMockTransport()
+
+	var (
+		gotMethod string
+		gotErr    error
+	)
+	client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+		gotMethod = method
+		gotErr = err
+	}))
+
+	var called bool
+	client.OnThreadRealtimeStarted(func(codex.ThreadRealtimeStartedNotification) {
+		called = true
+	})
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "thread/realtime/started",
+		Params:  json.RawMessage(`{"threadId":"thread_test"}`),
+	})
+
+	if called {
+		t.Fatal("handler should not be called for malformed payload")
+	}
+	if gotMethod != "thread/realtime/started" {
+		t.Fatalf("handler error method = %q; want %q", gotMethod, "thread/realtime/started")
+	}
+	if gotErr == nil || !strings.Contains(gotErr.Error(), "missing required field") {
+		t.Fatalf("handler error = %v; want missing required field failure", gotErr)
+	}
 }
 
 func TestThreadRealtimeClosedNotification(t *testing.T) {
@@ -315,6 +359,7 @@ func TestThreadRealtimeOutputAudioDeltaNotification(t *testing.T) {
 				"threadId": "thread_abc123",
 				"audio": {
 					"data": "AAABAAIAAQ",
+					"itemId": "item-123",
 					"numChannels": 1,
 					"sampleRate": 16000,
 					"samplesPerChannel": 1024
@@ -348,6 +393,9 @@ func TestThreadRealtimeOutputAudioDeltaNotification(t *testing.T) {
 			if notif.Audio.Data != "AAABAAIAAQ" {
 				t.Errorf("unexpected audio data: %s", notif.Audio.Data)
 			}
+			if tt.name == "with samplesPerChannel" && (notif.Audio.ItemID == nil || *notif.Audio.ItemID != "item-123") {
+				t.Fatalf("Audio.ItemID = %v, want item-123", notif.Audio.ItemID)
+			}
 
 			// Re-marshal and verify round-trip
 			data, err := json.Marshal(notif)
@@ -371,6 +419,9 @@ func TestThreadRealtimeOutputAudioDeltaNotification(t *testing.T) {
 			}
 			if notif.Audio.SampleRate != notif2.Audio.SampleRate {
 				t.Error("Audio.SampleRate mismatch after round-trip")
+			}
+			if tt.name == "with samplesPerChannel" && (notif2.Audio.ItemID == nil || *notif2.Audio.ItemID != "item-123") {
+				t.Fatalf("round-trip Audio.ItemID = %v, want item-123", notif2.Audio.ItemID)
 			}
 		})
 	}

@@ -156,6 +156,55 @@ func schemaTopLevelVariantFields(path, variantTitle string) (properties []string
 	return nil, nil, nil
 }
 
+func schemaTopLevelVariantFieldsByRequired(path string, requiredFields []string) (properties []string, required map[string]bool, err error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	var s schemaTopLevel
+	if err := json.Unmarshal(data, &s); err != nil {
+		return nil, nil, err
+	}
+
+	expected := make(map[string]struct{}, len(requiredFields))
+	for _, field := range requiredFields {
+		expected[field] = struct{}{}
+	}
+
+	for _, variant := range s.OneOf {
+		var v schemaTopLevel
+		if err := json.Unmarshal(variant, &v); err != nil {
+			continue
+		}
+		if len(v.Required) != len(expected) {
+			continue
+		}
+
+		match := true
+		for _, field := range v.Required {
+			if _, ok := expected[field]; !ok {
+				match = false
+				break
+			}
+		}
+		if !match {
+			continue
+		}
+
+		for k := range v.Properties {
+			properties = append(properties, k)
+		}
+		sort.Strings(properties)
+		required = make(map[string]bool, len(v.Required))
+		for _, r := range v.Required {
+			required[r] = true
+		}
+		return properties, required, nil
+	}
+
+	return nil, nil, nil
+}
+
 func schemaDefinitionFields(path, defName string) (properties []string, required map[string]bool, err error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -196,6 +245,12 @@ type topLevelVariantEntry struct {
 	specPath     string
 	variantTitle string
 	goType       reflect.Type
+}
+
+type topLevelRequiredVariantEntry struct {
+	specPath       string
+	requiredFields []string
+	goType         reflect.Type
 }
 
 type definitionStructEntry struct {
@@ -599,8 +654,36 @@ func testStructFields(t *testing.T) {
 		})
 	}
 
+	topLevelRequiredVariants := []topLevelRequiredVariantEntry{
+		{"specs/McpServerElicitationRequestParams.json", []string{"message", "mode", "requestedSchema"}, reflect.TypeOf(McpServerElicitationRequestParams{})},
+		{"specs/McpServerElicitationRequestParams.json", []string{"elicitationId", "message", "mode", "url"}, reflect.TypeOf(McpServerElicitationRequestParams{})},
+	}
+
+	for _, entry := range topLevelRequiredVariants {
+		entry := entry
+		name := entry.specPath + "/oneOf.required=" + strings.Join(entry.requiredFields, ",")
+		t.Run(name, func(t *testing.T) {
+			properties, _, err := schemaTopLevelVariantFieldsByRequired(entry.specPath, entry.requiredFields)
+			if err != nil {
+				t.Fatalf("failed to parse schema variant: %v", err)
+			}
+			if len(properties) == 0 {
+				t.Skip("variant has no properties")
+			}
+
+			goFields := structJSONFields(entry.goType)
+			for _, prop := range properties {
+				_, ok := goFields[prop]
+				if !ok {
+					t.Errorf("schema property %q has no matching JSON field on %s", prop, entry.goType.Name())
+				}
+			}
+		})
+	}
+
 	definitionStructs := []definitionStructEntry{
 		{"specs/v2/ConfigRequirementsReadResponse.json", "ConfigRequirements", reflect.TypeOf(ConfigRequirements{})},
+		{"specs/v2/ThreadRealtimeOutputAudioDeltaNotification.json", "ThreadRealtimeAudioChunk", reflect.TypeOf(ThreadRealtimeAudioChunk{})},
 	}
 
 	for _, entry := range definitionStructs {

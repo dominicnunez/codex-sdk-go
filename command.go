@@ -92,12 +92,34 @@ type CommandExecOutputDeltaNotification struct {
 	Stream      CommandExecOutputStream `json:"stream"`
 }
 
+func (n *CommandExecOutputDeltaNotification) UnmarshalJSON(data []byte) error {
+	type wire CommandExecOutputDeltaNotification
+	var decoded wire
+	required := []string{"capReached", "deltaBase64", "processId", "stream"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = CommandExecOutputDeltaNotification(decoded)
+	return nil
+}
+
 // CommandExecutionOutputDeltaNotification represents streaming output from command execution
 type CommandExecutionOutputDeltaNotification struct {
 	ThreadID string `json:"threadId"`
 	TurnID   string `json:"turnId"`
 	ItemID   string `json:"itemId"`
 	Delta    string `json:"delta"`
+}
+
+func (n *CommandExecutionOutputDeltaNotification) UnmarshalJSON(data []byte) error {
+	type wire CommandExecutionOutputDeltaNotification
+	var decoded wire
+	required := []string{"delta", "itemId", "threadId", "turnId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = CommandExecutionOutputDeltaNotification(decoded)
+	return nil
 }
 
 // CommandService provides command execution functionality

@@ -3,6 +3,7 @@ package codex_test
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go"
@@ -234,6 +235,43 @@ func TestCommandExecutionRequestApprovalRoundTrip(t *testing.T) {
 			}
 			if !tc.checkFunc(roundtrip) {
 				t.Errorf("roundtrip decision check failed")
+			}
+		})
+	}
+}
+
+func TestMcpServerElicitationRequestParamsRejectInvalidVariants(t *testing.T) {
+	tests := []struct {
+		name     string
+		payload  string
+		wantText string
+	}{
+		{
+			name:     "form missing requestedSchema",
+			payload:  `{"serverName":"demo-server","threadId":"thread-1","message":"Enter credentials","mode":"form"}`,
+			wantText: `requestedSchema`,
+		},
+		{
+			name:     "url missing elicitationId",
+			payload:  `{"serverName":"demo-server","threadId":"thread-1","message":"Open browser","mode":"url","url":"https://example.com"}`,
+			wantText: `elicitationId`,
+		},
+		{
+			name:     "unknown mode",
+			payload:  `{"serverName":"demo-server","threadId":"thread-1","message":"Unknown","mode":"modal"}`,
+			wantText: `unsupported elicitation mode`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var params codex.McpServerElicitationRequestParams
+			err := json.Unmarshal([]byte(tt.payload), &params)
+			if err == nil {
+				t.Fatal("expected unmarshal error")
+			}
+			if !strings.Contains(err.Error(), tt.wantText) {
+				t.Fatalf("error = %v; want %q", err, tt.wantText)
 			}
 		})
 	}

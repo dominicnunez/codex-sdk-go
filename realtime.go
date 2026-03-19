@@ -22,6 +22,17 @@ type ThreadRealtimeStartedNotification struct {
 	Version   RealtimeConversationVersion `json:"version"`
 }
 
+func (n *ThreadRealtimeStartedNotification) UnmarshalJSON(data []byte) error {
+	type wire ThreadRealtimeStartedNotification
+	var decoded wire
+	required := []string{"threadId", "version"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = ThreadRealtimeStartedNotification(decoded)
+	return nil
+}
+
 // ThreadRealtimeClosedNotification is sent when a realtime connection closes for a thread.
 // Method: thread/realtime/closed
 type ThreadRealtimeClosedNotification struct {
@@ -46,9 +57,21 @@ type ThreadRealtimeItemAddedNotification struct {
 // ThreadRealtimeAudioChunk contains audio data and metadata.
 type ThreadRealtimeAudioChunk struct {
 	Data              string  `json:"data"`                        // Base64-encoded audio bytes
+	ItemID            *string `json:"itemId,omitempty"`            // Associated item when the chunk belongs to a specific output item
 	NumChannels       uint16  `json:"numChannels"`                 // Number of audio channels
 	SampleRate        uint32  `json:"sampleRate"`                  // Sample rate in Hz
 	SamplesPerChannel *uint32 `json:"samplesPerChannel,omitempty"` // Number of samples per channel
+}
+
+func (c *ThreadRealtimeAudioChunk) UnmarshalJSON(data []byte) error {
+	type wire ThreadRealtimeAudioChunk
+	var decoded wire
+	required := []string{"data", "numChannels", "sampleRate"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*c = ThreadRealtimeAudioChunk(decoded)
+	return nil
 }
 
 // ThreadRealtimeOutputAudioDeltaNotification is sent when audio output is streamed.
@@ -56,6 +79,17 @@ type ThreadRealtimeAudioChunk struct {
 type ThreadRealtimeOutputAudioDeltaNotification struct {
 	ThreadID string                   `json:"threadId"`
 	Audio    ThreadRealtimeAudioChunk `json:"audio"`
+}
+
+func (n *ThreadRealtimeOutputAudioDeltaNotification) UnmarshalJSON(data []byte) error {
+	type wire ThreadRealtimeOutputAudioDeltaNotification
+	var decoded wire
+	required := []string{"audio", "threadId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = ThreadRealtimeOutputAudioDeltaNotification(decoded)
+	return nil
 }
 
 // OnThreadRealtimeStarted registers a listener for thread/realtime/started notifications.

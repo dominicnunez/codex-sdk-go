@@ -172,12 +172,34 @@ type McpServerOauthLoginCompletedNotification struct {
 	Error   *string `json:"error,omitempty"`
 }
 
+func (n *McpServerOauthLoginCompletedNotification) UnmarshalJSON(data []byte) error {
+	type wire McpServerOauthLoginCompletedNotification
+	var decoded wire
+	required := []string{"name", "success"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = McpServerOauthLoginCompletedNotification(decoded)
+	return nil
+}
+
 // McpToolCallProgressNotification is sent to report progress of MCP tool calls.
 type McpToolCallProgressNotification struct {
 	ItemID   string `json:"itemId"`
 	ThreadID string `json:"threadId"`
 	TurnID   string `json:"turnId"`
 	Message  string `json:"message"`
+}
+
+func (n *McpToolCallProgressNotification) UnmarshalJSON(data []byte) error {
+	type wire McpToolCallProgressNotification
+	var decoded wire
+	required := []string{"itemId", "message", "threadId", "turnId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = McpToolCallProgressNotification(decoded)
+	return nil
 }
 
 // McpService handles MCP server operations.

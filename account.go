@@ -391,6 +391,19 @@ type ApiKeyLoginAccountResponse struct {
 
 func (*ApiKeyLoginAccountResponse) isLoginAccountResponse() {}
 
+func (r *ApiKeyLoginAccountResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "type"); err != nil {
+		return err
+	}
+	type wire ApiKeyLoginAccountResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = ApiKeyLoginAccountResponse(decoded)
+	return nil
+}
+
 // ChatgptLoginAccountResponse represents ChatGPT OAuth login response
 type ChatgptLoginAccountResponse struct {
 	Type    string `json:"type"`
@@ -400,12 +413,38 @@ type ChatgptLoginAccountResponse struct {
 
 func (*ChatgptLoginAccountResponse) isLoginAccountResponse() {}
 
+func (r *ChatgptLoginAccountResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "type", "authUrl", "loginId"); err != nil {
+		return err
+	}
+	type wire ChatgptLoginAccountResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = ChatgptLoginAccountResponse(decoded)
+	return nil
+}
+
 // ChatgptAuthTokensLoginAccountResponse represents external auth token login response
 type ChatgptAuthTokensLoginAccountResponse struct {
 	Type string `json:"type"`
 }
 
 func (*ChatgptAuthTokensLoginAccountResponse) isLoginAccountResponse() {}
+
+func (r *ChatgptAuthTokensLoginAccountResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "type"); err != nil {
+		return err
+	}
+	type wire ChatgptAuthTokensLoginAccountResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = ChatgptAuthTokensLoginAccountResponse(decoded)
+	return nil
+}
 
 // UnknownLoginAccountResponse represents an unrecognized login response type from a newer protocol version.
 type UnknownLoginAccountResponse struct {

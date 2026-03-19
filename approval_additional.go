@@ -1,5 +1,7 @@
 package codex
 
+import "fmt"
+
 // AdditionalFileSystemPermissions requests or grants extra filesystem access.
 type AdditionalFileSystemPermissions struct {
 	Read  []string `json:"read,omitempty"`
@@ -104,8 +106,24 @@ func (p *McpServerElicitationRequestParams) UnmarshalJSON(data []byte) error {
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
+	if err := validateMcpServerElicitationVariant(data, decoded.Mode); err != nil {
+		return err
+	}
 	*p = McpServerElicitationRequestParams(decoded)
 	return nil
+}
+
+func validateMcpServerElicitationVariant(data []byte, mode McpServerElicitationMode) error {
+	switch mode {
+	case McpServerElicitationModeForm:
+		required := []string{"message", "mode", "requestedSchema"}
+		return validateInboundObjectFields(data, required, required)
+	case McpServerElicitationModeURL:
+		required := []string{"elicitationId", "message", "mode", "url"}
+		return validateInboundObjectFields(data, required, required)
+	default:
+		return fmt.Errorf("unsupported elicitation mode %q", mode)
+	}
 }
 
 // McpServerElicitationAction is the client response action for an elicitation request.
