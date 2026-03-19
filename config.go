@@ -463,6 +463,9 @@ func (r *ConfigWriteResponse) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	if err := validateWriteStatusField("status", decoded.Status); err != nil {
+		return err
+	}
 	*r = ConfigWriteResponse(decoded)
 	return nil
 }

@@ -1,5 +1,7 @@
 package codex
 
+import "fmt"
+
 // This file contains typed string enums defined in the protocol spec that are
 // referenced by fields across multiple domain files.
 
@@ -98,6 +100,15 @@ const (
 	WriteStatusOKOverridden WriteStatus = "okOverridden"
 )
 
+var validWriteStatuses = map[WriteStatus]struct{}{
+	WriteStatusOK:           {},
+	WriteStatusOKOverridden: {},
+}
+
+func validateWriteStatusField(field string, value WriteStatus) error {
+	return validateEnumValue(field, value, validWriteStatuses)
+}
+
 // NetworkApprovalProtocol represents the protocol in a network approval context.
 type NetworkApprovalProtocol string
 
@@ -108,6 +119,17 @@ const (
 	NetworkApprovalProtocolSocks5UDP NetworkApprovalProtocol = "socks5Udp"
 )
 
+var validNetworkApprovalProtocols = map[NetworkApprovalProtocol]struct{}{
+	NetworkApprovalProtocolHTTP:      {},
+	NetworkApprovalProtocolHTTPS:     {},
+	NetworkApprovalProtocolSocks5TCP: {},
+	NetworkApprovalProtocolSocks5UDP: {},
+}
+
+func validateNetworkApprovalProtocolField(field string, value NetworkApprovalProtocol) error {
+	return validateEnumValue(field, value, validNetworkApprovalProtocols)
+}
+
 // NetworkPolicyRuleAction represents the action for a network policy rule.
 type NetworkPolicyRuleAction string
 
@@ -115,6 +137,15 @@ const (
 	NetworkPolicyRuleActionAllow NetworkPolicyRuleAction = "allow"
 	NetworkPolicyRuleActionDeny  NetworkPolicyRuleAction = "deny"
 )
+
+func validateNetworkPolicyRuleAction(action NetworkPolicyRuleAction) error {
+	switch action {
+	case NetworkPolicyRuleActionAllow, NetworkPolicyRuleActionDeny:
+		return nil
+	default:
+		return fmt.Errorf("invalid network policy action %q", action)
+	}
+}
 
 // ExecCommandSource represents where a command execution originated.
 type ExecCommandSource string
@@ -208,6 +239,14 @@ const (
 	ChatgptAuthTokensRefreshReasonUnauthorized ChatgptAuthTokensRefreshReason = "unauthorized"
 )
 
+var validChatgptAuthTokensRefreshReasons = map[ChatgptAuthTokensRefreshReason]struct{}{
+	ChatgptAuthTokensRefreshReasonUnauthorized: {},
+}
+
+func validateChatgptAuthTokensRefreshReasonField(field string, value ChatgptAuthTokensRefreshReason) error {
+	return validateEnumValue(field, value, validChatgptAuthTokensRefreshReasons)
+}
+
 // FileChangeApprovalDecision represents the decision for a file change approval request.
 type FileChangeApprovalDecision string
 
@@ -217,6 +256,17 @@ const (
 	FileChangeApprovalDecisionDecline          FileChangeApprovalDecision = "decline"
 	FileChangeApprovalDecisionCancel           FileChangeApprovalDecision = "cancel"
 )
+
+var validFileChangeApprovalDecisions = map[FileChangeApprovalDecision]struct{}{
+	FileChangeApprovalDecisionAccept:           {},
+	FileChangeApprovalDecisionAcceptForSession: {},
+	FileChangeApprovalDecisionDecline:          {},
+	FileChangeApprovalDecisionCancel:           {},
+}
+
+func validateFileChangeApprovalDecisionField(field string, value FileChangeApprovalDecision) error {
+	return validateEnumValue(field, value, validFileChangeApprovalDecisions)
+}
 
 // AppToolApproval represents the approval mode for an app tool.
 type AppToolApproval string

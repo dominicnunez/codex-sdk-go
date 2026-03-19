@@ -358,6 +358,54 @@ func TestConfigBatchWrite(t *testing.T) {
 	}
 }
 
+func TestConfigWriteRejectsInvalidStatus(t *testing.T) {
+	tests := []struct {
+		name   string
+		method string
+	}{
+		{name: "value write", method: "config/value/write"},
+		{name: "batch write", method: "config/batchWrite"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := NewMockTransport()
+			_ = mock.SetResponseData(tt.method, map[string]interface{}{
+				"filePath": "/home/user/.claude/config.toml",
+				"status":   "stale",
+				"version":  "v1",
+			})
+
+			client := codex.NewClient(mock)
+
+			var err error
+			switch tt.method {
+			case "config/value/write":
+				_, err = client.Config.Write(context.Background(), codex.ConfigValueWriteParams{
+					KeyPath:       "model",
+					MergeStrategy: "replace",
+					Value:         json.RawMessage(`"o3"`),
+				})
+			case "config/batchWrite":
+				_, err = client.Config.BatchWrite(context.Background(), codex.ConfigBatchWriteParams{
+					Edits: []codex.ConfigEdit{{
+						KeyPath:       "model",
+						MergeStrategy: "replace",
+						Value:         json.RawMessage(`"o3"`),
+					}},
+				})
+			}
+
+			if err == nil {
+				t.Fatal("expected invalid status error")
+			}
+			if !strings.Contains(err.Error(), `invalid status "stale"`) {
+				t.Fatalf("error = %v; want invalid status", err)
+			}
+		})
+	}
+}
+
 func TestConfigWrite_RPCError_ReturnsRPCError(t *testing.T) {
 	mock := NewMockTransport()
 	client := codex.NewClient(mock)

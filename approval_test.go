@@ -124,6 +124,28 @@ func TestApplyPatchApprovalRoundTrip(t *testing.T) {
 	}
 }
 
+func TestNetworkApprovalContextRejectsInvalidProtocol(t *testing.T) {
+	var ctx codex.NetworkApprovalContext
+	err := json.Unmarshal([]byte(`{"host":"example.com","protocol":"ftp"}`), &ctx)
+	if err == nil {
+		t.Fatal("expected invalid protocol error")
+	}
+	if !strings.Contains(err.Error(), `invalid protocol "ftp"`) {
+		t.Fatalf("error = %v; want invalid protocol", err)
+	}
+}
+
+func TestChatgptAuthTokensRefreshParamsRejectInvalidReason(t *testing.T) {
+	var params codex.ChatgptAuthTokensRefreshParams
+	err := json.Unmarshal([]byte(`{"reason":"expired"}`), &params)
+	if err == nil {
+		t.Fatal("expected invalid reason error")
+	}
+	if !strings.Contains(err.Error(), `invalid reason "expired"`) {
+		t.Fatalf("error = %v; want invalid reason", err)
+	}
+}
+
 // TestCommandExecutionRequestApprovalRoundTrip tests CommandExecutionRequestApproval params/response
 func TestCommandExecutionRequestApprovalRoundTrip(t *testing.T) {
 	// Test params serialization

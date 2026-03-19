@@ -59,6 +59,18 @@ type PermissionsRequestApprovalResponse struct {
 	Scope       *PermissionGrantScope    `json:"scope,omitempty"`
 }
 
+func (r PermissionsRequestApprovalResponse) validate() error {
+	if r.Scope == nil {
+		return nil
+	}
+	switch *r.Scope {
+	case PermissionGrantScopeTurn, PermissionGrantScopeSession:
+		return nil
+	default:
+		return fmt.Errorf("invalid scope %q", *r.Scope)
+	}
+}
+
 // McpServerElicitationMode indicates how an MCP server wants user input collected.
 type McpServerElicitationMode string
 
@@ -140,4 +152,13 @@ type McpServerElicitationRequestResponse struct {
 	Meta    interface{}                `json:"_meta,omitempty"`
 	Action  McpServerElicitationAction `json:"action"`
 	Content interface{}                `json:"content,omitempty"`
+}
+
+func (r McpServerElicitationRequestResponse) validate() error {
+	switch r.Action {
+	case McpServerElicitationActionAccept, McpServerElicitationActionDecline, McpServerElicitationActionCancel:
+		return nil
+	default:
+		return fmt.Errorf("invalid action %q", r.Action)
+	}
 }

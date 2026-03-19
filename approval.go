@@ -199,6 +199,10 @@ type ApplyPatchApprovalResponse struct {
 	Decision ReviewDecisionWrapper `json:"decision"`
 }
 
+func (r ApplyPatchApprovalResponse) validate() error {
+	return validateReviewDecisionWrapper(r.Decision)
+}
+
 // ReviewDecision is the user's decision on the patch approval request.
 // Can be: "approved", "approved_for_session", "denied", "abort",
 // or objects for amendment decisions.
@@ -344,6 +348,31 @@ func normalizeReviewDecisionValue(value interface{}) interface{} {
 		return *v
 	default:
 		return value
+	}
+}
+
+func validateReviewDecisionWrapper(decision ReviewDecisionWrapper) error {
+	switch value := normalizeReviewDecisionValue(decision.Value).(type) {
+	case nil:
+		return errors.New("missing decision")
+	case string:
+		switch value {
+		case "approved", "approved_for_session", "denied", "abort":
+			return nil
+		default:
+			return fmt.Errorf("invalid decision %q", value)
+		}
+	case ApprovedExecpolicyAmendmentDecision:
+		if value.ProposedExecpolicyAmendment == nil {
+			return errors.New("approved_execpolicy_amendment.proposed_execpolicy_amendment: missing array")
+		}
+		return nil
+	case NetworkPolicyAmendmentDecision:
+		return validateNetworkPolicyAmendment(value.NetworkPolicyAmendment)
+	case UnknownReviewDecision:
+		return errors.New("missing decision")
+	default:
+		return fmt.Errorf("invalid decision type %T", decision.Value)
 	}
 }
 
@@ -543,6 +572,9 @@ func (c *NetworkApprovalContext) UnmarshalJSON(data []byte) error {
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
+	if err := validateNetworkApprovalProtocolField("protocol", decoded.Protocol); err != nil {
+		return err
+	}
 	*c = NetworkApprovalContext(decoded)
 	return nil
 }
@@ -550,6 +582,10 @@ func (c *NetworkApprovalContext) UnmarshalJSON(data []byte) error {
 // CommandExecutionRequestApprovalResponse represents the response to a command execution approval request.
 type CommandExecutionRequestApprovalResponse struct {
 	Decision CommandExecutionApprovalDecisionWrapper `json:"decision"`
+}
+
+func (r CommandExecutionRequestApprovalResponse) validate() error {
+	return validateCommandExecutionApprovalDecisionWrapper(r.Decision)
 }
 
 // CommandExecutionApprovalDecisionWrapper wraps the decision for command execution approval.
@@ -692,6 +728,34 @@ func normalizeCommandExecutionApprovalDecisionValue(value interface{}) interface
 		return *v
 	default:
 		return value
+	}
+}
+
+func validateCommandExecutionApprovalDecisionWrapper(decision CommandExecutionApprovalDecisionWrapper) error {
+	switch value := normalizeCommandExecutionApprovalDecisionValue(decision.Value).(type) {
+	case nil:
+		return errors.New("missing decision")
+	case string:
+		switch value {
+		case CommandExecutionApprovalDecisionAccept,
+			CommandExecutionApprovalDecisionAcceptForSession,
+			CommandExecutionApprovalDecisionDecline,
+			CommandExecutionApprovalDecisionCancel:
+			return nil
+		default:
+			return fmt.Errorf("invalid decision %q", value)
+		}
+	case AcceptWithExecpolicyAmendmentDecision:
+		if value.ExecpolicyAmendment == nil {
+			return errors.New("acceptWithExecpolicyAmendment.execpolicy_amendment: missing array")
+		}
+		return nil
+	case ApplyNetworkPolicyAmendmentDecision:
+		return validateNetworkPolicyAmendment(value.NetworkPolicyAmendment)
+	case UnknownCommandExecutionApprovalDecision:
+		return errors.New("missing decision")
+	default:
+		return fmt.Errorf("invalid decision type %T", decision.Value)
 	}
 }
 
@@ -884,6 +948,10 @@ type ExecCommandApprovalResponse struct {
 	Decision ReviewDecisionWrapper `json:"decision"`
 }
 
+func (r ExecCommandApprovalResponse) validate() error {
+	return validateReviewDecisionWrapper(r.Decision)
+}
+
 // ========== FileChangeRequestApproval (NEW - turn/start API) ==========
 
 // FileChangeRequestApprovalParams represents parameters for file change approval.
@@ -909,6 +977,10 @@ func (p *FileChangeRequestApprovalParams) UnmarshalJSON(data []byte) error {
 // FileChangeRequestApprovalResponse represents the response to a file change approval request.
 type FileChangeRequestApprovalResponse struct {
 	Decision FileChangeApprovalDecision `json:"decision"`
+}
+
+func (r FileChangeRequestApprovalResponse) validate() error {
+	return validateFileChangeApprovalDecisionField("decision", r.Decision)
 }
 
 // ========== DynamicToolCall (NEW - Direct Tool Execution) ==========
@@ -1195,6 +1267,9 @@ func (p *ChatgptAuthTokensRefreshParams) UnmarshalJSON(data []byte) error {
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
+	if err := validateChatgptAuthTokensRefreshReasonField("reason", decoded.Reason); err != nil {
+		return err
+	}
 	*p = ChatgptAuthTokensRefreshParams(decoded)
 	return nil
 }
@@ -1204,6 +1279,17 @@ type ChatgptAuthTokensRefreshResponse struct {
 	AccessToken      string  `json:"accessToken"`
 	ChatgptAccountID string  `json:"chatgptAccountId"`
 	ChatgptPlanType  *string `json:"chatgptPlanType,omitempty"`
+}
+
+func (r ChatgptAuthTokensRefreshResponse) validate() error {
+	switch {
+	case r.AccessToken == "":
+		return errors.New("missing accessToken")
+	case r.ChatgptAccountID == "":
+		return errors.New("missing chatgptAccountId")
+	default:
+		return nil
+	}
 }
 
 // MarshalJSON redacts the access token to prevent accidental credential leaks
@@ -1231,6 +1317,16 @@ func (r ChatgptAuthTokensRefreshResponse) marshalWire() ([]byte, error) {
 // String redacts the access token to prevent accidental credential leaks in logs.
 func (r ChatgptAuthTokensRefreshResponse) String() string {
 	return fmt.Sprintf("ChatgptAuthTokensRefreshResponse{AccessToken:[REDACTED], ChatgptAccountID:%s}", r.ChatgptAccountID)
+}
+
+func validateNetworkPolicyAmendment(amendment NetworkPolicyAmendment) error {
+	if err := validateNetworkPolicyRuleAction(amendment.Action); err != nil {
+		return err
+	}
+	if amendment.Host == "" {
+		return errors.New("network policy amendment missing host")
+	}
+	return nil
 }
 
 // GoString implements fmt.GoStringer to redact credentials from %#v.

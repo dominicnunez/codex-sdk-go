@@ -77,7 +77,7 @@ func TestCredentialTypesRedactWithAllFormatVerbs(t *testing.T) {
 			JSONRPC: "2.0",
 			Method:  "account/chatgptAuthTokens/refresh",
 			ID:      codex.RequestID{Value: float64(1)},
-			Params:  json.RawMessage(`{"reason":"expired"}`),
+			Params:  json.RawMessage(`{"reason":"unauthorized"}`),
 		}
 
 		resp, err := mock.InjectServerRequest(context.Background(), req)

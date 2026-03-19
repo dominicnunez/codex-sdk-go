@@ -832,6 +832,100 @@ func TestApprovalHandlerRejectsInvalidResponsePayloads(t *testing.T) {
 		wantErrPart string
 	}{
 		{
+			name:   "apply patch approval missing decision",
+			method: "applyPatchApproval",
+			params: `{"callId":"call-1","conversationId":"thread-1","fileChanges":{}}`,
+			register: func(client *codex.Client) {
+				client.SetApprovalHandlers(codex.ApprovalHandlers{
+					OnApplyPatchApproval: func(context.Context, codex.ApplyPatchApprovalParams) (codex.ApplyPatchApprovalResponse, error) {
+						return codex.ApplyPatchApprovalResponse{}, nil
+					},
+				})
+			},
+			wantErrPart: "missing decision",
+		},
+		{
+			name:   "command execution approval invalid decision",
+			method: "item/commandExecution/requestApproval",
+			params: `{"itemId":"item-1","threadId":"thread-1","turnId":"turn-1"}`,
+			register: func(client *codex.Client) {
+				client.SetApprovalHandlers(codex.ApprovalHandlers{
+					OnCommandExecutionRequestApproval: func(context.Context, codex.CommandExecutionRequestApprovalParams) (codex.CommandExecutionRequestApprovalResponse, error) {
+						return codex.CommandExecutionRequestApprovalResponse{
+							Decision: codex.CommandExecutionApprovalDecisionWrapper{Value: "maybe"},
+						}, nil
+					},
+				})
+			},
+			wantErrPart: `invalid decision "maybe"`,
+		},
+		{
+			name:   "exec command approval missing decision",
+			method: "execCommandApproval",
+			params: `{"callId":"call-1","command":["echo"],"conversationId":"thread-1","cwd":"/tmp","parsedCmd":[]}`,
+			register: func(client *codex.Client) {
+				client.SetApprovalHandlers(codex.ApprovalHandlers{
+					OnExecCommandApproval: func(context.Context, codex.ExecCommandApprovalParams) (codex.ExecCommandApprovalResponse, error) {
+						return codex.ExecCommandApprovalResponse{}, nil
+					},
+				})
+			},
+			wantErrPart: "missing decision",
+		},
+		{
+			name:   "file change approval invalid decision",
+			method: "item/fileChange/requestApproval",
+			params: `{"itemId":"item-1","threadId":"thread-1","turnId":"turn-1"}`,
+			register: func(client *codex.Client) {
+				client.SetApprovalHandlers(codex.ApprovalHandlers{
+					OnFileChangeRequestApproval: func(context.Context, codex.FileChangeRequestApprovalParams) (codex.FileChangeRequestApprovalResponse, error) {
+						return codex.FileChangeRequestApprovalResponse{Decision: "later"}, nil
+					},
+				})
+			},
+			wantErrPart: `invalid decision "later"`,
+		},
+		{
+			name:   "permissions approval invalid scope",
+			method: "item/permissions/requestApproval",
+			params: `{"itemId":"item-1","permissions":{},"threadId":"thread-1","turnId":"turn-1"}`,
+			register: func(client *codex.Client) {
+				client.SetApprovalHandlers(codex.ApprovalHandlers{
+					OnPermissionsRequestApproval: func(context.Context, codex.PermissionsRequestApprovalParams) (codex.PermissionsRequestApprovalResponse, error) {
+						scope := codex.PermissionGrantScope("forever")
+						return codex.PermissionsRequestApprovalResponse{Permissions: codex.GrantedPermissionProfile{}, Scope: &scope}, nil
+					},
+				})
+			},
+			wantErrPart: `invalid scope "forever"`,
+		},
+		{
+			name:   "chatgpt auth refresh missing access token",
+			method: "account/chatgptAuthTokens/refresh",
+			params: `{"reason":"unauthorized"}`,
+			register: func(client *codex.Client) {
+				client.SetApprovalHandlers(codex.ApprovalHandlers{
+					OnChatgptAuthTokensRefresh: func(context.Context, codex.ChatgptAuthTokensRefreshParams) (codex.ChatgptAuthTokensRefreshResponse, error) {
+						return codex.ChatgptAuthTokensRefreshResponse{ChatgptAccountID: "acct-1"}, nil
+					},
+				})
+			},
+			wantErrPart: "missing accessToken",
+		},
+		{
+			name:   "mcp elicitation invalid action",
+			method: "mcpServer/elicitation/request",
+			params: `{"serverName":"server-1","threadId":"thread-1","message":"hello","mode":"form","requestedSchema":{"properties":{},"type":"object"}}`,
+			register: func(client *codex.Client) {
+				client.SetApprovalHandlers(codex.ApprovalHandlers{
+					OnMcpServerElicitationRequest: func(context.Context, codex.McpServerElicitationRequestParams) (codex.McpServerElicitationRequestResponse, error) {
+						return codex.McpServerElicitationRequestResponse{Action: "later"}, nil
+					},
+				})
+			},
+			wantErrPart: `invalid action "later"`,
+		},
+		{
 			name:   "dynamic tool call missing content items",
 			method: "item/tool/call",
 			params: `{"tool":"test-tool","arguments":{},"callId":"call-1","threadId":"thread-1","turnId":"turn-1"}`,
