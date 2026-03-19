@@ -247,6 +247,48 @@ func TestConversationThreadAppliesNotificationOnlyMetadataUpdates(t *testing.T) 
 	}
 }
 
+func TestConversationCloseStopsThreadStateUpdates(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+
+	firstName := "Before Close"
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "thread/name/updated",
+		Params:  json.RawMessage(`{"threadId":"thread-1","threadName":"` + firstName + `"}`),
+	})
+
+	thread := conv.Thread()
+	if thread.Name == nil || *thread.Name != firstName {
+		t.Fatalf("Thread().Name = %v, want %q", thread.Name, firstName)
+	}
+
+	if err := conv.Close(); err != nil {
+		t.Fatalf("Close() error: %v", err)
+	}
+	if err := conv.Close(); err != nil {
+		t.Fatalf("second Close() error: %v", err)
+	}
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "thread/name/updated",
+		Params:  json.RawMessage(`{"threadId":"thread-1","threadName":"After Close"}`),
+	})
+
+	latest := conv.Thread()
+	if latest.Name == nil || *latest.Name != firstName {
+		t.Fatalf("Thread().Name after Close = %v, want %q", latest.Name, firstName)
+	}
+}
+
 func TestConversationThreadRetainsNotificationMetadataAfterCacheEviction(t *testing.T) {
 	proc, mock := mockProcess(t)
 

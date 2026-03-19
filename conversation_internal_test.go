@@ -3,6 +3,7 @@ package codex
 import (
 	"encoding/json"
 	"fmt"
+	"sync/atomic"
 	"testing"
 )
 
@@ -145,6 +146,32 @@ func TestConversationThreadRetainsLatestSnapshotAfterCacheEvictionPressure(t *te
 	}
 	if len(active.ActiveFlags) != 1 || active.ActiveFlags[0] != ThreadActiveFlagWaitingOnApproval {
 		t.Fatalf("Thread().Status.ActiveFlags = %v, want waitingOnApproval", active.ActiveFlags)
+	}
+}
+
+func TestConversationCloseReleasesResourcesAndRejectsFutureTurns(t *testing.T) {
+	var released atomic.Int32
+	conv := &Conversation{
+		state: newConversationState(Thread{ID: "thread-1"}),
+		release: func() {
+			released.Add(1)
+		},
+	}
+
+	if err := conv.Close(); err != nil {
+		t.Fatalf("Close() error: %v", err)
+	}
+	if err := conv.Close(); err != nil {
+		t.Fatalf("second Close() error: %v", err)
+	}
+	if got := released.Load(); got != 1 {
+		t.Fatalf("release count = %d, want 1", got)
+	}
+	if err := conv.state.ensureOpen(); err != errConversationClosed {
+		t.Fatalf("ensureOpen() error = %v, want %v", err, errConversationClosed)
+	}
+	if _, _, err := conv.state.startTurn(); err != errConversationClosed {
+		t.Fatalf("startTurn() error = %v, want %v", err, errConversationClosed)
 	}
 }
 

@@ -28,20 +28,25 @@ type TurnOptions struct {
 // errTurnInProgress is returned when a Turn or TurnStreamed call is made
 // while another turn is already executing on the same Conversation.
 var errTurnInProgress = errors.New("a turn is already in progress on this conversation")
+var errConversationClosed = errors.New("conversation is closed")
 
 // Conversation manages a persistent thread across multiple turns.
 // Concurrent Turn or TurnStreamed calls on the same Conversation are
 // not supported — the second call returns errTurnInProgress.
 type Conversation struct {
-	process  *Process
-	threadID string
-	state    *conversationState
+	process   *Process
+	threadID  string
+	state     *conversationState
+	release   func()
+	cleanup   *runtime.Cleanup
+	closeOnce sync.Once
 }
 
 type conversationState struct {
 	mu                       sync.Mutex
 	thread                   Thread
 	activeTurn               bool
+	closed                   bool
 	hasCompletedTerminalTurn bool
 }
 
@@ -64,11 +69,23 @@ func (s *conversationState) storeSnapshot(thread Thread) {
 func (s *conversationState) startTurn() (Thread, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.closed {
+		return Thread{}, false, errConversationClosed
+	}
 	if s.activeTurn {
 		return Thread{}, false, errTurnInProgress
 	}
 	s.activeTurn = true
 	return cloneThreadState(s.thread), !s.hasCompletedTerminalTurn, nil
+}
+
+func (s *conversationState) ensureOpen() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return errConversationClosed
+	}
+	return nil
 }
 
 func (s *conversationState) finishTurn() {
@@ -81,6 +98,12 @@ func (s *conversationState) applyCompletedThread(thread Thread) {
 	s.mu.Lock()
 	s.thread = cloneThreadState(thread)
 	s.hasCompletedTerminalTurn = true
+	s.mu.Unlock()
+}
+
+func (s *conversationState) close() {
+	s.mu.Lock()
+	s.closed = true
 	s.mu.Unlock()
 }
 
@@ -106,6 +129,28 @@ func (c *Conversation) applyCompletedThread(thread Thread) {
 		return
 	}
 	c.state.applyCompletedThread(thread)
+}
+
+// Close releases conversation-local resources. Safe to call multiple times.
+func (c *Conversation) Close() error {
+	if c == nil {
+		return nil
+	}
+
+	c.closeOnce.Do(func() {
+		if c.cleanup != nil {
+			c.cleanup.Stop()
+			c.cleanup = nil
+		}
+		if c.state != nil {
+			c.state.close()
+		}
+		if c.release != nil {
+			c.release()
+			c.release = nil
+		}
+	})
+	return nil
 }
 
 func cloneThreadState(thread Thread) Thread {
@@ -647,6 +692,8 @@ func cloneStringPtr(s *string) *string {
 }
 
 // StartConversation creates a thread and returns a Conversation handle.
+// Call Close on the returned Conversation when it is no longer needed so its
+// thread-state listener is released promptly.
 func (p *Process) StartConversation(ctx context.Context, opts ConversationOptions) (*Conversation, error) {
 	if err := validateContext(ctx); err != nil {
 		return nil, err
@@ -683,14 +730,16 @@ func (p *Process) StartConversation(ctx context.Context, opts ConversationOption
 		state:    state,
 	}
 	unsubscribe := p.Client.addThreadStateListener(resp.Thread.ID, state.storeSnapshot)
+	conv.release = unsubscribe
 	if snapshot, ok := p.Client.threadStateSnapshot(resp.Thread.ID); ok {
 		state.storeSnapshot(snapshot)
 	}
-	runtime.AddCleanup(conv, func(unsub func()) {
+	cleanup := runtime.AddCleanup(conv, func(unsub func()) {
 		if unsub != nil {
 			unsub()
 		}
 	}, unsubscribe)
+	conv.cleanup = &cleanup
 
 	return conv, nil
 }
@@ -722,7 +771,9 @@ func (c *Conversation) Turn(ctx context.Context, opts TurnOptions) (*RunResult, 
 	if opts.Prompt == "" {
 		return nil, errors.New("prompt is required")
 	}
-
+	if err := c.state.ensureOpen(); err != nil {
+		return nil, err
+	}
 	if err := c.process.ensureInit(ctx); err != nil {
 		return nil, err
 	}
@@ -749,6 +800,9 @@ func (c *Conversation) Turn(ctx context.Context, opts TurnOptions) (*RunResult, 
 // TurnStreamed executes a streaming turn on the existing thread.
 func (c *Conversation) TurnStreamed(ctx context.Context, opts TurnOptions) *Stream {
 	if err := validateContext(ctx); err != nil {
+		return newErrorStream(err)
+	}
+	if err := c.state.ensureOpen(); err != nil {
 		return newErrorStream(err)
 	}
 	g := newGuardedChan(streamChannelBuffer)
