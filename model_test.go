@@ -252,3 +252,91 @@ func TestModelReroutedNotificationMissingRequiredFieldReportsHandlerError(t *tes
 		t.Fatalf("handler error = %v; want missing required field failure", gotErr)
 	}
 }
+
+func TestModelRejectsInvalidDefaultReasoningEffort(t *testing.T) {
+	var model codex.Model
+	err := json.Unmarshal([]byte(`{
+		"id":"model-1",
+		"model":"model-1",
+		"displayName":"Model 1",
+		"description":"desc",
+		"hidden":false,
+		"isDefault":true,
+		"defaultReasoningEffort":"turbo",
+		"supportedReasoningEfforts":[],
+		"inputModalities":["text"]
+	}`), &model)
+	if err == nil || !strings.Contains(err.Error(), `invalid reasoningEffort "turbo"`) {
+		t.Fatalf("json.Unmarshal error = %v; want invalid reasoningEffort failure", err)
+	}
+}
+
+func TestModelRejectsInvalidSupportedReasoningEffort(t *testing.T) {
+	var model codex.Model
+	err := json.Unmarshal([]byte(`{
+		"id":"model-1",
+		"model":"model-1",
+		"displayName":"Model 1",
+		"description":"desc",
+		"hidden":false,
+		"isDefault":true,
+		"defaultReasoningEffort":"medium",
+		"supportedReasoningEfforts":[{"reasoningEffort":"turbo","description":"too much"}],
+		"inputModalities":["text"]
+	}`), &model)
+	if err == nil || !strings.Contains(err.Error(), `invalid reasoningEffort "turbo"`) {
+		t.Fatalf("json.Unmarshal error = %v; want invalid reasoningEffort failure", err)
+	}
+}
+
+func TestModelRejectsInvalidInputModality(t *testing.T) {
+	var model codex.Model
+	err := json.Unmarshal([]byte(`{
+		"id":"model-1",
+		"model":"model-1",
+		"displayName":"Model 1",
+		"description":"desc",
+		"hidden":false,
+		"isDefault":true,
+		"defaultReasoningEffort":"medium",
+		"supportedReasoningEfforts":[],
+		"inputModalities":["audio"]
+	}`), &model)
+	if err == nil || !strings.Contains(err.Error(), `invalid inputModality "audio"`) {
+		t.Fatalf("json.Unmarshal error = %v; want invalid inputModality failure", err)
+	}
+}
+
+func TestModelReroutedNotificationRejectsInvalidReason(t *testing.T) {
+	mock := NewMockTransport()
+
+	var (
+		gotMethod string
+		gotErr    error
+		called    bool
+	)
+	client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+		gotMethod = method
+		gotErr = err
+	}))
+
+	client.OnModelRerouted(func(codex.ModelReroutedNotification) {
+		called = true
+	})
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "model/rerouted",
+		Params:  json.RawMessage(`{"threadId":"thread-123","turnId":"turn-456","fromModel":"gpt-5","toModel":"gpt-5-mini","reason":"fallback"}`),
+	})
+
+	if called {
+		t.Fatal("handler should not be called for invalid reroute reason")
+	}
+	if gotMethod != "model/rerouted" {
+		t.Fatalf("handler error method = %q; want %q", gotMethod, "model/rerouted")
+	}
+	if gotErr == nil || !strings.Contains(gotErr.Error(), `invalid model.rerouted.reason "fallback"`) {
+		t.Fatalf("handler error = %v; want invalid reroute reason failure", gotErr)
+	}
+}

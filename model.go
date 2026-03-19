@@ -184,6 +184,14 @@ const (
 	ModelRerouteReasonHighRiskCyberActivity ModelRerouteReason = "highRiskCyberActivity"
 )
 
+var validModelRerouteReasons = map[ModelRerouteReason]struct{}{
+	ModelRerouteReasonHighRiskCyberActivity: {},
+}
+
+func (r *ModelRerouteReason) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "model.rerouted.reason", validModelRerouteReasons, r)
+}
+
 // ModelService provides access to model listing and notifications.
 type ModelService struct {
 	client *Client

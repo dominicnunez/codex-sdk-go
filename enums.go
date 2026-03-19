@@ -316,6 +316,19 @@ const (
 	ReasoningEffortXHigh   ReasoningEffort = "xhigh"
 )
 
+var validReasoningEfforts = map[ReasoningEffort]struct{}{
+	ReasoningEffortNone:    {},
+	ReasoningEffortMinimal: {},
+	ReasoningEffortLow:     {},
+	ReasoningEffortMedium:  {},
+	ReasoningEffortHigh:    {},
+	ReasoningEffortXHigh:   {},
+}
+
+func (r *ReasoningEffort) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "reasoningEffort", validReasoningEfforts, r)
+}
+
 // InputModality represents a canonical user-input modality tag advertised by a model.
 type InputModality string
 
@@ -323,6 +336,15 @@ const (
 	InputModalityText  InputModality = "text"
 	InputModalityImage InputModality = "image"
 )
+
+var validInputModalities = map[InputModality]struct{}{
+	InputModalityText:  {},
+	InputModalityImage: {},
+}
+
+func (m *InputModality) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "inputModality", validInputModalities, m)
+}
 
 // ReasoningSummaryMode represents enum variant ("auto" | "concise" | "detailed" | "none")
 type ReasoningSummaryMode string
