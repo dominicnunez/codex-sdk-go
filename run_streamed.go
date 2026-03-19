@@ -10,53 +10,74 @@ import (
 	"sync/atomic"
 )
 
-// streamChannelBuffer is the capacity of the event channel between the
-// lifecycle goroutine and the Events() iterator. 64 is large enough to
-// absorb short bursts of rapid notifications (e.g. streaming text deltas)
-// before the stream fails fast with [ErrStreamOverflow]. The buffer stays
-// bounded so a stalled consumer cannot grow memory without limit.
+// streamChannelBuffer is the capacity of the bounded event queue between the
+// lifecycle goroutine and the Events() iterator. The queue stays bounded so a
+// stalled or absent consumer cannot grow memory without limit, while an active
+// consumer receives burst-driven backpressure instead of a spurious failure.
 const streamChannelBuffer = 64
 
 // ErrStreamConsumed is returned when Events() is called on a Stream whose
 // events have already been consumed by a prior iteration.
 var ErrStreamConsumed = errors.New("stream events already consumed")
 
-// ErrStreamOverflow is returned when a streamed event producer outpaces the
-// Events() consumer and the bounded stream buffer fills up.
+// ErrStreamOverflow is returned when the bounded stream buffer fills before an
+// Events() consumer is attached to drain it.
 var ErrStreamOverflow = errors.New("stream event buffer overflow")
 
-// guardedChan wraps a channel with an RWMutex so that sends and close are
-// mutually exclusive. Senders hold a read lock (concurrent sends are fine);
-// the closer takes a write lock, ensuring no send is in flight when the
-// channel is closed.
+// guardedChan wraps a bounded ring buffer with condition variables so
+// producers can apply backpressure to an active consumer without growing
+// memory without limit. If iteration stops early, the queue detaches and
+// subsequent events are discarded so Result() can still complete.
 type guardedChan struct {
-	mu          sync.RWMutex
-	ch          chan eventOrErr
-	closed      bool
-	terminalErr error
+	mu             sync.Mutex
+	notEmpty       *sync.Cond
+	notFull        *sync.Cond
+	buf            []eventOrErr
+	head           int
+	size           int
+	closed         bool
+	detached       bool
+	consumerActive bool
+	terminalErr    error
 }
 
 func newGuardedChan(size int) *guardedChan {
-	return &guardedChan{ch: make(chan eventOrErr, size)}
+	g := &guardedChan{buf: make([]eventOrErr, size)}
+	g.notEmpty = sync.NewCond(&g.mu)
+	g.notFull = sync.NewCond(&g.mu)
+	return g
 }
 
-// send writes an event/error pair to the channel. When the bounded buffer fills,
-// the stream fails with [ErrStreamOverflow] instead of dropping queued events.
+// send writes an event/error pair to the bounded queue. When an Events()
+// consumer is active, a full queue applies backpressure until capacity is
+// available. If no consumer has attached yet, the stream fails with
+// [ErrStreamOverflow] instead of blocking indefinitely.
 func (g *guardedChan) send(eoe eventOrErr) {
-	g.mu.RLock()
-	if g.closed {
-		g.mu.RUnlock()
-		return
-	}
-	select {
-	case g.ch <- eoe:
-		g.mu.RUnlock()
-		return
-	default:
-	}
-	g.mu.RUnlock()
+	g.mu.Lock()
+	defer g.mu.Unlock()
 
-	g.fail(ErrStreamOverflow)
+	for {
+		switch {
+		case g.closed || g.detached || g.terminalErr != nil:
+			return
+		case g.size < len(g.buf):
+			tail := (g.head + g.size) % len(g.buf)
+			g.buf[tail] = eoe
+			g.size++
+			g.notEmpty.Signal()
+			return
+		case !g.consumerActive:
+			if g.terminalErr == nil {
+				g.terminalErr = ErrStreamOverflow
+			}
+			g.closed = true
+			g.notEmpty.Broadcast()
+			g.notFull.Broadcast()
+			return
+		default:
+			g.notFull.Wait()
+		}
+	}
 }
 
 // setTerminalError records the terminal stream error exactly once.
@@ -70,6 +91,8 @@ func (g *guardedChan) setTerminalError(err error) {
 		return
 	}
 	g.terminalErr = err
+	g.notFull.Broadcast()
+	g.notEmpty.Broadcast()
 }
 
 func (g *guardedChan) fail(err error) {
@@ -81,26 +104,73 @@ func (g *guardedChan) fail(err error) {
 	if g.terminalErr == nil {
 		g.terminalErr = err
 	}
-	if g.closed {
-		return
-	}
 	g.closed = true
-	close(g.ch)
+	g.notEmpty.Broadcast()
+	g.notFull.Broadcast()
 }
 
 func (g *guardedChan) terminalError() error {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	return g.terminalErr
 }
 
 func (g *guardedChan) closeOnce() {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	if !g.closed {
-		g.closed = true
-		close(g.ch)
+	if g.closed {
+		return
 	}
+	g.closed = true
+	g.notEmpty.Broadcast()
+	g.notFull.Broadcast()
+}
+
+func (g *guardedChan) attachConsumer() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.detached {
+		return
+	}
+	g.consumerActive = true
+	g.notFull.Broadcast()
+}
+
+func (g *guardedChan) detachConsumer() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.detached {
+		return
+	}
+	g.detached = true
+	g.consumerActive = false
+	for i := 0; i < g.size; i++ {
+		idx := (g.head + i) % len(g.buf)
+		g.buf[idx] = eventOrErr{}
+	}
+	g.head = 0
+	g.size = 0
+	g.notEmpty.Broadcast()
+	g.notFull.Broadcast()
+}
+
+func (g *guardedChan) recv() (eventOrErr, bool) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	for g.size == 0 {
+		if g.closed || g.detached {
+			return eventOrErr{}, false
+		}
+		g.notEmpty.Wait()
+	}
+
+	eoe := g.buf[g.head]
+	g.buf[g.head] = eventOrErr{}
+	g.head = (g.head + 1) % len(g.buf)
+	g.size--
+	g.notFull.Signal()
+	return eoe, true
 }
 
 // eventOrErr pairs an Event with an error for channel transport.
@@ -112,6 +182,7 @@ type eventOrErr struct {
 // Stream holds the streaming iterator and result for a RunStreamed call.
 type Stream struct {
 	events iter.Seq2[Event, error]
+	queue  *guardedChan
 
 	result   *RunResult
 	done     chan struct{}
@@ -128,6 +199,9 @@ func (s *Stream) Events() iter.Seq2[Event, error] {
 		return func(yield func(Event, error) bool) {
 			yield(nil, ErrStreamConsumed)
 		}
+	}
+	if s.queue != nil {
+		s.queue.attachConsumer()
 	}
 	return s.events
 }
@@ -166,7 +240,8 @@ func (p *Process) runStreamedWithCollector(ctx context.Context, opts RunOptions,
 
 	g := newGuardedChan(streamChannelBuffer)
 	s := &Stream{
-		done: make(chan struct{}),
+		done:  make(chan struct{}),
+		queue: g,
 	}
 
 	s.events = streamIterator(g)
@@ -187,13 +262,19 @@ func newErrorStream(err error) *Stream {
 	return &Stream{
 		done:   done,
 		events: streamIterator(g),
+		queue:  g,
 	}
 }
 
 func streamIterator(g *guardedChan) iter.Seq2[Event, error] {
 	return func(yield func(Event, error) bool) {
-		for eoe := range g.ch {
+		for {
+			eoe, ok := g.recv()
+			if !ok {
+				break
+			}
 			if !yield(eoe.event, eoe.err) {
+				g.detachConsumer()
 				return
 			}
 		}

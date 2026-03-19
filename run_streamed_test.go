@@ -650,21 +650,28 @@ func TestRunStreamedEarlyBreak(t *testing.T) {
 
 	waitForRunStreamedReady(t, mock)
 
-	// Inject a delta then completion.
-	mock.InjectServerNotification(ctx, codex.Notification{
-		JSONRPC: "2.0",
-		Method:  "item/agentMessage/delta",
-		Params:  json.RawMessage(`{"delta":"Hi","itemId":"item-1","threadId":"thread-1","turnId":"turn-1"}`),
-	})
-	mock.InjectServerNotification(ctx, codex.Notification{
-		JSONRPC: "2.0",
-		Method:  "turn/completed",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
-	})
+	seq := stream.Events()
+	go func() {
+		for i := 0; i < 100; i++ {
+			mock.InjectServerNotification(ctx, codex.Notification{
+				JSONRPC: "2.0",
+				Method:  "item/agentMessage/delta",
+				Params: json.RawMessage(fmt.Sprintf(
+					`{"delta":"chunk-%d","itemId":"item-1","threadId":"thread-1","turnId":"turn-1"}`,
+					i,
+				)),
+			})
+		}
+		mock.InjectServerNotification(ctx, codex.Notification{
+			JSONRPC: "2.0",
+			Method:  "turn/completed",
+			Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+		})
+	}()
 
 	// Break out of the Events loop after the first event.
 	count := 0
-	for range stream.Events() {
+	for range seq {
 		count++
 		break
 	}
@@ -1212,7 +1219,7 @@ func TestStreamEventsConsumedOnSecondCall(t *testing.T) {
 	}
 }
 
-func TestRunStreamedBackpressure_SlowConsumerCompletesUnderOverflow(t *testing.T) {
+func TestRunStreamedBackpressure_SlowActiveConsumerCompletesWithoutOverflow(t *testing.T) {
 	proc, mock := mockProcess(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -1222,8 +1229,31 @@ func TestRunStreamedBackpressure_SlowConsumerCompletesUnderOverflow(t *testing.T
 
 	waitForRunStreamedReady(t, mock)
 
-	// Inject more events than the channel buffer to force overflow.
 	const totalDeltas = 100
+	seq := stream.Events()
+	done := make(chan struct {
+		received int
+		err      error
+	}, 1)
+	go func() {
+		var received int
+		var gotErr error
+		for event, err := range seq {
+			if err != nil {
+				gotErr = err
+				break
+			}
+			if _, ok := event.(*codex.TextDelta); ok {
+				received++
+				time.Sleep(1 * time.Millisecond)
+			}
+		}
+		done <- struct {
+			received int
+			err      error
+		}{received: received, err: gotErr}
+	}()
+
 	go func() {
 		for i := 0; i < totalDeltas; i++ {
 			mock.InjectServerNotification(ctx, codex.Notification{
@@ -1241,30 +1271,15 @@ func TestRunStreamedBackpressure_SlowConsumerCompletesUnderOverflow(t *testing.T
 		})
 	}()
 
-	// Consume slowly while producer floods events. Once the bounded buffer
-	// fills, the stream must fail explicitly instead of silently dropping
-	// queued events.
-	var received int
-	var gotErr error
-	for event, err := range stream.Events() {
-		if err != nil {
-			gotErr = err
-			continue
-		}
-		if _, ok := event.(*codex.TextDelta); ok {
-			received++
-			time.Sleep(1 * time.Millisecond)
-		}
+	result := <-done
+	if result.err != nil {
+		t.Fatalf("unexpected terminal error: %v", result.err)
 	}
-
-	if received == 0 {
-		t.Fatal("expected to receive at least one text delta")
-	}
-	if !errors.Is(gotErr, codex.ErrStreamOverflow) {
-		t.Fatalf("terminal error = %v; want %v", gotErr, codex.ErrStreamOverflow)
+	if result.received != totalDeltas {
+		t.Fatalf("received %d text deltas, want %d", result.received, totalDeltas)
 	}
 	if result := stream.Result(); result == nil {
-		t.Fatal("Result() returned nil under overflow")
+		t.Fatal("Result() returned nil under active backpressure")
 	}
 }
 

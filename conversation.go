@@ -707,7 +707,8 @@ func (c *Conversation) TurnStreamed(ctx context.Context, opts TurnOptions) *Stre
 	}
 	g := newGuardedChan(streamChannelBuffer)
 	s := &Stream{
-		done: make(chan struct{}),
+		done:  make(chan struct{}),
+		queue: g,
 	}
 
 	s.events = streamIterator(g)

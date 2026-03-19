@@ -289,11 +289,11 @@ project evolves.
 
 **Reason:** Internal listeners run sequentially within the goroutine spawned by `StdioTransport.handleNotification`.
 If a listener blocks (e.g. on a full channel), it delays subsequent listeners for the same notification.
-This is acceptable by design: the backpressure model ensures slow consumers signal overload rather than
-silently dropping events. Internal listeners (e.g. `streamSendEvent`) use context-guarded sends that
-unblock on cancellation, preventing indefinite head-of-line blocking. Making listeners async would
-lose ordering guarantees and complicate error propagation. The sequential dispatch matches the
-single-goroutine-per-notification model that the transport layer establishes.
+This is acceptable by design: the stream path now uses a bounded queue that applies backpressure while
+an `Events()` consumer is attached, and it detaches the queue if iteration stops early so `Result()`
+can still complete. Making listeners async would lose ordering guarantees and complicate error
+propagation. The sequential dispatch matches the single-goroutine-per-notification model that the
+transport layer establishes.
 
 ### TestErrorCodeConstants verifies constants against their literal definitions
 

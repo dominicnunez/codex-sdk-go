@@ -3,9 +3,10 @@ package codex
 import (
 	"errors"
 	"testing"
+	"time"
 )
 
-func TestGuardedChanOverflowFailsStream(t *testing.T) {
+func TestGuardedChanOverflowFailsWithoutConsumer(t *testing.T) {
 	g := newGuardedChan(1)
 
 	streamSendEvent(g, &TextDelta{Delta: "seed", ItemID: "seed"})
@@ -33,6 +34,71 @@ func TestGuardedChanOverflowFailsStream(t *testing.T) {
 	}
 	if !errors.Is(gotErr, ErrStreamOverflow) {
 		t.Fatalf("terminal err = %v; want %v", gotErr, ErrStreamOverflow)
+	}
+}
+
+func TestGuardedChanActiveConsumerAppliesBackpressure(t *testing.T) {
+	g := newGuardedChan(1)
+	g.attachConsumer()
+
+	streamSendEvent(g, &TextDelta{Delta: "seed", ItemID: "seed"})
+
+	sent := make(chan struct{})
+	go func() {
+		streamSendEvent(g, &TextDelta{Delta: "second", ItemID: "second"})
+		close(sent)
+	}()
+
+	select {
+	case <-sent:
+		t.Fatal("send returned before queue capacity became available")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	first, ok := g.recv()
+	if !ok {
+		t.Fatal("recv returned closed queue before draining first event")
+	}
+	delta, ok := first.event.(*TextDelta)
+	if !ok || delta.Delta != "seed" {
+		t.Fatalf("first event = %#v; want seed TextDelta", first.event)
+	}
+
+	select {
+	case <-sent:
+	case <-time.After(time.Second):
+		t.Fatal("blocked sender did not resume after queue drained")
+	}
+}
+
+func TestGuardedChanDetachUnblocksBlockedSenders(t *testing.T) {
+	g := newGuardedChan(1)
+	g.attachConsumer()
+
+	streamSendEvent(g, &TextDelta{Delta: "seed", ItemID: "seed"})
+
+	sent := make(chan struct{})
+	go func() {
+		streamSendEvent(g, &TextDelta{Delta: "second", ItemID: "second"})
+		close(sent)
+	}()
+
+	select {
+	case <-sent:
+		t.Fatal("send returned before detach")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	g.detachConsumer()
+
+	select {
+	case <-sent:
+	case <-time.After(time.Second):
+		t.Fatal("blocked sender did not resume after detach")
+	}
+
+	if _, ok := g.recv(); ok {
+		t.Fatal("recv succeeded after detach")
 	}
 }
 
