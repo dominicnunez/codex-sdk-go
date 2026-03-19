@@ -2836,10 +2836,9 @@ func TestStdioSpontaneousReaderEOF(t *testing.T) {
 	// Wait for the request to be sent.
 	time.Sleep(50 * time.Millisecond)
 
-	// Simulate a child process crash by closing the reader pipe.
+	// Simulate a child process crash by closing the remote writer.
 	// This causes the readLoop scanner to hit EOF and close readerStopped.
 	_ = serverWriter.Close()
-	_ = clientReader.Close()
 
 	select {
 	case err := <-errCh:
@@ -2870,7 +2869,6 @@ func TestStdioNotifyAfterReaderEOFReturnsReaderStopped(t *testing.T) {
 	}()
 
 	_ = serverWriter.Close()
-	_ = clientReader.Close()
 
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
