@@ -22,10 +22,6 @@ var validTurnStatuses = map[TurnStatus]struct{}{
 	TurnStatusInProgress:  {},
 }
 
-func validateTurnStatusField(field string, value TurnStatus) error {
-	return validateEnumValue(field, value, validTurnStatuses)
-}
-
 func (s *TurnStatus) UnmarshalJSON(data []byte) error {
 	return unmarshalEnumString(data, "turn.status", validTurnStatuses, s)
 }
@@ -209,10 +205,6 @@ const (
 var validThreadActiveFlags = map[ThreadActiveFlag]struct{}{
 	ThreadActiveFlagWaitingOnApproval:  {},
 	ThreadActiveFlagWaitingOnUserInput: {},
-}
-
-func validateThreadActiveFlagField(field string, value ThreadActiveFlag) error {
-	return validateEnumValue(field, value, validThreadActiveFlags)
 }
 
 func (f *ThreadActiveFlag) UnmarshalJSON(data []byte) error {

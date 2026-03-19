@@ -2265,6 +2265,63 @@ func TestStdioHandleResponseUnmarshalError(t *testing.T) {
 	}
 }
 
+func TestStdioMalformedResponseShapeIncrementsCounterWhenAttributed(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	errCh := make(chan error, 1)
+	go func() {
+		req := codex.Request{
+			JSONRPC: "2.0",
+			ID:      codex.RequestID{Value: "test-malformed-shape"},
+			Method:  "test/method",
+		}
+		resp, err := transport.Send(ctx, req)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		if resp.Error == nil || resp.Error.Code != codex.ErrCodeParseError {
+			errCh <- fmt.Errorf("response error = %+v; want parse error", resp.Error)
+			return
+		}
+		errCh <- nil
+	}()
+
+	waitForOutboundRequest(t, serverReader)
+
+	_, _ = serverWriter.Write([]byte(
+		`{"jsonrpc":"2.0","id":"test-malformed-shape","result":{"ok":true},"error":{"code":-32603,"message":"bad"}}` + "\n",
+	))
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for malformed response handling")
+	}
+
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for transport.MalformedMessageCount() < 1 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if got := transport.MalformedMessageCount(); got != 1 {
+		t.Fatalf("MalformedMessageCount() = %d; want 1 after attributed malformed response", got)
+	}
+}
+
 func TestStdioIgnoresNonResponseFramesWithID(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()
