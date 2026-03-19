@@ -475,6 +475,78 @@ func TestThreadLoadedList(t *testing.T) {
 	}
 }
 
+func TestThreadListRequiresData(t *testing.T) {
+	tests := []struct {
+		name    string
+		payload map[string]interface{}
+		wantErr error
+	}{
+		{
+			name:    "missing data",
+			payload: map[string]interface{}{},
+			wantErr: codex.ErrMissingResultField,
+		},
+		{
+			name:    "null data",
+			payload: map[string]interface{}{"data": nil},
+			wantErr: codex.ErrNullResultField,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := NewMockTransport()
+			defer func() { _ = transport.Close() }()
+
+			client := codex.NewClient(transport)
+			if err := transport.SetResponseData("thread/list", tt.payload); err != nil {
+				t.Fatalf("SetResponseData(thread/list): %v", err)
+			}
+
+			_, err := client.Thread.List(context.Background(), codex.ThreadListParams{})
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("Thread.List error = %v, want %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestThreadLoadedListRequiresData(t *testing.T) {
+	tests := []struct {
+		name    string
+		payload map[string]interface{}
+		wantErr error
+	}{
+		{
+			name:    "missing data",
+			payload: map[string]interface{}{},
+			wantErr: codex.ErrMissingResultField,
+		},
+		{
+			name:    "null data",
+			payload: map[string]interface{}{"data": nil},
+			wantErr: codex.ErrNullResultField,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := NewMockTransport()
+			defer func() { _ = transport.Close() }()
+
+			client := codex.NewClient(transport)
+			if err := transport.SetResponseData("thread/loaded/list", tt.payload); err != nil {
+				t.Fatalf("SetResponseData(thread/loaded/list): %v", err)
+			}
+
+			_, err := client.Thread.LoadedList(context.Background(), codex.ThreadLoadedListParams{})
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("Thread.LoadedList error = %v, want %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 // TestThreadResume tests the ThreadService.Resume method
 func TestThreadResume(t *testing.T) {
 	transport := NewMockTransport()
