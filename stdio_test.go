@@ -1214,6 +1214,7 @@ type sendResult struct {
 
 const (
 	incompleteOversizedFrameBytes = 11 * 1024 * 1024
+	exactInboundFrameBytes        = 10 * 1024 * 1024
 )
 
 func buildOversizedFrame(t *testing.T, totalSize int, prefix, suffix string) string {
@@ -1222,6 +1223,17 @@ func buildOversizedFrame(t *testing.T, totalSize int, prefix, suffix string) str
 	payloadSize := totalSize - len(prefix) - len(suffix)
 	if payloadSize <= 0 {
 		t.Fatal("invalid oversized payload size")
+	}
+
+	return prefix + strings.Repeat("x", payloadSize) + suffix
+}
+
+func buildSizedFrame(t *testing.T, totalSize int, prefix, suffix string) string {
+	t.Helper()
+
+	payloadSize := totalSize - len(prefix) - len(suffix)
+	if payloadSize <= 0 {
+		t.Fatal("invalid payload size")
 	}
 
 	return prefix + strings.Repeat("x", payloadSize) + suffix
@@ -1447,6 +1459,56 @@ func TestStdioPartialOversizeResponseClosesTransportImmediately(t *testing.T) {
 
 	if err := transport.ScanErr(); err == nil || !strings.Contains(err.Error(), "oversized inbound frame") {
 		t.Fatalf("ScanErr = %v, want oversized inbound frame error", err)
+	}
+}
+
+func TestStdioExactInboundMessageLimitIsAccepted(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	received := make(chan string, 2)
+	transport.OnNotify(func(_ context.Context, notif codex.Notification) {
+		received <- notif.Method
+	})
+
+	const exactLimitMethod = "test/exact-limit"
+	const followupMethod = "test/follow-up"
+
+	exactLimitPrefix := `{"jsonrpc":"2.0","method":"` + exactLimitMethod + `","params":{"payload":"`
+	exactLimitSuffix := `"}}`
+	exactLimitFrame := buildSizedFrame(t, exactInboundFrameBytes, exactLimitPrefix, exactLimitSuffix) + "\n"
+	_, _ = serverWriter.Write([]byte(exactLimitFrame))
+
+	followupNotif := codex.Notification{
+		JSONRPC: "2.0",
+		Method:  followupMethod,
+	}
+	followupJSON, err := json.Marshal(followupNotif)
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+	_, _ = serverWriter.Write(append(followupJSON, '\n'))
+
+	for _, wantMethod := range []string{exactLimitMethod, followupMethod} {
+		select {
+		case gotMethod := <-received:
+			if gotMethod != wantMethod {
+				t.Fatalf("received notification %q, want %q", gotMethod, wantMethod)
+			}
+		case <-time.After(3 * time.Second):
+			t.Fatalf("timeout waiting for notification %q", wantMethod)
+		}
+	}
+
+	if err := transport.ScanErr(); err != nil {
+		t.Fatalf("ScanErr = %v, want nil", err)
 	}
 }
 
