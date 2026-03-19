@@ -521,6 +521,78 @@ func TestOnCollabToolCallStartedInvalidAgentStatusReportsHandlerError(t *testing
 	}
 }
 
+func TestItemNotificationsInvalidEnumsReportHandlerError(t *testing.T) {
+	tests := []struct {
+		name       string
+		method     string
+		payload    string
+		register   func(*codex.Client, *bool)
+		wantErrSub string
+	}{
+		{
+			name:   "item started invalid message phase",
+			method: "item/started",
+			payload: `{
+				"threadId":"thread-1","turnId":"turn-1",
+				"item":{"type":"agentMessage","id":"m1","text":"hello","phase":"draft"}
+			}`,
+			register: func(client *codex.Client, called *bool) {
+				client.OnItemStarted(func(codex.ItemStartedNotification) {
+					*called = true
+				})
+			},
+			wantErrSub: `invalid agentMessage.phase "draft"`,
+		},
+		{
+			name:   "item completed invalid command status",
+			method: "item/completed",
+			payload: `{
+				"threadId":"thread-1","turnId":"turn-1",
+				"item":{"type":"commandExecution","id":"c1","command":"ls","commandActions":[],"cwd":"/tmp","status":"queued"}
+			}`,
+			register: func(client *codex.Client, called *bool) {
+				client.OnItemCompleted(func(codex.ItemCompletedNotification) {
+					*called = true
+				})
+			},
+			wantErrSub: `invalid commandExecution.status "queued"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := NewMockTransport()
+
+			var (
+				gotMethod string
+				gotErr    error
+				called    bool
+			)
+			client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+				gotMethod = method
+				gotErr = err
+			}))
+			tt.register(client, &called)
+
+			mock.InjectServerNotification(context.Background(), codex.Notification{
+				JSONRPC: "2.0",
+				Method:  tt.method,
+				Params:  json.RawMessage(tt.payload),
+			})
+
+			if called {
+				t.Fatal("handler should not be called for invalid item enum")
+			}
+			if gotMethod != tt.method {
+				t.Fatalf("handler error method = %q, want %q", gotMethod, tt.method)
+			}
+			if gotErr == nil || !strings.Contains(gotErr.Error(), tt.wantErrSub) {
+				t.Fatalf("handler error = %v; want substring %q", gotErr, tt.wantErrSub)
+			}
+		})
+	}
+}
+
 // TestOnCollabToolCallStartedNilHandler verifies nil handler doesn't panic and returns a no-op unsub.
 func TestOnCollabToolCallStartedNilHandler(t *testing.T) {
 	mock := NewMockTransport()

@@ -3,6 +3,7 @@ package codex_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go"
@@ -152,5 +153,26 @@ func TestExperimentalFeatureList_RPCError_ReturnsRPCError(t *testing.T) {
 	}
 	if rpcErr.RPCError().Code != codex.ErrCodeInternalError {
 		t.Errorf("expected error code %d, got %d", codex.ErrCodeInternalError, rpcErr.RPCError().Code)
+	}
+}
+
+func TestExperimentalFeatureListRejectsInvalidStage(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+
+	_ = mock.SetResponseData("experimentalFeature/list", map[string]interface{}{
+		"data": []interface{}{
+			map[string]interface{}{
+				"name":           "feature-x",
+				"defaultEnabled": true,
+				"enabled":        true,
+				"stage":          "preview",
+			},
+		},
+	})
+
+	_, err := client.Experimental.FeatureList(context.Background(), codex.ExperimentalFeatureListParams{})
+	if err == nil || !strings.Contains(err.Error(), `invalid experimentalFeature.stage "preview"`) {
+		t.Fatalf("FeatureList error = %v; want invalid stage failure", err)
 	}
 }

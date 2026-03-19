@@ -242,6 +242,68 @@ func TestDynamicToolCallStatus(t *testing.T) {
 	}
 }
 
+func TestEventEnumsRejectInvalidValues(t *testing.T) {
+	tests := []struct {
+		name    string
+		target  func() interface{}
+		input   string
+		wantErr string
+	}{
+		{
+			name:    "message phase",
+			target:  func() interface{} { return new(codex.MessagePhase) },
+			input:   `"draft"`,
+			wantErr: `invalid agentMessage.phase "draft"`,
+		},
+		{
+			name:    "command execution status",
+			target:  func() interface{} { return new(codex.CommandExecutionStatus) },
+			input:   `"queued"`,
+			wantErr: `invalid commandExecution.status "queued"`,
+		},
+		{
+			name:    "patch apply status",
+			target:  func() interface{} { return new(codex.PatchApplyStatus) },
+			input:   `"queued"`,
+			wantErr: `invalid fileChange.status "queued"`,
+		},
+		{
+			name:    "mcp tool call status",
+			target:  func() interface{} { return new(codex.McpToolCallStatus) },
+			input:   `"queued"`,
+			wantErr: `invalid mcpToolCall.status "queued"`,
+		},
+		{
+			name:    "dynamic tool call status",
+			target:  func() interface{} { return new(codex.DynamicToolCallStatus) },
+			input:   `"queued"`,
+			wantErr: `invalid dynamicToolCall.status "queued"`,
+		},
+		{
+			name:    "collab agent tool",
+			target:  func() interface{} { return new(codex.CollabAgentTool) },
+			input:   `"handoff"`,
+			wantErr: `invalid collabAgentToolCall.tool "handoff"`,
+		},
+		{
+			name:    "collab agent tool call status",
+			target:  func() interface{} { return new(codex.CollabAgentToolCallStatus) },
+			input:   `"queued"`,
+			wantErr: `invalid collabAgentToolCall.status "queued"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dest := tt.target()
+			err := json.Unmarshal([]byte(tt.input), dest)
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("json.Unmarshal error = %v; want substring %q", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 // TestFileUpdateChange tests FileUpdateChange structure including Kind discriminator
 func TestFileUpdateChange(t *testing.T) {
 	tests := []struct {

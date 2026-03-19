@@ -3,6 +3,7 @@ package codex_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/dominicnunez/codex-sdk-go"
@@ -197,5 +198,24 @@ func TestExternalAgentConfigImport_RPCError_ReturnsRPCError(t *testing.T) {
 	}
 	if rpcErr.RPCError().Code != codex.ErrCodeInternalError {
 		t.Errorf("expected error code %d, got %d", codex.ErrCodeInternalError, rpcErr.RPCError().Code)
+	}
+}
+
+func TestExternalAgentConfigDetectRejectsInvalidItemType(t *testing.T) {
+	mock := NewMockTransport()
+	_ = mock.SetResponseData("externalAgentConfig/detect", map[string]interface{}{
+		"items": []interface{}{
+			map[string]interface{}{
+				"description": "Unsupported migration target",
+				"itemType":    "PROMPTS",
+			},
+		},
+	})
+
+	client := codex.NewClient(mock)
+
+	_, err := client.ExternalAgent.ConfigDetect(context.Background(), codex.ExternalAgentConfigDetectParams{})
+	if err == nil || !strings.Contains(err.Error(), `invalid externalAgentConfig.itemType "PROMPTS"`) {
+		t.Fatalf("ConfigDetect error = %v; want invalid item type failure", err)
 	}
 }

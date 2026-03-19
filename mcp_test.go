@@ -108,6 +108,28 @@ func TestMcpListServerStatus(t *testing.T) {
 	}
 }
 
+func TestMcpListServerStatusRejectsInvalidAuthStatus(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+
+	_ = mock.SetResponseData("mcpServerStatus/list", map[string]interface{}{
+		"data": []interface{}{
+			map[string]interface{}{
+				"authStatus":        "sessionCookie",
+				"name":              "github",
+				"resourceTemplates": []interface{}{},
+				"resources":         []interface{}{},
+				"tools":             map[string]interface{}{},
+			},
+		},
+	})
+
+	_, err := client.Mcp.ListServerStatus(context.Background(), codex.ListMcpServerStatusParams{})
+	if err == nil || !strings.Contains(err.Error(), `invalid mcpServerStatus.authStatus "sessionCookie"`) {
+		t.Fatalf("ListServerStatus error = %v; want invalid auth status failure", err)
+	}
+}
+
 func TestMcpOauthLogin(t *testing.T) {
 	tests := []struct {
 		name         string

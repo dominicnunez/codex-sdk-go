@@ -3,6 +3,7 @@ package codex_test
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go"
@@ -403,6 +404,60 @@ func TestThreadItemRejectsMalformedNestedPayloads(t *testing.T) {
 			err := json.Unmarshal([]byte(tt.input), &item)
 			if !errors.Is(err, codex.ErrMissingResultField) {
 				t.Fatalf("error = %v; want ErrMissingResultField", err)
+			}
+		})
+	}
+}
+
+func TestThreadItemRejectsInvalidEnums(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr string
+	}{
+		{
+			name:    "agent message phase",
+			input:   `{"type":"agentMessage","id":"a1","text":"response","phase":"draft"}`,
+			wantErr: `invalid agentMessage.phase "draft"`,
+		},
+		{
+			name:    "command execution status",
+			input:   `{"type":"commandExecution","id":"c1","command":"ls","commandActions":[],"cwd":"/tmp","status":"queued"}`,
+			wantErr: `invalid commandExecution.status "queued"`,
+		},
+		{
+			name:    "file change status",
+			input:   `{"type":"fileChange","id":"f1","changes":[{"path":"a.go","diff":"+line","kind":{"type":"add"}}],"status":"queued"}`,
+			wantErr: `invalid fileChange.status "queued"`,
+		},
+		{
+			name:    "mcp tool call status",
+			input:   `{"type":"mcpToolCall","id":"m1","server":"srv","tool":"read","status":"queued","arguments":{}}`,
+			wantErr: `invalid mcpToolCall.status "queued"`,
+		},
+		{
+			name:    "dynamic tool call status",
+			input:   `{"type":"dynamicToolCall","id":"d1","tool":"mytool","status":"queued","arguments":{}}`,
+			wantErr: `invalid dynamicToolCall.status "queued"`,
+		},
+		{
+			name:    "collab tool",
+			input:   `{"type":"collabAgentToolCall","id":"ca1","tool":"handoff","status":"completed","agentsStates":{"agent-1":{"status":"running"}},"receiverThreadIds":["t1"],"senderThreadId":"t0"}`,
+			wantErr: `invalid collabAgentToolCall.tool "handoff"`,
+		},
+		{
+			name:    "collab tool status",
+			input:   `{"type":"collabAgentToolCall","id":"ca1","tool":"spawnAgent","status":"queued","agentsStates":{"agent-1":{"status":"running"}},"receiverThreadIds":["t1"],"senderThreadId":"t0"}`,
+			wantErr: `invalid collabAgentToolCall.status "queued"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var item codex.ThreadItemWrapper
+			err := json.Unmarshal([]byte(tt.input), &item)
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %v; want substring %q", err, tt.wantErr)
 			}
 		})
 	}
