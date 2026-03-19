@@ -15,6 +15,20 @@ const (
 	HookEventNameStop             HookEventName = "stop"
 )
 
+var validHookEventNames = map[HookEventName]struct{}{
+	HookEventNameSessionStart:     {},
+	HookEventNameUserPromptSubmit: {},
+	HookEventNameStop:             {},
+}
+
+func (n HookEventName) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("hook.eventName", n, validHookEventNames)
+}
+
+func (n *HookEventName) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "hook.eventName", validHookEventNames, n)
+}
+
 // HookExecutionMode identifies whether a hook ran synchronously or asynchronously.
 type HookExecutionMode string
 
@@ -22,6 +36,19 @@ const (
 	HookExecutionModeSync  HookExecutionMode = "sync"
 	HookExecutionModeAsync HookExecutionMode = "async"
 )
+
+var validHookExecutionModes = map[HookExecutionMode]struct{}{
+	HookExecutionModeSync:  {},
+	HookExecutionModeAsync: {},
+}
+
+func (m HookExecutionMode) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("hook.executionMode", m, validHookExecutionModes)
+}
+
+func (m *HookExecutionMode) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "hook.executionMode", validHookExecutionModes, m)
+}
 
 // HookHandlerType identifies the type of hook handler.
 type HookHandlerType string
@@ -31,6 +58,20 @@ const (
 	HookHandlerTypePrompt  HookHandlerType = "prompt"
 	HookHandlerTypeAgent   HookHandlerType = "agent"
 )
+
+var validHookHandlerTypes = map[HookHandlerType]struct{}{
+	HookHandlerTypeCommand: {},
+	HookHandlerTypePrompt:  {},
+	HookHandlerTypeAgent:   {},
+}
+
+func (t HookHandlerType) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("hook.handlerType", t, validHookHandlerTypes)
+}
+
+func (t *HookHandlerType) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "hook.handlerType", validHookHandlerTypes, t)
+}
 
 // HookOutputEntryKind identifies the kind of hook output entry.
 type HookOutputEntryKind string
@@ -43,6 +84,22 @@ const (
 	HookOutputEntryKindError    HookOutputEntryKind = "error"
 )
 
+var validHookOutputEntryKinds = map[HookOutputEntryKind]struct{}{
+	HookOutputEntryKindWarning:  {},
+	HookOutputEntryKindStop:     {},
+	HookOutputEntryKindFeedback: {},
+	HookOutputEntryKindContext:  {},
+	HookOutputEntryKindError:    {},
+}
+
+func (k HookOutputEntryKind) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("hook.output.kind", k, validHookOutputEntryKinds)
+}
+
+func (k *HookOutputEntryKind) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "hook.output.kind", validHookOutputEntryKinds, k)
+}
+
 // HookRunStatus identifies the lifecycle state of a hook execution.
 type HookRunStatus string
 
@@ -54,6 +111,22 @@ const (
 	HookRunStatusStopped   HookRunStatus = "stopped"
 )
 
+var validHookRunStatuses = map[HookRunStatus]struct{}{
+	HookRunStatusRunning:   {},
+	HookRunStatusCompleted: {},
+	HookRunStatusFailed:    {},
+	HookRunStatusBlocked:   {},
+	HookRunStatusStopped:   {},
+}
+
+func (s HookRunStatus) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("hook.run.status", s, validHookRunStatuses)
+}
+
+func (s *HookRunStatus) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "hook.run.status", validHookRunStatuses, s)
+}
+
 // HookScope identifies whether a hook ran at thread or turn scope.
 type HookScope string
 
@@ -61,6 +134,19 @@ const (
 	HookScopeThread HookScope = "thread"
 	HookScopeTurn   HookScope = "turn"
 )
+
+var validHookScopes = map[HookScope]struct{}{
+	HookScopeThread: {},
+	HookScopeTurn:   {},
+}
+
+func (s HookScope) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("hook.scope", s, validHookScopes)
+}
+
+func (s *HookScope) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "hook.scope", validHookScopes, s)
+}
 
 // HookOutputEntry is a single line of hook output.
 type HookOutputEntry struct {

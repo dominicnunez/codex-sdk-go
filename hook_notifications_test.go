@@ -45,6 +45,134 @@ func TestHookNotificationTypesRejectMissingRequiredNestedFields(t *testing.T) {
 	})
 }
 
+func TestHookNotificationTypesRejectInvalidEnums(t *testing.T) {
+	tests := []struct {
+		name    string
+		payload string
+		target  func([]byte) error
+		wantErr string
+	}{
+		{
+			name:    "output entry kind",
+			payload: `{"kind":"bogus","text":"bad"}`,
+			target: func(data []byte) error {
+				var entry codex.HookOutputEntry
+				return json.Unmarshal(data, &entry)
+			},
+			wantErr: `invalid hook.output.kind "bogus"`,
+		},
+		{
+			name: "run summary event name",
+			payload: `{
+				"displayOrder": 1,
+				"entries": [{"kind":"warning","text":"be careful"}],
+				"eventName": "bogus",
+				"executionMode": "sync",
+				"handlerType": "command",
+				"id": "run-1",
+				"scope": "thread",
+				"sourcePath": "/tmp/hook",
+				"startedAt": 123,
+				"status": "running"
+			}`,
+			target: func(data []byte) error {
+				var run codex.HookRunSummary
+				return json.Unmarshal(data, &run)
+			},
+			wantErr: `invalid hook.eventName "bogus"`,
+		},
+		{
+			name: "run summary execution mode",
+			payload: `{
+				"displayOrder": 1,
+				"entries": [{"kind":"warning","text":"be careful"}],
+				"eventName": "sessionStart",
+				"executionMode": "bogus",
+				"handlerType": "command",
+				"id": "run-1",
+				"scope": "thread",
+				"sourcePath": "/tmp/hook",
+				"startedAt": 123,
+				"status": "running"
+			}`,
+			target: func(data []byte) error {
+				var run codex.HookRunSummary
+				return json.Unmarshal(data, &run)
+			},
+			wantErr: `invalid hook.executionMode "bogus"`,
+		},
+		{
+			name: "run summary handler type",
+			payload: `{
+				"displayOrder": 1,
+				"entries": [{"kind":"warning","text":"be careful"}],
+				"eventName": "sessionStart",
+				"executionMode": "sync",
+				"handlerType": "bogus",
+				"id": "run-1",
+				"scope": "thread",
+				"sourcePath": "/tmp/hook",
+				"startedAt": 123,
+				"status": "running"
+			}`,
+			target: func(data []byte) error {
+				var run codex.HookRunSummary
+				return json.Unmarshal(data, &run)
+			},
+			wantErr: `invalid hook.handlerType "bogus"`,
+		},
+		{
+			name: "run summary scope",
+			payload: `{
+				"displayOrder": 1,
+				"entries": [{"kind":"warning","text":"be careful"}],
+				"eventName": "sessionStart",
+				"executionMode": "sync",
+				"handlerType": "command",
+				"id": "run-1",
+				"scope": "bogus",
+				"sourcePath": "/tmp/hook",
+				"startedAt": 123,
+				"status": "running"
+			}`,
+			target: func(data []byte) error {
+				var run codex.HookRunSummary
+				return json.Unmarshal(data, &run)
+			},
+			wantErr: `invalid hook.scope "bogus"`,
+		},
+		{
+			name: "run summary status",
+			payload: `{
+				"displayOrder": 1,
+				"entries": [{"kind":"warning","text":"be careful"}],
+				"eventName": "sessionStart",
+				"executionMode": "sync",
+				"handlerType": "command",
+				"id": "run-1",
+				"scope": "thread",
+				"sourcePath": "/tmp/hook",
+				"startedAt": 123,
+				"status": "bogus"
+			}`,
+			target: func(data []byte) error {
+				var run codex.HookRunSummary
+				return json.Unmarshal(data, &run)
+			},
+			wantErr: `invalid hook.run.status "bogus"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.target([]byte(tt.payload))
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("json.Unmarshal error = %v; want substring %q", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestGuardianApprovalReviewRejectsInvalidEnums(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -69,6 +197,95 @@ func TestGuardianApprovalReviewRejectsInvalidEnums(t *testing.T) {
 			err := json.Unmarshal([]byte(tt.payload), &review)
 			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 				t.Fatalf("json.Unmarshal error = %v; want substring %q", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestHookNotificationsReportHandlerErrorsForInvalidEnums(t *testing.T) {
+	tests := []struct {
+		name    string
+		method  string
+		params  string
+		wantErr string
+	}{
+		{
+			name:   "invalid nested output kind",
+			method: "hook/started",
+			params: `{
+				"run": {
+					"displayOrder": 1,
+					"entries": [{"kind":"bogus","text":"be careful"}],
+					"eventName": "sessionStart",
+					"executionMode": "sync",
+					"handlerType": "command",
+					"id": "run-1",
+					"scope": "thread",
+					"sourcePath": "/tmp/hook",
+					"startedAt": 123,
+					"status": "running"
+				},
+				"threadId": "thread-1"
+			}`,
+			wantErr: `invalid hook.output.kind "bogus"`,
+		},
+		{
+			name:   "invalid run status",
+			method: "hook/completed",
+			params: `{
+				"run": {
+					"displayOrder": 1,
+					"entries": [{"kind":"warning","text":"be careful"}],
+					"eventName": "sessionStart",
+					"executionMode": "sync",
+					"handlerType": "command",
+					"id": "run-1",
+					"scope": "thread",
+					"sourcePath": "/tmp/hook",
+					"startedAt": 123,
+					"status": "mystery"
+				},
+				"threadId": "thread-1"
+			}`,
+			wantErr: `invalid hook.run.status "mystery"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := NewMockTransport()
+
+			var (
+				gotMethod string
+				gotErr    error
+				called    bool
+			)
+			client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+				gotMethod = method
+				gotErr = err
+			}))
+
+			client.OnHookStarted(func(codex.HookStartedNotification) {
+				called = true
+			})
+			client.OnHookCompleted(func(codex.HookCompletedNotification) {
+				called = true
+			})
+
+			mock.InjectServerNotification(context.Background(), codex.Notification{
+				JSONRPC: "2.0",
+				Method:  tt.method,
+				Params:  json.RawMessage(tt.params),
+			})
+
+			if called {
+				t.Fatal("handler should not be called for invalid hook enums")
+			}
+			if gotMethod != tt.method {
+				t.Fatalf("handler error method = %q; want %q", gotMethod, tt.method)
+			}
+			if gotErr == nil || !strings.Contains(gotErr.Error(), tt.wantErr) {
+				t.Fatalf("handler error = %v; want substring %q", gotErr, tt.wantErr)
 			}
 		})
 	}

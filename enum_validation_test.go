@@ -180,6 +180,72 @@ func TestProtocolEnumsRejectInvalidMarshalAndUnmarshal(t *testing.T) {
 			},
 			wantErr: `invalid residencyRequirement "totally-invalid"`,
 		},
+		{
+			name: "hook event name",
+			marshal: func() ([]byte, error) {
+				return json.Marshal(codex.HookEventName("totally-invalid"))
+			},
+			unmarshal: func(data []byte) error {
+				var value codex.HookEventName
+				return json.Unmarshal(data, &value)
+			},
+			wantErr: `invalid hook.eventName "totally-invalid"`,
+		},
+		{
+			name: "hook execution mode",
+			marshal: func() ([]byte, error) {
+				return json.Marshal(codex.HookExecutionMode("totally-invalid"))
+			},
+			unmarshal: func(data []byte) error {
+				var value codex.HookExecutionMode
+				return json.Unmarshal(data, &value)
+			},
+			wantErr: `invalid hook.executionMode "totally-invalid"`,
+		},
+		{
+			name: "hook handler type",
+			marshal: func() ([]byte, error) {
+				return json.Marshal(codex.HookHandlerType("totally-invalid"))
+			},
+			unmarshal: func(data []byte) error {
+				var value codex.HookHandlerType
+				return json.Unmarshal(data, &value)
+			},
+			wantErr: `invalid hook.handlerType "totally-invalid"`,
+		},
+		{
+			name: "hook output entry kind",
+			marshal: func() ([]byte, error) {
+				return json.Marshal(codex.HookOutputEntryKind("totally-invalid"))
+			},
+			unmarshal: func(data []byte) error {
+				var value codex.HookOutputEntryKind
+				return json.Unmarshal(data, &value)
+			},
+			wantErr: `invalid hook.output.kind "totally-invalid"`,
+		},
+		{
+			name: "hook run status",
+			marshal: func() ([]byte, error) {
+				return json.Marshal(codex.HookRunStatus("totally-invalid"))
+			},
+			unmarshal: func(data []byte) error {
+				var value codex.HookRunStatus
+				return json.Unmarshal(data, &value)
+			},
+			wantErr: `invalid hook.run.status "totally-invalid"`,
+		},
+		{
+			name: "hook scope",
+			marshal: func() ([]byte, error) {
+				return json.Marshal(codex.HookScope("totally-invalid"))
+			},
+			unmarshal: func(data []byte) error {
+				var value codex.HookScope
+				return json.Unmarshal(data, &value)
+			},
+			wantErr: `invalid hook.scope "totally-invalid"`,
+		},
 	}
 
 	for _, tt := range tests {
