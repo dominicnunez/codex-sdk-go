@@ -1350,3 +1350,124 @@ reported overflow gap does not exist in the current code.
 consumption, overflows the bounded queue, and asserts that both `Events()` and
 `collector.Summary()` report the overflow. This finding describes a missing regression test that is
 already present.
+
+### Required-field validation is not limited to thread/start
+
+**Location:** `thread_test.go:197`, `plugin_test.go:290` — response validation regression coverage
+
+**Reason:** The current test suite already exercises missing required fields beyond
+`Thread.Start`. `TestThreadResponsesRejectMissingRequiredThreadFields` covers
+`Thread.Read`, `Thread.Resume`, `Thread.MetadataUpdate`, and `Thread.Unarchive`,
+and `TestThreadResponseRequiredFieldValidation` checks missing required nested
+thread fields across those responses. `TestPluginRequiredFieldValidation` does
+the same for `Plugin.Read` and `Plugin.Install`.
+
+### Oversized-frame tests already cover the late-id response ordering case
+
+**Location:** `stdio_test.go:1327` — `TestStdioOversizeResponseWithLateIDUnblocksPendingSend`
+
+**Reason:** The current transport tests already send an oversized JSON-RPC
+response with a huge `result` field before the top-level `id` and assert that
+the pending `Send` resolves with a parse error instead of timing out. The
+claimed test gap no longer exists in this checkout.
+
+### Clone fallback comments no longer describe dropped unknown variants
+
+**Location:** `conversation.go:312`, `conversation_internal_test.go:455` — clone fallback semantics
+
+**Reason:** The current comment says the fallback preserves unexpected
+in-memory values with a reflective deep clone when the JSON round-trip path does
+not work, which matches the implementation and tests. The regression test
+`TestCloneFallbacksPreserveUncloneableValues` explicitly verifies that these
+fallback helpers preserve uncloneable values instead of dropping them.
+
+### Thread item enum decoding already rejects unknown phase and status values
+
+**Location:** `thread_item.go:46` — thread-item structs with enum-typed fields
+
+**Reason:** The finding assumes `json.Unmarshal` accepts arbitrary strings for these fields, but the
+enum types already implement validating `UnmarshalJSON` methods. `MessagePhase`,
+`CommandExecutionStatus`, `PatchApplyStatus`, `McpToolCallStatus`, `DynamicToolCallStatus`,
+`CollabAgentTool`, and `CollabAgentToolCallStatus` all reject off-spec values in
+`event_types.go:60-210`, so decoding a thread item with an invalid enum fails instead of flowing
+through as an impossible state.
+
+### Negative tests for invalid enum decode paths already exist
+
+**Location:** `thread_item_test.go:412` — related coverage also exists in `experimental_test.go:159`, `mcp_test.go:112`, and `external_agent_test.go:204`
+
+**Reason:** The report says the suite never injects invalid thread-item enums, experimental stages,
+MCP auth statuses, or external-agent migration item types through real decode paths. That is
+factually wrong in the current checkout. `TestThreadItemRejectsInvalidEnums` covers the thread-item
+paths, `TestExperimentalFeatureListRejectsInvalidStage` covers experimental stages,
+`TestMcpListServerStatusRejectsInvalidAuthStatus` covers MCP auth status decoding, and
+`TestExternalAgentConfigDetectRejectsInvalidItemType` covers external-agent item types.
+
+### Experimental feature stages are already validated during decode
+
+**Location:** `experimental.go:27` — `ExperimentalFeatureStage.UnmarshalJSON`
+
+**Reason:** The current code already defines `ExperimentalFeatureStage.UnmarshalJSON`, backed by the
+closed `validExperimentalFeatureStages` set in `experimental.go:19-25`. `ExperimentalFeature` uses
+that type for its `Stage` field, so invalid values are rejected during `json.Unmarshal`. The real
+decode path is also covered by `experimental_test.go:159-177`.
+
+### MCP server auth status is already validated during response decoding
+
+**Location:** `mcp.go:26` — `McpAuthStatus.UnmarshalJSON`
+
+**Reason:** The report missed the existing enum validator. `McpAuthStatus` already rejects unknown
+wire values via `unmarshalEnumString`, and `McpServerStatus.AuthStatus` uses that type directly, so
+`McpServerStatus.UnmarshalJSON` does not accept arbitrary `authStatus` strings. The end-to-end
+decode failure is exercised by `mcp_test.go:112-130`.
+
+### External-agent migration item types are already validated during decode
+
+**Location:** `external_agent.go:25` — `ExternalAgentConfigMigrationItemType.UnmarshalJSON`
+
+**Reason:** The current implementation already validates `itemType` against the closed enum set in
+`validExternalAgentConfigMigrationItemTypes`. Because `ExternalAgentConfigMigrationItem.ItemType`
+uses that type directly, unknown values are rejected during `json.Unmarshal`. The behavior is
+verified by `external_agent_test.go:204-220`.
+
+### The transport-shutdown exception note is not stale in the current audit set
+
+**Location:** `audit/exceptions/risks.md:12` — report referenced the first risk entry
+
+**Reason:** The finding does not match the current file. `audit/exceptions/risks.md:12` is now the
+Send write-goroutine entry, not the old reader-shutdown note the report quoted. The transport
+shutdown risk has already been refreshed later in the file as `A reader that cannot be closed
+cannot be force-unblocked during transport shutdown`, and that entry explicitly reflects the
+current `io.ReadCloser`-based transport API. The reported contradiction is stale against this
+checkout.
+
+### Thread and config union tests should reject unknown approval-policy string literals
+
+**Location:** `thread_test.go:375`, `config_test.go:97` — approval-policy union regression coverage
+
+**Reason:** `AskForApprovalWrapper.UnmarshalJSON` intentionally accepts any JSON string by storing
+it as `approvalPolicyLiteral` (`thread.go:541-546`) instead of validating against the current enum
+set. That matches the SDK's forward-compatibility handling for union string variants, so adding
+tests that expect unknown approval-policy strings to be rejected would assert behavior the current
+design does not implement. The real missing regression in this area is the `subAgent.other:null`
+decode path.
+
+### Config warning notifications do not use AbsolutePathBuf for the optional path field
+
+**Location:** `config.go:493` — `ConfigWarningNotification.UnmarshalJSON`
+
+**Reason:** The audit grouped `ConfigWarningNotification.UnmarshalJSON` with inbound path decoders
+that are backed by `AbsolutePathBuf`. That specific claim is wrong in the current specs.
+`specs/v2/ConfigWarningNotification.json` defines `path` as `string | null`, not `AbsolutePathBuf`,
+so there is no missing absolute-path validation requirement for this notification field.
+
+### Thread rollback does not violate the source-of-truth schema by allowing zero turns
+
+**Location:** `request_paths.go:557` — `ThreadRollbackParams.prepareRequest()`
+
+**Reason:** This finding relies on treating `numTurns >= 1` as a protocol requirement, but the
+repo’s source of truth says otherwise. `specs/v2/ThreadRollbackParams.json` defines `numTurns` with
+`minimum: 0.0`, and the project `AGENTS.md` explicitly says the JSON schemas in `specs/` are the
+source of truth for the protocol surface. In this codebase, allowing `NumTurns: 0` matches the
+checked-in schema rather than violating it, so the audit overstates a bug that is not supported by
+the authoritative spec files.
