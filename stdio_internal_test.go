@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"sync"
@@ -365,6 +366,7 @@ func TestTurnScopedNotificationWorkerSkipsBufferedNotificationsAfterCancellation
 		ctx:             ctx,
 		cancelCtx:       cancel,
 	}
+	transport.initTurnScopedScheduler()
 
 	var handled atomic.Int32
 	transport.OnNotify(func(_ context.Context, _ Notification) {
@@ -372,13 +374,14 @@ func TestTurnScopedNotificationWorkerSkipsBufferedNotificationsAfterCancellation
 	})
 
 	queue := &turnScopedNotificationQueue{
-		queue: []Notification{{Method: notifyTurnCompleted, threadKey: "thread-1"}},
+		threadKey: "thread-1",
+		queue:     []Notification{{Method: notifyTurnCompleted, threadKey: "thread-1"}},
 	}
-	queue.running = true
+	queue.scheduled = true
 	transport.turnNotifQueues["thread-1"] = queue
 
 	cancel()
-	transport.turnScopedNotificationWorker("thread-1", queue)
+	transport.handleTurnScopedNotificationQueue(queue)
 
 	if got := handled.Load(); got != 0 {
 		t.Fatalf("notification handler invoked %d times after cancellation; want 0", got)
@@ -386,6 +389,171 @@ func TestTurnScopedNotificationWorkerSkipsBufferedNotificationsAfterCancellation
 	if _, ok := transport.turnNotifQueues["thread-1"]; ok {
 		t.Fatal("turn-scoped queue was not removed after worker shutdown")
 	}
+}
+
+func TestEnqueueTurnScopedNotificationSchedulesDistinctQueuesOnce(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	transport := &StdioTransport{
+		turnNotifQueues: make(map[string]*turnScopedNotificationQueue),
+		ctx:             ctx,
+		cancelCtx:       cancel,
+	}
+	transport.initTurnScopedScheduler()
+
+	for i := range 8 {
+		transport.enqueueTurnScopedNotification(Notification{
+			Method:    notifyTurnCompleted,
+			threadKey: fmt.Sprintf("thread-%d", i),
+		})
+	}
+	transport.enqueueTurnScopedNotification(Notification{
+		Method:    notifyTurnCompleted,
+		threadKey: "thread-3",
+	})
+
+	if got := len(transport.turnNotifQueues); got != 8 {
+		t.Fatalf("tracked turn-scoped queues = %d, want 8", got)
+	}
+	if got := len(transport.turnNotifReady); got != 8 {
+		t.Fatalf("ready turn-scoped queues = %d, want 8", got)
+	}
+	if got := len(transport.turnNotifQueues["thread-3"].queue); got != 2 {
+		t.Fatalf("thread-3 queue length = %d, want 2", got)
+	}
+}
+
+func TestEnqueueTurnScopedNotificationCapsTrackedQueues(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	transport := &StdioTransport{
+		turnNotifQueues:    make(map[string]*turnScopedNotificationQueue),
+		criticalNotifQueue: make(chan Notification, maxTurnScopedNotificationQueues),
+		ctx:                ctx,
+		cancelCtx:          cancel,
+	}
+	transport.initTurnScopedScheduler()
+
+	total := maxTurnScopedNotificationQueues + 32
+	for i := range total {
+		transport.enqueueTurnScopedNotification(Notification{
+			Method:    notifyTurnCompleted,
+			threadKey: fmt.Sprintf("thread-%d", i),
+		})
+	}
+
+	if got := len(transport.turnNotifQueues); got != maxTurnScopedNotificationQueues {
+		t.Fatalf("tracked turn-scoped queues = %d, want %d", got, maxTurnScopedNotificationQueues)
+	}
+	if got := len(transport.turnNotifReady); got != maxTurnScopedNotificationQueues {
+		t.Fatalf("ready turn-scoped queues = %d, want %d", got, maxTurnScopedNotificationQueues)
+	}
+	if got := len(transport.criticalNotifQueue); got != total-maxTurnScopedNotificationQueues {
+		t.Fatalf("overflow notifications in critical queue = %d, want %d", got, total-maxTurnScopedNotificationQueues)
+	}
+}
+
+func TestStdioDistinctTurnScopedNotificationsLimitConcurrentHandlers(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	release := make(chan struct{})
+	var current atomic.Int32
+	var peak atomic.Int32
+	transport.OnNotify(func(_ context.Context, notif Notification) {
+		if notif.Method != notifyItemCompleted {
+			return
+		}
+		active := current.Add(1)
+		for {
+			prev := peak.Load()
+			if active <= prev || peak.CompareAndSwap(prev, active) {
+				break
+			}
+		}
+		defer current.Add(-1)
+		<-release
+	})
+
+	outbound := make(chan struct{}, 1)
+	go func() {
+		scanner := bufio.NewScanner(serverReader)
+		if scanner.Scan() {
+			outbound <- struct{}{}
+		}
+	}()
+
+	errCh := make(chan error, 1)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+		defer cancel()
+		resp, err := transport.Send(ctx, Request{
+			JSONRPC: jsonrpcVersion,
+			ID:      RequestID{Value: "distinct-turn-scope"},
+			Method:  "test/method",
+		})
+		if err != nil {
+			errCh <- fmt.Errorf("Send returned error: %w", err)
+			return
+		}
+		if string(resp.Result) != `{"ok":true}` {
+			errCh <- fmt.Errorf("response result = %s; want {\"ok\":true}", string(resp.Result))
+			return
+		}
+		errCh <- nil
+	}()
+
+	select {
+	case <-outbound:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout waiting for outbound request")
+	}
+
+	totalThreads := turnScopedNotificationWorkers + 24
+	for i := range totalThreads {
+		item := fmt.Sprintf(
+			`{"jsonrpc":"2.0","method":"item/completed","params":{"threadId":"thread-%d","turnId":"turn-%d","item":{"type":"plan","id":"item-%d","text":"queued"}}}`+"\n",
+			i, i, i,
+		)
+		if _, err := serverWriter.Write([]byte(item)); err != nil {
+			t.Fatalf("write item/completed %d: %v", i, err)
+		}
+		completed := fmt.Sprintf(
+			`{"jsonrpc":"2.0","method":"turn/completed","params":{"threadId":"thread-%d","turn":{"id":"turn-%d","status":"completed","items":[]}}}`+"\n",
+			i, i,
+		)
+		if _, err := serverWriter.Write([]byte(completed)); err != nil {
+			t.Fatalf("write turn/completed %d: %v", i, err)
+		}
+	}
+	if _, err := serverWriter.Write([]byte(`{"jsonrpc":"2.0","id":"distinct-turn-scope","result":{"ok":true}}` + "\n")); err != nil {
+		t.Fatalf("write response: %v", err)
+	}
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for response while many thread-scoped queues are blocked")
+	}
+
+	time.Sleep(100 * time.Millisecond)
+	if got := peak.Load(); got > turnScopedNotificationWorkers {
+		t.Fatalf("peak concurrent turn-scoped handlers = %d, want <= %d", got, turnScopedNotificationWorkers)
+	}
+
+	close(release)
 }
 
 func TestCleanupPendingReqDeletesMatchingEntry(t *testing.T) {

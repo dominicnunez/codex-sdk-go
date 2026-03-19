@@ -23,16 +23,18 @@ type pendingReq struct {
 // large enough for normal bursts, bounded to prevent untrusted-peer DoS via
 // unbounded goroutine or memory growth.
 const (
-	inboundRequestWorkers       = 8
-	inboundRequestQueueSize     = 64
-	inboundNotificationWorkers  = 8
-	criticalNotificationWorkers = 2
-	inboundNotifQueueSize       = 128
-	criticalNotifQueueSize      = 64
-	outboundWriteQueueSize      = 256
-	readBufferSizeBytes         = 64 * 1024
-	maxInboundMessageSizeBytes  = 10 * 1024 * 1024
-	defaultSendTimeout          = 5 * time.Minute
+	inboundRequestWorkers           = 8
+	inboundRequestQueueSize         = 64
+	inboundNotificationWorkers      = 8
+	criticalNotificationWorkers     = 2
+	turnScopedNotificationWorkers   = 8
+	maxTurnScopedNotificationQueues = 128
+	inboundNotifQueueSize           = 128
+	criticalNotifQueueSize          = 64
+	outboundWriteQueueSize          = 256
+	readBufferSizeBytes             = 64 * 1024
+	maxInboundMessageSizeBytes      = 10 * 1024 * 1024
+	defaultSendTimeout              = 5 * time.Minute
 )
 
 const (
@@ -51,9 +53,10 @@ type writeEnvelope struct {
 }
 
 type turnScopedNotificationQueue struct {
-	mu      sync.Mutex
-	queue   []Notification
-	running bool
+	mu        sync.Mutex
+	threadKey string
+	queue     []Notification
+	scheduled bool
 }
 
 type inboundFrame struct {
@@ -155,6 +158,10 @@ type StdioTransport struct {
 	requestQueue       chan Request
 	turnNotifQueuesMu  sync.Mutex
 	turnNotifQueues    map[string]*turnScopedNotificationQueue
+	turnNotifReadyMu   sync.Mutex
+	turnNotifReady     []*turnScopedNotificationQueue
+	turnNotifReadyCond *sync.Cond
+	turnNotifReadyOnce sync.Once
 	criticalNotifQueue chan Notification
 	notifQueue         chan Notification
 	writeQueue         chan writeEnvelope
@@ -246,6 +253,7 @@ func NewStdioTransport(reader io.ReadCloser, writer io.Writer) *StdioTransport {
 		ctx:                ctx,
 		cancelCtx:          cancel,
 	}
+	t.initTurnScopedScheduler()
 	for range inboundRequestWorkers {
 		go t.requestWorker()
 	}
@@ -255,9 +263,21 @@ func NewStdioTransport(reader io.ReadCloser, writer io.Writer) *StdioTransport {
 	for range criticalNotificationWorkers {
 		go t.criticalNotificationWorker()
 	}
+	for range turnScopedNotificationWorkers {
+		go t.turnScopedNotificationWorker()
+	}
 	go t.writeLoop()
 	t.ensureReadLoopStarted()
 	return t
+}
+
+func (t *StdioTransport) initTurnScopedScheduler() {
+	t.turnNotifReadyOnce.Do(func() {
+		if t.turnNotifQueues == nil {
+			t.turnNotifQueues = make(map[string]*turnScopedNotificationQueue)
+		}
+		t.turnNotifReadyCond = sync.NewCond(&t.turnNotifReadyMu)
+	})
 }
 
 // Send transmits a JSON-RPC request and waits for the response.
@@ -421,6 +441,11 @@ func (t *StdioTransport) closeWithFailure(scanErr error, message string, data js
 	t.mu.Unlock()
 
 	cancel()
+	if t.turnNotifReadyCond != nil {
+		t.turnNotifReadyMu.Lock()
+		t.turnNotifReadyCond.Broadcast()
+		t.turnNotifReadyMu.Unlock()
+	}
 	if readerCloser != nil {
 		_ = readerCloser.Close()
 	}
@@ -608,6 +633,41 @@ func (t *StdioTransport) criticalNotificationWorker() {
 		}
 		t.handleNotification(notif)
 	}
+}
+
+func (t *StdioTransport) turnScopedNotificationWorker() {
+	t.initTurnScopedScheduler()
+	for {
+		queue, ok := t.nextTurnScopedNotificationQueue()
+		if !ok {
+			return
+		}
+		t.handleTurnScopedNotificationQueue(queue)
+	}
+}
+
+func (t *StdioTransport) nextTurnScopedNotificationQueue() (*turnScopedNotificationQueue, bool) {
+	t.turnNotifReadyMu.Lock()
+	defer t.turnNotifReadyMu.Unlock()
+
+	for len(t.turnNotifReady) == 0 && t.ctx.Err() == nil {
+		t.turnNotifReadyCond.Wait()
+	}
+	if len(t.turnNotifReady) == 0 {
+		return nil, false
+	}
+
+	queue := t.turnNotifReady[0]
+	t.turnNotifReady[0] = nil
+	t.turnNotifReady = t.turnNotifReady[1:]
+	return queue, true
+}
+
+func (t *StdioTransport) scheduleTurnScopedNotificationQueue(queue *turnScopedNotificationQueue) {
+	t.turnNotifReadyMu.Lock()
+	t.turnNotifReady = append(t.turnNotifReady, queue)
+	t.turnNotifReadyMu.Unlock()
+	t.turnNotifReadyCond.Signal()
 }
 
 // readLoop continuously reads newline-delimited JSON messages from the reader
@@ -869,6 +929,8 @@ func (t *StdioTransport) enqueueNotification(notif Notification) {
 }
 
 func (t *StdioTransport) enqueueTurnScopedNotification(notif Notification) {
+	t.initTurnScopedScheduler()
+
 	if notif.threadKey == "" {
 		select {
 		case <-t.ctx.Done():
@@ -883,30 +945,43 @@ func (t *StdioTransport) enqueueTurnScopedNotification(notif Notification) {
 	t.turnNotifQueuesMu.Lock()
 	queue := t.turnNotifQueues[notif.threadKey]
 	if queue == nil {
-		queue = &turnScopedNotificationQueue{}
+		if len(t.turnNotifQueues) >= maxTurnScopedNotificationQueues {
+			t.turnNotifQueuesMu.Unlock()
+			t.enqueueCriticalNotification(notif)
+			return
+		}
+		queue = &turnScopedNotificationQueue{threadKey: notif.threadKey}
 		t.turnNotifQueues[notif.threadKey] = queue
 	}
 	t.turnNotifQueuesMu.Unlock()
 
 	queue.mu.Lock()
 	queue.queue = append(queue.queue, notif)
-	if queue.running {
+	if queue.scheduled {
 		queue.mu.Unlock()
 		return
 	}
-	queue.running = true
+	queue.scheduled = true
 	queue.mu.Unlock()
 
-	go t.turnScopedNotificationWorker(notif.threadKey, queue)
+	if t.ctx.Err() != nil {
+		queue.mu.Lock()
+		queue.queue = nil
+		queue.scheduled = false
+		queue.mu.Unlock()
+		t.removeTurnScopedNotificationQueue(queue.threadKey, queue)
+		return
+	}
+	t.scheduleTurnScopedNotificationQueue(queue)
 }
 
-func (t *StdioTransport) turnScopedNotificationWorker(threadKey string, queue *turnScopedNotificationQueue) {
+func (t *StdioTransport) handleTurnScopedNotificationQueue(queue *turnScopedNotificationQueue) {
 	for {
 		queue.mu.Lock()
 		if len(queue.queue) == 0 {
-			queue.running = false
+			queue.scheduled = false
 			queue.mu.Unlock()
-			t.removeTurnScopedNotificationQueue(threadKey, queue)
+			t.removeTurnScopedNotificationQueue(queue.threadKey, queue)
 			return
 		}
 		notif := queue.queue[0]
@@ -917,9 +992,9 @@ func (t *StdioTransport) turnScopedNotificationWorker(threadKey string, queue *t
 		if t.ctx.Err() != nil {
 			queue.mu.Lock()
 			queue.queue = nil
-			queue.running = false
+			queue.scheduled = false
 			queue.mu.Unlock()
-			t.removeTurnScopedNotificationQueue(threadKey, queue)
+			t.removeTurnScopedNotificationQueue(queue.threadKey, queue)
 			return
 		}
 		t.handleNotification(notif)
@@ -936,7 +1011,7 @@ func (t *StdioTransport) removeTurnScopedNotificationQueue(threadKey string, que
 	}
 
 	queue.mu.Lock()
-	empty := len(queue.queue) == 0 && !queue.running
+	empty := len(queue.queue) == 0 && !queue.scheduled
 	queue.mu.Unlock()
 	if empty {
 		delete(t.turnNotifQueues, threadKey)

@@ -1698,6 +1698,86 @@ func TestStdioTurnScopedNotificationsDoNotBlockReadLoop(t *testing.T) {
 	}
 }
 
+// TestStdioDistinctTurnScopedNotificationsDoNotBlockReadLoop verifies that a
+// backlog spread across many thread IDs still leaves the read loop responsive.
+func TestStdioDistinctTurnScopedNotificationsDoNotBlockReadLoop(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	block := make(chan struct{})
+	transport.OnNotify(func(_ context.Context, notif codex.Notification) {
+		if notif.Method == "item/completed" {
+			<-block
+		}
+	})
+	defer close(block)
+
+	outbound := make(chan struct{}, 1)
+	go func() {
+		scanner := bufio.NewScanner(serverReader)
+		if scanner.Scan() {
+			outbound <- struct{}{}
+		}
+	}()
+
+	errCh := make(chan error, 1)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+		defer cancel()
+		req := codex.Request{
+			JSONRPC: "2.0",
+			ID:      codex.RequestID{Value: "turn-scoped-distinct-queues"},
+			Method:  "test/method",
+		}
+		resp, err := transport.Send(ctx, req)
+		if err != nil {
+			errCh <- fmt.Errorf("Send returned error: %w", err)
+			return
+		}
+		if string(resp.Result) != `{"ok":true}` {
+			errCh <- fmt.Errorf("response result = %s; want {\"ok\":true}", string(resp.Result))
+			return
+		}
+		errCh <- nil
+	}()
+
+	select {
+	case <-outbound:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout waiting for outbound request")
+	}
+
+	for i := 0; i < 64; i++ {
+		item := fmt.Sprintf(
+			`{"jsonrpc":"2.0","method":"item/completed","params":{"threadId":"thread-%d","turnId":"turn-%d","item":{"type":"plan","id":"item-%d","text":"queued"}}}`+"\n",
+			i, i, i,
+		)
+		_, _ = serverWriter.Write([]byte(item))
+		completed := fmt.Sprintf(
+			`{"jsonrpc":"2.0","method":"turn/completed","params":{"threadId":"thread-%d","turn":{"id":"turn-%d","status":"completed","items":[]}}}`+"\n",
+			i, i,
+		)
+		_, _ = serverWriter.Write([]byte(completed))
+	}
+	_, _ = serverWriter.Write([]byte(`{"jsonrpc":"2.0","id":"turn-scoped-distinct-queues","result":{"ok":true}}` + "\n"))
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for response while distinct turn-scoped queues are saturated")
+	}
+}
+
 // TestStdioErrorNotificationsUseCriticalQueue verifies error-bearing
 // notifications are routed through the critical queue.
 func TestStdioErrorNotificationsUseCriticalQueue(t *testing.T) {
