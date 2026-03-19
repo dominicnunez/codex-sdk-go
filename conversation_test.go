@@ -1001,15 +1001,11 @@ func TestConversationTurnStreamedTurnError(t *testing.T) {
 		t.Error("expected TurnCompleted event before error")
 	}
 	result := stream.Result()
-	if result == nil {
-		t.Fatal("expected Result() to retain failed turn state")
-		return
+	if result != nil {
+		t.Fatalf("expected nil Result() on turn error, got %+v", result)
 	}
-	if result.Turn.Status != codex.TurnStatusFailed {
-		t.Fatalf("Result().Turn.Status = %q, want %q", result.Turn.Status, codex.TurnStatusFailed)
-	}
-	if result.Turn.Error == nil || result.Turn.Error.Message != "model error" {
-		t.Fatalf("Result().Turn.Error = %+v, want model error", result.Turn.Error)
+	if got := len(conv.Thread().Turns); got != 0 {
+		t.Fatalf("len(Thread().Turns) = %d, want 0 after failed streamed turn", got)
 	}
 }
 

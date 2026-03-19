@@ -125,7 +125,7 @@ type turnLifecycleParams struct {
 	thread                    Thread
 	threadID                  string
 	allowMissingInitialTurnID bool
-	onComplete                func(Turn) // called for every terminal turn; nil = no-op
+	onComplete                func(Turn) // called when a turn is finalized into thread state; nil = no-op
 	collector                 *StreamCollector
 }
 
@@ -472,13 +472,13 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, g *guardedC
 		copy(collectedItems, items)
 		itemsMu.Unlock()
 
-		s.mu.Lock()
-		s.result = completeTurnLifecycle(p, completed.Turn, collectedItems)
-		s.mu.Unlock()
 		if completed.Turn.Error != nil {
 			emitErr(fmt.Errorf("turn error: %w", completed.Turn.Error))
 			return
 		}
+		s.mu.Lock()
+		s.result = completeTurnLifecycle(p, completed.Turn, collectedItems)
+		s.mu.Unlock()
 
 	case <-ctx.Done():
 		emitErr(ctx.Err())
