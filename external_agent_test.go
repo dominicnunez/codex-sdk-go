@@ -2,7 +2,9 @@ package codex_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -17,6 +19,7 @@ func TestExternalAgentConfigDetect(t *testing.T) {
 		params       codex.ExternalAgentConfigDetectParams
 		responseData map[string]interface{}
 		wantItemsLen int
+		wantJSON     map[string]interface{}
 	}{
 		{
 			name:   "detected configs",
@@ -36,6 +39,10 @@ func TestExternalAgentConfigDetect(t *testing.T) {
 				},
 			},
 			wantItemsLen: 2,
+			wantJSON: map[string]interface{}{
+				"cwds":        []interface{}{"/path/to/project"},
+				"includeHome": true,
+			},
 		},
 		{
 			name:   "no configs detected",
@@ -44,6 +51,9 @@ func TestExternalAgentConfigDetect(t *testing.T) {
 				"items": []interface{}{},
 			},
 			wantItemsLen: 0,
+			wantJSON: map[string]interface{}{
+				"cwds": []interface{}{"/path/to/empty"},
+			},
 		},
 		{
 			name:   "minimal params (no cwds, no includeHome)",
@@ -57,6 +67,7 @@ func TestExternalAgentConfigDetect(t *testing.T) {
 				},
 			},
 			wantItemsLen: 1,
+			wantJSON:     map[string]interface{}{},
 		},
 	}
 
@@ -86,6 +97,22 @@ func TestExternalAgentConfigDetect(t *testing.T) {
 					t.Error("ConfigDetect() first item ItemType is empty")
 				}
 			}
+
+			if len(mock.SentRequests) != 1 {
+				t.Fatalf("expected 1 detect request, got %d", len(mock.SentRequests))
+			}
+			recordedReq := mock.SentRequests[0]
+			if recordedReq.Method != "externalAgentConfig/detect" {
+				t.Fatalf("method = %s; want externalAgentConfig/detect", recordedReq.Method)
+			}
+
+			var got map[string]interface{}
+			if err := json.Unmarshal(recordedReq.Params, &got); err != nil {
+				t.Fatalf("request params decode failed: %v", err)
+			}
+			if !reflect.DeepEqual(got, tt.wantJSON) {
+				t.Errorf("request params = %#v, want %#v", got, tt.wantJSON)
+			}
 		})
 	}
 }
@@ -94,8 +121,9 @@ func TestExternalAgentConfigImport(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		name   string
-		params codex.ExternalAgentConfigImportParams
+		name     string
+		params   codex.ExternalAgentConfigImportParams
+		wantJSON map[string]interface{}
 	}{
 		{
 			name: "import single config item",
@@ -105,6 +133,15 @@ func TestExternalAgentConfigImport(t *testing.T) {
 						Cwd:         ptr("/path/to/project"),
 						Description: "Continue.dev configuration",
 						ItemType:    codex.MigrationItemTypeConfig,
+					},
+				},
+			},
+			wantJSON: map[string]interface{}{
+				"migrationItems": []interface{}{
+					map[string]interface{}{
+						"cwd":         "/path/to/project",
+						"description": "Continue.dev configuration",
+						"itemType":    "CONFIG",
 					},
 				},
 			},
@@ -128,6 +165,23 @@ func TestExternalAgentConfigImport(t *testing.T) {
 					},
 				},
 			},
+			wantJSON: map[string]interface{}{
+				"migrationItems": []interface{}{
+					map[string]interface{}{
+						"description": "Home AGENTS.md",
+						"itemType":    "AGENTS_MD",
+					},
+					map[string]interface{}{
+						"cwd":         "/repo",
+						"description": "Project skills",
+						"itemType":    "SKILLS",
+					},
+					map[string]interface{}{
+						"description": "MCP server configuration",
+						"itemType":    "MCP_SERVER_CONFIG",
+					},
+				},
+			},
 		},
 	}
 
@@ -145,6 +199,22 @@ func TestExternalAgentConfigImport(t *testing.T) {
 
 			// Response is empty struct per spec
 			_ = resp
+
+			if len(mock.SentRequests) != 1 {
+				t.Fatalf("expected 1 import request, got %d", len(mock.SentRequests))
+			}
+			recordedReq := mock.SentRequests[0]
+			if recordedReq.Method != "externalAgentConfig/import" {
+				t.Fatalf("method = %s; want externalAgentConfig/import", recordedReq.Method)
+			}
+
+			var got map[string]interface{}
+			if err := json.Unmarshal(recordedReq.Params, &got); err != nil {
+				t.Fatalf("request params decode failed: %v", err)
+			}
+			if !reflect.DeepEqual(got, tt.wantJSON) {
+				t.Errorf("request params = %#v, want %#v", got, tt.wantJSON)
+			}
 		})
 	}
 }

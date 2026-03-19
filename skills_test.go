@@ -2,7 +2,9 @@ package codex_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -221,6 +223,7 @@ func TestSkillsConfigWrite(t *testing.T) {
 		params        codex.SkillsConfigWriteParams
 		mockResponse  map[string]interface{}
 		checkResponse func(t *testing.T, resp codex.SkillsConfigWriteResponse)
+		wantJSON      map[string]interface{}
 	}{
 		{
 			name: "enable skill",
@@ -236,6 +239,10 @@ func TestSkillsConfigWrite(t *testing.T) {
 					t.Errorf("expected effectiveEnabled = true, got %v", resp.EffectiveEnabled)
 				}
 			},
+			wantJSON: map[string]interface{}{
+				"path":    "/home/user/.claude/skills/my-skill",
+				"enabled": true,
+			},
 		},
 		{
 			name: "disable skill",
@@ -250,6 +257,10 @@ func TestSkillsConfigWrite(t *testing.T) {
 				if resp.EffectiveEnabled != false {
 					t.Errorf("expected effectiveEnabled = false, got %v", resp.EffectiveEnabled)
 				}
+			},
+			wantJSON: map[string]interface{}{
+				"path":    "/home/user/.claude/skills/my-skill",
+				"enabled": false,
 			},
 		},
 	}
@@ -273,6 +284,14 @@ func TestSkillsConfigWrite(t *testing.T) {
 			}
 			if mock.SentRequests[0].Method != "skills/config/write" {
 				t.Errorf("expected method = skills/config/write, got %s", mock.SentRequests[0].Method)
+			}
+
+			var got map[string]interface{}
+			if err := json.Unmarshal(mock.SentRequests[0].Params, &got); err != nil {
+				t.Fatalf("request params decode failed: %v", err)
+			}
+			if !reflect.DeepEqual(got, tt.wantJSON) {
+				t.Errorf("request params = %#v, want %#v", got, tt.wantJSON)
 			}
 		})
 	}
