@@ -32,11 +32,12 @@ var errTurnInProgress = errors.New("a turn is already in progress on this conver
 // Concurrent Turn or TurnStreamed calls on the same Conversation are
 // not supported — the second call returns errTurnInProgress.
 type Conversation struct {
-	process    *Process
-	threadID   string
-	thread     Thread
-	mu         sync.Mutex
-	activeTurn bool
+	process                  *Process
+	threadID                 string
+	thread                   Thread
+	mu                       sync.Mutex
+	activeTurn               bool
+	hasCompletedTerminalTurn bool
 }
 
 // ThreadID returns the underlying thread ID.
@@ -675,6 +676,7 @@ func (c *Conversation) Turn(ctx context.Context, opts TurnOptions) (*RunResult, 
 	}
 	c.activeTurn = true
 	thread := c.thread
+	allowMissingInitialTurnID := !c.hasCompletedTerminalTurn
 	c.mu.Unlock()
 
 	defer func() {
@@ -684,13 +686,15 @@ func (c *Conversation) Turn(ctx context.Context, opts TurnOptions) (*RunResult, 
 	}()
 
 	return executeTurn(ctx, turnLifecycleParams{
-		client:     c.process.Client,
-		turnParams: c.buildTurnParams(opts),
-		thread:     thread,
-		threadID:   c.threadID,
+		client:                    c.process.Client,
+		turnParams:                c.buildTurnParams(opts),
+		thread:                    thread,
+		threadID:                  c.threadID,
+		allowMissingInitialTurnID: allowMissingInitialTurnID,
 		onComplete: func(turn Turn) {
 			c.mu.Lock()
 			c.thread.Turns = append(c.thread.Turns, turn)
+			c.hasCompletedTerminalTurn = true
 			c.mu.Unlock()
 		},
 	})
@@ -735,6 +739,7 @@ func (c *Conversation) turnStreamedLifecycle(ctx context.Context, opts TurnOptio
 	}
 	c.activeTurn = true
 	thread := c.thread
+	allowMissingInitialTurnID := !c.hasCompletedTerminalTurn
 	c.mu.Unlock()
 
 	defer func() {
@@ -744,13 +749,15 @@ func (c *Conversation) turnStreamedLifecycle(ctx context.Context, opts TurnOptio
 	}()
 
 	executeStreamedTurn(ctx, turnLifecycleParams{
-		client:     c.process.Client,
-		turnParams: c.buildTurnParams(opts),
-		thread:     thread,
-		threadID:   c.threadID,
+		client:                    c.process.Client,
+		turnParams:                c.buildTurnParams(opts),
+		thread:                    thread,
+		threadID:                  c.threadID,
+		allowMissingInitialTurnID: allowMissingInitialTurnID,
 		onComplete: func(turn Turn) {
 			c.mu.Lock()
 			c.thread.Turns = append(c.thread.Turns, turn)
+			c.hasCompletedTerminalTurn = true
 			c.mu.Unlock()
 		},
 	}, g, s)

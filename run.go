@@ -132,9 +132,10 @@ func (p *Process) Run(ctx context.Context, opts RunOptions) (*RunResult, error) 
 	}
 
 	return executeTurn(ctx, turnLifecycleParams{
-		client:     p.Client,
-		turnParams: buildTurnParams(opts, threadResp.Thread.ID),
-		thread:     threadResp.Thread,
-		threadID:   threadResp.Thread.ID,
+		client:                    p.Client,
+		turnParams:                buildTurnParams(opts, threadResp.Thread.ID),
+		thread:                    threadResp.Thread,
+		threadID:                  threadResp.Thread.ID,
+		allowMissingInitialTurnID: true,
 	})
 }

@@ -120,12 +120,13 @@ func parseTurnCompletedForThread(params json.RawMessage, threadID string, allowM
 // transport is ever replaced with one that multiplexes responses and
 // notifications on separate channels, this ordering must be preserved.
 type turnLifecycleParams struct {
-	client     *Client
-	turnParams TurnStartParams
-	thread     Thread
-	threadID   string
-	onComplete func(Turn) // called on successful turn completion; nil = no-op
-	collector  *StreamCollector
+	client                    *Client
+	turnParams                TurnStartParams
+	thread                    Thread
+	threadID                  string
+	allowMissingInitialTurnID bool
+	onComplete                func(Turn) // called for every terminal turn; nil = no-op
+	collector                 *StreamCollector
 }
 
 type turnCompletionCandidate struct {
@@ -229,6 +230,18 @@ func waitForTurnCompletion(ctx context.Context, done <-chan TurnCompletedNotific
 	}
 }
 
+func completeTurnLifecycle(p turnLifecycleParams, completed Turn, items []ThreadItemWrapper) *RunResult {
+	completedTurn := turnWithItems(completed, items)
+
+	if p.onComplete != nil {
+		p.onComplete(completedTurn)
+	}
+
+	result := buildRunResult(p.thread, completedTurn, items)
+	p.client.cacheThreadState(result.Thread)
+	return result
+}
+
 // executeTurn runs a blocking turn: registers listeners, starts the turn,
 // collects items, and waits for completion or context cancellation.
 // Listeners are filtered by threadID and active turnID to avoid cross-turn contamination.
@@ -237,7 +250,7 @@ func executeTurn(ctx context.Context, p turnLifecycleParams) (*RunResult, error)
 		items              []ThreadItemWrapper
 		itemsMu            sync.Mutex
 		state              blockingTurnState
-		allowMissingTurnID = len(p.thread.Turns) == 0
+		allowMissingTurnID = p.allowMissingInitialTurnID
 		done               = make(chan TurnCompletedNotification, 1)
 		sendDone           = func(n TurnCompletedNotification) {
 			select {
@@ -315,23 +328,16 @@ func executeTurn(ctx context.Context, p turnLifecycleParams) (*RunResult, error)
 	if err != nil {
 		return nil, err
 	}
-	if completed.Turn.Error != nil {
-		return nil, fmt.Errorf("turn error: %w", completed.Turn.Error)
-	}
 
 	itemsMu.Lock()
 	collectedItems := make([]ThreadItemWrapper, len(items))
 	copy(collectedItems, items)
 	itemsMu.Unlock()
 
-	completedTurn := turnWithItems(completed.Turn, collectedItems)
-
-	if p.onComplete != nil {
-		p.onComplete(completedTurn)
+	result := completeTurnLifecycle(p, completed.Turn, collectedItems)
+	if completed.Turn.Error != nil {
+		return nil, fmt.Errorf("turn error: %w", completed.Turn.Error)
 	}
-
-	result := buildRunResult(p.thread, completedTurn, collectedItems)
-	p.client.cacheThreadState(result.Thread)
 	return result, nil
 }
 
@@ -343,7 +349,7 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, g *guardedC
 		itemsMu               sync.Mutex
 		turnStateMu           sync.Mutex
 		turnReady             bool
-		allowMissingTurnID    = len(p.thread.Turns) == 0
+		allowMissingTurnID    = p.allowMissingInitialTurnID
 		startedTurnID         string
 		pendingTurnScoped     []func(string)
 		pendingTurnCompletion []turnCompletionCandidate
@@ -461,26 +467,18 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, g *guardedC
 	case completed := <-turnDone:
 		emit(&TurnCompleted{Turn: completed.Turn})
 
-		if completed.Turn.Error != nil {
-			emitErr(fmt.Errorf("turn error: %w", completed.Turn.Error))
-			return
-		}
-
 		itemsMu.Lock()
 		collectedItems := make([]ThreadItemWrapper, len(items))
 		copy(collectedItems, items)
 		itemsMu.Unlock()
 
-		completedTurn := turnWithItems(completed.Turn, collectedItems)
-
-		if p.onComplete != nil {
-			p.onComplete(completedTurn)
-		}
-
 		s.mu.Lock()
-		s.result = buildRunResult(p.thread, completedTurn, collectedItems)
+		s.result = completeTurnLifecycle(p, completed.Turn, collectedItems)
 		s.mu.Unlock()
-		p.client.cacheThreadState(s.result.Thread)
+		if completed.Turn.Error != nil {
+			emitErr(fmt.Errorf("turn error: %w", completed.Turn.Error))
+			return
+		}
 
 	case <-ctx.Done():
 		emitErr(ctx.Err())

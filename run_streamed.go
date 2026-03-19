@@ -257,10 +257,11 @@ func (p *Process) runStreamedLifecycle(ctx context.Context, opts RunOptions, g *
 	}
 
 	executeStreamedTurn(ctx, turnLifecycleParams{
-		client:     p.Client,
-		turnParams: buildTurnParams(opts, threadResp.Thread.ID),
-		thread:     threadResp.Thread,
-		threadID:   threadResp.Thread.ID,
-		collector:  collector,
+		client:                    p.Client,
+		turnParams:                buildTurnParams(opts, threadResp.Thread.ID),
+		thread:                    threadResp.Thread,
+		threadID:                  threadResp.Thread.ID,
+		allowMissingInitialTurnID: true,
+		collector:                 collector,
 	}, g, s)
 }
