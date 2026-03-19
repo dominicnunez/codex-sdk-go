@@ -49,6 +49,19 @@ type AppInfo struct {
 	AppMetadata         *AppMetadata      `json:"appMetadata,omitempty"`
 }
 
+func (a *AppInfo) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "id", "name"); err != nil {
+		return err
+	}
+	type wire AppInfo
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*a = AppInfo(decoded)
+	return nil
+}
+
 // AppBranding contains branding information for an app.
 type AppBranding struct {
 	IsDiscoverableApp bool    `json:"isDiscoverableApp"`
@@ -57,6 +70,19 @@ type AppBranding struct {
 	PrivacyPolicy     *string `json:"privacyPolicy,omitempty"`
 	TermsOfService    *string `json:"termsOfService,omitempty"`
 	Website           *string `json:"website,omitempty"`
+}
+
+func (b *AppBranding) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "isDiscoverableApp"); err != nil {
+		return err
+	}
+	type wire AppBranding
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*b = AppBranding(decoded)
+	return nil
 }
 
 // AppMetadata contains extended metadata for an app.
@@ -80,11 +106,37 @@ type AppReview struct {
 	Status string `json:"status"`
 }
 
+func (r *AppReview) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "status"); err != nil {
+		return err
+	}
+	type wire AppReview
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = AppReview(decoded)
+	return nil
+}
+
 // AppScreenshot represents a screenshot for an app.
 type AppScreenshot struct {
 	UserPrompt string  `json:"userPrompt"`
 	FileID     *string `json:"fileId,omitempty"`
 	URL        *string `json:"url,omitempty"`
+}
+
+func (s *AppScreenshot) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "userPrompt"); err != nil {
+		return err
+	}
+	type wire AppScreenshot
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*s = AppScreenshot(decoded)
+	return nil
 }
 
 // AppListUpdatedNotification is sent when the app list changes.
@@ -110,7 +162,7 @@ func (s *AppsService) List(ctx context.Context, params AppsListParams) (AppsList
 	return resp, nil
 }
 
-// OnAppListUpdated registers a listener for app/listUpdated notifications.
+// OnAppListUpdated registers a listener for app/list/updated notifications.
 func (c *Client) OnAppListUpdated(handler func(AppListUpdatedNotification)) {
 	if handler == nil {
 		c.OnNotification(notifyAppListUpdated, nil)

@@ -185,6 +185,19 @@ type PluginMarketplaceEntry struct {
 	Plugins   []PluginSummary       `json:"plugins"`
 }
 
+func (p *PluginMarketplaceEntry) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "name", "path", "plugins"); err != nil {
+		return err
+	}
+	type wire PluginMarketplaceEntry
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*p = PluginMarketplaceEntry(decoded)
+	return nil
+}
+
 // PluginListParams lists plugins across marketplaces.
 type PluginListParams struct {
 	Cwds            []string `json:"cwds,omitempty"`
@@ -195,6 +208,19 @@ type PluginListParams struct {
 type PluginListResponse struct {
 	Marketplaces    []PluginMarketplaceEntry `json:"marketplaces"`
 	RemoteSyncError *string                  `json:"remoteSyncError,omitempty"`
+}
+
+func (r *PluginListResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "marketplaces"); err != nil {
+		return err
+	}
+	type wire PluginListResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = PluginListResponse(decoded)
+	return nil
 }
 
 // PluginReadParams reads a single plugin from a marketplace.

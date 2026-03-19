@@ -20,6 +20,19 @@ type GetAccountResponse struct {
 	RequiresOpenaiAuth bool            `json:"requiresOpenaiAuth"`
 }
 
+func (r *GetAccountResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "requiresOpenaiAuth"); err != nil {
+		return err
+	}
+	type wire GetAccountResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = GetAccountResponse(decoded)
+	return nil
+}
+
 // AccountWrapper wraps the Account interface for JSON marshaling
 type AccountWrapper struct {
 	Value Account
@@ -37,6 +50,19 @@ type ApiKeyAccount struct {
 
 func (*ApiKeyAccount) isAccount() {}
 
+func (a *ApiKeyAccount) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "type"); err != nil {
+		return err
+	}
+	type wire ApiKeyAccount
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*a = ApiKeyAccount(decoded)
+	return nil
+}
+
 // MarshalJSON injects the type discriminator, matching the pattern used by all
 // other discriminated union variants in the codebase.
 func (a *ApiKeyAccount) MarshalJSON() ([]byte, error) {
@@ -53,6 +79,19 @@ type ChatgptAccount struct {
 }
 
 func (*ChatgptAccount) isAccount() {}
+
+func (c *ChatgptAccount) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "type", "email", "planType"); err != nil {
+		return err
+	}
+	type wire ChatgptAccount
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*c = ChatgptAccount(decoded)
+	return nil
+}
 
 // MarshalJSON injects the type discriminator, matching the pattern used by all
 // other discriminated union variants in the codebase.
@@ -101,6 +140,10 @@ func (a *AccountWrapper) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
+	if err := validateRequiredObjectFields(data, "type"); err != nil {
+		return err
+	}
+
 	var typeCheck struct {
 		Type string `json:"type"`
 	}
@@ -142,6 +185,19 @@ type GetAccountRateLimitsResponse struct {
 	RateLimitsByLimitId map[string]*RateLimitSnapshot `json:"rateLimitsByLimitId,omitempty"`
 }
 
+func (r *GetAccountRateLimitsResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "rateLimits"); err != nil {
+		return err
+	}
+	type wire GetAccountRateLimitsResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = GetAccountRateLimitsResponse(decoded)
+	return nil
+}
+
 // RateLimitSnapshot represents rate limit information
 type RateLimitSnapshot struct {
 	Credits   *CreditsSnapshot `json:"credits,omitempty"`
@@ -159,11 +215,37 @@ type CreditsSnapshot struct {
 	Unlimited  bool    `json:"unlimited"`
 }
 
+func (c *CreditsSnapshot) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "hasCredits", "unlimited"); err != nil {
+		return err
+	}
+	type wire CreditsSnapshot
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*c = CreditsSnapshot(decoded)
+	return nil
+}
+
 // RateLimitWindow represents a rate limit time window
 type RateLimitWindow struct {
 	UsedPercent        int32  `json:"usedPercent"`
 	ResetsAt           *int64 `json:"resetsAt,omitempty"`
 	WindowDurationMins *int64 `json:"windowDurationMins,omitempty"`
+}
+
+func (w *RateLimitWindow) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "usedPercent"); err != nil {
+		return err
+	}
+	type wire RateLimitWindow
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*w = RateLimitWindow(decoded)
+	return nil
 }
 
 // Login account param type discriminators (spec-defined).

@@ -36,9 +36,35 @@ type SkillToolDependency struct {
 	Transport   *string `json:"transport,omitempty"`
 }
 
+func (d *SkillToolDependency) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "type", "value"); err != nil {
+		return err
+	}
+	type wire SkillToolDependency
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*d = SkillToolDependency(decoded)
+	return nil
+}
+
 // SkillDependencies defines dependencies for a skill
 type SkillDependencies struct {
 	Tools []SkillToolDependency `json:"tools"`
+}
+
+func (d *SkillDependencies) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "tools"); err != nil {
+		return err
+	}
+	type wire SkillDependencies
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*d = SkillDependencies(decoded)
+	return nil
 }
 
 // SkillMetadata represents metadata for a single skill
@@ -53,10 +79,36 @@ type SkillMetadata struct {
 	ShortDescription *string            `json:"shortDescription,omitempty"`
 }
 
+func (m *SkillMetadata) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "description", "enabled", "name", "path", "scope"); err != nil {
+		return err
+	}
+	type wire SkillMetadata
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*m = SkillMetadata(decoded)
+	return nil
+}
+
 // SkillErrorInfo represents an error encountered when loading a skill
 type SkillErrorInfo struct {
 	Path    string `json:"path"`
 	Message string `json:"message"`
+}
+
+func (e *SkillErrorInfo) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "message", "path"); err != nil {
+		return err
+	}
+	type wire SkillErrorInfo
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*e = SkillErrorInfo(decoded)
+	return nil
 }
 
 // SkillsListExtraRootsForCwd specifies extra user roots for a specific cwd
@@ -79,9 +131,35 @@ type SkillsListEntry struct {
 	Skills []SkillMetadata  `json:"skills"`
 }
 
+func (e *SkillsListEntry) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "cwd", "errors", "skills"); err != nil {
+		return err
+	}
+	type wire SkillsListEntry
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*e = SkillsListEntry(decoded)
+	return nil
+}
+
 // SkillsListResponse contains the list of skills grouped by cwd
 type SkillsListResponse struct {
 	Data []SkillsListEntry `json:"data"`
+}
+
+func (r *SkillsListResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "data"); err != nil {
+		return err
+	}
+	type wire SkillsListResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = SkillsListResponse(decoded)
+	return nil
 }
 
 // SkillsConfigWriteParams defines parameters for enabling/disabling a skill
@@ -93,6 +171,19 @@ type SkillsConfigWriteParams struct {
 // SkillsConfigWriteResponse contains the effective enabled state after write
 type SkillsConfigWriteResponse struct {
 	EffectiveEnabled bool `json:"effectiveEnabled"`
+}
+
+func (r *SkillsConfigWriteResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "effectiveEnabled"); err != nil {
+		return err
+	}
+	type wire SkillsConfigWriteResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = SkillsConfigWriteResponse(decoded)
+	return nil
 }
 
 // SkillsService provides access to skills-related operations

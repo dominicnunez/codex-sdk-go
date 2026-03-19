@@ -18,6 +18,94 @@ func TestClientMethodsRejectMalformedSuccessResponses(t *testing.T) {
 		call          func(*codex.Client) error
 	}{
 		{
+			name:          "config read",
+			method:        "config/read",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"config": map[string]interface{}{},
+				"origins": map[string]interface{}{
+					"user": map[string]interface{}{},
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Config.Read(context.Background(), codex.ConfigReadParams{})
+				return err
+			},
+		},
+		{
+			name:          "config write",
+			method:        "config/value/write",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"filePath": "/tmp/config.toml",
+				"status":   "okOverridden",
+				"version":  "v1",
+				"overriddenMetadata": map[string]interface{}{
+					"message": "overridden",
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Config.Write(context.Background(), codex.ConfigValueWriteParams{
+					KeyPath:       "model",
+					MergeStrategy: codex.MergeStrategyReplace,
+					Value:         json.RawMessage(`"gpt-5"`),
+				})
+				return err
+			},
+		},
+		{
+			name:          "config batch write",
+			method:        "config/batchWrite",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"filePath": "/tmp/config.toml",
+				"status":   "okOverridden",
+				"version":  "v1",
+				"overriddenMetadata": map[string]interface{}{
+					"message": "overridden",
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Config.BatchWrite(context.Background(), codex.ConfigBatchWriteParams{
+					Edits: []codex.ConfigEdit{
+						{
+							KeyPath:       "model",
+							MergeStrategy: codex.MergeStrategyReplace,
+							Value:         json.RawMessage(`"gpt-5"`),
+						},
+					},
+				})
+				return err
+			},
+		},
+		{
+			name:          "account read",
+			method:        "account/read",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"requiresOpenaiAuth": true,
+				"account":            map[string]interface{}{},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Account.Get(context.Background(), codex.GetAccountParams{})
+				return err
+			},
+		},
+		{
+			name:          "account rate limits read",
+			method:        "account/rateLimits/read",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"rateLimits": map[string]interface{}{
+					"credits": map[string]interface{}{},
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Account.GetRateLimits(context.Background())
+				return err
+			},
+		},
+		{
 			name:          "feedback upload",
 			method:        "feedback/upload",
 			missingObject: map[string]interface{}{},
@@ -87,6 +175,29 @@ func TestClientMethodsRejectMalformedSuccessResponses(t *testing.T) {
 			},
 		},
 		{
+			name:          "mcp server status list",
+			method:        "mcpServerStatus/list",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"data": []interface{}{
+					map[string]interface{}{},
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Mcp.ListServerStatus(context.Background(), codex.ListMcpServerStatusParams{})
+				return err
+			},
+		},
+		{
+			name:          "mcp oauth login",
+			method:        "mcpServer/oauth/login",
+			missingObject: map[string]interface{}{},
+			call: func(client *codex.Client) error {
+				_, err := client.Mcp.OauthLogin(context.Background(), codex.McpServerOauthLoginParams{Name: "github"})
+				return err
+			},
+		},
+		{
 			name:          "review start",
 			method:        "review/start",
 			missingObject: map[string]interface{}{},
@@ -100,6 +211,32 @@ func TestClientMethodsRejectMalformedSuccessResponses(t *testing.T) {
 					Target: codex.ReviewTargetWrapper{
 						Value: &codex.UncommittedChangesReviewTarget{},
 					},
+				})
+				return err
+			},
+		},
+		{
+			name:          "skills list",
+			method:        "skills/list",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"data": []interface{}{
+					map[string]interface{}{},
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Skills.List(context.Background(), codex.SkillsListParams{})
+				return err
+			},
+		},
+		{
+			name:          "skills config write",
+			method:        "skills/config/write",
+			missingObject: map[string]interface{}{},
+			call: func(client *codex.Client) error {
+				_, err := client.Skills.ConfigWrite(context.Background(), codex.SkillsConfigWriteParams{
+					Path:    "/tmp/skill",
+					Enabled: true,
 				})
 				return err
 			},
@@ -129,6 +266,54 @@ func TestClientMethodsRejectMalformedSuccessResponses(t *testing.T) {
 					Query: "main",
 					Roots: []string{"/tmp/project"},
 				})
+				return err
+			},
+		},
+		{
+			name:          "plugin list",
+			method:        "plugin/list",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"marketplaces": []interface{}{
+					map[string]interface{}{},
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Plugin.List(context.Background(), codex.PluginListParams{})
+				return err
+			},
+		},
+		{
+			name:          "apps list",
+			method:        "app/list",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"data": []interface{}{
+					map[string]interface{}{
+						"id":   "app-1",
+						"name": "App One",
+						"branding": map[string]interface{}{
+							"category": "tools",
+						},
+					},
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Apps.List(context.Background(), codex.AppsListParams{})
+				return err
+			},
+		},
+		{
+			name:          "external agent config detect",
+			method:        "externalAgentConfig/detect",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"items": []interface{}{
+					map[string]interface{}{},
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.ExternalAgent.ConfigDetect(context.Background(), codex.ExternalAgentConfigDetectParams{})
 				return err
 			},
 		},

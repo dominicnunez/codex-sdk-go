@@ -1,6 +1,9 @@
 package codex
 
-import "context"
+import (
+	"context"
+	"encoding/json"
+)
 
 // ExternalAgentConfigMigrationItemType represents the type of external agent config migration item.
 type ExternalAgentConfigMigrationItemType string
@@ -20,6 +23,19 @@ type ExternalAgentConfigMigrationItem struct {
 	ItemType    ExternalAgentConfigMigrationItemType `json:"itemType"`
 }
 
+func (i *ExternalAgentConfigMigrationItem) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "description", "itemType"); err != nil {
+		return err
+	}
+	type wire ExternalAgentConfigMigrationItem
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*i = ExternalAgentConfigMigrationItem(decoded)
+	return nil
+}
+
 // ExternalAgentConfigDetectParams contains parameters for detecting external agent configurations.
 type ExternalAgentConfigDetectParams struct {
 	Cwds        *[]string `json:"cwds,omitempty"`
@@ -29,6 +45,19 @@ type ExternalAgentConfigDetectParams struct {
 // ExternalAgentConfigDetectResponse contains the result of config detection.
 type ExternalAgentConfigDetectResponse struct {
 	Items []ExternalAgentConfigMigrationItem `json:"items"`
+}
+
+func (r *ExternalAgentConfigDetectResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "items"); err != nil {
+		return err
+	}
+	type wire ExternalAgentConfigDetectResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = ExternalAgentConfigDetectResponse(decoded)
+	return nil
 }
 
 // ExternalAgentConfigImportParams contains parameters for importing external agent configurations.

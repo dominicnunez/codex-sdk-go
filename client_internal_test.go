@@ -127,6 +127,47 @@ func TestValidateRequiredObjectFields(t *testing.T) {
 	}
 }
 
+func TestValidateRequiredObjectKeys(t *testing.T) {
+	tests := []struct {
+		name      string
+		data      []byte
+		fields    []string
+		targetErr error
+	}{
+		{
+			name:      "missing field",
+			data:      []byte(`{"name":"tool"}`),
+			fields:    []string{"name", "inputSchema"},
+			targetErr: ErrMissingResultField,
+		},
+		{
+			name:   "null field allowed",
+			data:   []byte(`{"name":"tool","inputSchema":null}`),
+			fields: []string{"name", "inputSchema"},
+		},
+		{
+			name:   "required fields present",
+			data:   []byte(`{"config":null,"name":{"type":"sessionFlags"},"version":"v1"}`),
+			fields: []string{"config", "name", "version"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateRequiredObjectKeys(tt.data, tt.fields...)
+			if tt.targetErr == nil {
+				if err != nil {
+					t.Fatalf("validateRequiredObjectKeys() error = %v", err)
+				}
+				return
+			}
+			if !errors.Is(err, tt.targetErr) {
+				t.Fatalf("validateRequiredObjectKeys() error = %v, want %v", err, tt.targetErr)
+			}
+		})
+	}
+}
+
 func TestSendRequestRejectsNilResultTarget(t *testing.T) {
 	client := NewClient(&mockInternalTransport{})
 

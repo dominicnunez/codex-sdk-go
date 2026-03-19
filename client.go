@@ -87,10 +87,15 @@ func isNullJSONValue(raw json.RawMessage) bool {
 	return bytes.Equal(bytes.TrimSpace(raw), []byte("null"))
 }
 
-func validateRequiredObjectFields(data []byte, requiredFields ...string) error {
+func validateObjectFields(data []byte, requiredFields []string, nonNullFields []string) error {
 	var payload map[string]json.RawMessage
 	if err := json.Unmarshal(data, &payload); err != nil {
 		return fmt.Errorf("%w: %w", ErrResultNotObject, err)
+	}
+
+	nonNull := make(map[string]struct{}, len(nonNullFields))
+	for _, field := range nonNullFields {
+		nonNull[field] = struct{}{}
 	}
 
 	for _, field := range requiredFields {
@@ -98,12 +103,20 @@ func validateRequiredObjectFields(data []byte, requiredFields ...string) error {
 		if !ok {
 			return fmt.Errorf("%w %q", ErrMissingResultField, field)
 		}
-		if isNullJSONValue(raw) {
+		if _, mustBeNonNull := nonNull[field]; mustBeNonNull && isNullJSONValue(raw) {
 			return fmt.Errorf("%w %q", ErrNullResultField, field)
 		}
 	}
 
 	return nil
+}
+
+func validateRequiredObjectKeys(data []byte, requiredFields ...string) error {
+	return validateObjectFields(data, requiredFields, nil)
+}
+
+func validateRequiredObjectFields(data []byte, requiredFields ...string) error {
+	return validateObjectFields(data, requiredFields, requiredFields)
 }
 
 func validateDecodedResponse(result interface{}) error {

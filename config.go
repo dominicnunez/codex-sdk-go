@@ -19,6 +19,22 @@ type ConfigReadResponse struct {
 	Origins map[string]ConfigLayerMetadata `json:"origins"`
 }
 
+func (r *ConfigReadResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectKeys(data, "config"); err != nil {
+		return err
+	}
+	if err := validateRequiredObjectFields(data, "origins"); err != nil {
+		return err
+	}
+	type wire ConfigReadResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = ConfigReadResponse(decoded)
+	return nil
+}
+
 // Config represents the effective configuration
 type Config struct {
 	Analytics                  *AnalyticsConfig         `json:"analytics,omitempty"`
@@ -112,10 +128,36 @@ type ConfigLayer struct {
 	Version        string                   `json:"version"`
 }
 
+func (c *ConfigLayer) UnmarshalJSON(data []byte) error {
+	if err := validateObjectFields(data, []string{"config", "name", "version"}, []string{"name", "version"}); err != nil {
+		return err
+	}
+	type wire ConfigLayer
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*c = ConfigLayer(decoded)
+	return nil
+}
+
 // ConfigLayerMetadata represents metadata about a config layer
 type ConfigLayerMetadata struct {
 	Name    ConfigLayerSourceWrapper `json:"name"`
 	Version string                   `json:"version"`
+}
+
+func (m *ConfigLayerMetadata) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "name", "version"); err != nil {
+		return err
+	}
+	type wire ConfigLayerMetadata
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*m = ConfigLayerMetadata(decoded)
+	return nil
 }
 
 // ConfigLayerSource interface for discriminated union
@@ -130,6 +172,19 @@ type MdmConfigLayerSource struct {
 }
 
 func (MdmConfigLayerSource) isConfigLayerSource() {}
+
+func (s *MdmConfigLayerSource) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "type", "domain", "key"); err != nil {
+		return err
+	}
+	type wire MdmConfigLayerSource
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*s = MdmConfigLayerSource(decoded)
+	return nil
+}
 
 func (s MdmConfigLayerSource) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
@@ -146,6 +201,19 @@ type SystemConfigLayerSource struct {
 
 func (SystemConfigLayerSource) isConfigLayerSource() {}
 
+func (s *SystemConfigLayerSource) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "type", "file"); err != nil {
+		return err
+	}
+	type wire SystemConfigLayerSource
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*s = SystemConfigLayerSource(decoded)
+	return nil
+}
+
 func (s SystemConfigLayerSource) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Type string `json:"type"`
@@ -160,6 +228,19 @@ type UserConfigLayerSource struct {
 
 func (UserConfigLayerSource) isConfigLayerSource() {}
 
+func (s *UserConfigLayerSource) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "type", "file"); err != nil {
+		return err
+	}
+	type wire UserConfigLayerSource
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*s = UserConfigLayerSource(decoded)
+	return nil
+}
+
 func (s UserConfigLayerSource) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Type string `json:"type"`
@@ -173,6 +254,19 @@ type ProjectConfigLayerSource struct {
 }
 
 func (ProjectConfigLayerSource) isConfigLayerSource() {}
+
+func (s *ProjectConfigLayerSource) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "type", "dotCodexFolder"); err != nil {
+		return err
+	}
+	type wire ProjectConfigLayerSource
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*s = ProjectConfigLayerSource(decoded)
+	return nil
+}
 
 func (s ProjectConfigLayerSource) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
@@ -198,6 +292,19 @@ type LegacyManagedConfigTomlFromFileConfigLayerSource struct {
 }
 
 func (LegacyManagedConfigTomlFromFileConfigLayerSource) isConfigLayerSource() {}
+
+func (s *LegacyManagedConfigTomlFromFileConfigLayerSource) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "type", "file"); err != nil {
+		return err
+	}
+	type wire LegacyManagedConfigTomlFromFileConfigLayerSource
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*s = LegacyManagedConfigTomlFromFileConfigLayerSource(decoded)
+	return nil
+}
 
 func (s LegacyManagedConfigTomlFromFileConfigLayerSource) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
@@ -238,18 +345,17 @@ type ConfigLayerSourceWrapper struct {
 }
 
 func (w *ConfigLayerSourceWrapper) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "type"); err != nil {
+		return fmt.Errorf("config layer source: %w", err)
+	}
+
 	var obj map[string]json.RawMessage
 	if err := json.Unmarshal(data, &obj); err != nil {
 		return fmt.Errorf("config layer source: %w", err)
 	}
 
-	typeBytes, ok := obj["type"]
-	if !ok {
-		return fmt.Errorf("config layer source: missing type key")
-	}
-
 	var typeStr string
-	if err := json.Unmarshal(typeBytes, &typeStr); err != nil {
+	if err := json.Unmarshal(obj["type"], &typeStr); err != nil {
 		return err
 	}
 
@@ -347,11 +453,37 @@ type ConfigWriteResponse struct {
 	OverriddenMetadata *OverriddenMetadata `json:"overriddenMetadata,omitempty"`
 }
 
+func (r *ConfigWriteResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "filePath", "status", "version"); err != nil {
+		return err
+	}
+	type wire ConfigWriteResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = ConfigWriteResponse(decoded)
+	return nil
+}
+
 // OverriddenMetadata represents info when value was overridden by higher layer
 type OverriddenMetadata struct {
 	EffectiveValue  json.RawMessage     `json:"effectiveValue"`
 	Message         string              `json:"message"`
 	OverridingLayer ConfigLayerMetadata `json:"overridingLayer"`
+}
+
+func (m *OverriddenMetadata) UnmarshalJSON(data []byte) error {
+	if err := validateObjectFields(data, []string{"effectiveValue", "message", "overridingLayer"}, []string{"message", "overridingLayer"}); err != nil {
+		return err
+	}
+	type wire OverriddenMetadata
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*m = OverriddenMetadata(decoded)
+	return nil
 }
 
 // ConfigWarningNotification represents the "configWarning" notification.
