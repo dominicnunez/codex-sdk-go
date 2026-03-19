@@ -132,6 +132,39 @@ func TestThreadRealtimeStartedMissingRequiredFieldReportsHandlerError(t *testing
 	}
 }
 
+func TestRealtimeNotificationTypesRejectMissingRequiredFields(t *testing.T) {
+	tests := []struct {
+		name    string
+		payload string
+		target  interface{}
+	}{
+		{
+			name:    "closed requires threadId",
+			payload: `{"reason":"timeout"}`,
+			target:  &codex.ThreadRealtimeClosedNotification{},
+		},
+		{
+			name:    "error requires message",
+			payload: `{"threadId":"thread-1"}`,
+			target:  &codex.ThreadRealtimeErrorNotification{},
+		},
+		{
+			name:    "item added requires item",
+			payload: `{"threadId":"thread-1"}`,
+			target:  &codex.ThreadRealtimeItemAddedNotification{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := json.Unmarshal([]byte(tt.payload), tt.target)
+			if err == nil || !strings.Contains(err.Error(), "missing required field") {
+				t.Fatalf("json.Unmarshal error = %v; want missing required field failure", err)
+			}
+		})
+	}
+}
+
 func TestThreadRealtimeClosedNotification(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -212,6 +245,40 @@ func TestThreadRealtimeClosedNotification(t *testing.T) {
 	})
 }
 
+func TestThreadRealtimeClosedMissingRequiredFieldReportsHandlerError(t *testing.T) {
+	mock := NewMockTransport()
+
+	var (
+		gotMethod string
+		gotErr    error
+	)
+	client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+		gotMethod = method
+		gotErr = err
+	}))
+
+	var called bool
+	client.OnThreadRealtimeClosed(func(codex.ThreadRealtimeClosedNotification) {
+		called = true
+	})
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "thread/realtime/closed",
+		Params:  json.RawMessage(`{"reason":"timeout"}`),
+	})
+
+	if called {
+		t.Fatal("handler should not be called for malformed payload")
+	}
+	if gotMethod != "thread/realtime/closed" {
+		t.Fatalf("handler error method = %q; want %q", gotMethod, "thread/realtime/closed")
+	}
+	if gotErr == nil || !strings.Contains(gotErr.Error(), "missing required field") {
+		t.Fatalf("handler error = %v; want missing required field failure", gotErr)
+	}
+}
+
 func TestThreadRealtimeErrorNotification(t *testing.T) {
 	jsonData := `{
 		"threadId": "thread_abc123",
@@ -275,6 +342,40 @@ func TestThreadRealtimeErrorNotification(t *testing.T) {
 			t.Errorf("expected Message 'test error', got %s", received.Message)
 		}
 	})
+}
+
+func TestThreadRealtimeErrorMissingRequiredFieldReportsHandlerError(t *testing.T) {
+	mock := NewMockTransport()
+
+	var (
+		gotMethod string
+		gotErr    error
+	)
+	client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+		gotMethod = method
+		gotErr = err
+	}))
+
+	var called bool
+	client.OnThreadRealtimeError(func(codex.ThreadRealtimeErrorNotification) {
+		called = true
+	})
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "thread/realtime/error",
+		Params:  json.RawMessage(`{"threadId":"thread_test"}`),
+	})
+
+	if called {
+		t.Fatal("handler should not be called for malformed payload")
+	}
+	if gotMethod != "thread/realtime/error" {
+		t.Fatalf("handler error method = %q; want %q", gotMethod, "thread/realtime/error")
+	}
+	if gotErr == nil || !strings.Contains(gotErr.Error(), "missing required field") {
+		t.Fatalf("handler error = %v; want missing required field failure", gotErr)
+	}
 }
 
 func TestThreadRealtimeItemAddedNotification(t *testing.T) {
@@ -346,6 +447,40 @@ func TestThreadRealtimeItemAddedNotification(t *testing.T) {
 			t.Error("expected Item to be non-nil")
 		}
 	})
+}
+
+func TestThreadRealtimeItemAddedMissingRequiredFieldReportsHandlerError(t *testing.T) {
+	mock := NewMockTransport()
+
+	var (
+		gotMethod string
+		gotErr    error
+	)
+	client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+		gotMethod = method
+		gotErr = err
+	}))
+
+	var called bool
+	client.OnThreadRealtimeItemAdded(func(codex.ThreadRealtimeItemAddedNotification) {
+		called = true
+	})
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "thread/realtime/itemAdded",
+		Params:  json.RawMessage(`{"threadId":"thread_test"}`),
+	})
+
+	if called {
+		t.Fatal("handler should not be called for malformed payload")
+	}
+	if gotMethod != "thread/realtime/itemAdded" {
+		t.Fatalf("handler error method = %q; want %q", gotMethod, "thread/realtime/itemAdded")
+	}
+	if gotErr == nil || !strings.Contains(gotErr.Error(), "missing required field") {
+		t.Fatalf("handler error = %v; want missing required field failure", gotErr)
+	}
 }
 
 func TestThreadRealtimeOutputAudioDeltaNotification(t *testing.T) {

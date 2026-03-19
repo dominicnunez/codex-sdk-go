@@ -40,6 +40,17 @@ type ThreadRealtimeClosedNotification struct {
 	Reason   *string `json:"reason,omitempty"`
 }
 
+func (n *ThreadRealtimeClosedNotification) UnmarshalJSON(data []byte) error {
+	type wire ThreadRealtimeClosedNotification
+	var decoded wire
+	required := []string{"threadId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = ThreadRealtimeClosedNotification(decoded)
+	return nil
+}
+
 // ThreadRealtimeErrorNotification is sent when an error occurs during realtime communication.
 // Method: thread/realtime/error
 type ThreadRealtimeErrorNotification struct {
@@ -47,11 +58,34 @@ type ThreadRealtimeErrorNotification struct {
 	Message  string `json:"message"`
 }
 
+func (n *ThreadRealtimeErrorNotification) UnmarshalJSON(data []byte) error {
+	type wire ThreadRealtimeErrorNotification
+	var decoded wire
+	required := []string{"message", "threadId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = ThreadRealtimeErrorNotification(decoded)
+	return nil
+}
+
 // ThreadRealtimeItemAddedNotification is sent when a non-audio item is added during realtime.
 // Method: thread/realtime/itemAdded
 type ThreadRealtimeItemAddedNotification struct {
 	ThreadID string          `json:"threadId"`
 	Item     json.RawMessage `json:"item"` // Open schema - any JSON value
+}
+
+func (n *ThreadRealtimeItemAddedNotification) UnmarshalJSON(data []byte) error {
+	type wire ThreadRealtimeItemAddedNotification
+	var decoded wire
+	required := []string{"item", "threadId"}
+	nonNull := []string{"threadId"}
+	if err := unmarshalInboundObject(data, &decoded, required, nonNull); err != nil {
+		return err
+	}
+	*n = ThreadRealtimeItemAddedNotification(decoded)
+	return nil
 }
 
 // ThreadRealtimeAudioChunk contains audio data and metadata.
