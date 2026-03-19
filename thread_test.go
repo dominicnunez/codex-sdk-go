@@ -394,6 +394,11 @@ func TestSessionSourceWrapperRejectsMalformedSubAgentVariants(t *testing.T) {
 			input:   `{"subAgent":{"thread_spawn":{"depth":1}}}`,
 			wantErr: codex.ErrMissingResultField,
 		},
+		{
+			name:    "other requires non-null string value",
+			input:   `{"subAgent":{"other":null}}`,
+			wantErr: codex.ErrNullResultField,
+		},
 	}
 
 	for _, tt := range tests {
@@ -526,6 +531,24 @@ func TestThreadLifecycleAndReadResponsesRejectMalformedUnionPayloads(t *testing.
 				return err
 			},
 			wantContain: "sub-agent source: missing discriminator",
+		},
+		{
+			name:   "read rejects sub-agent other with null value",
+			method: "thread/read",
+			payload: func() map[string]interface{} {
+				thread := validThreadPayload("thread-read-source-other")
+				thread["source"] = map[string]interface{}{
+					"subAgent": map[string]interface{}{
+						"other": nil,
+					},
+				}
+				return map[string]interface{}{"thread": thread}
+			}(),
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Read(context.Background(), codex.ThreadReadParams{ThreadID: "thread-read-source-other"})
+				return err
+			},
+			wantErr: codex.ErrNullResultField,
 		},
 	}
 

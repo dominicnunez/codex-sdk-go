@@ -193,6 +193,21 @@ type SubAgentSourceOther struct {
 
 func (SubAgentSourceOther) isSubAgentSource() {}
 
+func (s *SubAgentSourceOther) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "other"); err != nil {
+		return err
+	}
+
+	type wire SubAgentSourceOther
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+
+	*s = SubAgentSourceOther(decoded)
+	return nil
+}
+
 // UnknownSubAgentSource represents an unrecognized sub-agent source object from a newer protocol version.
 type UnknownSubAgentSource struct {
 	Raw json.RawMessage `json:"-"`
