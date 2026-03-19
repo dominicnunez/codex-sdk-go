@@ -145,14 +145,16 @@ the reset is accurate but not actionable as a code change.
 
 ### A reader that cannot be closed cannot be force-unblocked during transport shutdown
 
-**Location:** `stdio.go:106-112`, `stdio.go:210-214`, `stdio.go:333-380` — reader close path and scanner loop
+**Location:** `stdio.go:275-281`, `stdio.go:518-539` — constructor contract and shutdown close path
 **Date:** 2026-03-02
 
-**Reason:** `StdioTransport.Close` now closes inbound readers that implement `io.Closer`, which stops
-the scanner goroutine in common cases (`io.PipeReader`, files, sockets). For a true `io.Reader` that
-does not expose close/deadline controls, Go's stdlib provides no generic way to interrupt a blocked
-read. Solving that fully would require changing transport construction contracts to mandate an
-interruptible reader abstraction, which is disproportionate to this medium-severity lifecycle concern.
+**Reason:** `NewStdioTransport` now requires an `io.ReadCloser` and stores that closer so
+`Close` can always call `readerCloser.Close()` to unblock the read loop for normal stdio-style
+readers (`os.File`, pipes, sockets). The remaining risk is narrower: Go's stdlib still offers no
+generic guarantee that an arbitrary `io.ReadCloser` implementation will make a blocked `Read`
+return promptly when `Close` is called. Eliminating that edge case would require a stronger
+interruptible-reader contract or a different transport abstraction, which is disproportionate to
+this lifecycle concern.
 
 ### handleApproval includes server-controlled method name in internal error strings
 
