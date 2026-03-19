@@ -92,11 +92,23 @@ type CommandExecOutputDeltaNotification struct {
 	Stream      CommandExecOutputStream `json:"stream"`
 }
 
+func validateCommandExecOutputStream(stream CommandExecOutputStream) error {
+	switch stream {
+	case CommandExecOutputStreamStdout, CommandExecOutputStreamStderr:
+		return nil
+	default:
+		return fmt.Errorf("invalid stream %q", stream)
+	}
+}
+
 func (n *CommandExecOutputDeltaNotification) UnmarshalJSON(data []byte) error {
 	type wire CommandExecOutputDeltaNotification
 	var decoded wire
 	required := []string{"capReached", "deltaBase64", "processId", "stream"}
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	if err := validateCommandExecOutputStream(decoded.Stream); err != nil {
 		return err
 	}
 	*n = CommandExecOutputDeltaNotification(decoded)

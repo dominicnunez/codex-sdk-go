@@ -337,6 +337,40 @@ func TestCommandExecOutputDeltaMissingRequiredFieldReportsHandlerError(t *testin
 	}
 }
 
+func TestCommandExecOutputDeltaInvalidStreamReportsHandlerError(t *testing.T) {
+	mock := NewMockTransport()
+
+	var (
+		gotMethod string
+		gotErr    error
+	)
+	client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+		gotMethod = method
+		gotErr = err
+	}))
+
+	var called bool
+	client.OnCommandExecOutputDelta(func(codex.CommandExecOutputDeltaNotification) {
+		called = true
+	})
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "command/exec/outputDelta",
+		Params:  json.RawMessage(`{"capReached":true,"deltaBase64":"bW9yZQ==","processId":"proc-123","stream":"bogus"}`),
+	})
+
+	if called {
+		t.Fatal("handler should not be called for invalid stream")
+	}
+	if gotMethod != "command/exec/outputDelta" {
+		t.Fatalf("handler error method = %q; want %q", gotMethod, "command/exec/outputDelta")
+	}
+	if gotErr == nil || !strings.Contains(gotErr.Error(), `invalid stream "bogus"`) {
+		t.Fatalf("handler error = %v; want invalid stream failure", gotErr)
+	}
+}
+
 func TestCommandExec_RPCError_ReturnsRPCError(t *testing.T) {
 	mock := NewMockTransport()
 	client := codex.NewClient(mock)

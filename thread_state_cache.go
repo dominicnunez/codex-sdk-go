@@ -6,6 +6,8 @@ import (
 	"fmt"
 )
 
+const maxCachedThreadStates = 64
+
 func (c *Client) cacheThreadState(thread Thread) {
 	if thread.ID == "" {
 		return
@@ -13,6 +15,8 @@ func (c *Client) cacheThreadState(thread Thread) {
 
 	c.threadStateMu.Lock()
 	c.threadStates[thread.ID] = cloneThreadState(thread)
+	c.touchThreadStateLocked(thread.ID)
+	c.evictThreadStatesLocked()
 	c.threadStateMu.Unlock()
 }
 
@@ -36,8 +40,30 @@ func (c *Client) mutateThreadState(threadID string, mutate func(*Thread)) {
 	if ok {
 		mutate(&thread)
 		c.threadStates[threadID] = thread
+		c.touchThreadStateLocked(threadID)
+		c.evictThreadStatesLocked()
 	}
 	c.threadStateMu.Unlock()
+}
+
+func (c *Client) touchThreadStateLocked(threadID string) {
+	for i, id := range c.threadStateOrder {
+		if id != threadID {
+			continue
+		}
+		copy(c.threadStateOrder[i:], c.threadStateOrder[i+1:])
+		c.threadStateOrder = c.threadStateOrder[:len(c.threadStateOrder)-1]
+		break
+	}
+	c.threadStateOrder = append(c.threadStateOrder, threadID)
+}
+
+func (c *Client) evictThreadStatesLocked() {
+	for len(c.threadStateOrder) > maxCachedThreadStates {
+		evictedID := c.threadStateOrder[0]
+		c.threadStateOrder = c.threadStateOrder[1:]
+		delete(c.threadStates, evictedID)
+	}
 }
 
 func (c *Client) installThreadStateCache() {

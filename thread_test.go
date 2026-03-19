@@ -1305,6 +1305,27 @@ func TestThreadUnsubscribe(t *testing.T) {
 	}
 }
 
+func TestThreadUnsubscribeRejectsInvalidStatus(t *testing.T) {
+	transport := NewMockTransport()
+	defer func() { _ = transport.Close() }()
+
+	client := codex.NewClient(transport)
+
+	_ = transport.SetResponseData("thread/unsubscribe", map[string]interface{}{
+		"status": "bogus",
+	})
+
+	_, err := client.Thread.Unsubscribe(context.Background(), codex.ThreadUnsubscribeParams{
+		ThreadID: "thread-unsub",
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), `invalid status "bogus"`) {
+		t.Fatalf("error = %v, want invalid status", err)
+	}
+}
+
 // TestThreadCompactStart tests the ThreadService.CompactStart method
 func TestThreadCompactStart(t *testing.T) {
 	transport := NewMockTransport()

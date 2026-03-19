@@ -992,9 +992,6 @@ func (s *ThreadService) Start(ctx context.Context, params ThreadStartParams) (Th
 	if err := s.client.sendRequest(ctx, methodThreadStart, params, &response); err != nil {
 		return ThreadStartResponse{}, err
 	}
-	if err := response.validate(); err != nil {
-		return ThreadStartResponse{}, err
-	}
 	s.client.cacheThreadState(response.Thread)
 	return response, nil
 }
@@ -1021,9 +1018,6 @@ func (r ThreadReadResponse) validate() error {
 func (s *ThreadService) Read(ctx context.Context, params ThreadReadParams) (ThreadReadResponse, error) {
 	var response ThreadReadResponse
 	if err := s.client.sendRequest(ctx, methodThreadRead, params, &response); err != nil {
-		return ThreadReadResponse{}, err
-	}
-	if err := response.validate(); err != nil {
 		return ThreadReadResponse{}, err
 	}
 	s.client.cacheThreadState(response.Thread)
@@ -1167,9 +1161,6 @@ func (s *ThreadService) Resume(ctx context.Context, params ThreadResumeParams) (
 	if err := s.client.sendRequest(ctx, methodThreadResume, params, &response); err != nil {
 		return ThreadResumeResponse{}, err
 	}
-	if err := response.validate(); err != nil {
-		return ThreadResumeResponse{}, err
-	}
 	s.client.cacheThreadState(response.Thread)
 	return response, nil
 }
@@ -1234,9 +1225,6 @@ func (s *ThreadService) Fork(ctx context.Context, params ThreadForkParams) (Thre
 	if err := s.client.sendRequest(ctx, methodThreadFork, params, &response); err != nil {
 		return ThreadForkResponse{}, err
 	}
-	if err := response.validate(); err != nil {
-		return ThreadForkResponse{}, err
-	}
 	s.client.cacheThreadState(response.Thread)
 	return response, nil
 }
@@ -1263,9 +1251,6 @@ func (r ThreadRollbackResponse) validate() error {
 func (s *ThreadService) Rollback(ctx context.Context, params ThreadRollbackParams) (ThreadRollbackResponse, error) {
 	var response ThreadRollbackResponse
 	if err := s.client.sendRequest(ctx, methodThreadRollback, params, &response); err != nil {
-		return ThreadRollbackResponse{}, err
-	}
-	if err := response.validate(); err != nil {
 		return ThreadRollbackResponse{}, err
 	}
 	s.client.cacheThreadState(response.Thread)
@@ -1322,9 +1307,6 @@ func (s *ThreadService) MetadataUpdate(ctx context.Context, params ThreadMetadat
 	if err := s.client.sendRequest(ctx, methodThreadMetadataUpdate, params, &response); err != nil {
 		return ThreadMetadataUpdateResponse{}, err
 	}
-	if err := response.validate(); err != nil {
-		return ThreadMetadataUpdateResponse{}, err
-	}
 	s.client.cacheThreadState(response.Thread)
 	return response, nil
 }
@@ -1370,9 +1352,6 @@ func (s *ThreadService) Unarchive(ctx context.Context, params ThreadUnarchivePar
 	if err := s.client.sendRequest(ctx, methodThreadUnarchive, params, &response); err != nil {
 		return ThreadUnarchiveResponse{}, err
 	}
-	if err := response.validate(); err != nil {
-		return ThreadUnarchiveResponse{}, err
-	}
 	s.client.cacheThreadState(response.Thread)
 	return response, nil
 }
@@ -1387,6 +1366,15 @@ type ThreadUnsubscribeResponse struct {
 	Status ThreadUnsubscribeStatus `json:"status"`
 }
 
+func validateThreadUnsubscribeStatus(status ThreadUnsubscribeStatus) error {
+	switch status {
+	case ThreadUnsubscribeStatusNotLoaded, ThreadUnsubscribeStatusNotSubscribed, ThreadUnsubscribeStatusUnsubscribed:
+		return nil
+	default:
+		return fmt.Errorf("invalid status %q", status)
+	}
+}
+
 func (r *ThreadUnsubscribeResponse) UnmarshalJSON(data []byte) error {
 	if err := validateRequiredObjectFields(data, "status"); err != nil {
 		return err
@@ -1394,6 +1382,9 @@ func (r *ThreadUnsubscribeResponse) UnmarshalJSON(data []byte) error {
 	type wire ThreadUnsubscribeResponse
 	var decoded wire
 	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	if err := validateThreadUnsubscribeStatus(decoded.Status); err != nil {
 		return err
 	}
 	*r = ThreadUnsubscribeResponse(decoded)

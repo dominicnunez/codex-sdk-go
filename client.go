@@ -191,9 +191,11 @@ type Client struct {
 	// Best-effort latest thread snapshots keyed by thread ID. This is updated
 	// from thread-bearing responses and thread metadata notifications so
 	// Conversation.Thread can return current metadata without per-conversation
-	// listener registration.
-	threadStates  map[string]Thread
-	threadStateMu sync.RWMutex
+	// listener registration. The cache is bounded to avoid retaining snapshots
+	// for every thread a long-lived client has ever touched.
+	threadStates     map[string]Thread
+	threadStateOrder []string
+	threadStateMu    sync.RWMutex
 
 	// Approval handlers for server→client requests
 	approvalHandlers ApprovalHandlers
