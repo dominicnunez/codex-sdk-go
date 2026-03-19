@@ -267,6 +267,26 @@ that `RunResult.Thread` deliberately reflects thread metadata at turn-start time
 The semantics are defined and accepted, not ambiguous. This finding is a duplicate of the mutex
 race + the existing design exception.
 
+### Server-driven thread closure leaves conversations usable after the server closes the thread
+
+**Location:** `thread_state_cache.go:261` — `thread/closed` handling and conversation state propagation
+
+**Reason:** This does not match the current code. `installThreadStateCache` registers a
+`notifyThreadClosed` listener, `closeThreadState` marks the cached thread closed and notifies
+thread-state listeners, and `StartConversation` registers `state.close` as the close callback for
+that thread. After a `thread/closed` notification, both `Conversation.Turn` and
+`Conversation.TurnStreamed` fail locally with `conversation is closed` instead of sending another
+`turn/start`.
+
+### Conversation tests never cover server-side thread closure
+
+**Location:** `conversation_test.go:292` — `TestConversationRejectsTurnsAfterThreadClosedNotification`
+
+**Reason:** The reported coverage gap is stale. `TestConversationRejectsTurnsAfterThreadClosedNotification`
+starts a conversation, injects `thread/closed`, asserts `Turn` returns `conversation is closed`,
+asserts `TurnStreamed` yields the same error, and verifies no `turn/start` request is sent after
+the closure notification.
+
 ### AgentTracker.ProcessEvent ignores non-CollabToolCallEvent events silently
 
 **Location:** `collab_tracker.go:46-49` — ProcessEvent type switch
@@ -1345,3 +1365,21 @@ reported unbounded-retention path does not exist in this checkout.
 **Reason:** The current script checks whether `nix` is installed before trying to invoke it. When
 both `lefthook` and `nix` are absent, it prints an actionable install message and exits cleanly
 instead of failing with a bare shell error. The reported bootstrap behavior is stale.
+
+### Collector summaries drop stream buffer overflow errors
+
+**Location:** `run_streamed.go:57` — guarded stream queue overflow hook
+
+**Reason:** `guardedChan.send` already records `ErrStreamOverflow` and routes it through the
+collector via `setOverflowHandler`, which `RunStreamedWithCollector` installs before the lifecycle
+starts. The regression test `TestRunStreamedWithCollectorReportsOverflowInSummary` passes, so the
+reported overflow gap does not exist in the current code.
+
+### Collector tests never exercise RunStreamedWithCollector overflow handling
+
+**Location:** `stream_collector_test.go:358` — `TestRunStreamedWithCollectorReportsOverflowInSummary`
+
+**Reason:** The collector suite already starts `RunStreamedWithCollector`, withholds event
+consumption, overflows the bounded queue, and asserts that both `Events()` and
+`collector.Summary()` report the overflow. This finding describes a missing regression test that is
+already present.
