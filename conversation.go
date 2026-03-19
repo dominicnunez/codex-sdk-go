@@ -43,11 +43,11 @@ type Conversation struct {
 }
 
 type conversationState struct {
-	mu                       sync.Mutex
-	thread                   Thread
-	activeTurn               bool
-	closed                   bool
-	hasCompletedTerminalTurn bool
+	mu             sync.Mutex
+	thread         Thread
+	activeTurn     bool
+	closed         bool
+	hasStartedTurn bool
 }
 
 func newConversationState(thread Thread) *conversationState {
@@ -80,7 +80,7 @@ func (s *conversationState) startTurn() (Thread, bool, error) {
 		return Thread{}, false, errTurnInProgress
 	}
 	s.activeTurn = true
-	return cloneThreadState(s.thread), !s.hasCompletedTerminalTurn, nil
+	return cloneThreadState(s.thread), !s.hasStartedTurn, nil
 }
 
 func (s *conversationState) ensureOpen() error {
@@ -98,10 +98,15 @@ func (s *conversationState) finishTurn() {
 	s.mu.Unlock()
 }
 
+func (s *conversationState) markTurnStarted() {
+	s.mu.Lock()
+	s.hasStartedTurn = true
+	s.mu.Unlock()
+}
+
 func (s *conversationState) applyCompletedThread(thread Thread) {
 	s.mu.Lock()
 	s.thread = cloneThreadState(thread)
-	s.hasCompletedTerminalTurn = true
 	s.mu.Unlock()
 }
 
@@ -797,6 +802,7 @@ func (c *Conversation) Turn(ctx context.Context, opts TurnOptions) (*RunResult, 
 		thread:                    thread,
 		threadID:                  c.threadID,
 		allowMissingInitialTurnID: allowMissingInitialTurnID,
+		onStart:                   c.state.markTurnStarted,
 		onComplete:                c.applyCompletedThread,
 	})
 }
@@ -852,6 +858,7 @@ func (c *Conversation) turnStreamedLifecycle(ctx context.Context, opts TurnOptio
 		thread:                    thread,
 		threadID:                  c.threadID,
 		allowMissingInitialTurnID: allowMissingInitialTurnID,
+		onStart:                   c.state.markTurnStarted,
 		onComplete:                c.applyCompletedThread,
 	}, g, s)
 }

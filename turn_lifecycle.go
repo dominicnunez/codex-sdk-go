@@ -125,6 +125,7 @@ type turnLifecycleParams struct {
 	thread                    Thread
 	threadID                  string
 	allowMissingInitialTurnID bool
+	onStart                   func()       // called after turn/start returns a valid turn ID; nil = no-op
 	onComplete                func(Thread) // called with the completed thread snapshot; nil = no-op
 	collector                 *StreamCollector
 }
@@ -316,6 +317,9 @@ func executeTurn(ctx context.Context, p turnLifecycleParams) (*RunResult, error)
 	if startResp.Turn.ID == "" {
 		return nil, fmt.Errorf("turn/start: missing turn.id")
 	}
+	if p.onStart != nil {
+		p.onStart()
+	}
 
 	bufferedItems, bufferedCompletions := state.start(startResp.Turn.ID)
 
@@ -445,6 +449,9 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, g *guardedC
 	if startResp.Turn.ID == "" {
 		emitErr(fmt.Errorf("turn/start: missing turn.id"))
 		return
+	}
+	if p.onStart != nil {
+		p.onStart()
 	}
 
 	turnStateMu.Lock()

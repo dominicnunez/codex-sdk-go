@@ -1259,6 +1259,78 @@ func TestConversationTurnContextCancel(t *testing.T) {
 	}
 }
 
+func TestConversationTurnAfterCanceledTurnIgnoresMissingTurnIDCompletion(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+
+	firstCtx, cancelFirst := context.WithCancel(ctx)
+	firstDone := make(chan error, 1)
+	go func() {
+		_, err := conv.Turn(firstCtx, codex.TurnOptions{Prompt: "first cancels"})
+		firstDone <- err
+	}()
+
+	waitForMethodCallCount(t, mock, "turn/start", 1)
+	cancelFirst()
+
+	firstErr := <-firstDone
+	if !errors.Is(firstErr, context.Canceled) {
+		t.Fatalf("first turn error = %v, want context canceled", firstErr)
+	}
+
+	type turnResult struct {
+		result *codex.RunResult
+		err    error
+	}
+	secondDone := make(chan turnResult, 1)
+	go func() {
+		r, err := conv.Turn(ctx, codex.TurnOptions{Prompt: "second succeeds"})
+		secondDone <- turnResult{result: r, err: err}
+	}()
+
+	waitForMethodCallCount(t, mock, "turn/start", 2)
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"status":"completed","items":[]}}`),
+	})
+
+	select {
+	case second := <-secondDone:
+		t.Fatalf("second turn completed early after malformed notification: result=%+v err=%v", second.result, second.err)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-2","text":"final"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	second := <-secondDone
+	if second.err != nil {
+		t.Fatalf("second turn error: %v", second.err)
+	}
+	if second.result == nil {
+		t.Fatal("expected result from second turn")
+	}
+	if second.result.Response != "final" {
+		t.Fatalf("second turn response = %q, want final", second.result.Response)
+	}
+}
+
 func TestConversationTurnStreamedTurnError(t *testing.T) {
 	proc, mock := mockProcess(t)
 
@@ -1382,6 +1454,85 @@ func TestConversationTurnStreamedContextCancel(t *testing.T) {
 
 	if gotErr == nil {
 		t.Fatal("expected error from context cancellation")
+	}
+}
+
+func TestConversationTurnStreamedAfterCanceledTurnIgnoresMissingTurnIDCompletion(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+
+	firstCtx, cancelFirst := context.WithCancel(ctx)
+	first := conv.TurnStreamed(firstCtx, codex.TurnOptions{Prompt: "first cancels"})
+	waitForMethodCallCount(t, mock, "turn/start", 1)
+	cancelFirst()
+
+	var firstErr error
+	for _, err := range first.Events() {
+		if err != nil {
+			firstErr = err
+			break
+		}
+	}
+	if !errors.Is(firstErr, context.Canceled) {
+		t.Fatalf("first streamed turn error = %v, want context canceled", firstErr)
+	}
+
+	second := conv.TurnStreamed(ctx, codex.TurnOptions{Prompt: "second succeeds"})
+	waitForMethodCallCount(t, mock, "turn/start", 2)
+
+	secondDone := make(chan error, 1)
+	go func() {
+		var streamErr error
+		for _, err := range second.Events() {
+			if err != nil {
+				streamErr = err
+				break
+			}
+		}
+		secondDone <- streamErr
+	}()
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"status":"completed","items":[]}}`),
+	})
+
+	select {
+	case err := <-secondDone:
+		t.Fatalf("second streamed turn completed early after malformed notification: result=%+v err=%v", second.Result(), err)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-2","text":"final"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	if err := <-secondDone; err != nil {
+		t.Fatalf("second streamed turn error: %v", err)
+	}
+
+	result := second.Result()
+	if result == nil {
+		t.Fatal("expected streamed result from second turn")
+		return
+	}
+	if result.Response != "final" {
+		t.Fatalf("second streamed turn response = %q, want final", result.Response)
 	}
 }
 
