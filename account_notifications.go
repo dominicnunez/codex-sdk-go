@@ -15,10 +15,36 @@ const (
 	AuthModeChatGPTAuthTokens AuthMode = "chatgptAuthTokens"
 )
 
+var validAuthModes = map[AuthMode]struct{}{
+	AuthModeAPIKey:            {},
+	AuthModeChatGPT:           {},
+	AuthModeChatGPTAuthTokens: {},
+}
+
+func validateOptionalAuthModeField(field string, value *AuthMode) error {
+	return validateOptionalEnumValue(field, value, validAuthModes)
+}
+
 // AccountUpdatedNotification is sent when account information changes
 type AccountUpdatedNotification struct {
 	AuthMode *AuthMode `json:"authMode,omitempty"`
 	PlanType *PlanType `json:"planType,omitempty"`
+}
+
+func (n *AccountUpdatedNotification) UnmarshalJSON(data []byte) error {
+	type wire AccountUpdatedNotification
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	if err := validateOptionalAuthModeField("account.authMode", decoded.AuthMode); err != nil {
+		return err
+	}
+	if err := validateOptionalPlanTypeField("account.planType", decoded.PlanType); err != nil {
+		return err
+	}
+	*n = AccountUpdatedNotification(decoded)
+	return nil
 }
 
 // AccountLoginCompletedNotification is sent when a login attempt completes

@@ -143,6 +143,47 @@ func TestAccountGetRateLimits(t *testing.T) {
 	}
 }
 
+func TestAccountEnumValidation(t *testing.T) {
+	t.Run("get rejects invalid chatgpt plan type", func(t *testing.T) {
+		transport := NewMockTransport()
+		client := codex.NewClient(transport)
+		_ = transport.SetResponseData("account/read", map[string]interface{}{
+			"requiresOpenaiAuth": true,
+			"account": map[string]interface{}{
+				"type":     "chatgpt",
+				"email":    "test@example.com",
+				"planType": "vip",
+			},
+		})
+
+		_, err := client.Account.Get(context.Background(), codex.GetAccountParams{})
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), `invalid account.planType "vip"`) {
+			t.Fatalf("error = %q; want invalid planType failure", err.Error())
+		}
+	})
+
+	t.Run("get rate limits rejects invalid plan type", func(t *testing.T) {
+		transport := NewMockTransport()
+		client := codex.NewClient(transport)
+		_ = transport.SetResponseData("account/rateLimits/read", map[string]interface{}{
+			"rateLimits": map[string]interface{}{
+				"planType": "vip",
+			},
+		})
+
+		_, err := client.Account.GetRateLimits(context.Background())
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), `invalid rateLimits.planType "vip"`) {
+			t.Fatalf("error = %q; want invalid planType failure", err.Error())
+		}
+	})
+}
+
 func TestLoginParamsMarshalJSONHardcodesType(t *testing.T) {
 	t.Run("ApiKey_redacted_uses_correct_type", func(t *testing.T) {
 		p := &codex.ApiKeyLoginAccountParams{ApiKey: "sk-xxx"} // Type intentionally omitted
@@ -873,6 +914,96 @@ func TestAccountRateLimitsUpdatedNotificationMissingRequiredFieldReportsHandlerE
 		t.Fatalf("handler error = %v; want missing required field failure", gotErr)
 	}
 }
+
+func TestAccountUpdatedNotificationInvalidEnumReportsHandlerError(t *testing.T) {
+	tests := []struct {
+		name    string
+		params  string
+		wantErr string
+	}{
+		{
+			name:    "invalid auth mode",
+			params:  `{"authMode":"oauth"}`,
+			wantErr: `invalid account.authMode "oauth"`,
+		},
+		{
+			name:    "invalid plan type",
+			params:  `{"planType":"vip"}`,
+			wantErr: `invalid account.planType "vip"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := NewMockTransport()
+
+			var (
+				gotMethod string
+				gotErr    error
+			)
+			client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+				gotMethod = method
+				gotErr = err
+			}))
+
+			var called bool
+			client.OnAccountUpdated(func(codex.AccountUpdatedNotification) {
+				called = true
+			})
+
+			mock.InjectServerNotification(context.Background(), codex.Notification{
+				JSONRPC: "2.0",
+				Method:  "account/updated",
+				Params:  json.RawMessage(tt.params),
+			})
+
+			if called {
+				t.Fatal("handler should not be called for invalid enum payload")
+			}
+			if gotMethod != "account/updated" {
+				t.Fatalf("handler error method = %q, want %q", gotMethod, "account/updated")
+			}
+			if gotErr == nil || !strings.Contains(gotErr.Error(), tt.wantErr) {
+				t.Fatalf("handler error = %v; want substring %q", gotErr, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestAccountRateLimitsUpdatedNotificationInvalidPlanTypeReportsHandlerError(t *testing.T) {
+	mock := NewMockTransport()
+
+	var (
+		gotMethod string
+		gotErr    error
+	)
+	client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+		gotMethod = method
+		gotErr = err
+	}))
+
+	var called bool
+	client.OnAccountRateLimitsUpdated(func(codex.AccountRateLimitsUpdatedNotification) {
+		called = true
+	})
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "account/rateLimits/updated",
+		Params:  json.RawMessage(`{"rateLimits":{"planType":"vip"}}`),
+	})
+
+	if called {
+		t.Fatal("handler should not be called for invalid enum payload")
+	}
+	if gotMethod != "account/rateLimits/updated" {
+		t.Fatalf("handler error method = %q, want %q", gotMethod, "account/rateLimits/updated")
+	}
+	if gotErr == nil || !strings.Contains(gotErr.Error(), `invalid rateLimits.planType "vip"`) {
+		t.Fatalf("handler error = %v; want invalid planType failure", gotErr)
+	}
+}
+
 func TestAccountMarshalJSONInjectsTypeDiscriminator(t *testing.T) {
 	tests := []struct {
 		name    string

@@ -89,6 +89,9 @@ func (c *ChatgptAccount) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	if err := validatePlanTypeField("account.planType", decoded.PlanType); err != nil {
+		return err
+	}
 	*c = ChatgptAccount(decoded)
 	return nil
 }
@@ -132,6 +135,26 @@ const (
 	PlanTypeEdu        PlanType = "edu"
 	PlanTypeUnknown    PlanType = "unknown"
 )
+
+var validPlanTypes = map[PlanType]struct{}{
+	PlanTypeFree:       {},
+	PlanTypeGo:         {},
+	PlanTypePlus:       {},
+	PlanTypePro:        {},
+	PlanTypeTeam:       {},
+	PlanTypeBusiness:   {},
+	PlanTypeEnterprise: {},
+	PlanTypeEdu:        {},
+	PlanTypeUnknown:    {},
+}
+
+func validatePlanTypeField(field string, value PlanType) error {
+	return validateEnumValue(field, value, validPlanTypes)
+}
+
+func validateOptionalPlanTypeField(field string, value *PlanType) error {
+	return validateOptionalEnumValue(field, value, validPlanTypes)
+}
 
 // UnmarshalJSON implements custom unmarshaling for AccountWrapper
 func (a *AccountWrapper) UnmarshalJSON(data []byte) error {
@@ -206,6 +229,19 @@ type RateLimitSnapshot struct {
 	PlanType  *PlanType        `json:"planType,omitempty"`
 	Primary   *RateLimitWindow `json:"primary,omitempty"`
 	Secondary *RateLimitWindow `json:"secondary,omitempty"`
+}
+
+func (r *RateLimitSnapshot) UnmarshalJSON(data []byte) error {
+	type wire RateLimitSnapshot
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	if err := validateOptionalPlanTypeField("rateLimits.planType", decoded.PlanType); err != nil {
+		return err
+	}
+	*r = RateLimitSnapshot(decoded)
+	return nil
 }
 
 // CreditsSnapshot represents credit balance information
