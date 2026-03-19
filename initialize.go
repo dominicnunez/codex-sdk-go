@@ -84,10 +84,23 @@ func cloneInitializeParams(params InitializeParams) InitializeParams {
 
 func normalizeInitializeParams(params InitializeParams) InitializeParams {
 	cp := cloneInitializeParams(params)
+	if cp.Capabilities != nil {
+		cp.Capabilities.OptOutNotificationMethods = normalizeNotificationMethodSet(cp.Capabilities.OptOutNotificationMethods)
+	}
 	if cp.Capabilities != nil && !cp.Capabilities.ExperimentalAPI && len(cp.Capabilities.OptOutNotificationMethods) == 0 {
 		cp.Capabilities = nil
 	}
 	return cp
+}
+
+func normalizeNotificationMethodSet(methods []string) []string {
+	if len(methods) == 0 {
+		return nil
+	}
+
+	normalized := append([]string(nil), methods...)
+	slices.Sort(normalized)
+	return slices.Compact(normalized)
 }
 
 func initializeParamsEqual(a, b InitializeParams) bool {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -356,6 +357,49 @@ func TestClientInitializeTreatsDefaultCapabilitiesAsEquivalent(t *testing.T) {
 		t.Fatalf("second Initialize failed: %v", err)
 	}
 
+	if got := mock.MethodCallCount("initialize"); got != 1 {
+		t.Fatalf("initialize call count = %d, want 1", got)
+	}
+}
+
+func TestClientInitializeTreatsOptOutNotificationMethodsAsASet(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+
+	_ = mock.SetResponseData("initialize", codex.InitializeResponse{
+		PlatformFamily: "unix",
+		PlatformOS:     "linux",
+		UserAgent:      "codex-server/1.0.0",
+	})
+
+	firstMethods := []string{"thread/started", "thread/closed", "thread/started"}
+	secondMethods := []string{"thread/closed", "thread/started"}
+
+	ctx := context.Background()
+	if _, err := client.Initialize(ctx, codex.InitializeParams{
+		ClientInfo: codex.ClientInfo{Name: "test-client", Version: "1.0.0"},
+		Capabilities: &codex.InitializeCapabilities{
+			OptOutNotificationMethods: firstMethods,
+		},
+	}); err != nil {
+		t.Fatalf("first Initialize failed: %v", err)
+	}
+
+	if _, err := client.Initialize(ctx, codex.InitializeParams{
+		ClientInfo: codex.ClientInfo{Name: "test-client", Version: "1.0.0"},
+		Capabilities: &codex.InitializeCapabilities{
+			OptOutNotificationMethods: secondMethods,
+		},
+	}); err != nil {
+		t.Fatalf("second Initialize failed: %v", err)
+	}
+
+	if !slices.Equal(firstMethods, []string{"thread/started", "thread/closed", "thread/started"}) {
+		t.Fatalf("first caller slice mutated: %v", firstMethods)
+	}
+	if !slices.Equal(secondMethods, []string{"thread/closed", "thread/started"}) {
+		t.Fatalf("second caller slice mutated: %v", secondMethods)
+	}
 	if got := mock.MethodCallCount("initialize"); got != 1 {
 		t.Fatalf("initialize call count = %d, want 1", got)
 	}
