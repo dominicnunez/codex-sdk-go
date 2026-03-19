@@ -14,7 +14,14 @@ func defaultProcessShutdownMode() processShutdownMode {
 }
 
 func requestProcessShutdown(process *os.Process) error {
-	return process.Signal(os.Interrupt)
+	if process == nil {
+		return nil
+	}
+	interruptSignal, ok := os.Interrupt.(syscall.Signal)
+	if !ok {
+		return process.Signal(os.Interrupt)
+	}
+	return syscall.Kill(-process.Pid, interruptSignal)
 }
 
 func isExpectedShutdownWaitError(err error, attempt processShutdownAttempt) bool {

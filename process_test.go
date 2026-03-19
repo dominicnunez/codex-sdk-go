@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -107,6 +109,43 @@ func waitForRealtimeErrorMessage(t *testing.T, received <-chan codex.ThreadRealt
 	case <-time.After(2 * time.Second):
 		t.Fatalf("timeout waiting for shutdown notification %q", wantMessage)
 	}
+}
+
+func waitForFileContents(t *testing.T, path string) string {
+	t.Helper()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		data, err := os.ReadFile(path)
+		if err == nil {
+			text := strings.TrimSpace(string(data))
+			if text != "" {
+				return text
+			}
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	t.Fatalf("timed out waiting for file contents: %s", path)
+	return ""
+}
+
+func pidIsAlive(pid int) bool {
+	return exec.Command("sh", "-c", "kill -0 \"$1\"", "sh", strconv.Itoa(pid)).Run() == nil
+}
+
+func waitForPIDExit(t *testing.T, pid int) {
+	t.Helper()
+
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if !pidIsAlive(pid) {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	t.Fatalf("process %d still alive after timeout", pid)
 }
 
 // TestStartProcess verifies that StartProcess spawns a child process,
@@ -960,6 +999,43 @@ exit 0
 	}
 
 	waitForRealtimeErrorMessage(t, received, "eof")
+}
+
+func TestProcessCloseKillsSpawnedDescendants(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("process test requires unix process-group semantics")
+	}
+
+	dir := t.TempDir()
+	childPIDFile := filepath.Join(dir, "child.pid")
+	fakeBinary := writeProcessScriptBinary(t, dir, `#!/bin/sh
+trap 'exit 0' INT
+sleep 1000 &
+echo "$!" > "`+childPIDFile+`"
+while :; do sleep 1; done
+`)
+
+	proc, err := codex.StartProcess(context.Background(), &codex.ProcessOptions{
+		BinaryPath: fakeBinary,
+	})
+	if err != nil {
+		t.Fatalf("StartProcess: %v", err)
+	}
+
+	childPIDText := waitForFileContents(t, childPIDFile)
+	childPID, err := strconv.Atoi(childPIDText)
+	if err != nil {
+		t.Fatalf("parse child pid %q: %v", childPIDText, err)
+	}
+	if !pidIsAlive(childPID) {
+		t.Fatalf("spawned child %d is not running", childPID)
+	}
+
+	if err := proc.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	waitForPIDExit(t, childPID)
 }
 
 // TestStartProcessCustomStderr verifies stderr redirection.
