@@ -426,6 +426,15 @@ func (t *StdioTransport) ensureReadLoopStarted() {
 	})
 }
 
+func (t *StdioTransport) wakeTurnScopedNotificationWorkers() {
+	if t.turnNotifReadyCond == nil {
+		return
+	}
+	t.turnNotifReadyMu.Lock()
+	t.turnNotifReadyCond.Broadcast()
+	t.turnNotifReadyMu.Unlock()
+}
+
 func (t *StdioTransport) closeWithFailure(scanErr error, message string, data json.RawMessage) {
 	t.mu.Lock()
 	if scanErr != nil && t.scanErr == nil {
@@ -443,11 +452,7 @@ func (t *StdioTransport) closeWithFailure(scanErr error, message string, data js
 	t.mu.Unlock()
 
 	cancel()
-	if t.turnNotifReadyCond != nil {
-		t.turnNotifReadyMu.Lock()
-		t.turnNotifReadyCond.Broadcast()
-		t.turnNotifReadyMu.Unlock()
-	}
+	t.wakeTurnScopedNotificationWorkers()
 	if readerCloser != nil {
 		_ = readerCloser.Close()
 	}
@@ -1565,6 +1570,7 @@ func (t *StdioTransport) stopAfterReadFailure(scanErr error) {
 	t.mu.Unlock()
 
 	cancel()
+	t.wakeTurnScopedNotificationWorkers()
 	if readerCloser != nil {
 		_ = readerCloser.Close()
 	}

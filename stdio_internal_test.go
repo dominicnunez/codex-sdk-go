@@ -459,6 +459,38 @@ func TestEnqueueTurnScopedNotificationOverflowClosesTransport(t *testing.T) {
 		t.Fatal("expected transport to stop after queue overflow")
 	}
 }
+
+func TestStopAfterReadFailureWakesWaitingTurnScopedWorkers(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	reader, writer := io.Pipe()
+	defer func() { _ = writer.Close() }()
+
+	transport := &StdioTransport{
+		readerCloser: reader,
+		ctx:          ctx,
+		cancelCtx:    cancel,
+	}
+	transport.initTurnScopedScheduler()
+
+	done := make(chan bool, 1)
+	go func() {
+		_, ok := transport.nextTurnScopedNotificationQueue()
+		done <- ok
+	}()
+
+	time.Sleep(25 * time.Millisecond)
+	transport.stopAfterReadFailure(errOversizedInboundFrame)
+
+	select {
+	case ok := <-done:
+		if ok {
+			t.Fatal("nextTurnScopedNotificationQueue() reported work after read failure")
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout waiting for turn-scoped worker to wake after read failure")
+	}
+}
+
 func TestEnqueueTurnScopedNotificationCapsTrackedQueues(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
