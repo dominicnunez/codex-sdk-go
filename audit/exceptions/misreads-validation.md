@@ -52,3 +52,22 @@ action, and credential fields the report described. The regression test
 enum before returning a successful response. Unsupported values are rejected during unmarshaling
 for both `config/value/write` and `config/batchWrite`. The regression test
 `TestConfigWriteRejectsInvalidStatus` covers both client methods.
+
+### Account login decode failures already include the RPC method name
+
+**Location:** `account.go:614` — `AccountService.Login`
+
+**Reason:** The current implementation already wraps `UnmarshalLoginAccountResponse` failures with
+`fmt.Errorf("%s: %w", methodAccountLoginStart, err)`, so malformed login results surface as
+`account/login/start: ...` at the service boundary. The stale report line no longer matches the
+checked-in code, and the login tests assert the method-prefixed error text.
+
+### Thread, turn, and guardian payloads already reject unsupported enum values
+
+**Location:** `enums.go:18`, `enums.go:209`, `hook_notifications.go:167` — custom `UnmarshalJSON` on `TurnStatus`, `ThreadActiveFlag`, `GuardianApprovalReviewStatus`, and `GuardianRiskLevel`
+
+**Reason:** The current branch already validates these inbound enums during JSON decoding via
+`unmarshalEnumString`. Unsupported `TurnStatus`, `ThreadActiveFlag`,
+`GuardianApprovalReviewStatus`, and `GuardianRiskLevel` values fail unmarshaling before they can
+be cached on a thread or dispatched to notification handlers. The report item was stale; the only
+remaining gap was regression coverage, which is now covered by the test suite.

@@ -51,3 +51,12 @@ platform-specific env builder is also covered directly by
 `TestDefaultChildEnvKeysForGOOSUsesPlatformSpecificAllowlist` and
 `TestMinimalChildEnvForGOOSUsesPlatformAllowlist` in
 `process_internal_test.go:100-205`.
+
+### Malformed response accounting already increments when the pending request can be identified
+
+**Location:** `stdio.go:1486` — `handleMalformedResponse`
+
+**Reason:** The current transport increments `malformedCount` before it tries to parse or
+normalize the response ID, so malformed server responses are counted even when the transport can
+still attribute the parse error back to a pending request. The stale report line predates this
+behavior, and the transport tests now assert both the parse-error delivery and the counter bump.
