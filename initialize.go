@@ -55,8 +55,5 @@ func (c *Client) Initialize(ctx context.Context, params InitializeParams) (Initi
 	if err := c.sendRequest(ctx, methodInitialize, params, &result); err != nil {
 		return InitializeResponse{}, err
 	}
-	if err := result.validate(); err != nil {
-		return InitializeResponse{}, err
-	}
 	return result, nil
 }

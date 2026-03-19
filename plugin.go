@@ -489,9 +489,6 @@ func (s *PluginService) Read(ctx context.Context, params PluginReadParams) (Plug
 	if err := s.client.sendRequest(ctx, methodPluginRead, params, &resp); err != nil {
 		return PluginReadResponse{}, err
 	}
-	if err := resp.validate(); err != nil {
-		return PluginReadResponse{}, err
-	}
 	return resp, nil
 }
 
@@ -499,9 +496,6 @@ func (s *PluginService) Read(ctx context.Context, params PluginReadParams) (Plug
 func (s *PluginService) Install(ctx context.Context, params PluginInstallParams) (PluginInstallResponse, error) {
 	var resp PluginInstallResponse
 	if err := s.client.sendRequest(ctx, methodPluginInstall, params, &resp); err != nil {
-		return PluginInstallResponse{}, err
-	}
-	if err := resp.validate(); err != nil {
 		return PluginInstallResponse{}, err
 	}
 	return resp, nil
