@@ -4,11 +4,14 @@ import (
 	"encoding/json"
 	"strings"
 	"sync"
+	"unicode/utf8"
 )
 
 const (
 	streamCollectorErrorHistoryLimit       = 256
 	streamCollectorOutputDeltaHistoryLimit = 512
+	streamCollectorOutputDeltaBytesLimit   = 64 * 1024
+	streamCollectorPlanTextBytesLimit      = 64 * 1024
 	streamCollectorRawOutputChunkLimit     = 512
 	streamCollectorRawOutputBytesLimit     = 256 * 1024
 )
@@ -27,17 +30,18 @@ type NormalizedStreamError struct {
 // CommandExecutionLifecycle tracks start/completion state and output deltas for
 // a command execution thread item.
 type CommandExecutionLifecycle struct {
-	ItemID              string
-	ThreadID            string
-	TurnID              string
-	Started             bool
-	Completed           bool
-	Status              *CommandExecutionStatus
-	StartedItem         *CommandExecutionThreadItem
-	CompletedItem       *CommandExecutionThreadItem
-	OutputDeltas        []string
-	DroppedOutputDeltas int
-	AggregatedOutput    string
+	ItemID                  string
+	ThreadID                string
+	TurnID                  string
+	Started                 bool
+	Completed               bool
+	Status                  *CommandExecutionStatus
+	StartedItem             *CommandExecutionThreadItem
+	CompletedItem           *CommandExecutionThreadItem
+	OutputDeltas            []string
+	DroppedOutputDeltas     int
+	DroppedOutputDeltaBytes int
+	AggregatedOutput        string
 }
 
 // McpToolCallLifecycle tracks start/completion state for an MCP tool call item.
@@ -77,9 +81,10 @@ type FileChangeLifecycle struct {
 
 // StreamSummary is a convenience snapshot over a streamed run.
 type StreamSummary struct {
-	LatestPlanText   *string
-	LatestPlanItemID *string
-	LatestTokenUsage *ThreadTokenUsage
+	LatestPlanText             *string
+	LatestPlanItemID           *string
+	LatestTokenUsage           *ThreadTokenUsage
+	DroppedLatestPlanTextBytes int
 
 	NormalizedErrors        []NormalizedStreamError
 	DroppedNormalizedErrors int
@@ -97,30 +102,33 @@ type StreamSummary struct {
 type StreamCollector struct {
 	mu sync.Mutex
 
-	latestPlanText   *string
-	latestPlanItemID *string
-	latestTokenUsage *ThreadTokenUsage
+	latestPlanText             *string
+	latestPlanItemID           *string
+	latestTokenUsage           *ThreadTokenUsage
+	droppedLatestPlanTextBytes int
 
 	normalizedErrors        []NormalizedStreamError
 	droppedNormalizedErrors int
 
-	commandExecutions   map[string]CommandExecutionLifecycle
-	commandOutputChunks map[string][]string
-	commandOutputBytes  map[string]int
-	mcpToolCalls        map[string]McpToolCallLifecycle
-	webSearches         map[string]WebSearchLifecycle
-	fileChanges         map[string]FileChangeLifecycle
+	commandExecutions       map[string]CommandExecutionLifecycle
+	commandOutputChunks     map[string][]string
+	commandOutputDeltaBytes map[string]int
+	commandOutputBytes      map[string]int
+	mcpToolCalls            map[string]McpToolCallLifecycle
+	webSearches             map[string]WebSearchLifecycle
+	fileChanges             map[string]FileChangeLifecycle
 }
 
 // NewStreamCollector constructs a ready-to-use collector.
 func NewStreamCollector() *StreamCollector {
 	return &StreamCollector{
-		commandExecutions:   make(map[string]CommandExecutionLifecycle),
-		commandOutputChunks: make(map[string][]string),
-		commandOutputBytes:  make(map[string]int),
-		mcpToolCalls:        make(map[string]McpToolCallLifecycle),
-		webSearches:         make(map[string]WebSearchLifecycle),
-		fileChanges:         make(map[string]FileChangeLifecycle),
+		commandExecutions:       make(map[string]CommandExecutionLifecycle),
+		commandOutputChunks:     make(map[string][]string),
+		commandOutputDeltaBytes: make(map[string]int),
+		commandOutputBytes:      make(map[string]int),
+		mcpToolCalls:            make(map[string]McpToolCallLifecycle),
+		webSearches:             make(map[string]WebSearchLifecycle),
+		fileChanges:             make(map[string]FileChangeLifecycle),
 	}
 }
 
@@ -167,14 +175,15 @@ func (c *StreamCollector) Summary() StreamSummary {
 	defer c.mu.Unlock()
 
 	out := StreamSummary{
-		LatestPlanText:          cloneStringPtr(c.latestPlanText),
-		LatestPlanItemID:        cloneStringPtr(c.latestPlanItemID),
-		NormalizedErrors:        make([]NormalizedStreamError, len(c.normalizedErrors)),
-		DroppedNormalizedErrors: c.droppedNormalizedErrors,
-		CommandExecutions:       make(map[string]CommandExecutionLifecycle, len(c.commandExecutions)),
-		McpToolCalls:            make(map[string]McpToolCallLifecycle, len(c.mcpToolCalls)),
-		WebSearches:             make(map[string]WebSearchLifecycle, len(c.webSearches)),
-		FileChanges:             make(map[string]FileChangeLifecycle, len(c.fileChanges)),
+		LatestPlanText:             cloneStringPtr(c.latestPlanText),
+		LatestPlanItemID:           cloneStringPtr(c.latestPlanItemID),
+		DroppedLatestPlanTextBytes: c.droppedLatestPlanTextBytes,
+		NormalizedErrors:           make([]NormalizedStreamError, len(c.normalizedErrors)),
+		DroppedNormalizedErrors:    c.droppedNormalizedErrors,
+		CommandExecutions:          make(map[string]CommandExecutionLifecycle, len(c.commandExecutions)),
+		McpToolCalls:               make(map[string]McpToolCallLifecycle, len(c.mcpToolCalls)),
+		WebSearches:                make(map[string]WebSearchLifecycle, len(c.webSearches)),
+		FileChanges:                make(map[string]FileChangeLifecycle, len(c.fileChanges)),
 	}
 
 	if c.latestTokenUsage != nil {
@@ -221,12 +230,17 @@ func (c *StreamCollector) processCommandExecutionOutputDelta(n CommandExecutionO
 	lc.ItemID = n.ItemID
 	lc.ThreadID = n.ThreadID
 	lc.TurnID = n.TurnID
-	lc.OutputDeltas, lc.DroppedOutputDeltas = appendBoundedHistory(
+	historyBytes := c.commandOutputDeltaBytes[key]
+	lc.OutputDeltas, historyBytes, lc.DroppedOutputDeltas, lc.DroppedOutputDeltaBytes = appendBoundedStringHistory(
 		lc.OutputDeltas,
+		historyBytes,
 		n.Delta,
 		lc.DroppedOutputDeltas,
+		lc.DroppedOutputDeltaBytes,
 		streamCollectorOutputDeltaHistoryLimit,
+		streamCollectorOutputDeltaBytesLimit,
 	)
+	c.commandOutputDeltaBytes[key] = historyBytes
 	chunks := append(c.commandOutputChunks[key], n.Delta)
 	bytes := c.commandOutputBytes[key] + len(n.Delta)
 	chunks, bytes = trimBoundedStringHistory(
@@ -286,16 +300,17 @@ func (c *StreamCollector) mergePlanDeltaLocked(p *PlanDelta) {
 		return
 	}
 	if c.latestPlanItemID == nil || *c.latestPlanItemID != p.ItemID {
-		c.latestPlanItemID = Ptr(p.ItemID)
-		c.latestPlanText = Ptr(p.Delta)
+		c.setLatestPlanTextLocked(p.ItemID, p.Delta)
 		return
 	}
 	if c.latestPlanText == nil {
-		c.latestPlanText = Ptr(p.Delta)
+		c.setLatestPlanTextLocked(p.ItemID, p.Delta)
 		return
 	}
-	combined := *c.latestPlanText + p.Delta
+	c.latestPlanItemID = Ptr(p.ItemID)
+	combined, droppedBytes := appendBoundedStringSuffix(*c.latestPlanText, p.Delta, streamCollectorPlanTextBytesLimit)
 	c.latestPlanText = Ptr(combined)
+	c.droppedLatestPlanTextBytes += droppedBytes
 }
 
 func (c *StreamCollector) ingestStartedItemLocked(threadID string, turnID string, item ThreadItem) {
@@ -348,8 +363,7 @@ func (c *StreamCollector) ingestStartedItemLocked(threadID string, turnID string
 func (c *StreamCollector) ingestCompletedItemLocked(threadID string, turnID string, item ThreadItem) {
 	switch v := item.(type) {
 	case *PlanThreadItem:
-		c.latestPlanItemID = Ptr(v.ID)
-		c.latestPlanText = Ptr(v.Text)
+		c.setLatestPlanTextLocked(v.ID, v.Text)
 	case *CommandExecutionThreadItem:
 		key := streamLifecycleKey(threadID, turnID, v.ID)
 		lc := c.commandExecutions[key]
@@ -366,6 +380,7 @@ func (c *StreamCollector) ingestCompletedItemLocked(threadID string, turnID stri
 			lc.AggregatedOutput = strings.Join(chunks, "")
 		}
 		delete(c.commandOutputChunks, key)
+		delete(c.commandOutputDeltaBytes, key)
 		delete(c.commandOutputBytes, key)
 		c.commandExecutions[key] = lc
 	case *McpToolCallThreadItem:
@@ -517,6 +532,13 @@ func cloneCommandExecutionLifecycle(in CommandExecutionLifecycle, outputChunks [
 	return cp
 }
 
+func (c *StreamCollector) setLatestPlanTextLocked(itemID string, text string) {
+	c.latestPlanItemID = Ptr(itemID)
+	retained, droppedBytes := retainSuffixWithinByteLimit(text, streamCollectorPlanTextBytesLimit)
+	c.latestPlanText = Ptr(retained)
+	c.droppedLatestPlanTextBytes = droppedBytes
+}
+
 func cloneMcpToolCallLifecycle(in McpToolCallLifecycle) McpToolCallLifecycle {
 	cp := in
 	cp.Status = cloneMcpToolCallStatusPtr(in.Status)
@@ -574,6 +596,64 @@ func appendBoundedHistory[T any](history []T, next T, dropped int, limit int) ([
 	copy(history, history[1:])
 	history[len(history)-1] = next
 	return history, dropped + 1
+}
+
+func appendBoundedStringHistory(history []string, historyBytes int, next string, droppedEntries int, droppedBytes int, maxEntries int, maxBytes int) ([]string, int, int, int) {
+	if maxEntries <= 0 || maxBytes <= 0 {
+		return history, 0, droppedEntries + 1, droppedBytes + len(next)
+	}
+
+	retainedNext, trimmedBytes := retainSuffixWithinByteLimit(next, maxBytes)
+	droppedBytes += trimmedBytes
+
+	history = append(history, retainedNext)
+	historyBytes += len(retainedNext)
+
+	for len(history) > maxEntries {
+		droppedBytes += len(history[0])
+		historyBytes -= len(history[0])
+		history = history[1:]
+		droppedEntries++
+	}
+
+	for len(history) > 0 && historyBytes > maxBytes {
+		if len(history) == 1 {
+			trimmed, trimmedFromEntry := retainSuffixWithinByteLimit(history[0], maxBytes)
+			history[0] = trimmed
+			historyBytes = len(trimmed)
+			droppedBytes += trimmedFromEntry
+			break
+		}
+
+		droppedBytes += len(history[0])
+		historyBytes -= len(history[0])
+		history = history[1:]
+		droppedEntries++
+	}
+
+	return history, historyBytes, droppedEntries, droppedBytes
+}
+
+func appendBoundedStringSuffix(existing string, next string, maxBytes int) (string, int) {
+	return retainSuffixWithinByteLimit(existing+next, maxBytes)
+}
+
+func retainSuffixWithinByteLimit(text string, maxBytes int) (string, int) {
+	if maxBytes <= 0 {
+		return "", len(text)
+	}
+	if len(text) <= maxBytes {
+		return text, 0
+	}
+
+	start := len(text) - maxBytes
+	for start < len(text) && !utf8.RuneStart(text[start]) {
+		start++
+	}
+	if start >= len(text) {
+		return "", len(text)
+	}
+	return text[start:], start
 }
 
 func trimBoundedStringHistory(history []string, totalBytes int, maxChunks int, maxBytes int) ([]string, int) {

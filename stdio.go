@@ -423,7 +423,7 @@ func (t *StdioTransport) OnPanic(handler func(v any)) {
 
 // Close shuts down the transport. Safe to call multiple times.
 func (t *StdioTransport) Close() error {
-	t.closeWithFailure(nil, errTransportClosed, nil)
+	t.closeWithFailure(nil, errTransportClosed)
 	return nil
 }
 
@@ -483,7 +483,7 @@ func (t *StdioTransport) transportStopCauseLocked() error {
 	return errTransportClosed
 }
 
-func (t *StdioTransport) closeWithFailure(scanErr error, cause error, detail json.RawMessage) {
+func (t *StdioTransport) closeWithFailure(scanErr error, cause error) {
 	t.mu.Lock()
 	if t.closed {
 		t.mu.Unlock()
@@ -506,7 +506,6 @@ func (t *StdioTransport) closeWithFailure(scanErr error, cause error, detail jso
 		_ = readerCloser.Close()
 	}
 
-	_ = detail
 	pendingErr := pendingRequestTransportError("send failed", cause)
 	for _, pendingReq := range pending {
 		select {
@@ -522,7 +521,7 @@ func (t *StdioTransport) handleWriteFailure(err error) {
 	if err == nil {
 		return
 	}
-	t.closeWithFailure(err, err, nil)
+	t.closeWithFailure(err, err)
 }
 
 // writeRawMessage writes a pre-marshaled JSON-RPC message and trailing newline.
@@ -1043,7 +1042,6 @@ func (t *StdioTransport) enqueueTurnScopedNotification(notif Notification) {
 			t.closeWithFailure(
 				errTurnScopedNotificationQueueLimit,
 				errTurnScopedNotificationQueueLimit,
-				notificationOverflowData("turn-scoped-limit", notif),
 			)
 			return
 		}
@@ -1058,7 +1056,6 @@ func (t *StdioTransport) enqueueTurnScopedNotification(notif Notification) {
 		t.closeWithFailure(
 			errTurnScopedNotificationQueueOverflow,
 			errTurnScopedNotificationQueueOverflow,
-			json.RawMessage(fmt.Sprintf(`{"threadId":%q}`, queue.threadKey)),
 		)
 		return
 	}
@@ -1127,7 +1124,6 @@ func (t *StdioTransport) removeTurnScopedNotificationQueue(threadKey string, que
 func (t *StdioTransport) enqueueLosslessNotification(
 	queue chan Notification,
 	notif Notification,
-	queueName string,
 ) {
 	select {
 	case <-t.ctx.Done():
@@ -1136,7 +1132,7 @@ func (t *StdioTransport) enqueueLosslessNotification(
 		return
 	default:
 	}
-	t.closeWithFailure(errNotificationQueueOverflow, errNotificationQueueOverflow, notificationOverflowData(queueName, notif))
+	t.closeWithFailure(errNotificationQueueOverflow, errNotificationQueueOverflow)
 }
 
 func (t *StdioTransport) enqueueStreamingNotification(notif Notification) {
@@ -1147,25 +1143,12 @@ func (t *StdioTransport) enqueueStreamingNotification(notif Notification) {
 	}
 }
 
-func notificationOverflowData(queueName string, notif Notification) json.RawMessage {
-	threadKey := notif.threadKey
-	if threadKey == "" {
-		threadKey = "<none>"
-	}
-	return json.RawMessage(fmt.Sprintf(
-		`{"queue":%q,"method":%q,"threadKey":%q}`,
-		queueName,
-		notif.Method,
-		threadKey,
-	))
-}
-
 func (t *StdioTransport) enqueueProtectedNotification(notif Notification) {
-	t.enqueueLosslessNotification(t.protectedNotifQueue, notif, "protected")
+	t.enqueueLosslessNotification(t.protectedNotifQueue, notif)
 }
 
 func (t *StdioTransport) enqueueCriticalNotification(notif Notification) {
-	t.enqueueLosslessNotification(t.criticalNotifQueue, notif, "critical")
+	t.enqueueLosslessNotification(t.criticalNotifQueue, notif)
 }
 
 func isCriticalNotificationMethod(method string) bool {
@@ -2017,6 +2000,67 @@ func (t *StdioTransport) stopAfterReaderTermination(scanErr error) {
 	if readerCloser != nil {
 		_ = readerCloser.Close()
 	}
+	go t.drainPendingNotificationsAfterStop()
+}
+
+func (t *StdioTransport) drainPendingNotificationsAfterStop() {
+	for {
+		drained := false
+
+		drained = t.drainNotificationQueue(t.criticalNotifQueue) || drained
+		drained = t.drainNotificationQueue(t.protectedNotifQueue) || drained
+		drained = t.drainNotificationQueue(t.streamingNotifQueue) || drained
+		drained = t.drainNotificationQueue(t.notifQueue) || drained
+		drained = t.drainTurnScopedNotificationQueues() || drained
+
+		if !drained {
+			return
+		}
+	}
+}
+
+func (t *StdioTransport) drainNotificationQueue(queue chan Notification) bool {
+	drained := false
+	for {
+		select {
+		case notif := <-queue:
+			t.handleNotification(notif)
+			drained = true
+		default:
+			return drained
+		}
+	}
+}
+
+func (t *StdioTransport) drainTurnScopedNotificationQueues() bool {
+	t.turnNotifQueuesMu.Lock()
+	queues := make([]*turnScopedNotificationQueue, 0, len(t.turnNotifQueues))
+	for _, queue := range t.turnNotifQueues {
+		queues = append(queues, queue)
+	}
+	t.turnNotifQueuesMu.Unlock()
+
+	drained := false
+	for _, queue := range queues {
+		for {
+			queue.mu.Lock()
+			if len(queue.queue) == 0 {
+				queue.scheduled = false
+				queue.mu.Unlock()
+				t.removeTurnScopedNotificationQueue(queue.threadKey, queue)
+				break
+			}
+			notif := queue.queue[0]
+			queue.queue[0] = Notification{}
+			queue.queue = queue.queue[1:]
+			queue.mu.Unlock()
+
+			t.handleNotification(notif)
+			drained = true
+		}
+	}
+
+	return drained
 }
 
 func consumeNestedJSONValue(decoder *json.Decoder) error {

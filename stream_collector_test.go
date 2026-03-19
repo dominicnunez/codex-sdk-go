@@ -630,6 +630,91 @@ func TestStreamCollectorBoundsOutputDeltaHistory(t *testing.T) {
 	}
 }
 
+func TestStreamCollectorBoundsOutputDeltaBytes(t *testing.T) {
+	proc, mock := mockProcess(t)
+	collector := codex.NewStreamCollector()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	stream := proc.RunStreamedWithCollector(ctx, codex.RunOptions{Prompt: "collect large output deltas"}, collector)
+	waitForRunStreamedReady(t, mock)
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/started",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"commandExecution","id":"cmd-big","command":"echo","commandActions":[],"cwd":"/tmp","status":"inProgress"}}`),
+	})
+
+	const maxRetainedOutputDeltaBytes = 64 * 1024
+	const largeDeltaBytes = 48 * 1024
+	for i := 0; i < 3; i++ {
+		delta := strings.Repeat(string(rune('a'+i)), largeDeltaBytes)
+		mock.InjectServerNotification(ctx, codex.Notification{
+			JSONRPC: "2.0",
+			Method:  "item/commandExecution/outputDelta",
+			Params: json.RawMessage(fmt.Sprintf(
+				`{"threadId":"thread-1","turnId":"turn-1","itemId":"cmd-big","delta":"%s"}`,
+				delta,
+			)),
+		})
+	}
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	for _, err := range stream.Events() {
+		if err != nil {
+			t.Fatalf("unexpected stream error: %v", err)
+		}
+	}
+
+	summary := collector.Summary()
+	cmd, ok := summary.CommandExecutions["cmd-big"]
+	if !ok {
+		t.Fatal("expected command execution lifecycle for cmd-big")
+	}
+	retainedBytes := len(strings.Join(cmd.OutputDeltas, ""))
+	if retainedBytes > maxRetainedOutputDeltaBytes {
+		t.Fatalf("retained output delta bytes = %d, want <= %d", retainedBytes, maxRetainedOutputDeltaBytes)
+	}
+	if cmd.DroppedOutputDeltas == 0 {
+		t.Fatal("expected large deltas to evict older entries")
+	}
+	if cmd.DroppedOutputDeltaBytes == 0 {
+		t.Fatal("expected dropped output delta bytes to be tracked")
+	}
+}
+
+func TestStreamCollectorBoundsLatestPlanTextBytes(t *testing.T) {
+	collector := codex.NewStreamCollector()
+
+	const maxRetainedPlanBytes = 64 * 1024
+	const planDeltaBytes = 48 * 1024
+
+	collector.Process(&codex.PlanDelta{
+		ItemID: "plan-1",
+		Delta:  strings.Repeat("a", planDeltaBytes),
+	}, nil)
+	collector.Process(&codex.PlanDelta{
+		ItemID: "plan-1",
+		Delta:  strings.Repeat("b", planDeltaBytes),
+	}, nil)
+
+	summary := collector.Summary()
+	if summary.LatestPlanText == nil {
+		t.Fatal("expected latest plan text to be retained")
+	}
+	if got := len(*summary.LatestPlanText); got > maxRetainedPlanBytes {
+		t.Fatalf("latest plan text bytes = %d, want <= %d", got, maxRetainedPlanBytes)
+	}
+	if summary.DroppedLatestPlanTextBytes == 0 {
+		t.Fatal("expected dropped latest plan text bytes to be tracked")
+	}
+}
+
 func TestStreamCollectorBoundsRawOutputChunksAndFinalizesOnCompletion(t *testing.T) {
 	proc, mock := mockProcess(t)
 	collector := codex.NewStreamCollector()
