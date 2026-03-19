@@ -99,6 +99,11 @@ func (m *SkillMetadata) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	validatedPath, err := validateInboundAbsolutePathField("skill.path", decoded.Path)
+	if err != nil {
+		return err
+	}
+	decoded.Path = validatedPath
 	*m = SkillMetadata(decoded)
 	return nil
 }
@@ -118,6 +123,11 @@ func (e *SkillErrorInfo) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	validatedPath, err := validateInboundAbsolutePathField("skill.error.path", decoded.Path)
+	if err != nil {
+		return err
+	}
+	decoded.Path = validatedPath
 	*e = SkillErrorInfo(decoded)
 	return nil
 }
@@ -178,6 +188,11 @@ func (e *SkillsListEntry) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	validatedCwd, err := validateInboundAbsolutePathField("skills.cwd", decoded.Cwd)
+	if err != nil {
+		return err
+	}
+	decoded.Cwd = validatedCwd
 	*e = SkillsListEntry(decoded)
 	return nil
 }

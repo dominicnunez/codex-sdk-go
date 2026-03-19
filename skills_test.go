@@ -349,3 +349,77 @@ func TestSkillsListRejectsInvalidScope(t *testing.T) {
 		t.Fatalf("Skills.List error = %v; want invalid scope failure", err)
 	}
 }
+
+func TestSkillsListRejectsInvalidPaths(t *testing.T) {
+	tests := []struct {
+		name         string
+		response     map[string]interface{}
+		wantContains string
+	}{
+		{
+			name: "relative cwd",
+			response: map[string]interface{}{
+				"data": []interface{}{
+					map[string]interface{}{
+						"cwd":    "project",
+						"errors": []interface{}{},
+						"skills": []interface{}{},
+					},
+				},
+			},
+			wantContains: `skills.cwd: must be an absolute path`,
+		},
+		{
+			name: "non-normalized skill path",
+			response: map[string]interface{}{
+				"data": []interface{}{
+					map[string]interface{}{
+						"cwd":    "/home/user/project",
+						"errors": []interface{}{},
+						"skills": []interface{}{
+							map[string]interface{}{
+								"name":        "example-skill",
+								"description": "An example skill",
+								"path":        "/home/user/project/../project/.claude/skills/example-skill",
+								"enabled":     true,
+								"scope":       "repo",
+							},
+						},
+					},
+				},
+			},
+			wantContains: `skill.path: must be normalized`,
+		},
+		{
+			name: "relative error path",
+			response: map[string]interface{}{
+				"data": []interface{}{
+					map[string]interface{}{
+						"cwd": "/home/user/project",
+						"errors": []interface{}{
+							map[string]interface{}{
+								"path":    "broken-skill",
+								"message": "Syntax error in SKILL.md",
+							},
+						},
+						"skills": []interface{}{},
+					},
+				},
+			},
+			wantContains: `skill.error.path: must be an absolute path`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := NewMockTransport()
+			_ = mock.SetResponseData("skills/list", tt.response)
+			client := codex.NewClient(mock)
+
+			_, err := client.Skills.List(context.Background(), codex.SkillsListParams{})
+			if err == nil || !strings.Contains(err.Error(), tt.wantContains) {
+				t.Fatalf("Skills.List error = %v; want substring %q", err, tt.wantContains)
+			}
+		})
+	}
+}
