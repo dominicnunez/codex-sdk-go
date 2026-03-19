@@ -28,6 +28,8 @@ type NormalizedStreamError struct {
 // a command execution thread item.
 type CommandExecutionLifecycle struct {
 	ItemID              string
+	ThreadID            string
+	TurnID              string
 	Started             bool
 	Completed           bool
 	Status              *CommandExecutionStatus
@@ -41,6 +43,8 @@ type CommandExecutionLifecycle struct {
 // McpToolCallLifecycle tracks start/completion state for an MCP tool call item.
 type McpToolCallLifecycle struct {
 	ItemID        string
+	ThreadID      string
+	TurnID        string
 	Started       bool
 	Completed     bool
 	Status        *McpToolCallStatus
@@ -51,6 +55,8 @@ type McpToolCallLifecycle struct {
 // WebSearchLifecycle tracks start/completion state for a web search item.
 type WebSearchLifecycle struct {
 	ItemID        string
+	ThreadID      string
+	TurnID        string
 	Started       bool
 	Completed     bool
 	StartedItem   *WebSearchThreadItem
@@ -60,6 +66,8 @@ type WebSearchLifecycle struct {
 // FileChangeLifecycle tracks start/completion state for a file-change item.
 type FileChangeLifecycle struct {
 	ItemID        string
+	ThreadID      string
+	TurnID        string
 	Started       bool
 	Completed     bool
 	Status        *PatchApplyStatus
@@ -76,6 +84,8 @@ type StreamSummary struct {
 	NormalizedErrors        []NormalizedStreamError
 	DroppedNormalizedErrors int
 
+	// Keys use the bare item ID when it is unique in the summary and switch to
+	// thread/turn/item scoping only when duplicate item IDs need disambiguation.
 	CommandExecutions map[string]CommandExecutionLifecycle
 	McpToolCalls      map[string]McpToolCallLifecycle
 	WebSearches       map[string]WebSearchLifecycle
@@ -134,14 +144,15 @@ func (c *StreamCollector) Process(event Event, err error) {
 	case *PlanDelta:
 		c.mergePlanDeltaLocked(e)
 	case *ItemStarted:
-		c.ingestStartedItemLocked(e.Item.Value)
+		c.ingestStartedItemLocked(e.ThreadID, e.TurnID, e.Item.Value)
 	case *ItemCompleted:
-		c.ingestCompletedItemLocked(e.Item.Value)
+		c.ingestCompletedItemLocked(e.ThreadID, e.TurnID, e.Item.Value)
 	case *TurnCompleted:
 		if e.Turn.Error != nil {
 			c.appendErrorLocked(NormalizedStreamError{
 				Kind:         "turn_error",
 				Message:      e.Turn.Error.Message,
+				ThreadID:     cloneStringPtr(&e.ThreadID),
 				TurnID:       cloneStringPtr(&e.Turn.ID),
 				SourceMethod: cloneStringPtr(Ptr(notifyTurnCompleted)),
 				Raw:          append(json.RawMessage(nil), e.Turn.Error.Raw...),
@@ -170,23 +181,32 @@ func (c *StreamCollector) Summary() StreamSummary {
 		out.LatestTokenUsage = cloneThreadTokenUsage(c.latestTokenUsage)
 	}
 
+	commandExecutionCounts := countLifecycleItemIDs(c.commandExecutions, func(v CommandExecutionLifecycle) string { return v.ItemID })
+	mcpToolCallCounts := countLifecycleItemIDs(c.mcpToolCalls, func(v McpToolCallLifecycle) string { return v.ItemID })
+	webSearchCounts := countLifecycleItemIDs(c.webSearches, func(v WebSearchLifecycle) string { return v.ItemID })
+	fileChangeCounts := countLifecycleItemIDs(c.fileChanges, func(v FileChangeLifecycle) string { return v.ItemID })
+
 	for i, err := range c.normalizedErrors {
 		out.NormalizedErrors[i] = cloneNormalizedStreamError(err)
 	}
 	for k, v := range c.commandExecutions {
-		out.CommandExecutions[k] = cloneCommandExecutionLifecycle(
+		summaryKey := summaryLifecycleKey(v.ThreadID, v.TurnID, v.ItemID, commandExecutionCounts[v.ItemID] > 1)
+		out.CommandExecutions[summaryKey] = cloneCommandExecutionLifecycle(
 			v,
 			c.commandOutputChunks[k],
 		)
 	}
-	for k, v := range c.mcpToolCalls {
-		out.McpToolCalls[k] = cloneMcpToolCallLifecycle(v)
+	for _, v := range c.mcpToolCalls {
+		summaryKey := summaryLifecycleKey(v.ThreadID, v.TurnID, v.ItemID, mcpToolCallCounts[v.ItemID] > 1)
+		out.McpToolCalls[summaryKey] = cloneMcpToolCallLifecycle(v)
 	}
-	for k, v := range c.webSearches {
-		out.WebSearches[k] = cloneWebSearchLifecycle(v)
+	for _, v := range c.webSearches {
+		summaryKey := summaryLifecycleKey(v.ThreadID, v.TurnID, v.ItemID, webSearchCounts[v.ItemID] > 1)
+		out.WebSearches[summaryKey] = cloneWebSearchLifecycle(v)
 	}
-	for k, v := range c.fileChanges {
-		out.FileChanges[k] = cloneFileChangeLifecycle(v)
+	for _, v := range c.fileChanges {
+		summaryKey := summaryLifecycleKey(v.ThreadID, v.TurnID, v.ItemID, fileChangeCounts[v.ItemID] > 1)
+		out.FileChanges[summaryKey] = cloneFileChangeLifecycle(v)
 	}
 
 	return out
@@ -196,25 +216,28 @@ func (c *StreamCollector) processCommandExecutionOutputDelta(n CommandExecutionO
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	lc := c.commandExecutions[n.ItemID]
+	key := streamLifecycleKey(n.ThreadID, n.TurnID, n.ItemID)
+	lc := c.commandExecutions[key]
 	lc.ItemID = n.ItemID
+	lc.ThreadID = n.ThreadID
+	lc.TurnID = n.TurnID
 	lc.OutputDeltas, lc.DroppedOutputDeltas = appendBoundedHistory(
 		lc.OutputDeltas,
 		n.Delta,
 		lc.DroppedOutputDeltas,
 		streamCollectorOutputDeltaHistoryLimit,
 	)
-	chunks := append(c.commandOutputChunks[n.ItemID], n.Delta)
-	bytes := c.commandOutputBytes[n.ItemID] + len(n.Delta)
+	chunks := append(c.commandOutputChunks[key], n.Delta)
+	bytes := c.commandOutputBytes[key] + len(n.Delta)
 	chunks, bytes = trimBoundedStringHistory(
 		chunks,
 		bytes,
 		streamCollectorRawOutputChunkLimit,
 		streamCollectorRawOutputBytesLimit,
 	)
-	c.commandOutputChunks[n.ItemID] = chunks
-	c.commandOutputBytes[n.ItemID] = bytes
-	c.commandExecutions[n.ItemID] = lc
+	c.commandOutputChunks[key] = chunks
+	c.commandOutputBytes[key] = bytes
+	c.commandExecutions[key] = lc
 }
 
 func (c *StreamCollector) processThreadTokenUsageUpdated(n ThreadTokenUsageUpdatedNotification) {
@@ -275,84 +298,130 @@ func (c *StreamCollector) mergePlanDeltaLocked(p *PlanDelta) {
 	c.latestPlanText = Ptr(combined)
 }
 
-func (c *StreamCollector) ingestStartedItemLocked(item ThreadItem) {
+func (c *StreamCollector) ingestStartedItemLocked(threadID string, turnID string, item ThreadItem) {
 	switch v := item.(type) {
 	case *CommandExecutionThreadItem:
-		lc := c.commandExecutions[v.ID]
+		key := streamLifecycleKey(threadID, turnID, v.ID)
+		lc := c.commandExecutions[key]
 		lc.ItemID = v.ID
+		lc.ThreadID = threadID
+		lc.TurnID = turnID
 		lc.Started = true
 		status := v.Status
 		lc.Status = &status
 		lc.StartedItem = cloneCommandExecutionItem(v)
-		c.commandExecutions[v.ID] = lc
+		c.commandExecutions[key] = lc
 	case *McpToolCallThreadItem:
-		lc := c.mcpToolCalls[v.ID]
+		key := streamLifecycleKey(threadID, turnID, v.ID)
+		lc := c.mcpToolCalls[key]
 		lc.ItemID = v.ID
+		lc.ThreadID = threadID
+		lc.TurnID = turnID
 		lc.Started = true
 		status := v.Status
 		lc.Status = &status
 		lc.StartedItem = cloneMcpToolCallItem(v)
-		c.mcpToolCalls[v.ID] = lc
+		c.mcpToolCalls[key] = lc
 	case *WebSearchThreadItem:
-		lc := c.webSearches[v.ID]
+		key := streamLifecycleKey(threadID, turnID, v.ID)
+		lc := c.webSearches[key]
 		lc.ItemID = v.ID
+		lc.ThreadID = threadID
+		lc.TurnID = turnID
 		lc.Started = true
 		lc.StartedItem = cloneWebSearchItem(v)
-		c.webSearches[v.ID] = lc
+		c.webSearches[key] = lc
 	case *FileChangeThreadItem:
-		lc := c.fileChanges[v.ID]
+		key := streamLifecycleKey(threadID, turnID, v.ID)
+		lc := c.fileChanges[key]
 		lc.ItemID = v.ID
+		lc.ThreadID = threadID
+		lc.TurnID = turnID
 		lc.Started = true
 		status := v.Status
 		lc.Status = &status
 		lc.StartedItem = cloneFileChangeItem(v)
-		c.fileChanges[v.ID] = lc
+		c.fileChanges[key] = lc
 	}
 }
 
-func (c *StreamCollector) ingestCompletedItemLocked(item ThreadItem) {
+func (c *StreamCollector) ingestCompletedItemLocked(threadID string, turnID string, item ThreadItem) {
 	switch v := item.(type) {
 	case *PlanThreadItem:
 		c.latestPlanItemID = Ptr(v.ID)
 		c.latestPlanText = Ptr(v.Text)
 	case *CommandExecutionThreadItem:
-		lc := c.commandExecutions[v.ID]
+		key := streamLifecycleKey(threadID, turnID, v.ID)
+		lc := c.commandExecutions[key]
 		lc.ItemID = v.ID
+		lc.ThreadID = threadID
+		lc.TurnID = turnID
 		lc.Completed = true
 		status := v.Status
 		lc.Status = &status
 		lc.CompletedItem = cloneCommandExecutionItem(v)
 		if v.AggregatedOutput != nil {
 			lc.AggregatedOutput = *v.AggregatedOutput
-		} else if chunks := c.commandOutputChunks[v.ID]; len(chunks) > 0 {
+		} else if chunks := c.commandOutputChunks[key]; len(chunks) > 0 {
 			lc.AggregatedOutput = strings.Join(chunks, "")
 		}
-		delete(c.commandOutputChunks, v.ID)
-		delete(c.commandOutputBytes, v.ID)
-		c.commandExecutions[v.ID] = lc
+		delete(c.commandOutputChunks, key)
+		delete(c.commandOutputBytes, key)
+		c.commandExecutions[key] = lc
 	case *McpToolCallThreadItem:
-		lc := c.mcpToolCalls[v.ID]
+		key := streamLifecycleKey(threadID, turnID, v.ID)
+		lc := c.mcpToolCalls[key]
 		lc.ItemID = v.ID
+		lc.ThreadID = threadID
+		lc.TurnID = turnID
 		lc.Completed = true
 		status := v.Status
 		lc.Status = &status
 		lc.CompletedItem = cloneMcpToolCallItem(v)
-		c.mcpToolCalls[v.ID] = lc
+		c.mcpToolCalls[key] = lc
 	case *WebSearchThreadItem:
-		lc := c.webSearches[v.ID]
+		key := streamLifecycleKey(threadID, turnID, v.ID)
+		lc := c.webSearches[key]
 		lc.ItemID = v.ID
+		lc.ThreadID = threadID
+		lc.TurnID = turnID
 		lc.Completed = true
 		lc.CompletedItem = cloneWebSearchItem(v)
-		c.webSearches[v.ID] = lc
+		c.webSearches[key] = lc
 	case *FileChangeThreadItem:
-		lc := c.fileChanges[v.ID]
+		key := streamLifecycleKey(threadID, turnID, v.ID)
+		lc := c.fileChanges[key]
 		lc.ItemID = v.ID
+		lc.ThreadID = threadID
+		lc.TurnID = turnID
 		lc.Completed = true
 		status := v.Status
 		lc.Status = &status
 		lc.CompletedItem = cloneFileChangeItem(v)
-		c.fileChanges[v.ID] = lc
+		c.fileChanges[key] = lc
 	}
+}
+
+func streamLifecycleKey(threadID string, turnID string, itemID string) string {
+	if threadID == "" && turnID == "" {
+		return itemID
+	}
+	return threadID + "\x1f" + turnID + "\x1f" + itemID
+}
+
+func summaryLifecycleKey(threadID string, turnID string, itemID string, duplicate bool) string {
+	if !duplicate || (threadID == "" && turnID == "") {
+		return itemID
+	}
+	return threadID + "/" + turnID + "/" + itemID
+}
+
+func countLifecycleItemIDs[T any](states map[string]T, itemID func(T) string) map[string]int {
+	counts := make(map[string]int, len(states))
+	for _, state := range states {
+		counts[itemID(state)]++
+	}
+	return counts
 }
 
 func cloneCommandExecutionItem(in *CommandExecutionThreadItem) *CommandExecutionThreadItem {

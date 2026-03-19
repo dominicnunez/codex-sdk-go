@@ -43,30 +43,38 @@ func (*ReasoningSummaryDelta) streamEvent() {}
 
 // PlanDelta is emitted for incremental plan text.
 type PlanDelta struct {
-	Delta  string
-	ItemID string
+	Delta    string
+	ItemID   string
+	ThreadID string
+	TurnID   string
 }
 
 func (*PlanDelta) streamEvent() {}
 
 // FileChangeDelta is emitted for incremental file change diff text.
 type FileChangeDelta struct {
-	Delta  string
-	ItemID string
+	Delta    string
+	ItemID   string
+	ThreadID string
+	TurnID   string
 }
 
 func (*FileChangeDelta) streamEvent() {}
 
 // ItemStarted is emitted when a thread item begins.
 type ItemStarted struct {
-	Item ThreadItemWrapper
+	Item     ThreadItemWrapper
+	ThreadID string
+	TurnID   string
 }
 
 func (*ItemStarted) streamEvent() {}
 
 // ItemCompleted is emitted when a thread item finishes.
 type ItemCompleted struct {
-	Item ThreadItemWrapper
+	Item     ThreadItemWrapper
+	ThreadID string
+	TurnID   string
 }
 
 func (*ItemCompleted) streamEvent() {}
@@ -117,7 +125,8 @@ func newCollabEvent(phase CollabToolCallPhase, c *CollabAgentToolCallThreadItem)
 
 // TurnCompleted is emitted when the turn finishes.
 type TurnCompleted struct {
-	Turn Turn
+	Turn     Turn
+	ThreadID string
 }
 
 func (*TurnCompleted) streamEvent() {}

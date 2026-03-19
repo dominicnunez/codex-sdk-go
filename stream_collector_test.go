@@ -600,3 +600,81 @@ func TestStreamCollectorBoundsRawOutputChunksAndFinalizesOnCompletion(t *testing
 		t.Fatalf("aggregated output length = %d; want bounded length smaller than %d", len(cmd.AggregatedOutput), fullLength)
 	}
 }
+
+func TestStreamCollectorScopesRepeatedItemIDsAcrossRuns(t *testing.T) {
+	collector := codex.NewStreamCollector()
+
+	collector.Process(&codex.ItemStarted{
+		ThreadID: "thread-1",
+		TurnID:   "turn-1",
+		Item: codex.ThreadItemWrapper{
+			Value: &codex.CommandExecutionThreadItem{
+				ID:             "cmd-1",
+				Command:        "ls",
+				CommandActions: []codex.CommandActionWrapper{},
+				Cwd:            "/tmp/one",
+				Status:         codex.CommandExecutionStatusInProgress,
+			},
+		},
+	}, nil)
+	collector.Process(&codex.ItemCompleted{
+		ThreadID: "thread-1",
+		TurnID:   "turn-1",
+		Item: codex.ThreadItemWrapper{
+			Value: &codex.CommandExecutionThreadItem{
+				ID:               "cmd-1",
+				Command:          "ls",
+				CommandActions:   []codex.CommandActionWrapper{},
+				Cwd:              "/tmp/one",
+				Status:           codex.CommandExecutionStatusCompleted,
+				AggregatedOutput: ptr("first"),
+			},
+		},
+	}, nil)
+	collector.Process(&codex.ItemStarted{
+		ThreadID: "thread-2",
+		TurnID:   "turn-2",
+		Item: codex.ThreadItemWrapper{
+			Value: &codex.CommandExecutionThreadItem{
+				ID:             "cmd-1",
+				Command:        "pwd",
+				CommandActions: []codex.CommandActionWrapper{},
+				Cwd:            "/tmp/two",
+				Status:         codex.CommandExecutionStatusInProgress,
+			},
+		},
+	}, nil)
+
+	summary := collector.Summary()
+	if len(summary.CommandExecutions) != 2 {
+		t.Fatalf("command execution summaries = %d, want 2", len(summary.CommandExecutions))
+	}
+
+	first, ok := summary.CommandExecutions["thread-1/turn-1/cmd-1"]
+	if !ok {
+		t.Fatalf("missing first scoped lifecycle: %#v", summary.CommandExecutions)
+	}
+	if !first.Started || !first.Completed {
+		t.Fatalf("first lifecycle started/completed = %v/%v, want true/true", first.Started, first.Completed)
+	}
+	if first.ThreadID != "thread-1" || first.TurnID != "turn-1" {
+		t.Fatalf("first lifecycle scope = %q/%q, want thread-1/turn-1", first.ThreadID, first.TurnID)
+	}
+	if first.AggregatedOutput != "first" {
+		t.Fatalf("first aggregated output = %q, want %q", first.AggregatedOutput, "first")
+	}
+
+	second, ok := summary.CommandExecutions["thread-2/turn-2/cmd-1"]
+	if !ok {
+		t.Fatalf("missing second scoped lifecycle: %#v", summary.CommandExecutions)
+	}
+	if !second.Started || second.Completed {
+		t.Fatalf("second lifecycle started/completed = %v/%v, want true/false", second.Started, second.Completed)
+	}
+	if second.ThreadID != "thread-2" || second.TurnID != "turn-2" {
+		t.Fatalf("second lifecycle scope = %q/%q, want thread-2/turn-2", second.ThreadID, second.TurnID)
+	}
+	if second.StartedItem == nil || second.StartedItem.Command != "pwd" {
+		t.Fatalf("second started item = %#v, want pwd", second.StartedItem)
+	}
+}

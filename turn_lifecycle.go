@@ -472,19 +472,20 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, g *guardedC
 	// Wait for turn completion or context cancellation.
 	select {
 	case completed := <-turnDone:
-		emit(&TurnCompleted{Turn: completed.Turn})
+		emit(&TurnCompleted{Turn: completed.Turn, ThreadID: completed.ThreadID})
 
 		itemsMu.Lock()
 		collectedItems := make([]ThreadItemWrapper, len(items))
 		copy(collectedItems, items)
 		itemsMu.Unlock()
 
+		result := completeTurnLifecycle(p, completed.Turn, collectedItems)
 		if completed.Turn.Error != nil {
 			emitErr(fmt.Errorf("turn error: %w", completed.Turn.Error))
 			return
 		}
 		s.mu.Lock()
-		s.result = completeTurnLifecycle(p, completed.Turn, collectedItems)
+		s.result = result
 		s.mu.Unlock()
 
 	case <-ctx.Done():
@@ -524,14 +525,14 @@ func registerStreamDeltaListeners(p turnLifecycleParams, g *guardedChan, on func
 	}, func(n PlanDeltaNotification) string {
 		return n.TurnID
 	}, func(n PlanDeltaNotification) Event {
-		return &PlanDelta{Delta: n.Delta, ItemID: n.ItemID}
+		return &PlanDelta{Delta: n.Delta, ItemID: n.ItemID, ThreadID: n.ThreadID, TurnID: n.TurnID}
 	})
 	streamListenTurnScoped(on, notifyFileChangeOutputDelta, g, p.threadID, p.client.reportHandlerError, onEvent, dispatchTurnScoped, func(n FileChangeOutputDeltaNotification) string {
 		return n.ThreadID
 	}, func(n FileChangeOutputDeltaNotification) string {
 		return n.TurnID
 	}, func(n FileChangeOutputDeltaNotification) Event {
-		return &FileChangeDelta{Delta: n.Delta, ItemID: n.ItemID}
+		return &FileChangeDelta{Delta: n.Delta, ItemID: n.ItemID, ThreadID: n.ThreadID, TurnID: n.TurnID}
 	})
 }
 
@@ -574,7 +575,7 @@ func registerItemListeners(ctx context.Context, p turnLifecycleParams, on func(s
 			if c, ok := n.Item.Value.(*CollabAgentToolCallThreadItem); ok {
 				emit(newCollabEvent(CollabToolCallStartedPhase, c))
 			}
-			emit(&ItemStarted{Item: n.Item})
+			emit(&ItemStarted{Item: n.Item, ThreadID: n.ThreadID, TurnID: n.TurnID})
 		})
 	})
 
@@ -593,7 +594,7 @@ func registerItemListeners(ctx context.Context, p turnLifecycleParams, on func(s
 			if c, ok := n.Item.Value.(*CollabAgentToolCallThreadItem); ok {
 				emit(newCollabEvent(CollabToolCallCompletedPhase, c))
 			}
-			emit(&ItemCompleted{Item: n.Item})
+			emit(&ItemCompleted{Item: n.Item, ThreadID: n.ThreadID, TurnID: n.TurnID})
 		})
 	})
 
