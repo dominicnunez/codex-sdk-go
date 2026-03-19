@@ -1,7 +1,9 @@
 package codex
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync/atomic"
 	"testing"
@@ -413,6 +415,7 @@ func TestThreadCloneCollabToolCallPointerIsolation(t *testing.T) {
 }
 
 func TestThreadCloneDoesNotPanicOnUnmarshalableDynamicArguments(t *testing.T) {
+	argFn := func() {}
 	conv := newConversationForTest(Thread{
 		Turns: []Turn{{
 			ID:     "t1",
@@ -423,7 +426,7 @@ func TestThreadCloneDoesNotPanicOnUnmarshalableDynamicArguments(t *testing.T) {
 						ID:        "dyn-1",
 						Tool:      "tool",
 						Status:    DynamicToolCallStatusCompleted,
-						Arguments: func() {},
+						Arguments: argFn,
 					},
 				},
 			},
@@ -441,63 +444,142 @@ func TestThreadCloneDoesNotPanicOnUnmarshalableDynamicArguments(t *testing.T) {
 		t.Fatal("expected cloned item")
 	}
 	item := snap.Turns[0].Items[0].Value.(*DynamicToolCallThreadItem)
-	if item.Arguments != nil {
-		t.Fatalf("Arguments = %#v, want nil for uncloneable data", item.Arguments)
+	if item.Arguments == nil {
+		t.Fatal("Arguments = nil, want preserved function value")
+	}
+	if _, ok := item.Arguments.(func()); !ok {
+		t.Fatalf("Arguments type = %T, want func()", item.Arguments)
 	}
 }
 
-func TestCloneFallbacksDropUncloneableValues(t *testing.T) {
-	if got := cloneThreadItemWrapperFallback(ThreadItemWrapper{Value: &uncloneableThreadItem{}}); got.Value != nil {
-		t.Fatalf("thread item fallback = %#v, want nil Value", got.Value)
+func TestCloneFallbacksPreserveUncloneableValues(t *testing.T) {
+	originalThreadItem := &uncloneableThreadItem{Fn: func() {}}
+	if got := cloneThreadItemWrapperFallback(ThreadItemWrapper{Value: originalThreadItem}); got.Value == nil {
+		t.Fatal("thread item fallback lost Value")
+	} else if clone, ok := got.Value.(*uncloneableThreadItem); !ok {
+		t.Fatalf("thread item fallback type = %T, want *uncloneableThreadItem", got.Value)
+	} else if clone == originalThreadItem {
+		t.Fatal("thread item fallback reused original pointer")
 	}
-	if got := cloneSessionSourceWrapperFallback(SessionSourceWrapper{Value: uncloneableSessionSource{}}); got.Value != nil {
-		t.Fatalf("session source fallback = %#v, want nil Value", got.Value)
+	if got := cloneSessionSourceWrapperFallback(SessionSourceWrapper{Value: uncloneableSessionSource{Fn: func() {}}}); got.Value == nil {
+		t.Fatal("session source fallback lost Value")
+	} else if _, ok := got.Value.(uncloneableSessionSource); !ok {
+		t.Fatalf("session source fallback type = %T, want uncloneableSessionSource", got.Value)
 	}
-	if got := cloneThreadStatusWrapperFallback(ThreadStatusWrapper{Value: uncloneableThreadStatus{}}); got.Value != nil {
-		t.Fatalf("thread status fallback = %#v, want nil Value", got.Value)
+	if got := cloneThreadStatusWrapperFallback(ThreadStatusWrapper{Value: uncloneableThreadStatus{Fn: func() {}}}); got.Value == nil {
+		t.Fatal("thread status fallback lost Value")
+	} else if _, ok := got.Value.(uncloneableThreadStatus); !ok {
+		t.Fatalf("thread status fallback type = %T, want uncloneableThreadStatus", got.Value)
 	}
-	if got := cloneSubAgentSourceFallback(uncloneableSubAgentSource{}); got != nil {
-		t.Fatalf("sub-agent source fallback = %#v, want nil", got)
+	originalSubAgent := uncloneableSubAgentSource{Fn: func() {}}
+	if got := cloneSubAgentSourceFallback(originalSubAgent); got == nil {
+		t.Fatal("sub-agent source fallback lost value")
+	} else if _, ok := got.(uncloneableSubAgentSource); !ok {
+		t.Fatalf("sub-agent source fallback type = %T, want uncloneableSubAgentSource", got)
 	}
-	if got := cloneUserInputFallback(&uncloneableUserInput{}); got != nil {
-		t.Fatalf("user input fallback = %#v, want nil", got)
+	originalUserInput := &uncloneableUserInput{Fn: func() {}}
+	if got := cloneUserInputFallback(originalUserInput); got == nil {
+		t.Fatal("user input fallback lost value")
+	} else if clone, ok := got.(*uncloneableUserInput); !ok {
+		t.Fatalf("user input fallback type = %T, want *uncloneableUserInput", got)
+	} else if clone == originalUserInput {
+		t.Fatal("user input fallback reused original pointer")
 	}
-	if got := cloneCommandActionWrapperFallback(CommandActionWrapper{Value: &uncloneableCommandAction{}}); got.Value != nil {
-		t.Fatalf("command action fallback = %#v, want nil Value", got.Value)
+	originalCommandAction := &uncloneableCommandAction{Fn: func() {}}
+	if got := cloneCommandActionWrapperFallback(CommandActionWrapper{Value: originalCommandAction}); got.Value == nil {
+		t.Fatal("command action fallback lost Value")
+	} else if clone, ok := got.Value.(*uncloneableCommandAction); !ok {
+		t.Fatalf("command action fallback type = %T, want *uncloneableCommandAction", got.Value)
+	} else if clone == originalCommandAction {
+		t.Fatal("command action fallback reused original pointer")
 	}
-	if got := clonePatchChangeKindWrapperFallback(PatchChangeKindWrapper{Value: uncloneablePatchChangeKind{}}); got.Value != nil {
-		t.Fatalf("patch change fallback = %#v, want nil Value", got.Value)
+	if got := clonePatchChangeKindWrapperFallback(PatchChangeKindWrapper{Value: uncloneablePatchChangeKind{Fn: func() {}}}); got.Value == nil {
+		t.Fatal("patch change fallback lost Value")
+	} else if _, ok := got.Value.(uncloneablePatchChangeKind); !ok {
+		t.Fatalf("patch change fallback type = %T, want uncloneablePatchChangeKind", got.Value)
 	}
-	if got := cloneDynamicToolCallOutputContentItemWrapperFallback(DynamicToolCallOutputContentItemWrapper{Value: &uncloneableDynamicToolCallOutputContentItem{}}); got.Value != nil {
-		t.Fatalf("dynamic output fallback = %#v, want nil Value", got.Value)
+	originalOutput := &uncloneableDynamicToolCallOutputContentItem{Fn: func() {}}
+	if got := cloneDynamicToolCallOutputContentItemWrapperFallback(DynamicToolCallOutputContentItemWrapper{Value: originalOutput}); got.Value == nil {
+		t.Fatal("dynamic output fallback lost Value")
+	} else if clone, ok := got.Value.(*uncloneableDynamicToolCallOutputContentItem); !ok {
+		t.Fatalf("dynamic output fallback type = %T, want *uncloneableDynamicToolCallOutputContentItem", got.Value)
+	} else if clone == originalOutput {
+		t.Fatal("dynamic output fallback reused original pointer")
 	}
-	if got := cloneWebSearchActionWrapperFallback(WebSearchActionWrapper{Value: uncloneableWebSearchAction{}}); got.Value != nil {
-		t.Fatalf("web search action fallback = %#v, want nil Value", got.Value)
+	if got := cloneWebSearchActionWrapperFallback(WebSearchActionWrapper{Value: uncloneableWebSearchAction{Fn: func() {}}}); got.Value == nil {
+		t.Fatal("web search action fallback lost Value")
+	} else if _, ok := got.Value.(uncloneableWebSearchAction); !ok {
+		t.Fatalf("web search action fallback type = %T, want uncloneableWebSearchAction", got.Value)
 	}
-	if got := cloneJSONValue(map[string]interface{}{"bad": func() {}}); got != nil {
-		t.Fatalf("cloneJSONValue returned %#v, want nil for uncloneable input", got)
+	sourceMap := map[string]interface{}{"bad": func() {}, "nested": map[string]string{"k": "v"}}
+	gotJSON := cloneJSONValue(sourceMap)
+	clonedMap, ok := gotJSON.(map[string]interface{})
+	if !ok {
+		t.Fatalf("cloneJSONValue type = %T, want map[string]interface{}", gotJSON)
+	}
+	if clonedMap["bad"] == nil {
+		t.Fatal("cloneJSONValue lost function value")
+	}
+	nested, ok := clonedMap["nested"].(map[string]string)
+	if !ok {
+		t.Fatalf("cloneJSONValue nested type = %T, want map[string]string", clonedMap["nested"])
+	}
+	nested["k"] = "changed"
+	if sourceMap["nested"].(map[string]string)["k"] != "v" {
+		t.Fatal("cloneJSONValue reused nested map")
 	}
 
 	conv := newConversationForTest(Thread{
-		Source: SessionSourceWrapper{Value: uncloneableSessionSource{}},
-		Status: ThreadStatusWrapper{Value: uncloneableThreadStatus{}},
+		Source: SessionSourceWrapper{Value: uncloneableSessionSource{Fn: func() {}}},
+		Status: ThreadStatusWrapper{Value: uncloneableThreadStatus{Fn: func() {}}},
 		Turns: []Turn{{
 			ID:     "turn-1",
 			Status: TurnStatusCompleted,
 			Items: []ThreadItemWrapper{
-				{Value: &uncloneableThreadItem{}},
+				{Value: &uncloneableThreadItem{Fn: func() {}}},
 			},
 		}},
 	})
 
 	snap := conv.Thread()
-	if snap.Source.Value != nil {
-		t.Fatalf("snapshot source = %#v, want nil Value", snap.Source.Value)
+	if _, ok := snap.Source.Value.(uncloneableSessionSource); !ok {
+		t.Fatalf("snapshot source type = %T, want uncloneableSessionSource", snap.Source.Value)
 	}
-	if snap.Status.Value != nil {
-		t.Fatalf("snapshot status = %#v, want nil Value", snap.Status.Value)
+	if _, ok := snap.Status.Value.(uncloneableThreadStatus); !ok {
+		t.Fatalf("snapshot status type = %T, want uncloneableThreadStatus", snap.Status.Value)
 	}
-	if snap.Turns[0].Items[0].Value != nil {
-		t.Fatalf("snapshot item = %#v, want nil Value", snap.Turns[0].Items[0].Value)
+	if _, ok := snap.Turns[0].Items[0].Value.(*uncloneableThreadItem); !ok {
+		t.Fatalf("snapshot item type = %T, want *uncloneableThreadItem", snap.Turns[0].Items[0].Value)
+	}
+}
+
+func TestConversationTurnsRequireInitializedConversation(t *testing.T) {
+	tests := []struct {
+		name string
+		conv *Conversation
+	}{
+		{name: "nil conversation", conv: nil},
+		{name: "zero value", conv: &Conversation{}},
+		{name: "missing state", conv: &Conversation{process: &Process{Client: &Client{}}}},
+		{name: "missing process", conv: &Conversation{state: newConversationState(Thread{ID: "thread-1"})}},
+		{name: "missing client", conv: &Conversation{process: &Process{}, state: newConversationState(Thread{ID: "thread-1"})}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := tt.conv.Turn(context.Background(), TurnOptions{Prompt: "hello"}); err != errConversationUninitialized {
+				t.Fatalf("Turn() error = %v, want %v", err, errConversationUninitialized)
+			}
+
+			stream := tt.conv.TurnStreamed(context.Background(), TurnOptions{Prompt: "hello"})
+			var gotErr error
+			for _, err := range stream.Events() {
+				gotErr = err
+				break
+			}
+			if !errors.Is(gotErr, errConversationUninitialized) {
+				t.Fatalf("TurnStreamed() error = %v, want %v", gotErr, errConversationUninitialized)
+			}
+		})
 	}
 }

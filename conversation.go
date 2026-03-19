@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"runtime"
 	"sync"
 )
@@ -29,6 +30,7 @@ type TurnOptions struct {
 // while another turn is already executing on the same Conversation.
 var errTurnInProgress = errors.New("a turn is already in progress on this conversation")
 var errConversationClosed = errors.New("conversation is closed")
+var errConversationUninitialized = errors.New("conversation must be created with StartConversation")
 
 // Conversation manages a persistent thread across multiple turns.
 // Concurrent Turn or TurnStreamed calls on the same Conversation are
@@ -138,6 +140,21 @@ func (c *Conversation) applyCompletedThread(thread Thread) {
 		return
 	}
 	c.state.applyCompletedThread(thread)
+}
+
+func (c *Conversation) ensureInitialized() error {
+	switch {
+	case c == nil:
+		return errConversationUninitialized
+	case c.state == nil:
+		return errConversationUninitialized
+	case c.process == nil:
+		return errConversationUninitialized
+	case c.process.Client == nil:
+		return errConversationUninitialized
+	default:
+		return nil
+	}
 }
 
 // Close releases conversation-local resources. Safe to call multiple times.
@@ -292,8 +309,9 @@ func cloneThreadItemWrapper(w ThreadItemWrapper) ThreadItemWrapper {
 		cp.Raw = append(json.RawMessage(nil), v.Raw...)
 		return ThreadItemWrapper{Value: &cp}
 	default:
-		// Best-effort fallback for unexpected in-memory variants. If the JSON roundtrip
-		// cannot clone the value, the fallback returns a zero wrapper instead of preserving it.
+		// Best-effort fallback for unexpected in-memory variants. If the JSON
+		// round-trip path does not work, preserve the in-memory value with a
+		// reflective deep clone instead of silently dropping it.
 		return cloneThreadItemWrapperFallback(w)
 	}
 }
@@ -574,7 +592,7 @@ func cloneThreadItemWrapperFallback(w ThreadItemWrapper) ThreadItemWrapper {
 	if cloneViaJSON(w, &clone) {
 		return clone
 	}
-	return ThreadItemWrapper{}
+	return ThreadItemWrapper{Value: cloneArbitraryValue(w.Value)}
 }
 
 func cloneSessionSourceWrapperFallback(w SessionSourceWrapper) SessionSourceWrapper {
@@ -582,7 +600,7 @@ func cloneSessionSourceWrapperFallback(w SessionSourceWrapper) SessionSourceWrap
 	if cloneViaJSON(w, &clone) {
 		return clone
 	}
-	return SessionSourceWrapper{}
+	return SessionSourceWrapper{Value: cloneArbitraryValue(w.Value)}
 }
 
 func cloneThreadStatusWrapperFallback(w ThreadStatusWrapper) ThreadStatusWrapper {
@@ -590,7 +608,7 @@ func cloneThreadStatusWrapperFallback(w ThreadStatusWrapper) ThreadStatusWrapper
 	if cloneViaJSON(w, &clone) {
 		return clone
 	}
-	return ThreadStatusWrapper{}
+	return ThreadStatusWrapper{Value: cloneArbitraryValue(w.Value)}
 }
 
 func cloneSubAgentSourceFallback(src SubAgentSource) SubAgentSource {
@@ -598,7 +616,7 @@ func cloneSubAgentSourceFallback(src SubAgentSource) SubAgentSource {
 	if cloneViaJSON(src, &clone) {
 		return clone
 	}
-	return nil
+	return cloneArbitraryValue(src)
 }
 
 func cloneUserInputFallback(input UserInput) UserInput {
@@ -606,7 +624,7 @@ func cloneUserInputFallback(input UserInput) UserInput {
 	if cloneViaJSON(input, &clone) {
 		return clone
 	}
-	return nil
+	return cloneArbitraryValue(input)
 }
 
 func cloneCommandActionWrapperFallback(w CommandActionWrapper) CommandActionWrapper {
@@ -614,7 +632,7 @@ func cloneCommandActionWrapperFallback(w CommandActionWrapper) CommandActionWrap
 	if cloneViaJSON(w, &clone) {
 		return clone
 	}
-	return CommandActionWrapper{}
+	return CommandActionWrapper{Value: cloneArbitraryValue(w.Value)}
 }
 
 func clonePatchChangeKindWrapperFallback(w PatchChangeKindWrapper) PatchChangeKindWrapper {
@@ -622,7 +640,7 @@ func clonePatchChangeKindWrapperFallback(w PatchChangeKindWrapper) PatchChangeKi
 	if cloneViaJSON(w, &clone) {
 		return clone
 	}
-	return PatchChangeKindWrapper{}
+	return PatchChangeKindWrapper{Value: cloneArbitraryValue(w.Value)}
 }
 
 func cloneDynamicToolCallOutputContentItemWrapperFallback(w DynamicToolCallOutputContentItemWrapper) DynamicToolCallOutputContentItemWrapper {
@@ -630,7 +648,7 @@ func cloneDynamicToolCallOutputContentItemWrapperFallback(w DynamicToolCallOutpu
 	if cloneViaJSON(w, &clone) {
 		return clone
 	}
-	return DynamicToolCallOutputContentItemWrapper{}
+	return DynamicToolCallOutputContentItemWrapper{Value: cloneArbitraryValue(w.Value)}
 }
 
 func cloneWebSearchActionWrapperFallback(w WebSearchActionWrapper) WebSearchActionWrapper {
@@ -638,7 +656,7 @@ func cloneWebSearchActionWrapperFallback(w WebSearchActionWrapper) WebSearchActi
 	if cloneViaJSON(w, &clone) {
 		return clone
 	}
-	return WebSearchActionWrapper{}
+	return WebSearchActionWrapper{Value: cloneArbitraryValue(w.Value)}
 }
 
 func cloneViaJSON(in, out interface{}) bool {
@@ -653,11 +671,146 @@ func cloneJSONValue(in interface{}) interface{} {
 	if in == nil {
 		return nil
 	}
-	var out interface{}
-	if cloneViaJSON(in, &out) {
+	return cloneArbitraryValue(in)
+}
+
+type cloneVisitKey struct {
+	typ reflect.Type
+	ptr uintptr
+}
+
+func cloneArbitraryValue[T any](in T) T {
+	v := reflect.ValueOf(in)
+	if !v.IsValid() {
+		var zero T
+		return zero
+	}
+
+	cloned := cloneReflectValue(v, make(map[cloneVisitKey]reflect.Value))
+	out, ok := cloned.Interface().(T)
+	if ok {
 		return out
 	}
-	return nil
+	return in
+}
+
+func cloneReflectValue(v reflect.Value, seen map[cloneVisitKey]reflect.Value) reflect.Value {
+	if !v.IsValid() {
+		return v
+	}
+
+	switch v.Kind() {
+	case reflect.Pointer:
+		return cloneReflectPointer(v, seen)
+	case reflect.Interface:
+		return cloneReflectInterface(v, seen)
+	case reflect.Struct:
+		return cloneReflectStruct(v, seen)
+	case reflect.Slice:
+		return cloneReflectSlice(v, seen)
+	case reflect.Array:
+		return cloneReflectArray(v, seen)
+	case reflect.Map:
+		return cloneReflectMap(v, seen)
+	default:
+		return v
+	}
+}
+
+func cloneReflectPointer(v reflect.Value, seen map[cloneVisitKey]reflect.Value) reflect.Value {
+	if v.IsNil() {
+		return reflect.Zero(v.Type())
+	}
+	key := cloneVisitKey{typ: v.Type(), ptr: v.Pointer()}
+	if cached, ok := seen[key]; ok {
+		return cached
+	}
+	cloned := reflect.New(v.Type().Elem())
+	seen[key] = cloned
+	cloned.Elem().Set(cloneReflectValue(v.Elem(), seen))
+	return cloned
+}
+
+func cloneReflectInterface(v reflect.Value, seen map[cloneVisitKey]reflect.Value) reflect.Value {
+	if v.IsNil() {
+		return reflect.Zero(v.Type())
+	}
+	cloned := cloneReflectValue(v.Elem(), seen)
+	out := reflect.New(v.Type()).Elem()
+	out.Set(cloned)
+	return out
+}
+
+func cloneReflectStruct(v reflect.Value, seen map[cloneVisitKey]reflect.Value) reflect.Value {
+	cloned := reflect.New(v.Type()).Elem()
+	for i := range v.NumField() {
+		dst := cloned.Field(i)
+		if !dst.CanSet() {
+			return v
+		}
+		dst.Set(cloneReflectValue(v.Field(i), seen))
+	}
+	return cloned
+}
+
+func cloneReflectSlice(v reflect.Value, seen map[cloneVisitKey]reflect.Value) reflect.Value {
+	if v.IsNil() {
+		return reflect.Zero(v.Type())
+	}
+	key, cached, ok := lookupSeenClone(v, seen)
+	if ok {
+		return cached
+	}
+	cloned := reflect.MakeSlice(v.Type(), v.Len(), v.Len())
+	rememberSeenClone(key, cloned, seen)
+	for i := range v.Len() {
+		cloned.Index(i).Set(cloneReflectValue(v.Index(i), seen))
+	}
+	return cloned
+}
+
+func cloneReflectArray(v reflect.Value, seen map[cloneVisitKey]reflect.Value) reflect.Value {
+	cloned := reflect.New(v.Type()).Elem()
+	for i := range v.Len() {
+		cloned.Index(i).Set(cloneReflectValue(v.Index(i), seen))
+	}
+	return cloned
+}
+
+func cloneReflectMap(v reflect.Value, seen map[cloneVisitKey]reflect.Value) reflect.Value {
+	if v.IsNil() {
+		return reflect.Zero(v.Type())
+	}
+	key, cached, ok := lookupSeenClone(v, seen)
+	if ok {
+		return cached
+	}
+	cloned := reflect.MakeMapWithSize(v.Type(), v.Len())
+	rememberSeenClone(key, cloned, seen)
+	iter := v.MapRange()
+	for iter.Next() {
+		cloned.SetMapIndex(
+			cloneReflectValue(iter.Key(), seen),
+			cloneReflectValue(iter.Value(), seen),
+		)
+	}
+	return cloned
+}
+
+func lookupSeenClone(v reflect.Value, seen map[cloneVisitKey]reflect.Value) (cloneVisitKey, reflect.Value, bool) {
+	key := cloneVisitKey{typ: v.Type(), ptr: v.Pointer()}
+	if key.ptr == 0 {
+		return key, reflect.Value{}, false
+	}
+	cached, ok := seen[key]
+	return key, cached, ok
+}
+
+func rememberSeenClone(key cloneVisitKey, cloned reflect.Value, seen map[cloneVisitKey]reflect.Value) {
+	if key.ptr == 0 {
+		return
+	}
+	seen[key] = cloned
 }
 
 func cloneMessagePhasePtr(in *MessagePhase) *MessagePhase {
@@ -780,6 +933,9 @@ func (c *Conversation) Turn(ctx context.Context, opts TurnOptions) (*RunResult, 
 	if opts.Prompt == "" {
 		return nil, errors.New("prompt is required")
 	}
+	if err := c.ensureInitialized(); err != nil {
+		return nil, err
+	}
 	if err := c.state.ensureOpen(); err != nil {
 		return nil, err
 	}
@@ -810,6 +966,9 @@ func (c *Conversation) Turn(ctx context.Context, opts TurnOptions) (*RunResult, 
 // TurnStreamed executes a streaming turn on the existing thread.
 func (c *Conversation) TurnStreamed(ctx context.Context, opts TurnOptions) *Stream {
 	if err := validateContext(ctx); err != nil {
+		return newErrorStream(err)
+	}
+	if err := c.ensureInitialized(); err != nil {
 		return newErrorStream(err)
 	}
 	if err := c.state.ensureOpen(); err != nil {
