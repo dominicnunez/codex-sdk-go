@@ -474,6 +474,76 @@ func TestStartProcessExecArgsWithSingleDashTypedFlags(t *testing.T) {
 	}
 }
 
+// TestStartProcessExecArgsWithAttachedShortTypedFlags verifies that attached
+// short-option values are rejected for blocked safety aliases.
+func TestStartProcessExecArgsWithAttachedShortTypedFlags(t *testing.T) {
+	tests := []struct {
+		name     string
+		arg      string
+		wantFlag string
+	}{
+		{
+			name:     "model short alias with attached value",
+			arg:      "-mfoo",
+			wantFlag: "--model",
+		},
+		{
+			name:     "sandbox short alias with attached value",
+			arg:      "-sdanger-full-access",
+			wantFlag: "--sandbox",
+		},
+		{
+			name:     "config short alias with attached value",
+			arg:      "-capproval_policy=never",
+			wantFlag: "--config",
+		},
+		{
+			name:     "approval short alias with attached value",
+			arg:      "-aon-request",
+			wantFlag: "--ask-for-approval",
+		},
+		{
+			name:     "sandbox-prefixed token parsed as short alias",
+			arg:      "-server",
+			wantFlag: "--sandbox",
+		},
+		{
+			name:     "model-prefixed token parsed as short alias",
+			arg:      "-metadata",
+			wantFlag: "--model",
+		},
+		{
+			name:     "config-prefixed token parsed as short alias",
+			arg:      "-configurable",
+			wantFlag: "--config",
+		},
+		{
+			name:     "approval-prefixed token parsed as short alias",
+			arg:      "-all",
+			wantFlag: "--ask-for-approval",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			_, err := codex.StartProcess(ctx, &codex.ProcessOptions{
+				BinaryPath: "/nonexistent/binary",
+				ExecArgs:   []string{tt.arg},
+			})
+			if err == nil {
+				t.Fatalf("expected error when ExecArgs contains %q", tt.arg)
+			}
+			if !strings.Contains(err.Error(), "typed safety flags") {
+				t.Fatalf("error should mention typed safety flags, got: %v", err)
+			}
+			if !strings.Contains(err.Error(), tt.wantFlag) {
+				t.Fatalf("error should mention %q, got: %v", tt.wantFlag, err)
+			}
+		})
+	}
+}
+
 func TestStartProcessApprovalModeRejectsUnknownValue(t *testing.T) {
 	ctx := context.Background()
 	_, err := codex.StartProcess(ctx, &codex.ProcessOptions{
@@ -505,8 +575,8 @@ func TestStartProcessApprovalModeRejectsConfigConflict(t *testing.T) {
 	}
 }
 
-// TestStartProcessExecArgsAllowsNonSafetyFlags verifies that non-safety
-// flags with = values are allowed through validation (failing only at exec).
+// TestStartProcessExecArgsAllowsNonSafetyFlags verifies that non-overlapping
+// opaque ExecArgs survive validation and only fail later at exec.
 func TestStartProcessExecArgsAllowsNonSafetyFlags(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -519,22 +589,6 @@ func TestStartProcessExecArgsAllowsNonSafetyFlags(t *testing.T) {
 		{
 			name:     "short flag with attached value",
 			execArgs: []string{"-xtrace"},
-		},
-		{
-			name:     "single-dash forward compat flag beginning with s",
-			execArgs: []string{"-server"},
-		},
-		{
-			name:     "single-dash forward compat flag beginning with m",
-			execArgs: []string{"-metadata"},
-		},
-		{
-			name:     "single-dash forward compat flag beginning with c",
-			execArgs: []string{"-configurable"},
-		},
-		{
-			name:     "single-dash forward compat flag beginning with a",
-			execArgs: []string{"-all"},
 		},
 		{
 			name:     "short flag with equals value",

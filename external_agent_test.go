@@ -290,6 +290,35 @@ func TestExternalAgentConfigDetectRejectsInvalidItemType(t *testing.T) {
 	}
 }
 
+func TestExternalAgentConfigDetectAcceptsEmptyCwd(t *testing.T) {
+	mock := NewMockTransport()
+	_ = mock.SetResponseData("externalAgentConfig/detect", map[string]interface{}{
+		"items": []interface{}{
+			map[string]interface{}{
+				"cwd":         "",
+				"description": "Home-scoped skills",
+				"itemType":    "SKILLS",
+			},
+		},
+	})
+
+	client := codex.NewClient(mock)
+
+	resp, err := client.ExternalAgent.ConfigDetect(context.Background(), codex.ExternalAgentConfigDetectParams{})
+	if err != nil {
+		t.Fatalf("ConfigDetect() error = %v", err)
+	}
+	if len(resp.Items) != 1 {
+		t.Fatalf("ConfigDetect() items length = %d, want 1", len(resp.Items))
+	}
+	if resp.Items[0].Cwd == nil {
+		t.Fatal("ConfigDetect() item cwd = nil, want empty-string pointer")
+	}
+	if *resp.Items[0].Cwd != "" {
+		t.Fatalf("ConfigDetect() item cwd = %q, want empty string", *resp.Items[0].Cwd)
+	}
+}
+
 func TestExternalAgentConfigDetectRejectsInvalidCwd(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -342,6 +371,16 @@ func TestExternalAgentConfigImportPreparesRequestParams(t *testing.T) {
 			name:    "nil migration items",
 			params:  codex.ExternalAgentConfigImportParams{},
 			wantErr: "migrationItems must not be null",
+		},
+		{
+			name: "invalid migration item type",
+			params: codex.ExternalAgentConfigImportParams{
+				MigrationItems: []codex.ExternalAgentConfigMigrationItem{{
+					Description: "Unsupported migration target",
+					ItemType:    codex.ExternalAgentConfigMigrationItemType("PROMPTS"),
+				}},
+			},
+			wantErr: `invalid externalAgentConfig.itemType "PROMPTS"`,
 		},
 		{
 			name: "normalizes repo cwd",

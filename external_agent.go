@@ -44,11 +44,13 @@ func (i *ExternalAgentConfigMigrationItem) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
-	validatedCwd, err := validateInboundAbsolutePathPointerField("externalAgentConfig.cwd", decoded.Cwd)
-	if err != nil {
-		return err
+	if decoded.Cwd != nil && *decoded.Cwd != "" {
+		validatedCwd, err := validateInboundAbsolutePathPointerField("externalAgentConfig.cwd", decoded.Cwd)
+		if err != nil {
+			return err
+		}
+		decoded.Cwd = validatedCwd
 	}
-	decoded.Cwd = validatedCwd
 	*i = ExternalAgentConfigMigrationItem(decoded)
 	return nil
 }
@@ -101,6 +103,14 @@ func (p ExternalAgentConfigImportParams) prepareRequest() (interface{}, error) {
 	}
 
 	for i := range p.MigrationItems {
+		if err := validateEnumValue(
+			"externalAgentConfig.itemType",
+			p.MigrationItems[i].ItemType,
+			validExternalAgentConfigMigrationItemTypes,
+		); err != nil {
+			return nil, invalidParamsError("migrationItems[%d].itemType: %v", i, err)
+		}
+
 		cwd := p.MigrationItems[i].Cwd
 		if cwd == nil || *cwd == "" {
 			continue
