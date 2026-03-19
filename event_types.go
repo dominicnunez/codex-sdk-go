@@ -103,6 +103,20 @@ const (
 	CollabAgentStatusNotFound    CollabAgentStatus = "notFound"
 )
 
+var validCollabAgentStatuses = map[CollabAgentStatus]struct{}{
+	CollabAgentStatusPendingInit: {},
+	CollabAgentStatusRunning:     {},
+	CollabAgentStatusInterrupted: {},
+	CollabAgentStatusCompleted:   {},
+	CollabAgentStatusErrored:     {},
+	CollabAgentStatusShutdown:    {},
+	CollabAgentStatusNotFound:    {},
+}
+
+func (s *CollabAgentStatus) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "collabAgentState.status", validCollabAgentStatuses, s)
+}
+
 // CollabAgentTool represents the type of collaboration tool being invoked.
 type CollabAgentTool string
 

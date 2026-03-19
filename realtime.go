@@ -14,6 +14,15 @@ const (
 	RealtimeConversationVersionV2 RealtimeConversationVersion = "v2"
 )
 
+var validRealtimeConversationVersions = map[RealtimeConversationVersion]struct{}{
+	RealtimeConversationVersionV1: {},
+	RealtimeConversationVersionV2: {},
+}
+
+func (v *RealtimeConversationVersion) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "thread.realtime.version", validRealtimeConversationVersions, v)
+}
+
 // ThreadRealtimeStartedNotification is sent when a realtime connection starts for a thread.
 // Method: thread/realtime/started
 type ThreadRealtimeStartedNotification struct {

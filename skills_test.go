@@ -3,6 +3,7 @@ package codex_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go"
@@ -300,5 +301,32 @@ func TestSkillsList_RPCError_ReturnsRPCError(t *testing.T) {
 	}
 	if rpcErr.RPCError().Code != codex.ErrCodeInternalError {
 		t.Errorf("expected error code %d, got %d", codex.ErrCodeInternalError, rpcErr.RPCError().Code)
+	}
+}
+
+func TestSkillsListRejectsInvalidScope(t *testing.T) {
+	mock := NewMockTransport()
+	_ = mock.SetResponseData("skills/list", map[string]interface{}{
+		"data": []interface{}{
+			map[string]interface{}{
+				"cwd":    "/home/user/project",
+				"errors": []interface{}{},
+				"skills": []interface{}{
+					map[string]interface{}{
+						"name":        "example-skill",
+						"description": "An example skill",
+						"path":        "/home/user/project/.claude/skills/example-skill",
+						"enabled":     true,
+						"scope":       "team",
+					},
+				},
+			},
+		},
+	})
+	client := codex.NewClient(mock)
+
+	_, err := client.Skills.List(context.Background(), codex.SkillsListParams{})
+	if err == nil || !strings.Contains(err.Error(), "invalid skill.scope") {
+		t.Fatalf("Skills.List error = %v; want invalid scope failure", err)
 	}
 }

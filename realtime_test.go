@@ -132,6 +132,48 @@ func TestThreadRealtimeStartedMissingRequiredFieldReportsHandlerError(t *testing
 	}
 }
 
+func TestThreadRealtimeStartedRejectsInvalidVersion(t *testing.T) {
+	var notif codex.ThreadRealtimeStartedNotification
+	err := json.Unmarshal([]byte(`{"threadId":"thread_test","version":"v3"}`), &notif)
+	if err == nil || !strings.Contains(err.Error(), "invalid thread.realtime.version") {
+		t.Fatalf("json.Unmarshal error = %v; want invalid version failure", err)
+	}
+}
+
+func TestThreadRealtimeStartedInvalidVersionReportsHandlerError(t *testing.T) {
+	mock := NewMockTransport()
+
+	var (
+		gotMethod string
+		gotErr    error
+	)
+	client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+		gotMethod = method
+		gotErr = err
+	}))
+
+	var called bool
+	client.OnThreadRealtimeStarted(func(codex.ThreadRealtimeStartedNotification) {
+		called = true
+	})
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "thread/realtime/started",
+		Params:  json.RawMessage(`{"threadId":"thread_test","version":"v3"}`),
+	})
+
+	if called {
+		t.Fatal("handler should not be called for invalid version")
+	}
+	if gotMethod != "thread/realtime/started" {
+		t.Fatalf("handler error method = %q; want %q", gotMethod, "thread/realtime/started")
+	}
+	if gotErr == nil || !strings.Contains(gotErr.Error(), "invalid thread.realtime.version") {
+		t.Fatalf("handler error = %v; want invalid version failure", gotErr)
+	}
+}
+
 func TestRealtimeNotificationTypesRejectMissingRequiredFields(t *testing.T) {
 	tests := []struct {
 		name    string

@@ -16,6 +16,17 @@ const (
 	SkillScopeAdmin  SkillScope = "admin"
 )
 
+var validSkillScopes = map[SkillScope]struct{}{
+	SkillScopeUser:   {},
+	SkillScopeRepo:   {},
+	SkillScopeSystem: {},
+	SkillScopeAdmin:  {},
+}
+
+func (s *SkillScope) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "skill.scope", validSkillScopes, s)
+}
+
 // SkillInterface defines optional UI metadata for a skill
 type SkillInterface struct {
 	DisplayName      *string `json:"displayName,omitempty"`

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go"
@@ -443,6 +444,14 @@ func TestCollabAgentState(t *testing.T) {
 				t.Errorf("message: got %q, want %q", *got.Message, *tt.want.Message)
 			}
 		})
+	}
+}
+
+func TestCollabAgentStateRejectsInvalidStatus(t *testing.T) {
+	var got codex.CollabAgentState
+	err := json.Unmarshal([]byte(`{"status":"paused"}`), &got)
+	if err == nil || !strings.Contains(err.Error(), "invalid collabAgentState.status") {
+		t.Fatalf("json.Unmarshal error = %v; want invalid collab status failure", err)
 	}
 }
 

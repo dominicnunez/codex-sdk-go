@@ -3,6 +3,7 @@ package codex_test
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go"
@@ -341,6 +342,73 @@ func TestTurnPlanUpdatedNotification(t *testing.T) {
 	}
 	if gotNotif.Explanation == nil || *gotNotif.Explanation != "Here's my plan" {
 		t.Errorf("OnTurnPlanUpdated() explanation = %v, want 'Here's my plan'", gotNotif.Explanation)
+	}
+}
+
+func TestTurnPlanUpdatedNotificationRejectsInvalidPlanEntries(t *testing.T) {
+	tests := []struct {
+		name    string
+		payload string
+		wantErr string
+	}{
+		{
+			name:    "missing step",
+			payload: `{"threadId":"thread-123","turnId":"turn-456","plan":[{"status":"completed"}]}`,
+			wantErr: "missing required field",
+		},
+		{
+			name:    "missing status",
+			payload: `{"threadId":"thread-123","turnId":"turn-456","plan":[{"step":"Read the file"}]}`,
+			wantErr: "missing required field",
+		},
+		{
+			name:    "invalid status",
+			payload: `{"threadId":"thread-123","turnId":"turn-456","plan":[{"step":"Read the file","status":"queued"}]}`,
+			wantErr: "invalid turn.plan.status",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var notif codex.TurnPlanUpdatedNotification
+			err := json.Unmarshal([]byte(tt.payload), &notif)
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("json.Unmarshal error = %v; want substring %q", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestTurnPlanUpdatedNotificationInvalidPlanEntryReportsHandlerError(t *testing.T) {
+	mockTransport := NewMockTransport()
+
+	var (
+		gotMethod string
+		gotErr    error
+		called    bool
+	)
+	client := codex.NewClient(mockTransport, codex.WithHandlerErrorCallback(func(method string, err error) {
+		gotMethod = method
+		gotErr = err
+	}))
+	client.OnTurnPlanUpdated(func(codex.TurnPlanUpdatedNotification) {
+		called = true
+	})
+
+	mockTransport.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/plan/updated",
+		Params:  json.RawMessage(`{"threadId":"thread-123","turnId":"turn-456","plan":[{"step":"Read the file","status":"queued"}]}`),
+	})
+
+	if called {
+		t.Fatal("handler should not be called for invalid plan entry")
+	}
+	if gotMethod != "turn/plan/updated" {
+		t.Fatalf("handler error method = %q, want %q", gotMethod, "turn/plan/updated")
+	}
+	if gotErr == nil || !strings.Contains(gotErr.Error(), "invalid turn.plan.status") {
+		t.Fatalf("handler error = %v; want invalid plan status failure", gotErr)
 	}
 }
 

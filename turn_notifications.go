@@ -106,10 +106,31 @@ const (
 	TurnPlanStepStatusCompleted  TurnPlanStepStatus = "completed"
 )
 
+var validTurnPlanStepStatuses = map[TurnPlanStepStatus]struct{}{
+	TurnPlanStepStatusPending:    {},
+	TurnPlanStepStatusInProgress: {},
+	TurnPlanStepStatusCompleted:  {},
+}
+
+func (s *TurnPlanStepStatus) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "turn.plan.status", validTurnPlanStepStatuses, s)
+}
+
 // TurnPlanStep represents a step in a turn plan
 type TurnPlanStep struct {
 	Step   string             `json:"step"`
 	Status TurnPlanStepStatus `json:"status"`
+}
+
+func (s *TurnPlanStep) UnmarshalJSON(data []byte) error {
+	type wire TurnPlanStep
+	var decoded wire
+	required := []string{"status", "step"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*s = TurnPlanStep(decoded)
+	return nil
 }
 
 // OnTurnPlanUpdated registers a listener for turn/plan/updated notifications

@@ -3,6 +3,7 @@ package codex_test
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go"
@@ -475,6 +476,48 @@ func TestOnCollabToolCallStartedIgnoresNonCollab(t *testing.T) {
 
 	if called {
 		t.Error("handler should not be called for non-collab items")
+	}
+}
+
+func TestOnCollabToolCallStartedInvalidAgentStatusReportsHandlerError(t *testing.T) {
+	mock := NewMockTransport()
+
+	var (
+		gotMethod string
+		gotErr    error
+		called    bool
+	)
+	client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+		gotMethod = method
+		gotErr = err
+	}))
+	client.OnCollabToolCallStarted(func(codex.ItemStartedNotification, *codex.CollabAgentToolCallThreadItem) {
+		called = true
+	})
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/started",
+		Params: json.RawMessage(`{
+			"threadId":"thread-1","turnId":"turn-1",
+			"item":{
+				"type":"collabAgentToolCall","id":"tc-1",
+				"tool":"spawnAgent","status":"inProgress",
+				"agentsStates":{"child-1":{"status":"paused"}},
+				"receiverThreadIds":["child-1"],
+				"senderThreadId":"thread-1"
+			}
+		}`),
+	})
+
+	if called {
+		t.Fatal("handler should not be called for invalid agent state")
+	}
+	if gotMethod != "item/started" {
+		t.Fatalf("handler error method = %q, want %q", gotMethod, "item/started")
+	}
+	if gotErr == nil || !strings.Contains(gotErr.Error(), "invalid collabAgentState.status") {
+		t.Fatalf("handler error = %v; want invalid collab status failure", gotErr)
 	}
 }
 

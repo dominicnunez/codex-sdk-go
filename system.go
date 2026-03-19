@@ -14,6 +14,15 @@ const (
 	WindowsSandboxSetupModeUnelevated WindowsSandboxSetupMode = "unelevated"
 )
 
+var validWindowsSandboxSetupModes = map[WindowsSandboxSetupMode]struct{}{
+	WindowsSandboxSetupModeElevated:   {},
+	WindowsSandboxSetupModeUnelevated: {},
+}
+
+func (m *WindowsSandboxSetupMode) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "windowsSandbox.mode", validWindowsSandboxSetupModes, m)
+}
+
 // --- Client→Server Request Types ---
 
 // WindowsSandboxSetupStartParams are the parameters for windowsSandbox/setupStart request

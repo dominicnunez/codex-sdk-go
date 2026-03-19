@@ -153,6 +153,48 @@ func TestWindowsSandboxSetupCompletedNotification(t *testing.T) {
 	}
 }
 
+func TestWindowsSandboxSetupCompletedNotificationRejectsInvalidMode(t *testing.T) {
+	var notif codex.WindowsSandboxSetupCompletedNotification
+	err := json.Unmarshal([]byte(`{"mode":"admin","success":true}`), &notif)
+	if err == nil || !strings.Contains(err.Error(), "invalid windowsSandbox.mode") {
+		t.Fatalf("json.Unmarshal error = %v; want invalid mode failure", err)
+	}
+}
+
+func TestWindowsSandboxSetupCompletedInvalidModeReportsHandlerError(t *testing.T) {
+	mock := NewMockTransport()
+
+	var (
+		gotMethod string
+		gotErr    error
+	)
+	client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+		gotMethod = method
+		gotErr = err
+	}))
+
+	var called bool
+	client.OnWindowsSandboxSetupCompleted(func(codex.WindowsSandboxSetupCompletedNotification) {
+		called = true
+	})
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "windowsSandbox/setupCompleted",
+		Params:  json.RawMessage(`{"mode":"admin","success":true}`),
+	})
+
+	if called {
+		t.Fatal("handler should not be called for invalid mode")
+	}
+	if gotMethod != "windowsSandbox/setupCompleted" {
+		t.Fatalf("handler error method = %q; want %q", gotMethod, "windowsSandbox/setupCompleted")
+	}
+	if gotErr == nil || !strings.Contains(gotErr.Error(), "invalid windowsSandbox.mode") {
+		t.Fatalf("handler error = %v; want invalid mode failure", gotErr)
+	}
+}
+
 // TestWindowsWorldWritableWarningNotification tests the world-writable warning notification
 func TestWindowsWorldWritableWarningNotification(t *testing.T) {
 	tests := []struct {
