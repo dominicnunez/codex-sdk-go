@@ -44,7 +44,10 @@ func (c *Conversation) ThreadID() string {
 	return c.threadID
 }
 
-// Thread returns a deep-copy snapshot of the latest thread state.
+// Thread returns a deep-copy snapshot of the Conversation's locally tracked
+// thread state. The snapshot starts from the thread metadata returned by
+// thread/start and appends turns completed through this Conversation; it does
+// not subscribe to independent thread metadata updates from elsewhere.
 // The returned Thread is fully isolated from the Conversation's internal
 // state — mutations to the snapshot do not affect the Conversation.
 func (c *Conversation) Thread() Thread {

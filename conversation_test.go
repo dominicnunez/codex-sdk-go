@@ -96,6 +96,92 @@ func TestConversationMultiTurn(t *testing.T) {
 	}
 }
 
+func TestConversationThreadKeepsLocallyTrackedMetadataSnapshot(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+
+	threadName := "Renamed Thread"
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "thread/name/updated",
+		Params:  json.RawMessage(`{"threadId":"thread-1","threadName":"` + threadName + `"}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "thread/status/changed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","status":{"type":"active","activeFlags":["waitingOnApproval"]}}`),
+	})
+
+	_ = mock.SetResponseData("thread/read", map[string]interface{}{
+		"thread": map[string]interface{}{
+			"id":            "thread-1",
+			"cliVersion":    "1.0.0",
+			"createdAt":     1700000000,
+			"cwd":           "/tmp",
+			"modelProvider": "openai",
+			"path":          "/workspace/project",
+			"preview":       "",
+			"source":        "exec",
+			"status": map[string]interface{}{
+				"type":        "active",
+				"activeFlags": []interface{}{"waitingOnApproval"},
+			},
+			"turns":     []interface{}{},
+			"updatedAt": 1700000001,
+			"ephemeral": true,
+			"name":      threadName,
+			"gitInfo": map[string]interface{}{
+				"branch":    "main",
+				"originUrl": "https://example.com/repo.git",
+				"sha":       "abc123",
+			},
+		},
+	})
+
+	if _, err := proc.Client.Thread.Read(ctx, codex.ThreadReadParams{ThreadID: conv.ThreadID()}); err != nil {
+		t.Fatalf("Thread.Read: %v", err)
+	}
+
+	thread := conv.Thread()
+	if thread.Name != nil {
+		t.Fatalf("Thread().Name = %v, want nil", thread.Name)
+	}
+	if thread.Path != nil {
+		t.Fatalf("Thread().Path = %v, want nil", thread.Path)
+	}
+	if thread.GitInfo != nil {
+		t.Fatalf("Thread().GitInfo = %+v, want nil", thread.GitInfo)
+	}
+
+	status, ok := thread.Status.Value.(codex.ThreadStatusIdle)
+	if !ok {
+		t.Fatalf("Thread().Status = %T, want ThreadStatusIdle", thread.Status.Value)
+	}
+
+	thread.Name = codex.Ptr("mutated")
+	thread.Path = codex.Ptr("/mutated")
+	thread.GitInfo = &codex.GitInfo{Branch: codex.Ptr("mutated")}
+
+	latest := conv.Thread()
+	if latest.Name != nil {
+		t.Fatalf("latest Thread().Name = %v, want nil", latest.Name)
+	}
+	if latest.Path != nil {
+		t.Fatalf("latest Thread().Path = %v, want nil", latest.Path)
+	}
+	if latest.GitInfo != nil {
+		t.Fatalf("latest Thread().GitInfo = %+v, want nil", latest.GitInfo)
+	}
+	_ = status
+}
+
 func TestConversationTurnStreamed(t *testing.T) {
 	proc, mock := mockProcess(t)
 
