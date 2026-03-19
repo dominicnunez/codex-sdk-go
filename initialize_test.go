@@ -449,6 +449,7 @@ func TestClientInitializeCanonicalizesOptOutNotificationMethods(t *testing.T) {
 	sentReq := mock.GetSentRequest(0)
 	if sentReq == nil {
 		t.Fatal("no initialize request was sent")
+		return
 	}
 
 	var sentParams codex.InitializeParams
