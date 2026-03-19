@@ -1621,9 +1621,10 @@ func TestStdioOversizeResponseAtEOFFailsPendingSend(t *testing.T) {
 	}
 }
 
-// TestStdioTerminalNotificationsDoNotBlockReadLoop verifies that a backlog of
-// turn-completed notifications does not block response processing.
-func TestStdioTerminalNotificationsDoNotBlockReadLoop(t *testing.T) {
+// TestStdioTurnScopedNotificationsDoNotBlockReadLoop verifies that a backlog
+// of same-thread turn/completed notifications does not block response
+// processing.
+func TestStdioTurnScopedNotificationsDoNotBlockReadLoop(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()
 	defer func() { _ = clientReader.Close() }()
@@ -1657,7 +1658,7 @@ func TestStdioTerminalNotificationsDoNotBlockReadLoop(t *testing.T) {
 		defer cancel()
 		req := codex.Request{
 			JSONRPC: "2.0",
-			ID:      codex.RequestID{Value: "terminal-queue"},
+			ID:      codex.RequestID{Value: "turn-scoped-queue"},
 			Method:  "test/method",
 		}
 		resp, err := transport.Send(ctx, req)
@@ -1678,11 +1679,14 @@ func TestStdioTerminalNotificationsDoNotBlockReadLoop(t *testing.T) {
 		t.Fatal("timeout waiting for outbound request")
 	}
 
-	terminalNotif := `{"jsonrpc":"2.0","method":"turn/completed","params":{"n":1}}` + "\n"
 	for i := 0; i < 200; i++ {
-		_, _ = serverWriter.Write([]byte(terminalNotif))
+		notif := fmt.Sprintf(
+			`{"jsonrpc":"2.0","method":"turn/completed","params":{"threadId":"thread-1","turn":{"id":"noise-%d","status":"completed","items":[]}}}`+"\n",
+			i,
+		)
+		_, _ = serverWriter.Write([]byte(notif))
 	}
-	_, _ = serverWriter.Write([]byte(`{"jsonrpc":"2.0","id":"terminal-queue","result":{"ok":true}}` + "\n"))
+	_, _ = serverWriter.Write([]byte(`{"jsonrpc":"2.0","id":"turn-scoped-queue","result":{"ok":true}}` + "\n"))
 
 	select {
 	case err := <-errCh:
@@ -1690,7 +1694,7 @@ func TestStdioTerminalNotificationsDoNotBlockReadLoop(t *testing.T) {
 			t.Fatal(err)
 		}
 	case <-time.After(2 * time.Second):
-		t.Fatal("timeout waiting for response while terminal queue is saturated")
+		t.Fatal("timeout waiting for response while turn-scoped queue is saturated")
 	}
 }
 
