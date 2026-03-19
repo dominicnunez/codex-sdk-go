@@ -737,6 +737,7 @@ func TestRunItemCompletedUnmarshalFailureStillCollectsFallbackItem(t *testing.T)
 	if item.Type != codex.UnmarshalErrorItemType {
 		t.Fatalf("UnknownThreadItem.Type = %q, want %q", item.Type, codex.UnmarshalErrorItemType)
 	}
+	assertUnknownThreadItemFallback(t, item, `"bad-item"`)
 	if result.result.Turn.ID != "turn-1" {
 		t.Fatalf("Turn.ID = %q, want turn-1", result.result.Turn.ID)
 	}

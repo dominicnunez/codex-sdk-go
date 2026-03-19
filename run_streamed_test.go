@@ -971,6 +971,7 @@ func TestRunStreamedItemCompletedUnmarshalFailureStillEmitsFallbackItem(t *testi
 		if item.Type != codex.UnmarshalErrorItemType {
 			t.Fatalf("UnknownThreadItem.Type = %q, want %q", item.Type, codex.UnmarshalErrorItemType)
 		}
+		assertUnknownThreadItemFallback(t, item, `"bad-item"`)
 		fallbackSeen = true
 	}
 
@@ -986,9 +987,11 @@ func TestRunStreamedItemCompletedUnmarshalFailureStillEmitsFallbackItem(t *testi
 	if len(result.Items) != 1 {
 		t.Fatalf("len(Items) = %d, want 1", len(result.Items))
 	}
-	if _, ok := result.Items[0].Value.(*codex.UnknownThreadItem); !ok {
+	item, ok := result.Items[0].Value.(*codex.UnknownThreadItem)
+	if !ok {
 		t.Fatalf("result item type = %T, want *UnknownThreadItem", result.Items[0].Value)
 	}
+	assertUnknownThreadItemFallback(t, item, `"bad-item"`)
 }
 
 func TestRunStreamedApprovalFlowDuringTurn(t *testing.T) {

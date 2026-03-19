@@ -18,10 +18,24 @@ type rawTurnCompletedCarrier struct {
 	Turn     json.RawMessage `json:"turn"`
 }
 
+type rawItemCompletedCarrier struct {
+	ThreadID string          `json:"threadId"`
+	TurnID   string          `json:"turnId"`
+	Item     json.RawMessage `json:"item"`
+}
+
 func unmarshalThreadIDCarrier(params json.RawMessage) (threadIDCarrier, bool) {
 	var carrier threadIDCarrier
 	if err := json.Unmarshal(params, &carrier); err != nil {
 		return threadIDCarrier{}, false
+	}
+	return carrier, true
+}
+
+func unmarshalItemCompletedCarrier(params json.RawMessage) (rawItemCompletedCarrier, bool) {
+	var carrier rawItemCompletedCarrier
+	if err := json.Unmarshal(params, &carrier); err != nil {
+		return rawItemCompletedCarrier{}, false
 	}
 	return carrier, true
 }
@@ -51,7 +65,7 @@ func extractRawTurnCompletedID(turn json.RawMessage) string {
 func parseItemCompletedForThread(params json.RawMessage, threadID string) (ItemCompletedNotification, bool, error) {
 	var n ItemCompletedNotification
 	if err := json.Unmarshal(params, &n); err != nil {
-		carrier, ok := unmarshalThreadIDCarrier(params)
+		carrier, ok := unmarshalItemCompletedCarrier(params)
 		if !ok || carrier.ThreadID != threadID {
 			return ItemCompletedNotification{}, false, nil
 		}
@@ -59,7 +73,7 @@ func parseItemCompletedForThread(params json.RawMessage, threadID string) (ItemC
 		n.TurnID = carrier.TurnID
 		n.Item = ThreadItemWrapper{Value: &UnknownThreadItem{
 			Type: UnmarshalErrorItemType,
-			Raw:  append(json.RawMessage(nil), params...),
+			Raw:  append(json.RawMessage(nil), carrier.Item...),
 		}}
 		return n, true, err
 	}

@@ -333,7 +333,21 @@ func (u *UnknownThreadItem) MarshalJSON() ([]byte, error) {
 	if u.Raw == nil {
 		return []byte("null"), nil
 	}
-	return u.Raw, nil
+
+	rawType, err := decodeRequiredObjectTypeField(u.Raw, "thread item")
+	if err == nil && rawType == u.Type {
+		return u.Raw, nil
+	}
+
+	type fallbackThreadItem struct {
+		Type string          `json:"type"`
+		Raw  json.RawMessage `json:"raw"`
+	}
+
+	return json.Marshal(fallbackThreadItem{
+		Type: u.Type,
+		Raw:  u.Raw,
+	})
 }
 
 type threadItemDecoder func([]byte) (ThreadItem, error)
