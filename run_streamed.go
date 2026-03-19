@@ -249,10 +249,10 @@ func (p *Process) RunStreamedWithCollector(ctx context.Context, opts RunOptions,
 
 func (p *Process) runStreamedWithCollector(ctx context.Context, opts RunOptions, collector *StreamCollector) *Stream {
 	if err := validateContext(ctx); err != nil {
-		return newErrorStream(err)
+		return newCollectedErrorStream(err, collector)
 	}
 	if opts.Prompt == "" {
-		return newErrorStream(errors.New("prompt is required"))
+		return newCollectedErrorStream(errors.New("prompt is required"), collector)
 	}
 
 	g := newGuardedChan(streamChannelBuffer)
@@ -271,6 +271,13 @@ func (p *Process) runStreamedWithCollector(ctx context.Context, opts RunOptions,
 	go p.runStreamedLifecycle(ctx, opts, g, s, collector)
 
 	return s
+}
+
+func newCollectedErrorStream(err error, collector *StreamCollector) *Stream {
+	if collector != nil {
+		collector.Process(nil, err)
+	}
+	return newErrorStream(err)
 }
 
 // newErrorStream returns a Stream that yields a single error and completes

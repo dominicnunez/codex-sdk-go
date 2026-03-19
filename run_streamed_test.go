@@ -153,9 +153,10 @@ func TestRunStreamedNilContext(t *testing.T) {
 
 func TestRunStreamedWithCollectorNilContext(t *testing.T) {
 	proc, mock := mockProcess(t)
+	collector := codex.NewStreamCollector()
 
 	var nilCtx context.Context
-	stream := proc.RunStreamedWithCollector(nilCtx, codex.RunOptions{Prompt: "hello"}, codex.NewStreamCollector())
+	stream := proc.RunStreamedWithCollector(nilCtx, codex.RunOptions{Prompt: "hello"}, collector)
 
 	var gotErr error
 	for _, err := range stream.Events() {
@@ -170,6 +171,17 @@ func TestRunStreamedWithCollectorNilContext(t *testing.T) {
 	}
 	if got := mock.CallCount(); got != 0 {
 		t.Fatalf("mock CallCount = %d, want 0", got)
+	}
+
+	summary := collector.Summary()
+	if len(summary.NormalizedErrors) != 1 {
+		t.Fatalf("collector normalized errors = %d, want 1", len(summary.NormalizedErrors))
+	}
+	if summary.NormalizedErrors[0].Kind != "stream_error" {
+		t.Fatalf("collector error kind = %q, want stream_error", summary.NormalizedErrors[0].Kind)
+	}
+	if summary.NormalizedErrors[0].Message != codex.ErrNilContext.Error() {
+		t.Fatalf("collector error message = %q, want %q", summary.NormalizedErrors[0].Message, codex.ErrNilContext.Error())
 	}
 }
 
@@ -189,6 +201,40 @@ func TestRunStreamedEmptyPrompt(t *testing.T) {
 
 	if gotErr == nil {
 		t.Fatal("expected error for empty prompt")
+	}
+}
+
+func TestRunStreamedWithCollectorEmptyPrompt(t *testing.T) {
+	proc, mock := mockProcess(t)
+	ctx := context.Background()
+	collector := codex.NewStreamCollector()
+
+	stream := proc.RunStreamedWithCollector(ctx, codex.RunOptions{}, collector)
+
+	var gotErr error
+	for _, err := range stream.Events() {
+		if err != nil {
+			gotErr = err
+			break
+		}
+	}
+
+	if gotErr == nil || gotErr.Error() != "prompt is required" {
+		t.Fatalf("RunStreamedWithCollector(empty prompt) error = %v; want prompt is required", gotErr)
+	}
+	if got := mock.CallCount(); got != 0 {
+		t.Fatalf("mock CallCount = %d, want 0", got)
+	}
+
+	summary := collector.Summary()
+	if len(summary.NormalizedErrors) != 1 {
+		t.Fatalf("collector normalized errors = %d, want 1", len(summary.NormalizedErrors))
+	}
+	if summary.NormalizedErrors[0].Kind != "stream_error" {
+		t.Fatalf("collector error kind = %q, want stream_error", summary.NormalizedErrors[0].Kind)
+	}
+	if summary.NormalizedErrors[0].Message != "prompt is required" {
+		t.Fatalf("collector error message = %q, want prompt is required", summary.NormalizedErrors[0].Message)
 	}
 }
 
