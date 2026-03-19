@@ -508,23 +508,53 @@ func TestStartProcessApprovalModeRejectsConfigConflict(t *testing.T) {
 // TestStartProcessExecArgsAllowsNonSafetyFlags verifies that non-safety
 // flags with = values are allowed through validation (failing only at exec).
 func TestStartProcessExecArgsAllowsNonSafetyFlags(t *testing.T) {
-	ctx := context.Background()
-	// StartProcess will fail because the binary doesn't exist, but it
-	// should fail at exec, not at flag validation.
-	_, err := codex.StartProcess(ctx, &codex.ProcessOptions{
-		BinaryPath: "/nonexistent/binary",
-		ExecArgs:   []string{"--some-other-flag=value", "--another=123"},
-	})
-	if err == nil {
-		t.Fatal("expected error (binary not found), got nil")
+	tests := []struct {
+		name     string
+		execArgs []string
+	}{
+		{
+			name:     "long form flags",
+			execArgs: []string{"--some-other-flag=value", "--another=123"},
+		},
+		{
+			name:     "short prefixed m flag name",
+			execArgs: []string{"-max-jobs=8"},
+		},
+		{
+			name:     "short prefixed c flag name",
+			execArgs: []string{"-cache-dir=/tmp/cache"},
+		},
+		{
+			name:     "short prefixed s flag name",
+			execArgs: []string{"-snapshot-dir=/tmp/snapshots"},
+		},
+		{
+			name:     "short prefixed a flag name",
+			execArgs: []string{"-artifact-dir=/tmp/artifacts"},
+		},
 	}
-	// Verify we reached the exec stage (not rejected by flag validation).
-	if strings.Contains(err.Error(), "typed safety flags") {
-		t.Errorf("non-safety flags should not be rejected, got: %v", err)
-	}
-	if !strings.Contains(err.Error(), "codex") && !strings.Contains(err.Error(), "nonexistent") &&
-		!strings.Contains(err.Error(), "no such file") && !strings.Contains(err.Error(), "not found") {
-		t.Errorf("expected exec-stage error (binary not found), got: %v", err)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			// StartProcess will fail because the binary doesn't exist, but it
+			// should fail at exec, not at flag validation.
+			_, err := codex.StartProcess(ctx, &codex.ProcessOptions{
+				BinaryPath: "/nonexistent/binary",
+				ExecArgs:   tt.execArgs,
+			})
+			if err == nil {
+				t.Fatal("expected error (binary not found), got nil")
+			}
+			// Verify we reached the exec stage (not rejected by flag validation).
+			if strings.Contains(err.Error(), "typed safety flags") {
+				t.Fatalf("non-safety flags should not be rejected, got: %v", err)
+			}
+			if !strings.Contains(err.Error(), "codex") && !strings.Contains(err.Error(), "nonexistent") &&
+				!strings.Contains(err.Error(), "no such file") && !strings.Contains(err.Error(), "not found") {
+				t.Fatalf("expected exec-stage error (binary not found), got: %v", err)
+			}
+		})
 	}
 }
 
