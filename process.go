@@ -44,9 +44,9 @@ type ProcessOptions struct {
 	// Relative paths and PATH lookup are rejected to avoid binary hijacking.
 	BinaryPath string
 
-	// Extra arguments prepended before typed flags (so typed flags win via last-wins).
+	// Extra arguments inserted before typed flags after validation rejects
+	// typed safety flags and the "--" end-of-options marker.
 	// Use for forward-compat with new CLI flags not yet covered by typed fields.
-	// Must not contain "--" (end-of-options marker), which would bypass typed flag safety.
 	ExecArgs []string
 
 	// Environment variables for the child process. Nil uses a minimal allowlist
@@ -175,9 +175,10 @@ func canonicalRejectedExecArgFlag(arg string) (string, bool) {
 }
 
 // buildArgs constructs the CLI argument list from typed fields and ExecArgs.
-// ExecArgs are prepended before typed flags so that typed fields (Model,
-// Sandbox, ApprovalMode, Config) always win via last-wins CLI parsing.
-// This prevents untrusted ExecArgs from overriding safety-critical flags.
+// Typed safety flags and the "--" end-of-options marker are rejected from
+// ExecArgs up front. The remaining ExecArgs are inserted before the typed
+// fields to keep the emitted argv stable without relying on CLI duplicate-flag
+// semantics for safety.
 func (opts *ProcessOptions) buildArgs() ([]string, error) {
 	for _, arg := range opts.ExecArgs {
 		if arg == "--" {

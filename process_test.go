@@ -121,7 +121,8 @@ exit 0
 		}
 	}
 
-	// Verify typed flags come after ExecArgs (typed fields win via last-wins)
+	// Verify typed fields are emitted after validated ExecArgs for stable argv
+	// construction. Safety comes from rejecting typed safety flags in ExecArgs.
 	modelIdx := strings.Index(args, "--model")
 	extraIdx := strings.Index(args, "--extra")
 	if modelIdx < extraIdx {
