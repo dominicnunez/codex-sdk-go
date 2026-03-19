@@ -144,7 +144,7 @@ func isWindowsDriveAbsolutePath(value string) bool {
 }
 
 func isWindowsUNCPath(value string) bool {
-	if !strings.HasPrefix(value, `\\`) && !strings.HasPrefix(value, `//`) {
+	if !strings.HasPrefix(value, `\\`) {
 		return false
 	}
 	prefix, _, ok := splitWindowsUNCPath(value)

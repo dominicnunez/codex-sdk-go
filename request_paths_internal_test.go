@@ -15,6 +15,11 @@ func TestNormalizeAbsolutePath(t *testing.T) {
 			want:  "/var/log",
 		},
 		{
+			name:  "unix path with duplicate leading slash stays unix",
+			input: "//var/log",
+			want:  "/var/log",
+		},
+		{
 			name:  "windows drive path is cleaned on any platform",
 			input: `C:\Users\kai\..\logs\app.txt`,
 			want:  `C:\Users\logs\app.txt`,
