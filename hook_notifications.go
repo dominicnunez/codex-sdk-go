@@ -164,6 +164,17 @@ const (
 	GuardianApprovalReviewStatusAborted    GuardianApprovalReviewStatus = "aborted"
 )
 
+var validGuardianApprovalReviewStatuses = map[GuardianApprovalReviewStatus]struct{}{
+	GuardianApprovalReviewStatusInProgress: {},
+	GuardianApprovalReviewStatusApproved:   {},
+	GuardianApprovalReviewStatusDenied:     {},
+	GuardianApprovalReviewStatusAborted:    {},
+}
+
+func (s *GuardianApprovalReviewStatus) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "guardian.review.status", validGuardianApprovalReviewStatuses, s)
+}
+
 // GuardianRiskLevel is the risk level assigned by guardian review.
 type GuardianRiskLevel string
 
@@ -172,6 +183,16 @@ const (
 	GuardianRiskLevelMedium GuardianRiskLevel = "medium"
 	GuardianRiskLevelHigh   GuardianRiskLevel = "high"
 )
+
+var validGuardianRiskLevels = map[GuardianRiskLevel]struct{}{
+	GuardianRiskLevelLow:    {},
+	GuardianRiskLevelMedium: {},
+	GuardianRiskLevelHigh:   {},
+}
+
+func (l *GuardianRiskLevel) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "guardian.review.riskLevel", validGuardianRiskLevels, l)
+}
 
 // GuardianApprovalReview contains the guardian review payload.
 type GuardianApprovalReview struct {

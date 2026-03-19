@@ -15,6 +15,21 @@ const (
 	TurnStatusInProgress  TurnStatus = "inProgress"
 )
 
+var validTurnStatuses = map[TurnStatus]struct{}{
+	TurnStatusCompleted:   {},
+	TurnStatusInterrupted: {},
+	TurnStatusFailed:      {},
+	TurnStatusInProgress:  {},
+}
+
+func validateTurnStatusField(field string, value TurnStatus) error {
+	return validateEnumValue(field, value, validTurnStatuses)
+}
+
+func (s *TurnStatus) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "turn.status", validTurnStatuses, s)
+}
+
 // TurnAbortReason represents the reason a turn was aborted.
 type TurnAbortReason string
 
@@ -190,6 +205,19 @@ const (
 	ThreadActiveFlagWaitingOnApproval  ThreadActiveFlag = "waitingOnApproval"
 	ThreadActiveFlagWaitingOnUserInput ThreadActiveFlag = "waitingOnUserInput"
 )
+
+var validThreadActiveFlags = map[ThreadActiveFlag]struct{}{
+	ThreadActiveFlagWaitingOnApproval:  {},
+	ThreadActiveFlagWaitingOnUserInput: {},
+}
+
+func validateThreadActiveFlagField(field string, value ThreadActiveFlag) error {
+	return validateEnumValue(field, value, validThreadActiveFlags)
+}
+
+func (f *ThreadActiveFlag) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "thread.status.activeFlags", validThreadActiveFlags, f)
+}
 
 // ThreadUnsubscribeStatus represents the result of unsubscribing from a thread.
 type ThreadUnsubscribeStatus string

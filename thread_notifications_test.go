@@ -3,6 +3,7 @@ package codex_test
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/dominicnunez/codex-sdk-go"
@@ -230,6 +231,20 @@ func TestThreadStatusChangedNotification(t *testing.T) {
 			}
 			tt.validate(t, notification)
 		})
+	}
+}
+
+func TestThreadStatusChangedNotificationRejectsInvalidActiveFlag(t *testing.T) {
+	var notification codex.ThreadStatusChangedNotification
+	err := json.Unmarshal([]byte(`{
+		"threadId": "thread-456",
+		"status": {
+			"type": "active",
+			"activeFlags": ["waitingOnApproval", "bogus"]
+		}
+	}`), &notification)
+	if err == nil || !strings.Contains(err.Error(), `invalid thread.status.activeFlags "bogus"`) {
+		t.Fatalf("json.Unmarshal error = %v; want invalid active flag failure", err)
 	}
 }
 

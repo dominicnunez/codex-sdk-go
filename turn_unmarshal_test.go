@@ -2,6 +2,7 @@ package codex_test
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go"
@@ -74,6 +75,18 @@ func TestValidUserInputTextUnmarshal(t *testing.T) {
 
 	if textInput.Text != "Hello world" {
 		t.Errorf("expected text 'Hello world', got '%s'", textInput.Text)
+	}
+}
+
+func TestTurnRejectsInvalidStatus(t *testing.T) {
+	var turn codex.Turn
+	err := json.Unmarshal([]byte(`{
+		"id": "turn-123",
+		"status": "queued",
+		"items": []
+	}`), &turn)
+	if err == nil || !strings.Contains(err.Error(), `invalid turn.status "queued"`) {
+		t.Fatalf("json.Unmarshal error = %v; want invalid turn.status failure", err)
 	}
 }
 
