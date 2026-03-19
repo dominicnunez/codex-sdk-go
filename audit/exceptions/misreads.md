@@ -1267,3 +1267,36 @@ streams the discarded frame through `extractTopLevelIDAndMethodFromReader` via
 large `result` field. A regression test now covers a valid oversized response where
 `result` appears before `id`, and `Send` resolves with the expected parse error
 instead of timing out.
+
+### Same-thread completion notifications are not routed through dropping transport queues
+
+**Location:** `stdio.go:848-925` — `enqueueTurnScopedNotification` and `turnScopedNotificationWorker`
+
+**Reason:** The report describes `item/completed` and `turn/completed` as going through bounded
+critical or terminal queues that evict older entries. That is not how the current transport
+works. When those notifications carry a `threadId`, `enqueueNotification` sends them into the
+per-thread `turnNotifQueues` map, where they are appended to a dedicated FIFO slice and drained by
+`turnScopedNotificationWorker` without any drop-oldest path. The queueing bug described in the
+report is stale for this checkout.
+
+### StartProcess does not forward child stderr to the parent by default
+
+**Location:** `process.go:258-262` — `StartProcess` child stdio wiring
+
+**Reason:** The report says `StartProcess` replaces a nil `ProcessOptions.Stderr` with
+`os.Stderr`. In the current code, `StartProcess` assigns `cmd.Stderr = opts.Stderr` directly and
+the `ProcessOptions` comment states that nil discards child stderr output. The regression test
+`TestStartProcessNilStderrDoesNotForwardToParent` in `process_test.go` already verifies that the
+parent process does not receive child stderr unless the caller opts in.
+
+### Turn backlog coverage for Run, Conversation.Turn, and RunStreamed already exists
+
+**Location:** `turn_lifecycle_test.go:803`, `turn_lifecycle_test.go:887`, `turn_lifecycle_test.go:976`
+
+**Reason:** The report says the suite only checks transport liveness under queue pressure and does
+not drive real turn lifecycles. The current test suite already includes
+`TestRunCompletesWithAllItemsUnderTurnNotificationBacklog`,
+`TestConversationTurnCompletesWithAllItemsUnderTurnNotificationBacklog`, and
+`TestRunStreamedCompletesWithAllItemsUnderTurnNotificationBacklog`, all backed by the real stdio
+transport via `serveBurstLifecycleOverStdio`. Those tests exercise the user-facing turn flows
+under heavy same-thread completion backlog and assert that items and turn completion are preserved.
