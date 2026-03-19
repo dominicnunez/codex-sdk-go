@@ -94,6 +94,52 @@ func TestConfigRead(t *testing.T) {
 	}
 }
 
+func TestConfigReadRejectsMalformedApprovalPolicy(t *testing.T) {
+	tests := []struct {
+		name        string
+		approval    interface{}
+		wantErr     error
+		wantContain string
+	}{
+		{
+			name:        "approval policy object requires discriminator",
+			approval:    map[string]interface{}{},
+			wantContain: "approval policy: missing discriminator",
+		},
+		{
+			name: "granular approval policy requires mandatory fields",
+			approval: map[string]interface{}{
+				"granular": map[string]interface{}{},
+			},
+			wantErr: codex.ErrMissingResultField,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := NewMockTransport()
+			_ = mock.SetResponseData("config/read", map[string]interface{}{
+				"config": map[string]interface{}{
+					"approval_policy": tt.approval,
+				},
+				"origins": map[string]interface{}{},
+			})
+			client := codex.NewClient(mock)
+
+			_, err := client.Config.Read(context.Background(), codex.ConfigReadParams{})
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if tt.wantErr != nil && !errors.Is(err, tt.wantErr) {
+				t.Fatalf("error = %v, want %v", err, tt.wantErr)
+			}
+			if tt.wantContain != "" && !strings.Contains(err.Error(), tt.wantContain) {
+				t.Fatalf("error = %q, want substring %q", err.Error(), tt.wantContain)
+			}
+		})
+	}
+}
+
 func TestConfigReadRequirements(t *testing.T) {
 	tests := []struct {
 		name          string

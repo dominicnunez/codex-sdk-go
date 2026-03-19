@@ -167,6 +167,25 @@ type SubAgentSourceThreadSpawn struct {
 
 func (SubAgentSourceThreadSpawn) isSubAgentSource() {}
 
+func (s *SubAgentSourceThreadSpawn) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		ThreadSpawn json.RawMessage `json:"thread_spawn"`
+	}
+	if err := unmarshalInboundObject(data, &raw, []string{"thread_spawn"}, []string{"thread_spawn"}); err != nil {
+		return err
+	}
+	if err := validateRequiredObjectFields(raw.ThreadSpawn, "depth", "parent_thread_id"); err != nil {
+		return err
+	}
+	type wire SubAgentSourceThreadSpawn
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*s = SubAgentSourceThreadSpawn(decoded)
+	return nil
+}
+
 // SubAgentSourceOther represents an unknown sub-agent type
 type SubAgentSourceOther struct {
 	Other string `json:"other"`
@@ -228,6 +247,16 @@ type ThreadStatusActive struct {
 }
 
 func (ThreadStatusActive) isThreadStatus() {}
+
+func (t *ThreadStatusActive) UnmarshalJSON(data []byte) error {
+	type wire ThreadStatusActive
+	var decoded wire
+	if err := unmarshalInboundObject(data, &decoded, []string{"activeFlags"}, []string{"activeFlags"}); err != nil {
+		return err
+	}
+	*t = ThreadStatusActive(decoded)
+	return nil
+}
 
 // UnknownThreadStatus represents an unrecognized thread status type from a newer protocol version.
 type UnknownThreadStatus struct {
@@ -340,7 +369,7 @@ func unmarshalSubAgentSource(data json.RawMessage) (SubAgentSource, error) {
 		return other, nil
 	}
 
-	return UnknownSubAgentSource{Raw: append(json.RawMessage(nil), data...)}, nil
+	return nil, errors.New("sub-agent source: missing discriminator")
 }
 
 // MarshalJSON for SessionSourceWrapper
@@ -367,14 +396,12 @@ type ThreadStatusWrapper struct {
 
 // UnmarshalJSON for ThreadStatusWrapper handles the discriminated union
 func (t *ThreadStatusWrapper) UnmarshalJSON(data []byte) error {
-	var raw struct {
-		Type string `json:"type"`
-	}
-	if err := json.Unmarshal(data, &raw); err != nil {
+	typeField, err := decodeRequiredObjectTypeField(data, "thread status")
+	if err != nil {
 		return err
 	}
 
-	switch raw.Type {
+	switch typeField {
 	case "notLoaded":
 		t.Value = ThreadStatusNotLoaded{}
 	case "idle":
@@ -383,12 +410,15 @@ func (t *ThreadStatusWrapper) UnmarshalJSON(data []byte) error {
 		t.Value = ThreadStatusSystemError{}
 	case "active":
 		var status ThreadStatusActive
+		if err := validateRequiredTaggedObjectFields(data, "activeFlags"); err != nil {
+			return err
+		}
 		if err := json.Unmarshal(data, &status); err != nil {
 			return err
 		}
 		t.Value = status
 	default:
-		t.Value = UnknownThreadStatus{Type: raw.Type, Raw: append(json.RawMessage(nil), data...)}
+		t.Value = UnknownThreadStatus{Type: typeField, Raw: append(json.RawMessage(nil), data...)}
 	}
 
 	return nil
@@ -456,6 +486,25 @@ type ApprovalPolicyGranular struct {
 
 func (ApprovalPolicyGranular) isAskForApproval() {}
 
+func (a *ApprovalPolicyGranular) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		Granular json.RawMessage `json:"granular"`
+	}
+	if err := unmarshalInboundObject(data, &raw, []string{"granular"}, []string{"granular"}); err != nil {
+		return err
+	}
+	if err := validateRequiredObjectFields(raw.Granular, "mcp_elicitations", "rules", "sandbox_approval"); err != nil {
+		return err
+	}
+	type wire ApprovalPolicyGranular
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*a = ApprovalPolicyGranular(decoded)
+	return nil
+}
+
 // UnknownAskForApproval represents an unrecognized approval policy shape from a newer protocol version.
 type UnknownAskForApproval struct {
 	Raw json.RawMessage `json:"-"`
@@ -496,11 +545,10 @@ func (a *AskForApprovalWrapper) UnmarshalJSON(data []byte) error {
 			a.Value = granular
 			return nil
 		}
+		return errors.New("approval policy: missing discriminator")
 	}
 
-	// Unknown shape — preserve raw JSON for forward compatibility
-	a.Value = UnknownAskForApproval{Raw: append(json.RawMessage(nil), data...)}
-	return nil
+	return fmt.Errorf("unable to unmarshal approval policy from: %.200s", data)
 }
 
 // MarshalJSON for AskForApprovalWrapper
@@ -635,16 +683,17 @@ type ReadOnlyAccessWrapper struct {
 
 // UnmarshalJSON for ReadOnlyAccessWrapper
 func (w *ReadOnlyAccessWrapper) UnmarshalJSON(data []byte) error {
-	var raw struct {
-		Type string `json:"type"`
-	}
-	if err := json.Unmarshal(data, &raw); err != nil {
+	typeField, err := decodeRequiredObjectTypeField(data, "read only access")
+	if err != nil {
 		return err
 	}
 
-	switch raw.Type {
+	switch typeField {
 	case "restricted":
 		var v ReadOnlyAccessRestricted
+		if err := validateRequiredTaggedObjectFields(data); err != nil {
+			return err
+		}
 		if err := json.Unmarshal(data, &v); err != nil {
 			return err
 		}
@@ -652,7 +701,7 @@ func (w *ReadOnlyAccessWrapper) UnmarshalJSON(data []byte) error {
 	case "fullAccess":
 		w.Value = ReadOnlyAccessFullAccess{}
 	default:
-		w.Value = UnknownReadOnlyAccess{Type: raw.Type, Raw: append(json.RawMessage(nil), data...)}
+		w.Value = UnknownReadOnlyAccess{Type: typeField, Raw: append(json.RawMessage(nil), data...)}
 	}
 	return nil
 }
@@ -721,36 +770,43 @@ type SandboxPolicyWrapper struct {
 
 // UnmarshalJSON for SandboxPolicyWrapper handles the discriminated union
 func (s *SandboxPolicyWrapper) UnmarshalJSON(data []byte) error {
-	var raw struct {
-		Type string `json:"type"`
-	}
-	if err := json.Unmarshal(data, &raw); err != nil {
+	typeField, err := decodeRequiredObjectTypeField(data, "sandbox policy")
+	if err != nil {
 		return err
 	}
 
-	switch raw.Type {
+	switch typeField {
 	case "dangerFullAccess":
 		s.Value = SandboxPolicyDangerFullAccess{}
 	case "readOnly":
 		var policy SandboxPolicyReadOnly
+		if err := validateRequiredTaggedObjectFields(data); err != nil {
+			return err
+		}
 		if err := json.Unmarshal(data, &policy); err != nil {
 			return err
 		}
 		s.Value = policy
 	case "externalSandbox":
 		var policy SandboxPolicyExternalSandbox
+		if err := validateRequiredTaggedObjectFields(data); err != nil {
+			return err
+		}
 		if err := json.Unmarshal(data, &policy); err != nil {
 			return err
 		}
 		s.Value = policy
 	case "workspaceWrite":
 		var policy SandboxPolicyWorkspaceWrite
+		if err := validateRequiredTaggedObjectFields(data); err != nil {
+			return err
+		}
 		if err := json.Unmarshal(data, &policy); err != nil {
 			return err
 		}
 		s.Value = policy
 	default:
-		s.Value = UnknownSandboxPolicy{Type: raw.Type, Raw: append(json.RawMessage(nil), data...)}
+		s.Value = UnknownSandboxPolicy{Type: typeField, Raw: append(json.RawMessage(nil), data...)}
 	}
 
 	return nil

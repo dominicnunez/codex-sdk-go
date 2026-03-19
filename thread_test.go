@@ -265,6 +265,292 @@ func TestThreadResponsesRejectMissingRequiredThreadFields(t *testing.T) {
 	}
 }
 
+func TestThreadMetadataWrappersRejectMissingOrEmptyType(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		target  interface{}
+		wantErr error
+	}{
+		{
+			name:    "thread status missing type",
+			input:   `{}`,
+			target:  &codex.ThreadStatusWrapper{},
+			wantErr: codex.ErrMissingResultField,
+		},
+		{
+			name:    "thread status empty type",
+			input:   `{"type":""}`,
+			target:  &codex.ThreadStatusWrapper{},
+			wantErr: nil,
+		},
+		{
+			name:    "read only access missing type",
+			input:   `{}`,
+			target:  &codex.ReadOnlyAccessWrapper{},
+			wantErr: codex.ErrMissingResultField,
+		},
+		{
+			name:    "sandbox policy missing type",
+			input:   `{}`,
+			target:  &codex.SandboxPolicyWrapper{},
+			wantErr: codex.ErrMissingResultField,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := json.Unmarshal([]byte(tt.input), tt.target)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("error = %v; want %v", err, tt.wantErr)
+				}
+				return
+			}
+			if err.Error() != "thread status: missing or empty type field" {
+				t.Fatalf("error = %v; want empty type failure", err)
+			}
+		})
+	}
+}
+
+func TestThreadMetadataWrappersValidateRequiredFieldsAndUnknownTypes(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		target  interface{}
+		wantErr error
+	}{
+		{
+			name:    "active thread status missing active flags",
+			input:   `{"type":"active"}`,
+			target:  &codex.ThreadStatusWrapper{},
+			wantErr: codex.ErrMissingResultField,
+		},
+		{
+			name:    "unknown thread status remains forward compatible",
+			input:   `{"type":"futureStatus","extra":true}`,
+			target:  &codex.ThreadStatusWrapper{},
+			wantErr: nil,
+		},
+		{
+			name:    "unknown read only access remains forward compatible",
+			input:   `{"type":"futureAccess","extra":true}`,
+			target:  &codex.ReadOnlyAccessWrapper{},
+			wantErr: nil,
+		},
+		{
+			name:    "unknown sandbox policy remains forward compatible",
+			input:   `{"type":"futureSandbox","extra":true}`,
+			target:  &codex.SandboxPolicyWrapper{},
+			wantErr: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := json.Unmarshal([]byte(tt.input), tt.target)
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("error = %v; want %v", err, tt.wantErr)
+				}
+				return
+			}
+			if tt.name == "active thread status missing active flags" {
+				if err == nil || !strings.Contains(err.Error(), "missing required field") {
+					t.Fatalf("error = %v; want missing required field failure", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestSessionSourceWrapperRejectsMalformedSubAgentVariants(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		wantErr     error
+		wantContain string
+	}{
+		{
+			name:        "sub-agent object requires discriminator",
+			input:       `{"subAgent":{}}`,
+			wantContain: "sub-agent source: missing discriminator",
+		},
+		{
+			name:    "thread_spawn requires nested fields",
+			input:   `{"subAgent":{"thread_spawn":{}}}`,
+			wantErr: codex.ErrMissingResultField,
+		},
+		{
+			name:    "thread_spawn requires parent thread id",
+			input:   `{"subAgent":{"thread_spawn":{"depth":1}}}`,
+			wantErr: codex.ErrMissingResultField,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var wrapper codex.SessionSourceWrapper
+			err := json.Unmarshal([]byte(tt.input), &wrapper)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if tt.wantErr != nil && !errors.Is(err, tt.wantErr) {
+				t.Fatalf("error = %v, want %v", err, tt.wantErr)
+			}
+			if tt.wantContain != "" && !strings.Contains(err.Error(), tt.wantContain) {
+				t.Fatalf("error = %q, want substring %q", err.Error(), tt.wantContain)
+			}
+		})
+	}
+}
+
+func TestThreadLifecycleAndReadResponsesRejectMalformedUnionPayloads(t *testing.T) {
+	tests := []struct {
+		name        string
+		method      string
+		payload     map[string]interface{}
+		call        func(*codex.Client) error
+		wantErr     error
+		wantContain string
+	}{
+		{
+			name:   "start rejects approval policy object without discriminator",
+			method: "thread/start",
+			payload: func() map[string]interface{} {
+				response := validThreadLifecycleResponse(validThreadPayload("thread-start"))
+				response["approvalPolicy"] = map[string]interface{}{}
+				return response
+			}(),
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Start(context.Background(), codex.ThreadStartParams{})
+				return err
+			},
+			wantContain: "approval policy: missing discriminator",
+		},
+		{
+			name:   "resume rejects granular approval policy missing required fields",
+			method: "thread/resume",
+			payload: func() map[string]interface{} {
+				response := validThreadLifecycleResponse(validThreadPayload("thread-resume"))
+				response["approvalPolicy"] = map[string]interface{}{
+					"granular": map[string]interface{}{},
+				}
+				return response
+			}(),
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Resume(context.Background(), codex.ThreadResumeParams{ThreadID: "thread-resume"})
+				return err
+			},
+			wantErr: codex.ErrMissingResultField,
+		},
+		{
+			name:   "fork rejects sandbox missing type",
+			method: "thread/fork",
+			payload: func() map[string]interface{} {
+				response := validThreadLifecycleResponse(validThreadPayload("thread-fork"))
+				response["sandbox"] = map[string]interface{}{}
+				return response
+			}(),
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Fork(context.Background(), codex.ThreadForkParams{ThreadID: "thread-fork"})
+				return err
+			},
+			wantErr: codex.ErrMissingResultField,
+		},
+		{
+			name:   "start rejects nested read only access missing type",
+			method: "thread/start",
+			payload: func() map[string]interface{} {
+				response := validThreadLifecycleResponse(validThreadPayload("thread-start-nested"))
+				response["sandbox"] = map[string]interface{}{
+					"type":           "workspaceWrite",
+					"readOnlyAccess": map[string]interface{}{},
+				}
+				return response
+			}(),
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Start(context.Background(), codex.ThreadStartParams{})
+				return err
+			},
+			wantErr: codex.ErrMissingResultField,
+		},
+		{
+			name:   "read rejects status missing type",
+			method: "thread/read",
+			payload: func() map[string]interface{} {
+				thread := validThreadPayload("thread-read")
+				thread["status"] = map[string]interface{}{}
+				return map[string]interface{}{"thread": thread}
+			}(),
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Read(context.Background(), codex.ThreadReadParams{ThreadID: "thread-read"})
+				return err
+			},
+			wantErr: codex.ErrMissingResultField,
+		},
+		{
+			name:   "read rejects active status missing flags",
+			method: "thread/read",
+			payload: func() map[string]interface{} {
+				thread := validThreadPayload("thread-read-active")
+				thread["status"] = map[string]interface{}{"type": "active"}
+				return map[string]interface{}{"thread": thread}
+			}(),
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Read(context.Background(), codex.ThreadReadParams{ThreadID: "thread-read-active"})
+				return err
+			},
+			wantErr: codex.ErrMissingResultField,
+		},
+		{
+			name:   "read rejects sub-agent source without discriminator",
+			method: "thread/read",
+			payload: func() map[string]interface{} {
+				thread := validThreadPayload("thread-read-source")
+				thread["source"] = map[string]interface{}{
+					"subAgent": map[string]interface{}{},
+				}
+				return map[string]interface{}{"thread": thread}
+			}(),
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Read(context.Background(), codex.ThreadReadParams{ThreadID: "thread-read-source"})
+				return err
+			},
+			wantContain: "sub-agent source: missing discriminator",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := NewMockTransport()
+			defer func() { _ = transport.Close() }()
+
+			client := codex.NewClient(transport)
+			_ = transport.SetResponseData(tt.method, tt.payload)
+
+			err := tt.call(client)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if tt.wantErr != nil && !errors.Is(err, tt.wantErr) {
+				t.Fatalf("error = %v, want %v", err, tt.wantErr)
+			}
+			if tt.wantContain != "" && !strings.Contains(err.Error(), tt.wantContain) {
+				t.Fatalf("error = %q, want substring %q", err.Error(), tt.wantContain)
+			}
+		})
+	}
+}
+
 func TestThreadLifecycleResponsesRequireApprovalsReviewer(t *testing.T) {
 	tests := []struct {
 		name    string
