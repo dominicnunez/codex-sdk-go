@@ -3,6 +3,7 @@ package codex_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -352,6 +353,70 @@ func TestRunStreamedWithCollectorPreservesRawNormalizedErrorPayloads(t *testing.
 		if normalized.Kind == "system_error" && string(normalized.Raw) != string(systemRaw) {
 			t.Fatalf("normalized error raw leaked mutation: %s", string(normalized.Raw))
 		}
+	}
+}
+
+func TestRunStreamedWithCollectorReportsOverflowInSummary(t *testing.T) {
+	proc, mock := mockProcess(t)
+	collector := codex.NewStreamCollector()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	stream := proc.RunStreamedWithCollector(ctx, codex.RunOptions{Prompt: "overflow collector"}, collector)
+	waitForRunStreamedReady(t, mock)
+
+	for i := 0; i < 128; i++ {
+		mock.InjectServerNotification(ctx, codex.Notification{
+			JSONRPC: "2.0",
+			Method:  "item/agentMessage/delta",
+			Params: json.RawMessage(fmt.Sprintf(
+				`{"delta":"chunk-%d","itemId":"item-1","threadId":"thread-1","turnId":"turn-1"}`,
+				i,
+			)),
+		})
+	}
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		summary := collector.Summary()
+		for _, normalized := range summary.NormalizedErrors {
+			if normalized.Kind == "stream_error" && strings.Contains(normalized.Message, codex.ErrStreamOverflow.Error()) {
+				goto overflowRecorded
+			}
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("timeout waiting for overflow to be recorded in collector summary")
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+overflowRecorded:
+	var gotErr error
+	for _, err := range stream.Events() {
+		if err != nil {
+			gotErr = err
+		}
+	}
+	if !errors.Is(gotErr, codex.ErrStreamOverflow) {
+		t.Fatalf("stream error = %v, want %v", gotErr, codex.ErrStreamOverflow)
+	}
+
+	summary := collector.Summary()
+	var foundOverflow bool
+	for _, normalized := range summary.NormalizedErrors {
+		if normalized.Kind == "stream_error" && strings.Contains(normalized.Message, codex.ErrStreamOverflow.Error()) {
+			foundOverflow = true
+			break
+		}
+	}
+	if !foundOverflow {
+		t.Fatalf("collector summary = %+v, want overflow stream_error", summary.NormalizedErrors)
 	}
 }
 

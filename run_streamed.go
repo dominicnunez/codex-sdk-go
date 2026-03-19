@@ -39,6 +39,7 @@ type guardedChan struct {
 	detached       bool
 	consumerActive bool
 	terminalErr    error
+	onOverflow     func(error)
 }
 
 func newGuardedChan(size int) *guardedChan {
@@ -53,26 +54,36 @@ func newGuardedChan(size int) *guardedChan {
 // available. If no consumer has attached yet, the stream fails with
 // [ErrStreamOverflow] instead of blocking indefinitely.
 func (g *guardedChan) send(eoe eventOrErr) {
+	var overflowHandler func(error)
+	var overflowErr error
+
 	g.mu.Lock()
-	defer g.mu.Unlock()
 
 	for {
 		switch {
 		case g.closed || g.detached || g.terminalErr != nil:
+			g.mu.Unlock()
 			return
 		case g.size < len(g.buf):
 			tail := (g.head + g.size) % len(g.buf)
 			g.buf[tail] = eoe
 			g.size++
 			g.notEmpty.Signal()
+			g.mu.Unlock()
 			return
 		case !g.consumerActive:
 			if g.terminalErr == nil {
 				g.terminalErr = ErrStreamOverflow
+				overflowErr = g.terminalErr
+				overflowHandler = g.onOverflow
 			}
 			g.closed = true
 			g.notEmpty.Broadcast()
 			g.notFull.Broadcast()
+			g.mu.Unlock()
+			if overflowHandler != nil {
+				overflowHandler(overflowErr)
+			}
 			return
 		default:
 			g.notFull.Wait()
@@ -99,6 +110,26 @@ func (g *guardedChan) terminalError() error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	return g.terminalErr
+}
+
+func (g *guardedChan) setOverflowHandler(handler func(error)) {
+	if handler == nil {
+		return
+	}
+
+	var overflowErr error
+
+	g.mu.Lock()
+	if errors.Is(g.terminalErr, ErrStreamOverflow) {
+		overflowErr = g.terminalErr
+	} else {
+		g.onOverflow = handler
+	}
+	g.mu.Unlock()
+
+	if overflowErr != nil {
+		handler(overflowErr)
+	}
 }
 
 func (g *guardedChan) closeOnce() {
@@ -228,6 +259,11 @@ func (p *Process) runStreamedWithCollector(ctx context.Context, opts RunOptions,
 	s := &Stream{
 		done:  make(chan struct{}),
 		queue: g,
+	}
+	if collector != nil {
+		g.setOverflowHandler(func(err error) {
+			collector.Process(nil, err)
+		})
 	}
 
 	s.events = streamIterator(g)
