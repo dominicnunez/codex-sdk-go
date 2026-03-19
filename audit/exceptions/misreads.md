@@ -711,18 +711,6 @@ when keys or values contain `=`. The existing exception already documents why th
 parsing concern and not an SDK defect. The additional suggestion to validate keys is a feature
 request, not a bug.
 
-### cloneThreadItemWrapper panics on marshal/unmarshal failure
-
-**Location:** `conversation.go:89-102` — cloneThreadItemWrapper panic behavior
-**Date:** 2026-03-01
-
-**Reason:** Covered by existing exception "cloneThreadItemWrapper uses JSON round-trip for deep copy"
-which explicitly states: "The error path now panics (instead of silently returning the original),
-ensuring the deep-copy guarantee is never silently broken." The panic is a deliberate design choice
-already analyzed and accepted. The alternative (returning an error from `Thread()`) would change the
-public API signature — a breaking change disproportionate to the risk, since marshal/unmarshal failure
-on types with tested JSON methods indicates a logic bug, not a runtime condition to handle gracefully.
-
 ### Duplicate approval dispatch tests across two files
 
 **Location:** `approval_test.go`, `dispatch_test.go` — approval handler tests
@@ -792,16 +780,6 @@ described as a potential bug but works correctly." The audit itself concludes th
 today and "No immediate change needed." All existing approval response types implement `marshalWire`
 on value receivers, which are callable on pointer receivers in Go. The concern about a future change
 to pointer receivers is speculative — not an actionable finding.
-
-### Conversation.Thread() deep-copy panics on failure described as a code quality issue
-
-**Location:** `conversation.go:89-136` — cloneThreadItemWrapper, cloneSessionSourceWrapper, cloneThreadStatusWrapper
-**Date:** 2026-03-01
-
-**Reason:** Covered by existing exception "cloneThreadItemWrapper uses JSON round-trip for deep copy"
-which explicitly states: "The error path now panics (instead of silently returning the original),
-ensuring the deep-copy guarantee is never silently broken." The panic is a deliberate design choice
-already analyzed and accepted.
 
 ### Conversation.Thread() claimed to not deep-copy TokenUsage or other top-level fields
 
@@ -887,17 +865,6 @@ lines with no diagnostic" at `stdio.go:250-253`. Both describe the same behavior
 receives a line that fails JSON unmarshal, it silently continues. The known exception documents that
 surfacing dropped-line counts requires new public API surface disproportionate to a Low severity
 debugging-convenience finding.
-
-### Clone functions panic on marshal failure described as a code quality issue
-
-**Location:** `conversation.go:89-102, conversation.go:106-119, conversation.go:122-136` — clone panic behavior
-**Date:** 2026-03-01
-
-**Reason:** This is a duplicate of the known exception "cloneThreadItemWrapper uses JSON round-trip
-for deep copy" which explicitly states: "The error path now panics (instead of silently returning
-the original), ensuring the deep-copy guarantee is never silently broken." The panic is a deliberate
-design choice already analyzed and accepted. The alternative (returning an error from `Thread()`)
-would change the public API signature.
 
 ### Unbounded goroutine spawning per server request described as new finding
 
