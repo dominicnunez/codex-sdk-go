@@ -42,6 +42,12 @@ func TestAppsList(t *testing.T) {
 		if app.Name != "Test App" {
 			t.Errorf("expected Name 'Test App', got %s", app.Name)
 		}
+		if !app.IsEnabled {
+			t.Error("expected IsEnabled to default to true")
+		}
+		if len(app.PluginDisplayNames) != 0 {
+			t.Errorf("expected empty PluginDisplayNames default, got %v", app.PluginDisplayNames)
+		}
 	})
 
 	t.Run("with pagination and options", func(t *testing.T) {
@@ -61,6 +67,7 @@ func TestAppsList(t *testing.T) {
 					"logoUrlDark":         "https://example.com/logo-dark.png",
 					"installUrl":          "https://example.com/install",
 					"distributionChannel": "chatgpt",
+					"pluginDisplayNames":  []string{"Calendar", "Docs"},
 					"labels": map[string]string{
 						"category": "productivity",
 					},
@@ -127,6 +134,9 @@ func TestAppsList(t *testing.T) {
 		}
 		if !app.IsEnabled {
 			t.Error("expected IsEnabled true")
+		}
+		if len(app.PluginDisplayNames) != 2 || app.PluginDisplayNames[0] != "Calendar" || app.PluginDisplayNames[1] != "Docs" {
+			t.Errorf("expected plugin display names to round-trip, got %v", app.PluginDisplayNames)
 		}
 		if app.Branding == nil {
 			t.Fatal("expected Branding to be non-nil")
@@ -197,6 +207,42 @@ func TestAppsList(t *testing.T) {
 		}
 		if resp.NextCursor != nil {
 			t.Error("expected nil nextCursor for empty list")
+		}
+	})
+}
+
+func TestAppInfoUnmarshalAppliesSchemaDefaults(t *testing.T) {
+	t.Run("minimal payload defaults isEnabled and pluginDisplayNames", func(t *testing.T) {
+		var app codex.AppInfo
+		if err := json.Unmarshal([]byte(`{"id":"app-1","name":"Test App"}`), &app); err != nil {
+			t.Fatalf("json.Unmarshal failed: %v", err)
+		}
+
+		if !app.IsEnabled {
+			t.Fatal("expected IsEnabled to default to true")
+		}
+		if len(app.PluginDisplayNames) != 0 {
+			t.Fatalf("expected empty PluginDisplayNames default, got %v", app.PluginDisplayNames)
+		}
+	})
+
+	t.Run("explicit fields are preserved", func(t *testing.T) {
+		var app codex.AppInfo
+		payload := `{
+			"id":"app-2",
+			"name":"Enabled App",
+			"isEnabled":false,
+			"pluginDisplayNames":["Drive","Sheets"]
+		}`
+		if err := json.Unmarshal([]byte(payload), &app); err != nil {
+			t.Fatalf("json.Unmarshal failed: %v", err)
+		}
+
+		if app.IsEnabled {
+			t.Fatal("expected explicit isEnabled=false to be preserved")
+		}
+		if len(app.PluginDisplayNames) != 2 || app.PluginDisplayNames[0] != "Drive" || app.PluginDisplayNames[1] != "Sheets" {
+			t.Fatalf("expected plugin display names to be preserved, got %v", app.PluginDisplayNames)
 		}
 	})
 }

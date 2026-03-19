@@ -45,6 +45,7 @@ type AppInfo struct {
 	Labels              map[string]string `json:"labels,omitempty"`
 	LogoURL             *string           `json:"logoUrl,omitempty"`
 	LogoURLDark         *string           `json:"logoUrlDark,omitempty"`
+	PluginDisplayNames  []string          `json:"pluginDisplayNames,omitempty"`
 	Branding            *AppBranding      `json:"branding,omitempty"`
 	AppMetadata         *AppMetadata      `json:"appMetadata,omitempty"`
 }
@@ -54,11 +55,23 @@ func (a *AppInfo) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	type wire AppInfo
-	var decoded wire
+	var decoded struct {
+		wire
+		IsEnabled *bool `json:"isEnabled"`
+	}
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
-	*a = AppInfo(decoded)
+	appInfo := AppInfo(decoded.wire)
+	if decoded.IsEnabled == nil {
+		appInfo.IsEnabled = true
+	} else {
+		appInfo.IsEnabled = *decoded.IsEnabled
+	}
+	if appInfo.PluginDisplayNames == nil {
+		appInfo.PluginDisplayNames = []string{}
+	}
+	*a = appInfo
 	return nil
 }
 
