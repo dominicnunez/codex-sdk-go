@@ -150,6 +150,13 @@ type Client struct {
 	internalListenerSeq uint64
 	listenersMu         sync.RWMutex
 
+	// Best-effort latest thread snapshots keyed by thread ID. This is updated
+	// from thread-bearing responses and thread metadata notifications so
+	// Conversation.Thread can return current metadata without per-conversation
+	// listener registration.
+	threadStates  map[string]Thread
+	threadStateMu sync.RWMutex
+
 	// Approval handlers for server→client requests
 	approvalHandlers ApprovalHandlers
 	approvalMu       sync.RWMutex
@@ -211,6 +218,7 @@ func NewClient(transport Transport, opts ...ClientOption) *Client {
 		transport:             transport,
 		notificationListeners: make(map[string]NotificationHandler),
 		internalListeners:     make(map[string][]internalListener),
+		threadStates:          make(map[string]Thread),
 	}
 
 	// Apply options
@@ -236,6 +244,7 @@ func NewClient(transport Transport, opts ...ClientOption) *Client {
 	c.Fs = newFsService(c)
 	c.Plugin = newPluginService(c)
 	c.FuzzyFileSearch = newFuzzyFileSearchService(c)
+	c.installThreadStateCache()
 
 	// Register the transport's notification handler to route to our listeners
 	transport.OnNotify(c.handleNotification)

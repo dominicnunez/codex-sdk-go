@@ -44,13 +44,19 @@ func (c *Conversation) ThreadID() string {
 	return c.threadID
 }
 
-// Thread returns a deep-copy snapshot of the Conversation's locally tracked
-// thread state. The snapshot starts from the thread metadata returned by
-// thread/start and appends turns completed through this Conversation; it does
-// not subscribe to independent thread metadata updates from elsewhere.
-// The returned Thread is fully isolated from the Conversation's internal
-// state — mutations to the snapshot do not affect the Conversation.
+// Thread returns a deep-copy snapshot of the latest thread state known to the
+// client. The snapshot reflects thread metadata cached from thread service
+// responses, thread lifecycle notifications, and turns completed through this
+// Conversation. When no client-backed snapshot is available, it falls back to
+// the Conversation's locally tracked state. The returned Thread is fully
+// isolated from internal state, so mutating the snapshot does not affect the
+// Conversation or client cache.
 func (c *Conversation) Thread() Thread {
+	if c.process != nil && c.process.Client != nil {
+		if snapshot, ok := c.process.Client.threadStateSnapshot(c.threadID); ok {
+			return snapshot
+		}
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return cloneThreadState(c.thread)

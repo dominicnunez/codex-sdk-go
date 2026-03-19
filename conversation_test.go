@@ -96,7 +96,7 @@ func TestConversationMultiTurn(t *testing.T) {
 	}
 }
 
-func TestConversationThreadKeepsLocallyTrackedMetadataSnapshot(t *testing.T) {
+func TestConversationThreadReflectsLatestCachedThreadState(t *testing.T) {
 	proc, mock := mockProcess(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -150,8 +150,66 @@ func TestConversationThreadKeepsLocallyTrackedMetadataSnapshot(t *testing.T) {
 	}
 
 	thread := conv.Thread()
-	if thread.Name != nil {
-		t.Fatalf("Thread().Name = %v, want nil", thread.Name)
+	if thread.Name == nil || *thread.Name != threadName {
+		t.Fatalf("Thread().Name = %v, want %q", thread.Name, threadName)
+	}
+	if thread.Path == nil || *thread.Path != "/workspace/project" {
+		t.Fatalf("Thread().Path = %v, want /workspace/project", thread.Path)
+	}
+	if thread.GitInfo == nil || thread.GitInfo.Branch == nil || *thread.GitInfo.Branch != "main" {
+		t.Fatalf("Thread().GitInfo = %+v, want branch main", thread.GitInfo)
+	}
+
+	status, ok := thread.Status.Value.(codex.ThreadStatusActive)
+	if !ok {
+		t.Fatalf("Thread().Status = %T, want ThreadStatusActive", thread.Status.Value)
+	}
+	if len(status.ActiveFlags) != 1 || status.ActiveFlags[0] != codex.ThreadActiveFlagWaitingOnApproval {
+		t.Fatalf("Thread().Status.ActiveFlags = %v, want waitingOnApproval", status.ActiveFlags)
+	}
+
+	thread.Name = codex.Ptr("mutated")
+	thread.Path = codex.Ptr("/mutated")
+	thread.GitInfo.Branch = codex.Ptr("mutated")
+
+	latest := conv.Thread()
+	if latest.Name == nil || *latest.Name != threadName {
+		t.Fatalf("latest Thread().Name = %v, want %q", latest.Name, threadName)
+	}
+	if latest.Path == nil || *latest.Path != "/workspace/project" {
+		t.Fatalf("latest Thread().Path = %v, want /workspace/project", latest.Path)
+	}
+	if latest.GitInfo == nil || latest.GitInfo.Branch == nil || *latest.GitInfo.Branch != "main" {
+		t.Fatalf("latest Thread().GitInfo = %+v, want branch main", latest.GitInfo)
+	}
+}
+
+func TestConversationThreadAppliesNotificationOnlyMetadataUpdates(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
+	if err != nil {
+		t.Fatalf("StartConversation: %v", err)
+	}
+
+	threadName := "Renamed Thread"
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "thread/name/updated",
+		Params:  json.RawMessage(`{"threadId":"thread-1","threadName":"` + threadName + `"}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "thread/status/changed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","status":{"type":"active","activeFlags":["waitingOnApproval"]}}`),
+	})
+
+	thread := conv.Thread()
+	if thread.Name == nil || *thread.Name != threadName {
+		t.Fatalf("Thread().Name = %v, want %q", thread.Name, threadName)
 	}
 	if thread.Path != nil {
 		t.Fatalf("Thread().Path = %v, want nil", thread.Path)
@@ -160,9 +218,16 @@ func TestConversationThreadKeepsLocallyTrackedMetadataSnapshot(t *testing.T) {
 		t.Fatalf("Thread().GitInfo = %+v, want nil", thread.GitInfo)
 	}
 
-	status, ok := thread.Status.Value.(codex.ThreadStatusIdle)
+	if _, ok := thread.Status.Value.(codex.ThreadStatusIdle); ok {
+		t.Fatalf("Thread().Status = %T, want ThreadStatusActive", thread.Status.Value)
+	}
+
+	active, ok := thread.Status.Value.(codex.ThreadStatusActive)
 	if !ok {
-		t.Fatalf("Thread().Status = %T, want ThreadStatusIdle", thread.Status.Value)
+		t.Fatalf("Thread().Status = %T, want ThreadStatusActive", thread.Status.Value)
+	}
+	if len(active.ActiveFlags) != 1 || active.ActiveFlags[0] != codex.ThreadActiveFlagWaitingOnApproval {
+		t.Fatalf("Thread().Status.ActiveFlags = %v, want waitingOnApproval", active.ActiveFlags)
 	}
 
 	thread.Name = codex.Ptr("mutated")
@@ -170,8 +235,8 @@ func TestConversationThreadKeepsLocallyTrackedMetadataSnapshot(t *testing.T) {
 	thread.GitInfo = &codex.GitInfo{Branch: codex.Ptr("mutated")}
 
 	latest := conv.Thread()
-	if latest.Name != nil {
-		t.Fatalf("latest Thread().Name = %v, want nil", latest.Name)
+	if latest.Name == nil || *latest.Name != threadName {
+		t.Fatalf("latest Thread().Name = %v, want %q", latest.Name, threadName)
 	}
 	if latest.Path != nil {
 		t.Fatalf("latest Thread().Path = %v, want nil", latest.Path)
@@ -179,7 +244,6 @@ func TestConversationThreadKeepsLocallyTrackedMetadataSnapshot(t *testing.T) {
 	if latest.GitInfo != nil {
 		t.Fatalf("latest Thread().GitInfo = %+v, want nil", latest.GitInfo)
 	}
-	_ = status
 }
 
 func TestConversationTurnStreamed(t *testing.T) {

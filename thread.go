@@ -882,6 +882,7 @@ func (s *ThreadService) Start(ctx context.Context, params ThreadStartParams) (Th
 	if err := response.validate(); err != nil {
 		return ThreadStartResponse{}, err
 	}
+	s.client.cacheThreadState(response.Thread)
 	return response, nil
 }
 
@@ -912,6 +913,7 @@ func (s *ThreadService) Read(ctx context.Context, params ThreadReadParams) (Thre
 	if err := response.validate(); err != nil {
 		return ThreadReadResponse{}, err
 	}
+	s.client.cacheThreadState(response.Thread)
 	return response, nil
 }
 
@@ -938,6 +940,9 @@ func (s *ThreadService) List(ctx context.Context, params ThreadListParams) (Thre
 	var response ThreadListResponse
 	if err := s.client.sendRequest(ctx, methodThreadList, params, &response); err != nil {
 		return ThreadListResponse{}, err
+	}
+	for _, thread := range response.Data {
+		s.client.cacheThreadState(thread)
 	}
 	return response, nil
 }
@@ -1019,6 +1024,7 @@ func (s *ThreadService) Resume(ctx context.Context, params ThreadResumeParams) (
 	if err := response.validate(); err != nil {
 		return ThreadResumeResponse{}, err
 	}
+	s.client.cacheThreadState(response.Thread)
 	return response, nil
 }
 
@@ -1078,6 +1084,7 @@ func (s *ThreadService) Fork(ctx context.Context, params ThreadForkParams) (Thre
 	if err := response.validate(); err != nil {
 		return ThreadForkResponse{}, err
 	}
+	s.client.cacheThreadState(response.Thread)
 	return response, nil
 }
 
@@ -1108,6 +1115,7 @@ func (s *ThreadService) Rollback(ctx context.Context, params ThreadRollbackParam
 	if err := response.validate(); err != nil {
 		return ThreadRollbackResponse{}, err
 	}
+	s.client.cacheThreadState(response.Thread)
 	return response, nil
 }
 
@@ -1164,6 +1172,7 @@ func (s *ThreadService) MetadataUpdate(ctx context.Context, params ThreadMetadat
 	if err := response.validate(); err != nil {
 		return ThreadMetadataUpdateResponse{}, err
 	}
+	s.client.cacheThreadState(response.Thread)
 	return response, nil
 }
 
@@ -1211,6 +1220,7 @@ func (s *ThreadService) Unarchive(ctx context.Context, params ThreadUnarchivePar
 	if err := response.validate(); err != nil {
 		return ThreadUnarchiveResponse{}, err
 	}
+	s.client.cacheThreadState(response.Thread)
 	return response, nil
 }
 

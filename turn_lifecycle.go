@@ -330,7 +330,9 @@ func executeTurn(ctx context.Context, p turnLifecycleParams) (*RunResult, error)
 		p.onComplete(completedTurn)
 	}
 
-	return buildRunResult(p.thread, completedTurn, collectedItems), nil
+	result := buildRunResult(p.thread, completedTurn, collectedItems)
+	p.client.cacheThreadState(result.Thread)
+	return result, nil
 }
 
 // executeStreamedTurn runs the streaming lifecycle: registers filtered listeners,
@@ -478,6 +480,7 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, g *guardedC
 		s.mu.Lock()
 		s.result = buildRunResult(p.thread, completedTurn, collectedItems)
 		s.mu.Unlock()
+		p.client.cacheThreadState(s.result.Thread)
 
 	case <-ctx.Done():
 		emitErr(ctx.Err())
