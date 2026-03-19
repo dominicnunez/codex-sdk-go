@@ -172,6 +172,13 @@ var rejectedExecArgFlagAliases = map[string]string{
 	"-a": "--ask-for-approval",
 }
 
+var rejectedExecArgShortValueAliases = map[string]string{
+	"-m": "--model",
+	"-s": "--sandbox",
+	"-c": "--config",
+	"-a": "--ask-for-approval",
+}
+
 func canonicalRejectedExecArgFlag(arg string) (string, bool) {
 	if !strings.HasPrefix(arg, "-") || arg == "-" {
 		return "", false
@@ -184,6 +191,11 @@ func canonicalRejectedExecArgFlag(arg string) (string, bool) {
 
 	if canonical, ok := rejectedExecArgFlagAliases[token]; ok {
 		return canonical, true
+	}
+	for shortAlias, canonical := range rejectedExecArgShortValueAliases {
+		if token != shortAlias && strings.HasPrefix(token, shortAlias) {
+			return canonical, true
+		}
 	}
 
 	return "", false

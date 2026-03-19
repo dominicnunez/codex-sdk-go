@@ -474,6 +474,39 @@ func TestStartProcessExecArgsWithSingleDashTypedFlags(t *testing.T) {
 	}
 }
 
+// TestStartProcessExecArgsWithAttachedShortValueTypedFlags verifies that short
+// aliases with attached values are rejected alongside split forms.
+func TestStartProcessExecArgsWithAttachedShortValueTypedFlags(t *testing.T) {
+	tests := []struct {
+		arg           string
+		canonicalFlag string
+	}{
+		{arg: "-mfoo", canonicalFlag: "--model"},
+		{arg: "-sread-only", canonicalFlag: "--sandbox"},
+		{arg: "-capproval_policy=never", canonicalFlag: "--config"},
+		{arg: "-aon-request", canonicalFlag: "--ask-for-approval"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.arg, func(t *testing.T) {
+			ctx := context.Background()
+			_, err := codex.StartProcess(ctx, &codex.ProcessOptions{
+				BinaryPath: "/nonexistent/binary",
+				ExecArgs:   []string{tt.arg},
+			})
+			if err == nil {
+				t.Fatalf("expected error when ExecArgs contains %q", tt.arg)
+			}
+			if !strings.Contains(err.Error(), "typed safety flags") {
+				t.Fatalf("error should mention typed safety flags, got: %v", err)
+			}
+			if !strings.Contains(err.Error(), tt.canonicalFlag) {
+				t.Fatalf("error should mention canonical flag %q, got: %v", tt.canonicalFlag, err)
+			}
+		})
+	}
+}
+
 func TestStartProcessApprovalModeRejectsUnknownValue(t *testing.T) {
 	ctx := context.Background()
 	_, err := codex.StartProcess(ctx, &codex.ProcessOptions{
@@ -517,20 +550,16 @@ func TestStartProcessExecArgsAllowsNonSafetyFlags(t *testing.T) {
 			execArgs: []string{"--some-other-flag=value", "--another=123"},
 		},
 		{
-			name:     "short prefixed m flag name",
-			execArgs: []string{"-max-jobs=8"},
+			name:     "short flag with attached value",
+			execArgs: []string{"-xtrace"},
 		},
 		{
-			name:     "short prefixed c flag name",
-			execArgs: []string{"-cache-dir=/tmp/cache"},
+			name:     "short flag with equals value",
+			execArgs: []string{"-p=/tmp/cache"},
 		},
 		{
-			name:     "short prefixed s flag name",
-			execArgs: []string{"-snapshot-dir=/tmp/snapshots"},
-		},
-		{
-			name:     "short prefixed a flag name",
-			execArgs: []string{"-artifact-dir=/tmp/artifacts"},
+			name:     "mixed positional and non-safety flags",
+			execArgs: []string{"serve", "-xdebug", "--verbose"},
 		},
 	}
 
