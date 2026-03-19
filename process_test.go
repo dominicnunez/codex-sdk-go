@@ -834,6 +834,53 @@ exit 0
 	}
 }
 
+func TestStartProcessNilStderrDoesNotForwardToParent(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("process test requires unix shell script")
+	}
+
+	dir := t.TempDir()
+	fakeBinary := filepath.Join(dir, "fake-codex")
+	parentStderr := filepath.Join(dir, "parent-stderr.log")
+
+	script := `#!/bin/sh
+echo "sensitive child stderr" >&2
+exit 0
+`
+	if err := os.WriteFile(fakeBinary, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake binary: %v", err)
+	}
+
+	f, err := os.Create(parentStderr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = f.Close() }()
+
+	originalStderr := os.Stderr
+	os.Stderr = f
+	defer func() { os.Stderr = originalStderr }()
+
+	proc, err := codex.StartProcess(context.Background(), &codex.ProcessOptions{
+		BinaryPath: fakeBinary,
+	})
+	if err != nil {
+		t.Fatalf("StartProcess: %v", err)
+	}
+
+	_ = proc.Wait()
+	_ = proc.Close()
+	_ = f.Close()
+
+	data, err := os.ReadFile(parentStderr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(data) != 0 {
+		t.Fatalf("parent stderr captured %q; want empty output", string(data))
+	}
+}
+
 // delayedCountingTransport delays initialize responses and counts how many
 // times each method is called. Used to test that ensureInit serializes
 // concurrent callers so only one initialize request is sent.

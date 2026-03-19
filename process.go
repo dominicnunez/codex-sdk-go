@@ -60,7 +60,7 @@ type ProcessOptions struct {
 	// Working directory for the child process. Empty inherits the parent.
 	Dir string
 
-	// Stderr writer for the child process. Nil defaults to os.Stderr.
+	// Stderr writer for the child process. Nil discards child stderr output.
 	Stderr io.Writer
 
 	// Client options forwarded to NewClient.
@@ -259,11 +259,7 @@ func StartProcess(ctx context.Context, opts *ProcessOptions) (*Process, error) {
 	cmd.Env = resolveProcessEnv(opts)
 	cmd.Dir = opts.Dir
 
-	stderr := opts.Stderr
-	if stderr == nil {
-		stderr = os.Stderr
-	}
-	cmd.Stderr = stderr
+	cmd.Stderr = opts.Stderr
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
