@@ -165,6 +165,103 @@ func TestRunStreamedWithCollectorCapturesNotificationConveniences(t *testing.T) 
 	}
 }
 
+func TestRunStreamedWithCollectorPreservesRawNormalizedErrorPayloads(t *testing.T) {
+	proc, mock := mockProcess(t)
+	collector := codex.NewStreamCollector()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	stream := proc.RunStreamedWithCollector(ctx, codex.RunOptions{Prompt: "collect raw errors"}, collector)
+	waitForRunStreamedReady(t, mock)
+
+	systemRaw := json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","willRetry":false,"error":{"message":"system failed","additionalDetails":"details"}}`)
+	realtimeRaw := json.RawMessage(`{"threadId":"thread-1","message":"realtime failed"}`)
+	turnRaw := json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"failed","items":[],"error":{"message":"turn failed","additionalDetails":"details","codexErrorInfo":{"code":"E_TURN"}}}}`)
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "error",
+		Params:  systemRaw,
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "thread/realtime/error",
+		Params:  realtimeRaw,
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  turnRaw,
+	})
+
+	var streamErr error
+	for _, err := range stream.Events() {
+		if err != nil {
+			streamErr = err
+		}
+	}
+	if streamErr == nil || !strings.Contains(streamErr.Error(), "turn error: turn failed") {
+		t.Fatalf("stream error = %v, want turn failure", streamErr)
+	}
+
+	summary := collector.Summary()
+	if len(summary.NormalizedErrors) != 4 {
+		t.Fatalf("normalized errors = %d, want 4", len(summary.NormalizedErrors))
+	}
+
+	errorsByKind := make(map[string]codex.NormalizedStreamError, len(summary.NormalizedErrors))
+	for _, normalized := range summary.NormalizedErrors {
+		errorsByKind[normalized.Kind] = normalized
+	}
+
+	systemErr, ok := errorsByKind["system_error"]
+	if !ok {
+		t.Fatal("missing system_error")
+	}
+	if string(systemErr.Raw) != string(systemRaw) {
+		t.Fatalf("system raw = %s, want %s", string(systemErr.Raw), string(systemRaw))
+	}
+
+	realtimeErr, ok := errorsByKind["realtime_error"]
+	if !ok {
+		t.Fatal("missing realtime_error")
+	}
+	if string(realtimeErr.Raw) != string(realtimeRaw) {
+		t.Fatalf("realtime raw = %s, want %s", string(realtimeErr.Raw), string(realtimeRaw))
+	}
+
+	turnErr, ok := errorsByKind["turn_error"]
+	if !ok {
+		t.Fatal("missing turn_error")
+	}
+	if turnErr.TurnID == nil || *turnErr.TurnID != "turn-1" {
+		t.Fatalf("turn error turn id = %v, want turn-1", turnErr.TurnID)
+	}
+	if turnErr.SourceMethod == nil || *turnErr.SourceMethod != "turn/completed" {
+		t.Fatalf("turn error source method = %v, want turn/completed", turnErr.SourceMethod)
+	}
+	if !strings.Contains(string(turnErr.Raw), `"code":"E_TURN"`) {
+		t.Fatalf("turn raw = %s, want codexErrorInfo payload", string(turnErr.Raw))
+	}
+
+	streamErrSummary, ok := errorsByKind["stream_error"]
+	if !ok {
+		t.Fatal("missing stream_error")
+	}
+	if len(streamErrSummary.Raw) != 0 {
+		t.Fatalf("stream error raw = %s, want empty", string(streamErrSummary.Raw))
+	}
+
+	summary.NormalizedErrors[0].Raw[0] = '{'
+	after := collector.Summary()
+	for _, normalized := range after.NormalizedErrors {
+		if normalized.Kind == "system_error" && string(normalized.Raw) != string(systemRaw) {
+			t.Fatalf("normalized error raw leaked mutation: %s", string(normalized.Raw))
+		}
+	}
+}
+
 func TestStreamCollectorSummaryIsDeepCopied(t *testing.T) {
 	collector := codex.NewStreamCollector()
 	commandPath := ptr("/workspace")

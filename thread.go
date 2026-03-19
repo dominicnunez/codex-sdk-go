@@ -301,6 +301,19 @@ type TurnError struct {
 	Message           string          `json:"message"`
 	CodexErrorInfo    json.RawMessage `json:"codexErrorInfo,omitempty"`
 	AdditionalDetails *string         `json:"additionalDetails,omitempty"`
+	Raw               json.RawMessage `json:"-"`
+}
+
+func (e *TurnError) UnmarshalJSON(data []byte) error {
+	type wire TurnError
+	var decoded wire
+	required := []string{"message"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	decoded.Raw = append(json.RawMessage(nil), data...)
+	*e = TurnError(decoded)
+	return nil
 }
 
 // Error implements the error interface.

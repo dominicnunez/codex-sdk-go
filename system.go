@@ -115,10 +115,11 @@ func (n *DeprecationNoticeNotification) UnmarshalJSON(data []byte) error {
 
 // ErrorNotification is sent when a system error occurs
 type ErrorNotification struct {
-	Error     TurnError `json:"error"`
-	ThreadID  string    `json:"threadId"`
-	TurnID    string    `json:"turnId"`
-	WillRetry bool      `json:"willRetry"`
+	Error     TurnError       `json:"error"`
+	ThreadID  string          `json:"threadId"`
+	TurnID    string          `json:"turnId"`
+	WillRetry bool            `json:"willRetry"`
+	Raw       json.RawMessage `json:"-"`
 }
 
 func (n *ErrorNotification) UnmarshalJSON(data []byte) error {
@@ -128,6 +129,7 @@ func (n *ErrorNotification) UnmarshalJSON(data []byte) error {
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
+	decoded.Raw = append(json.RawMessage(nil), data...)
 	*n = ErrorNotification(decoded)
 	return nil
 }

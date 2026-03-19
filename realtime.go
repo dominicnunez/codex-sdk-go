@@ -54,8 +54,9 @@ func (n *ThreadRealtimeClosedNotification) UnmarshalJSON(data []byte) error {
 // ThreadRealtimeErrorNotification is sent when an error occurs during realtime communication.
 // Method: thread/realtime/error
 type ThreadRealtimeErrorNotification struct {
-	ThreadID string `json:"threadId"`
-	Message  string `json:"message"`
+	ThreadID string          `json:"threadId"`
+	Message  string          `json:"message"`
+	Raw      json.RawMessage `json:"-"`
 }
 
 func (n *ThreadRealtimeErrorNotification) UnmarshalJSON(data []byte) error {
@@ -65,6 +66,7 @@ func (n *ThreadRealtimeErrorNotification) UnmarshalJSON(data []byte) error {
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
+	decoded.Raw = append(json.RawMessage(nil), data...)
 	*n = ThreadRealtimeErrorNotification(decoded)
 	return nil
 }

@@ -140,8 +140,11 @@ func (c *StreamCollector) Process(event Event, err error) {
 	case *TurnCompleted:
 		if e.Turn.Error != nil {
 			c.appendErrorLocked(NormalizedStreamError{
-				Kind:    "turn_error",
-				Message: e.Turn.Error.Message,
+				Kind:         "turn_error",
+				Message:      e.Turn.Error.Message,
+				TurnID:       cloneStringPtr(&e.Turn.ID),
+				SourceMethod: cloneStringPtr(Ptr(notifyTurnCompleted)),
+				Raw:          append(json.RawMessage(nil), e.Turn.Error.Raw...),
 			})
 		}
 	}
@@ -230,6 +233,7 @@ func (c *StreamCollector) processSystemError(n ErrorNotification) {
 		ThreadID:     cloneStringPtr(&n.ThreadID),
 		TurnID:       cloneStringPtr(&n.TurnID),
 		SourceMethod: cloneStringPtr(Ptr(notifyError)),
+		Raw:          append(json.RawMessage(nil), n.Raw...),
 	})
 }
 
@@ -241,6 +245,7 @@ func (c *StreamCollector) processThreadRealtimeError(n ThreadRealtimeErrorNotifi
 		Message:      n.Message,
 		ThreadID:     cloneStringPtr(&n.ThreadID),
 		SourceMethod: cloneStringPtr(Ptr(notifyRealtimeError)),
+		Raw:          append(json.RawMessage(nil), n.Raw...),
 	})
 }
 
