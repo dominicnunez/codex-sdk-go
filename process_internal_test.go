@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -90,6 +91,54 @@ func TestBuildArgsEmitFlagsAcceptedByCodexCLI(t *testing.T) {
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("codex %s failed: %v\noutput:\n%s", strings.Join(args, " "), err, string(out))
+	}
+}
+
+type errCloser struct {
+	err   error
+	calls int
+}
+
+func (c *errCloser) Close() error {
+	c.calls++
+	return c.err
+}
+
+var _ io.Closer = (*errCloser)(nil)
+
+func TestCloseIgnoresStdinCloseErrorAfterWait(t *testing.T) {
+	closer := &errCloser{err: os.ErrClosed}
+	proc := &Process{
+		stdin:    closer,
+		waitDone: make(chan struct{}),
+	}
+	close(proc.waitDone)
+
+	if err := proc.Close(); err != nil {
+		t.Fatalf("Close() error = %v, want nil", err)
+	}
+	if closer.calls != 1 {
+		t.Fatalf("stdin Close calls = %d, want 1", closer.calls)
+	}
+	if proc.stdin != nil {
+		t.Fatal("stdin should be cleared after Close")
+	}
+}
+
+func TestCloseReturnsUnexpectedStdinCloseErrorWhileRunning(t *testing.T) {
+	sentinel := errors.New("boom")
+	closer := &errCloser{err: sentinel}
+	proc := &Process{
+		stdin:    closer,
+		waitDone: make(chan struct{}),
+	}
+
+	err := proc.Close()
+	if !errors.Is(err, sentinel) {
+		t.Fatalf("Close() error = %v, want wrapped sentinel", err)
+	}
+	if closer.calls != 1 {
+		t.Fatalf("stdin Close calls = %d, want 1", closer.calls)
 	}
 }
 

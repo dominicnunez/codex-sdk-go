@@ -462,9 +462,9 @@ exit 0
 		t.Fatalf("Wait: %v", err)
 	}
 
-	// Close after Wait should be safe (idempotent).
+	// Close after Wait should be a clean no-op.
 	if err := proc.Close(); err != nil {
-		t.Logf("Close after Wait: %v (expected)", err)
+		t.Fatalf("Close after Wait: %v", err)
 	}
 }
 

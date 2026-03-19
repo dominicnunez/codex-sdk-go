@@ -354,8 +354,13 @@ func (p *Process) closeStdin() error {
 		return nil
 	}
 	if err := p.stdin.Close(); err != nil {
+		if p.waitCompleted() || isExpectedPipeCloseError(err) {
+			p.stdin = nil
+			return nil
+		}
 		return fmt.Errorf("close stdin: %w", err)
 	}
+	p.stdin = nil
 	return nil
 }
 
@@ -498,6 +503,22 @@ func isSignalError(err error) bool {
 
 func isExpectedProcessStopError(err error) bool {
 	return errors.Is(err, os.ErrProcessDone) || errors.Is(err, syscall.ESRCH)
+}
+
+func isExpectedPipeCloseError(err error) bool {
+	return errors.Is(err, os.ErrClosed) || errors.Is(err, syscall.EPIPE)
+}
+
+func (p *Process) waitCompleted() bool {
+	if p.waitDone == nil {
+		return false
+	}
+	select {
+	case <-p.waitDone:
+		return true
+	default:
+		return false
+	}
 }
 
 // Wait waits for the child process to exit and returns the exit error.
