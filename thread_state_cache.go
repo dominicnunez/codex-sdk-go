@@ -14,8 +14,37 @@ func (c *Client) cacheThreadState(thread Thread) {
 	}
 
 	c.threadStateMu.Lock()
+	c.ensureThreadStateCacheMapsLocked()
 	c.threadStates[thread.ID] = cloneThreadState(thread)
 	c.touchThreadStateLocked(thread.ID)
+	c.evictThreadStatesLocked()
+	c.threadStateMu.Unlock()
+}
+
+func (c *Client) pinThreadState(threadID string) {
+	if threadID == "" {
+		return
+	}
+
+	c.threadStateMu.Lock()
+	c.ensureThreadStateCacheMapsLocked()
+	c.threadStatePins[threadID]++
+	c.evictThreadStatesLocked()
+	c.threadStateMu.Unlock()
+}
+
+func (c *Client) unpinThreadState(threadID string) {
+	if threadID == "" {
+		return
+	}
+
+	c.threadStateMu.Lock()
+	c.ensureThreadStateCacheMapsLocked()
+	if pins := c.threadStatePins[threadID]; pins <= 1 {
+		delete(c.threadStatePins, threadID)
+	} else {
+		c.threadStatePins[threadID] = pins - 1
+	}
 	c.evictThreadStatesLocked()
 	c.threadStateMu.Unlock()
 }
@@ -36,6 +65,7 @@ func (c *Client) mutateThreadState(threadID string, mutate func(*Thread)) {
 	}
 
 	c.threadStateMu.Lock()
+	c.ensureThreadStateCacheMapsLocked()
 	thread, ok := c.threadStates[threadID]
 	if ok {
 		mutate(&thread)
@@ -59,10 +89,40 @@ func (c *Client) touchThreadStateLocked(threadID string) {
 }
 
 func (c *Client) evictThreadStatesLocked() {
-	for len(c.threadStateOrder) > maxCachedThreadStates {
-		evictedID := c.threadStateOrder[0]
-		c.threadStateOrder = c.threadStateOrder[1:]
+	for c.cachedUnpinnedThreadStatesLocked() > maxCachedThreadStates {
+		evictedIndex := -1
+		for i, threadID := range c.threadStateOrder {
+			if c.threadStatePins[threadID] == 0 {
+				evictedIndex = i
+				break
+			}
+		}
+		if evictedIndex < 0 {
+			return
+		}
+		evictedID := c.threadStateOrder[evictedIndex]
+		copy(c.threadStateOrder[evictedIndex:], c.threadStateOrder[evictedIndex+1:])
+		c.threadStateOrder = c.threadStateOrder[:len(c.threadStateOrder)-1]
 		delete(c.threadStates, evictedID)
+	}
+}
+
+func (c *Client) cachedUnpinnedThreadStatesLocked() int {
+	count := 0
+	for _, threadID := range c.threadStateOrder {
+		if c.threadStatePins[threadID] == 0 {
+			count++
+		}
+	}
+	return count
+}
+
+func (c *Client) ensureThreadStateCacheMapsLocked() {
+	if c.threadStates == nil {
+		c.threadStates = make(map[string]Thread)
+	}
+	if c.threadStatePins == nil {
+		c.threadStatePins = make(map[string]int)
 	}
 }
 

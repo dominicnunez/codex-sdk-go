@@ -7,7 +7,8 @@ import (
 
 func TestCacheThreadStateEvictsLeastRecentlyUpdatedThread(t *testing.T) {
 	client := &Client{
-		threadStates: make(map[string]Thread),
+		threadStates:    make(map[string]Thread),
+		threadStatePins: make(map[string]int),
 	}
 
 	for i := range maxCachedThreadStates {
@@ -33,7 +34,8 @@ func TestCacheThreadStateEvictsLeastRecentlyUpdatedThread(t *testing.T) {
 
 func TestMutateThreadStateRefreshesThreadRecency(t *testing.T) {
 	client := &Client{
-		threadStates: make(map[string]Thread),
+		threadStates:    make(map[string]Thread),
+		threadStatePins: make(map[string]int),
 	}
 
 	for i := range maxCachedThreadStates {
@@ -56,4 +58,54 @@ func TestMutateThreadStateRefreshesThreadRecency(t *testing.T) {
 	if _, ok := client.threadStateSnapshot("thread-01"); ok {
 		t.Fatal("expected oldest untouched thread to be evicted")
 	}
+}
+
+func TestPinnedThreadStateSurvivesEvictionPressure(t *testing.T) {
+	client := &Client{
+		threadStates:    make(map[string]Thread),
+		threadStatePins: make(map[string]int),
+	}
+
+	client.cacheThreadState(Thread{ID: "thread-pinned"})
+	client.pinThreadState("thread-pinned")
+
+	for i := range maxCachedThreadStates + 10 {
+		client.cacheThreadState(Thread{ID: fmt.Sprintf("thread-%02d", i)})
+	}
+
+	if _, ok := client.threadStateSnapshot("thread-pinned"); !ok {
+		t.Fatal("expected pinned thread to remain cached")
+	}
+	if got := client.cachedUnpinnedThreadStatesForTest(); got != maxCachedThreadStates {
+		t.Fatalf("cached unpinned thread count = %d, want %d", got, maxCachedThreadStates)
+	}
+}
+
+func TestUnpinThreadStateAllowsDeferredEviction(t *testing.T) {
+	client := &Client{
+		threadStates:    make(map[string]Thread),
+		threadStatePins: make(map[string]int),
+	}
+
+	client.cacheThreadState(Thread{ID: "thread-pinned"})
+	client.pinThreadState("thread-pinned")
+
+	for i := range maxCachedThreadStates + 1 {
+		client.cacheThreadState(Thread{ID: fmt.Sprintf("thread-%02d", i)})
+	}
+	if _, ok := client.threadStateSnapshot("thread-pinned"); !ok {
+		t.Fatal("expected pinned thread to remain cached before unpin")
+	}
+
+	client.unpinThreadState("thread-pinned")
+
+	if _, ok := client.threadStateSnapshot("thread-pinned"); ok {
+		t.Fatal("expected formerly pinned thread to be evicted after unpin")
+	}
+}
+
+func (c *Client) cachedUnpinnedThreadStatesForTest() int {
+	c.threadStateMu.RLock()
+	defer c.threadStateMu.RUnlock()
+	return c.cachedUnpinnedThreadStatesLocked()
 }

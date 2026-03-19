@@ -2,6 +2,7 @@ package codex
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 )
 
@@ -89,6 +90,49 @@ func TestThreadCloneAdditionalDetails(t *testing.T) {
 	if *conv.thread.Turns[0].Error.AdditionalDetails != "retry after 30s" {
 		t.Errorf("AdditionalDetails = %q, want %q — mutation leaked through shallow copy",
 			*conv.thread.Turns[0].Error.AdditionalDetails, "retry after 30s")
+	}
+}
+
+func TestConversationThreadFallsBackToPinnedLatestSnapshotAfterEvictionPressure(t *testing.T) {
+	client := &Client{
+		threadStates:    make(map[string]Thread),
+		threadStatePins: make(map[string]int),
+	}
+	process := &Process{Client: client}
+	conv := &Conversation{
+		process:  process,
+		threadID: "thread-1",
+		thread: Thread{
+			ID:     "thread-1",
+			Status: ThreadStatusWrapper{Value: ThreadStatusIdle{}},
+		},
+	}
+
+	client.cacheThreadState(conv.thread)
+	client.pinThreadState(conv.threadID)
+
+	name := "renamed"
+	client.mutateThreadState(conv.threadID, func(thread *Thread) {
+		thread.Name = &name
+		thread.Status = ThreadStatusWrapper{
+			Value: ThreadStatusActive{ActiveFlags: []ThreadActiveFlag{ThreadActiveFlagWaitingOnApproval}},
+		}
+	})
+
+	for i := range maxCachedThreadStates + 10 {
+		client.cacheThreadState(Thread{ID: fmt.Sprintf("other-%02d", i)})
+	}
+
+	snapshot := conv.Thread()
+	if snapshot.Name == nil || *snapshot.Name != name {
+		t.Fatalf("Thread().Name = %v, want %q", snapshot.Name, name)
+	}
+	active, ok := snapshot.Status.Value.(ThreadStatusActive)
+	if !ok {
+		t.Fatalf("Thread().Status = %T, want ThreadStatusActive", snapshot.Status.Value)
+	}
+	if len(active.ActiveFlags) != 1 || active.ActiveFlags[0] != ThreadActiveFlagWaitingOnApproval {
+		t.Fatalf("Thread().Status.ActiveFlags = %v, want waitingOnApproval", active.ActiveFlags)
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"runtime"
 	"sync"
 )
 
@@ -126,6 +127,7 @@ func cloneTurnError(err *TurnError) *TurnError {
 	cp := *err
 	cp.CodexErrorInfo = append(json.RawMessage(nil), err.CodexErrorInfo...)
 	cp.AdditionalDetails = cloneStringPtr(err.AdditionalDetails)
+	cp.Raw = append(json.RawMessage(nil), err.Raw...)
 	return &cp
 }
 
@@ -646,11 +648,21 @@ func (p *Process) StartConversation(ctx context.Context, opts ConversationOption
 		return nil, fmt.Errorf("thread/start: %w", err)
 	}
 
-	return &Conversation{
+	p.Client.pinThreadState(resp.Thread.ID)
+
+	conv := &Conversation{
 		process:  p,
 		threadID: resp.Thread.ID,
 		thread:   resp.Thread,
-	}, nil
+	}
+	runtime.SetFinalizer(conv, func(c *Conversation) {
+		if c == nil || c.process == nil || c.process.Client == nil {
+			return
+		}
+		c.process.Client.unpinThreadState(c.threadID)
+	})
+
+	return conv, nil
 }
 
 func (c *Conversation) buildTurnParams(opts TurnOptions) TurnStartParams {

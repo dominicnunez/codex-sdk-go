@@ -192,9 +192,12 @@ type Client struct {
 	// from thread-bearing responses and thread metadata notifications so
 	// Conversation.Thread can return current metadata without per-conversation
 	// listener registration. The cache is bounded to avoid retaining snapshots
-	// for every thread a long-lived client has ever touched.
+	// for every thread a long-lived client has ever touched. Active
+	// Conversations pin their thread snapshot so cache eviction cannot regress
+	// their metadata between turns.
 	threadStates     map[string]Thread
 	threadStateOrder []string
+	threadStatePins  map[string]int
 	threadStateMu    sync.RWMutex
 
 	// Approval handlers for server→client requests
@@ -259,6 +262,7 @@ func NewClient(transport Transport, opts ...ClientOption) *Client {
 		notificationListeners: make(map[string]NotificationHandler),
 		internalListeners:     make(map[string][]internalListener),
 		threadStates:          make(map[string]Thread),
+		threadStatePins:       make(map[string]int),
 	}
 
 	// Apply options
