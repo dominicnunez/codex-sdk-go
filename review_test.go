@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/dominicnunez/codex-sdk-go"
@@ -251,5 +252,65 @@ func TestReviewStart_RPCError_ReturnsRPCError(t *testing.T) {
 	}
 	if rpcErr.RPCError().Code != codex.ErrCodeInternalError {
 		t.Errorf("expected error code %d, got %d", codex.ErrCodeInternalError, rpcErr.RPCError().Code)
+	}
+}
+
+func TestReviewStartRejectsInvalidParamsBeforeSending(t *testing.T) {
+	tests := []struct {
+		name    string
+		params  codex.ReviewStartParams
+		wantErr string
+	}{
+		{
+			name: "empty thread id",
+			params: codex.ReviewStartParams{
+				ThreadID: "",
+				Target: codex.ReviewTargetWrapper{
+					Value: &codex.UncommittedChangesReviewTarget{},
+				},
+			},
+			wantErr: "threadId must not be empty",
+		},
+		{
+			name: "nil target value",
+			params: codex.ReviewStartParams{
+				ThreadID: "thread-123",
+			},
+			wantErr: "target must not be null",
+		},
+		{
+			name: "typed nil target value",
+			params: func() codex.ReviewStartParams {
+				var target *codex.UncommittedChangesReviewTarget
+				return codex.ReviewStartParams{
+					ThreadID: "thread-123",
+					Target: codex.ReviewTargetWrapper{
+						Value: target,
+					},
+				}
+			}(),
+			wantErr: "target must not be null",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := NewMockTransport()
+			client := codex.NewClient(mock)
+
+			_, err := client.Review.Start(context.Background(), tt.params)
+			if err == nil {
+				t.Fatal("expected invalid params error")
+			}
+			if !strings.Contains(err.Error(), "invalid params") {
+				t.Fatalf("error = %v, want invalid params context", err)
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %v, want substring %q", err, tt.wantErr)
+			}
+			if got := mock.CallCount(); got != 0 {
+				t.Fatalf("transport recorded %d requests, want 0", got)
+			}
+		})
 	}
 }

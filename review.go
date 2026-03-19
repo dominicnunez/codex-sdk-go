@@ -258,6 +258,16 @@ func (r *ReviewStartResponse) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (p ReviewStartParams) prepareRequest() (interface{}, error) {
+	if err := validateThreadScopedRequest(p.ThreadID); err != nil {
+		return nil, err
+	}
+	if err := validateRequiredJSONObjectField("target", p.Target); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
 // ReviewService provides methods for code review operations.
 type ReviewService struct {
 	client *Client

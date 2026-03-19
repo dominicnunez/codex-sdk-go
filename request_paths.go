@@ -1,8 +1,11 @@
 package codex
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	pathpkg "path"
+	"reflect"
 	"strings"
 )
 
@@ -16,6 +19,39 @@ func prepareRequestParams(params interface{}) (interface{}, error) {
 		return params, nil
 	}
 	return preparer.prepareRequest()
+}
+
+func isNilInterfaceValue(value interface{}) bool {
+	if value == nil {
+		return true
+	}
+
+	rv := reflect.ValueOf(value)
+	switch rv.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return rv.IsNil()
+	default:
+		return false
+	}
+}
+
+func validateRequiredJSONObjectField(field string, value interface{}) error {
+	if isNilInterfaceValue(value) {
+		return invalidParamsError("%s must not be null", field)
+	}
+
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+	encoded = bytes.TrimSpace(encoded)
+	if bytes.Equal(encoded, []byte("null")) {
+		return invalidParamsError("%s must not be null", field)
+	}
+	if len(encoded) == 0 || encoded[0] != '{' {
+		return invalidParamsError("%s must be a JSON object", field)
+	}
+	return nil
 }
 
 func normalizeAbsolutePathField(field, value string) (string, error) {
@@ -510,6 +546,14 @@ func (p TurnStartParams) prepareRequest() (interface{}, error) {
 	if err := validateThreadScopedRequest(p.ThreadID); err != nil {
 		return nil, err
 	}
+	if p.Input == nil {
+		return nil, invalidParamsError("input must not be null")
+	}
+	for i, input := range p.Input {
+		if isNilInterfaceValue(input) {
+			return nil, invalidParamsError("input[%d] must not be null", i)
+		}
+	}
 
 	var err error
 	p.SandboxPolicy, err = normalizeSandboxPolicyPointerField("sandboxPolicy", p.SandboxPolicy)
@@ -529,6 +573,14 @@ func (p TurnInterruptParams) prepareRequest() (interface{}, error) {
 func (p TurnSteerParams) prepareRequest() (interface{}, error) {
 	if err := validateExpectedTurnScopedRequest(p.ThreadID, p.ExpectedTurnID); err != nil {
 		return nil, err
+	}
+	if p.Input == nil {
+		return nil, invalidParamsError("input must not be null")
+	}
+	for i, input := range p.Input {
+		if isNilInterfaceValue(input) {
+			return nil, invalidParamsError("input[%d] must not be null", i)
+		}
 	}
 	return p, nil
 }

@@ -290,6 +290,52 @@ func TestTurnRequestsRejectEmptyRequiredIDs(t *testing.T) {
 			},
 			wantErr: "expectedTurnId must not be empty",
 		},
+		{
+			name: "start rejects nil input slice",
+			call: func(client *codex.Client) error {
+				_, err := client.Turn.Start(context.Background(), codex.TurnStartParams{
+					ThreadID: "thread-123",
+				})
+				return err
+			},
+			wantErr: "input must not be null",
+		},
+		{
+			name: "steer rejects nil input slice",
+			call: func(client *codex.Client) error {
+				_, err := client.Turn.Steer(context.Background(), codex.TurnSteerParams{
+					ThreadID:       "thread-123",
+					ExpectedTurnID: "turn-456",
+				})
+				return err
+			},
+			wantErr: "input must not be null",
+		},
+		{
+			name: "start rejects nil input item",
+			call: func(client *codex.Client) error {
+				var input *codex.TextUserInput
+				_, err := client.Turn.Start(context.Background(), codex.TurnStartParams{
+					ThreadID: "thread-123",
+					Input:    []codex.UserInput{input},
+				})
+				return err
+			},
+			wantErr: "input[0] must not be null",
+		},
+		{
+			name: "steer rejects nil input item",
+			call: func(client *codex.Client) error {
+				var input *codex.TextUserInput
+				_, err := client.Turn.Steer(context.Background(), codex.TurnSteerParams{
+					ThreadID:       "thread-123",
+					ExpectedTurnID: "turn-456",
+					Input:          []codex.UserInput{input},
+				})
+				return err
+			},
+			wantErr: "input[0] must not be null",
+		},
 	}
 
 	for _, tt := range tests {
