@@ -394,9 +394,9 @@ func (t *StdioTransport) OnNotify(handler NotificationHandler) {
 	}
 }
 
-// OnPanic registers a handler called when a notification handler panics.
-// The transport recovers from the panic and continues operating; this
-// callback provides observability into the recovered value.
+// OnPanic registers a handler called when a request handler or notification
+// handler panics. The transport recovers from the panic and continues
+// operating; this callback provides observability into the recovered value.
 func (t *StdioTransport) OnPanic(handler func(v any)) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
