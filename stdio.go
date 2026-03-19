@@ -26,11 +26,13 @@ const (
 	inboundRequestWorkers              = 8
 	inboundRequestQueueSize            = 64
 	inboundNotificationWorkers         = 8
+	protectedNotificationWorkers       = 8
 	criticalNotificationWorkers        = 2
 	turnScopedNotificationWorkers      = 8
 	maxTurnScopedNotificationQueueSize = 256
 	maxTurnScopedNotificationQueues    = 128
 	inboundNotifQueueSize              = 128
+	protectedNotifQueueSize            = 128
 	criticalNotifQueueSize             = 64
 	outboundWriteQueueSize             = 256
 	readBufferSizeBytes                = 64 * 1024
@@ -149,32 +151,33 @@ type StdioTransport struct {
 	readerCloser io.Closer
 	writer       io.Writer
 
-	mu                 sync.Mutex
-	closed             bool
-	readerEOF          bool
-	pendingReqs        map[string]pendingReq
-	reqHandler         RequestHandler
-	notifHandler       NotificationHandler
-	pendingReqHandler  []Request
-	pendingNotifHandle []Notification
-	requestQueue       chan Request
-	turnNotifQueuesMu  sync.Mutex
-	turnNotifQueues    map[string]*turnScopedNotificationQueue
-	turnNotifReadyMu   sync.Mutex
-	turnNotifReady     []*turnScopedNotificationQueue
-	turnNotifReadyCond *sync.Cond
-	turnNotifReadyOnce sync.Once
-	criticalNotifQueue chan Notification
-	notifQueue         chan Notification
-	writeQueue         chan writeEnvelope
-	readerStopped      chan struct{}
-	once               sync.Once
-	startReadLoopOnce  sync.Once
-	scanErr            error // set by readLoop when an unrecoverable read error occurs
-	malformedCount     atomic.Uint64
-	panicHandler       func(v any)
-	ctx                context.Context
-	cancelCtx          context.CancelFunc
+	mu                  sync.Mutex
+	closed              bool
+	readerEOF           bool
+	pendingReqs         map[string]pendingReq
+	reqHandler          RequestHandler
+	notifHandler        NotificationHandler
+	pendingReqHandler   []Request
+	pendingNotifHandle  []Notification
+	requestQueue        chan Request
+	turnNotifQueuesMu   sync.Mutex
+	turnNotifQueues     map[string]*turnScopedNotificationQueue
+	turnNotifReadyMu    sync.Mutex
+	turnNotifReady      []*turnScopedNotificationQueue
+	turnNotifReadyCond  *sync.Cond
+	turnNotifReadyOnce  sync.Once
+	protectedNotifQueue chan Notification
+	criticalNotifQueue  chan Notification
+	notifQueue          chan Notification
+	writeQueue          chan writeEnvelope
+	readerStopped       chan struct{}
+	once                sync.Once
+	startReadLoopOnce   sync.Once
+	scanErr             error // set by readLoop when an unrecoverable read error occurs
+	malformedCount      atomic.Uint64
+	panicHandler        func(v any)
+	ctx                 context.Context
+	cancelCtx           context.CancelFunc
 }
 
 // errUnexpectedIDType is returned when normalizeID encounters an ID value
@@ -183,7 +186,9 @@ var errUnexpectedIDType = errors.New("unexpected ID type")
 var errTransportClosed = errors.New("transport closed")
 var errTransportReaderStopped = errors.New("transport reader stopped")
 var errOversizedInboundFrame = errors.New("oversized inbound frame exceeded maximum size")
+var errNotificationQueueOverflow = errors.New("notification queue overflow")
 var errTurnScopedNotificationQueueOverflow = errors.New("turn-scoped notification queue overflow")
+var errTurnScopedNotificationQueueLimit = errors.New("turn-scoped notification queue limit exceeded")
 
 // errNullID is returned when normalizeID encounters a nil (JSON null) ID.
 // JSON-RPC 2.0 responses with "id": null indicate the server could not
@@ -244,18 +249,19 @@ func NewStdioTransport(reader io.ReadCloser, writer io.Writer) *StdioTransport {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	t := &StdioTransport{
-		reader:             reader,
-		readerCloser:       reader,
-		writer:             writer,
-		pendingReqs:        make(map[string]pendingReq),
-		requestQueue:       make(chan Request, inboundRequestQueueSize),
-		turnNotifQueues:    make(map[string]*turnScopedNotificationQueue),
-		criticalNotifQueue: make(chan Notification, criticalNotifQueueSize),
-		notifQueue:         make(chan Notification, inboundNotifQueueSize),
-		writeQueue:         make(chan writeEnvelope, outboundWriteQueueSize),
-		readerStopped:      make(chan struct{}),
-		ctx:                ctx,
-		cancelCtx:          cancel,
+		reader:              reader,
+		readerCloser:        reader,
+		writer:              writer,
+		pendingReqs:         make(map[string]pendingReq),
+		requestQueue:        make(chan Request, inboundRequestQueueSize),
+		turnNotifQueues:     make(map[string]*turnScopedNotificationQueue),
+		protectedNotifQueue: make(chan Notification, protectedNotifQueueSize),
+		criticalNotifQueue:  make(chan Notification, criticalNotifQueueSize),
+		notifQueue:          make(chan Notification, inboundNotifQueueSize),
+		writeQueue:          make(chan writeEnvelope, outboundWriteQueueSize),
+		readerStopped:       make(chan struct{}),
+		ctx:                 ctx,
+		cancelCtx:           cancel,
 	}
 	t.initTurnScopedScheduler()
 	for range inboundRequestWorkers {
@@ -263,6 +269,9 @@ func NewStdioTransport(reader io.ReadCloser, writer io.Writer) *StdioTransport {
 	}
 	for range inboundNotificationWorkers {
 		go t.notificationWorker()
+	}
+	for range protectedNotificationWorkers {
+		go t.protectedNotificationWorker()
 	}
 	for range criticalNotificationWorkers {
 		go t.criticalNotificationWorker()
@@ -653,6 +662,16 @@ func (t *StdioTransport) notificationWorker() {
 	}
 }
 
+func (t *StdioTransport) protectedNotificationWorker() {
+	for {
+		notif, ok := recvWhileRunning(t.ctx, t.protectedNotifQueue)
+		if !ok {
+			return
+		}
+		t.handleNotification(notif)
+	}
+}
+
 func (t *StdioTransport) criticalNotificationWorker() {
 	for {
 		notif, ok := recvWhileRunning(t.ctx, t.criticalNotifQueue)
@@ -717,11 +736,7 @@ func (t *StdioTransport) readLoop() {
 				t.stopAfterReaderEOF()
 				return
 			}
-			t.mu.Lock()
-			if t.scanErr == nil {
-				t.scanErr = err
-			}
-			t.mu.Unlock()
+			t.stopAfterReadFailure(err)
 			return
 		}
 
@@ -942,6 +957,10 @@ func (t *StdioTransport) enqueueNotification(notif Notification) {
 		t.enqueueTurnScopedNotification(notif)
 		return
 	}
+	if isProtectedNotificationMethod(notif.Method) {
+		t.enqueueProtectedNotification(notif)
+		return
+	}
 	if isCriticalNotificationMethod(notif.Method) {
 		t.enqueueCriticalNotification(notif)
 		return
@@ -952,8 +971,8 @@ func (t *StdioTransport) enqueueNotification(notif Notification) {
 		return
 	case t.notifQueue <- notif:
 	default:
-		// Notifications are fire-and-forget. If the queue is full we drop to
-		// preserve process liveness and bound memory use under abuse.
+		// Unknown notifications remain best-effort to preserve read-loop
+		// liveness without changing known SDK-visible behavior.
 	}
 }
 
@@ -976,7 +995,11 @@ func (t *StdioTransport) enqueueTurnScopedNotification(notif Notification) {
 	if queue == nil {
 		if len(t.turnNotifQueues) >= maxTurnScopedNotificationQueues {
 			t.turnNotifQueuesMu.Unlock()
-			t.enqueueCriticalNotification(notif)
+			t.closeWithFailure(
+				errTurnScopedNotificationQueueLimit,
+				errTurnScopedNotificationQueueLimit.Error(),
+				notificationOverflowData("turn-scoped-limit", notif),
+			)
 			return
 		}
 		queue = &turnScopedNotificationQueue{threadKey: notif.threadKey}
@@ -1056,7 +1079,12 @@ func (t *StdioTransport) removeTurnScopedNotificationQueue(threadKey string, que
 	}
 }
 
-func (t *StdioTransport) enqueueBoundedNotification(queue chan Notification, notif Notification) {
+func (t *StdioTransport) enqueueLosslessNotification(
+	queue chan Notification,
+	notif Notification,
+	scanErr error,
+	queueName string,
+) {
 	select {
 	case <-t.ctx.Done():
 		return
@@ -1064,28 +1092,85 @@ func (t *StdioTransport) enqueueBoundedNotification(queue chan Notification, not
 		return
 	default:
 	}
+	t.closeWithFailure(scanErr, scanErr.Error(), notificationOverflowData(queueName, notif))
+}
 
-	// Queue is full: drop oldest and enqueue newest to preserve read-loop
-	// liveness under sustained notification pressure.
-	select {
-	case <-queue:
-	default:
+func notificationOverflowData(queueName string, notif Notification) json.RawMessage {
+	threadKey := notif.threadKey
+	if threadKey == "" {
+		threadKey = "<none>"
 	}
+	return json.RawMessage(fmt.Sprintf(
+		`{"queue":%q,"method":%q,"threadKey":%q}`,
+		queueName,
+		notif.Method,
+		threadKey,
+	))
+}
 
-	select {
-	case <-t.ctx.Done():
-	case queue <- notif:
-	default:
-	}
+func (t *StdioTransport) enqueueProtectedNotification(notif Notification) {
+	t.enqueueLosslessNotification(t.protectedNotifQueue, notif, errNotificationQueueOverflow, "protected")
 }
 
 func (t *StdioTransport) enqueueCriticalNotification(notif Notification) {
-	t.enqueueBoundedNotification(t.criticalNotifQueue, notif)
+	t.enqueueLosslessNotification(t.criticalNotifQueue, notif, errNotificationQueueOverflow, "critical")
 }
 
 func isCriticalNotificationMethod(method string) bool {
 	switch method {
 	case notifyError, notifyRealtimeError:
+		return true
+	default:
+		return false
+	}
+}
+
+func isProtectedNotificationMethod(method string) bool {
+	switch method {
+	case notifyAgentMessageDelta,
+		notifyFileChangeOutputDelta,
+		notifyPlanDelta,
+		notifyReasoningTextDelta,
+		notifyReasoningSummaryTextDelta,
+		notifyReasoningSummaryPartAdded,
+		notifyItemStarted,
+		notifyThreadStarted,
+		notifyThreadClosed,
+		notifyThreadArchived,
+		notifyThreadUnarchived,
+		notifyThreadNameUpdated,
+		notifyThreadStatusChanged,
+		notifyThreadTokenUsageUpdated,
+		notifyTurnStarted,
+		notifyTurnPlanUpdated,
+		notifyTurnDiffUpdated,
+		notifyAccountUpdated,
+		notifyAccountLoginCompleted,
+		notifyAccountRateLimitsUpdated,
+		notifyRealtimeStarted,
+		notifyRealtimeClosed,
+		notifyRealtimeItemAdded,
+		notifyRealtimeOutputAudioDelta,
+		notifyWindowsSandboxSetupCompleted,
+		notifyWindowsWorldWritableWarning,
+		notifyThreadCompacted,
+		notifyDeprecationNotice,
+		notifyTerminalInteraction,
+		notifyMcpServerOauthLoginCompleted,
+		notifyMcpToolCallProgress,
+		notifyServerRequestResolved,
+		notifyModelRerouted,
+		notifyFuzzyFileSearchSessionCompleted,
+		notifyFuzzyFileSearchSessionUpdated,
+		notifyCommandExecutionOutputDelta,
+		notifyCommandExecOutputDelta,
+		notifyAppListUpdated,
+		notifyConfigWarning,
+		notifySkillsChanged,
+		notifyHookStarted,
+		notifyHookCompleted,
+		notifyItemGuardianApprovalReviewStarted,
+		notifyItemGuardianApprovalReviewCompleted:
 		return true
 	default:
 		return false
@@ -1578,29 +1663,18 @@ func consumeJSONScalar(data []byte, start int) (int, bool) {
 }
 
 func (t *StdioTransport) stopAfterReadFailure(scanErr error) {
+	t.stopAfterReaderTermination(scanErr)
+}
+
+func (t *StdioTransport) stopAfterReaderEOF() {
+	t.stopAfterReaderTermination(nil)
+}
+
+func (t *StdioTransport) stopAfterReaderTermination(scanErr error) {
 	t.mu.Lock()
 	if t.scanErr == nil {
 		t.scanErr = scanErr
 	}
-	if t.closed {
-		t.mu.Unlock()
-		return
-	}
-	t.closed = true
-	t.readerEOF = false
-	cancel := t.cancelCtx
-	readerCloser := t.readerCloser
-	t.mu.Unlock()
-
-	cancel()
-	t.wakeTurnScopedNotificationWorkers()
-	if readerCloser != nil {
-		_ = readerCloser.Close()
-	}
-}
-
-func (t *StdioTransport) stopAfterReaderEOF() {
-	t.mu.Lock()
 	if t.closed {
 		t.mu.Unlock()
 		return

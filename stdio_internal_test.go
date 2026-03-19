@@ -534,6 +534,47 @@ func TestReadLoopEOFCancelsTransportAndWakesWaitingTurnScopedWorkers(t *testing.
 	}
 }
 
+func TestReadLoopNonEOFFailureCancelsTransportAndWakesWaitingTurnScopedWorkers(t *testing.T) {
+	reader := newErrorReadCloser(errors.New("read failed"))
+	transport := NewStdioTransport(reader, io.Discard)
+	defer func() { _ = transport.Close() }()
+	transport.initTurnScopedScheduler()
+	transport.ensureReadLoopStarted()
+
+	done := make(chan bool, 1)
+	go func() {
+		_, ok := transport.nextTurnScopedNotificationQueue()
+		done <- ok
+	}()
+
+	time.Sleep(25 * time.Millisecond)
+	reader.Release()
+
+	select {
+	case <-transport.ctx.Done():
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout waiting for transport context cancellation after reader failure")
+	}
+
+	select {
+	case ok := <-done:
+		if ok {
+			t.Fatal("nextTurnScopedNotificationQueue() reported work after reader failure")
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout waiting for turn-scoped worker to wake after reader failure")
+	}
+
+	if !errors.Is(transport.ScanErr(), reader.err) {
+		t.Fatalf("ScanErr() = %v, want %v", transport.ScanErr(), reader.err)
+	}
+	if err := transport.Notify(context.Background(), Notification{JSONRPC: "2.0", Method: "test/read-failure"}); err == nil {
+		t.Fatal("expected notify to fail after reader failure")
+	} else if !strings.Contains(err.Error(), errTransportReaderStopped.Error()) {
+		t.Fatalf("Notify() error = %v, want reader stopped error", err)
+	}
+}
+
 func TestStopAfterReaderEOFWakesWaitingTurnScopedWorkers(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	reader, writer := io.Pipe()
@@ -571,25 +612,29 @@ func TestStopAfterReaderEOFWakesWaitingTurnScopedWorkers(t *testing.T) {
 	}
 }
 
-func TestEnqueueTurnScopedNotificationCapsTrackedQueues(t *testing.T) {
+func TestEnqueueTurnScopedNotificationQueueLimitClosesTransport(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	transport := &StdioTransport{
-		turnNotifQueues:    make(map[string]*turnScopedNotificationQueue),
-		criticalNotifQueue: make(chan Notification, maxTurnScopedNotificationQueues),
-		ctx:                ctx,
-		cancelCtx:          cancel,
+		pendingReqs:     make(map[string]pendingReq),
+		turnNotifQueues: make(map[string]*turnScopedNotificationQueue),
+		readerStopped:   make(chan struct{}),
+		ctx:             ctx,
+		cancelCtx:       cancel,
 	}
 	transport.initTurnScopedScheduler()
 
-	total := maxTurnScopedNotificationQueues + 32
-	for i := range total {
+	for i := range maxTurnScopedNotificationQueues {
 		transport.enqueueTurnScopedNotification(Notification{
 			Method:    notifyTurnCompleted,
 			threadKey: fmt.Sprintf("thread-%d", i),
 		})
 	}
+	transport.enqueueTurnScopedNotification(Notification{
+		Method:    notifyTurnCompleted,
+		threadKey: "thread-overflow",
+	})
 
 	if got := len(transport.turnNotifQueues); got != maxTurnScopedNotificationQueues {
 		t.Fatalf("tracked turn-scoped queues = %d, want %d", got, maxTurnScopedNotificationQueues)
@@ -597,8 +642,43 @@ func TestEnqueueTurnScopedNotificationCapsTrackedQueues(t *testing.T) {
 	if got := len(transport.turnNotifReady); got != maxTurnScopedNotificationQueues {
 		t.Fatalf("ready turn-scoped queues = %d, want %d", got, maxTurnScopedNotificationQueues)
 	}
-	if got := len(transport.criticalNotifQueue); got != total-maxTurnScopedNotificationQueues {
-		t.Fatalf("overflow notifications in critical queue = %d, want %d", got, total-maxTurnScopedNotificationQueues)
+
+	if !errors.Is(transport.ScanErr(), errTurnScopedNotificationQueueLimit) {
+		t.Fatalf("ScanErr() = %v, want %v", transport.ScanErr(), errTurnScopedNotificationQueueLimit)
+	}
+
+	select {
+	case <-transport.readerStopped:
+	default:
+		t.Fatal("expected transport to stop after turn-scoped queue limit overflow")
+	}
+}
+
+func TestProtectedNotificationQueueOverflowClosesTransport(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	transport := &StdioTransport{
+		pendingReqs:         make(map[string]pendingReq),
+		protectedNotifQueue: make(chan Notification, 1),
+		readerStopped:       make(chan struct{}),
+		ctx:                 ctx,
+		cancelCtx:           cancel,
+	}
+
+	first := Notification{Method: notifyConfigWarning}
+	second := Notification{Method: notifyModelRerouted}
+	transport.protectedNotifQueue <- first
+	transport.enqueueProtectedNotification(second)
+
+	if !errors.Is(transport.ScanErr(), errNotificationQueueOverflow) {
+		t.Fatalf("ScanErr() = %v, want %v", transport.ScanErr(), errNotificationQueueOverflow)
+	}
+
+	select {
+	case <-transport.readerStopped:
+	default:
+		t.Fatal("expected transport to stop after protected notification overflow")
 	}
 }
 
@@ -770,8 +850,8 @@ func TestStdioNotificationFloodStillDeliversTurnCompleted(t *testing.T) {
 
 	nonCritical := Notification{
 		JSONRPC: jsonrpcVersion,
-		Method:  notifyAgentMessageDelta,
-		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","itemId":"item-1","delta":"x"}`),
+		Method:  "test/flood",
+		Params:  json.RawMessage(`{"n":1}`),
 	}
 	nonCriticalBytes, err := json.Marshal(nonCritical)
 	if err != nil {
@@ -830,8 +910,8 @@ func TestStdioNotificationFloodStillDeliversItemCompleted(t *testing.T) {
 
 	nonCritical := Notification{
 		JSONRPC: jsonrpcVersion,
-		Method:  notifyAgentMessageDelta,
-		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","itemId":"item-1","delta":"x"}`),
+		Method:  "test/flood",
+		Params:  json.RawMessage(`{"n":1}`),
 	}
 	nonCriticalBytes, err := json.Marshal(nonCritical)
 	if err != nil {
@@ -864,6 +944,66 @@ func TestStdioNotificationFloodStillDeliversItemCompleted(t *testing.T) {
 	case <-itemSeen:
 	case <-time.After(2 * time.Second):
 		t.Fatal("item/completed notification was not delivered under queue pressure")
+	}
+
+	close(release)
+}
+
+func TestStdioBestEffortFloodStillDeliversProtectedNotification(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+
+	transport := NewStdioTransport(clientReader, &safeBuffer{})
+	defer func() { _ = transport.Close() }()
+
+	release := make(chan struct{})
+	protectedSeen := make(chan struct{}, 1)
+	transport.OnNotify(func(_ context.Context, notif Notification) {
+		if notif.Method == notifyConfigWarning {
+			select {
+			case protectedSeen <- struct{}{}:
+			default:
+			}
+			return
+		}
+		<-release
+	})
+
+	bestEffort := Notification{
+		JSONRPC: jsonrpcVersion,
+		Method:  "test/flood",
+		Params:  json.RawMessage(`{"n":1}`),
+	}
+	bestEffortBytes, err := json.Marshal(bestEffort)
+	if err != nil {
+		t.Fatalf("marshal best-effort notification: %v", err)
+	}
+
+	totalFlood := inboundNotificationWorkers + inboundNotifQueueSize + 32
+	for range totalFlood {
+		if _, err := serverWriter.Write(append(bestEffortBytes, '\n')); err != nil {
+			t.Fatalf("write flood notification: %v", err)
+		}
+	}
+
+	protected := Notification{
+		JSONRPC: jsonrpcVersion,
+		Method:  notifyConfigWarning,
+		Params:  json.RawMessage(`{"message":"warn","severity":"medium"}`),
+	}
+	protectedBytes, err := json.Marshal(protected)
+	if err != nil {
+		t.Fatalf("marshal protected notification: %v", err)
+	}
+	if _, err := serverWriter.Write(append(protectedBytes, '\n')); err != nil {
+		t.Fatalf("write protected notification: %v", err)
+	}
+
+	select {
+	case <-protectedSeen:
+	case <-time.After(2 * time.Second):
+		t.Fatal("protected notification was not delivered under best-effort queue pressure")
 	}
 
 	close(release)
@@ -949,6 +1089,47 @@ func (r *blockingReadCloser) Read(_ []byte) (int, error) {
 
 func (r *blockingReadCloser) Close() error {
 	r.once.Do(func() {
+		close(r.done)
+	})
+	return nil
+}
+
+type errorReadCloser struct {
+	closeOnce   sync.Once
+	releaseOnce sync.Once
+	done        chan struct{}
+	release     chan struct{}
+	err         error
+}
+
+func newErrorReadCloser(err error) *errorReadCloser {
+	return &errorReadCloser{
+		done:    make(chan struct{}),
+		release: make(chan struct{}),
+		err:     err,
+	}
+}
+
+func (r *errorReadCloser) Read(_ []byte) (int, error) {
+	select {
+	case <-r.done:
+		return 0, io.EOF
+	case <-r.release:
+		return 0, r.err
+	}
+}
+
+func (r *errorReadCloser) Release() {
+	r.releaseOnce.Do(func() {
+		close(r.release)
+	})
+}
+
+func (r *errorReadCloser) Close() error {
+	r.releaseOnce.Do(func() {
+		close(r.release)
+	})
+	r.closeOnce.Do(func() {
 		close(r.done)
 	})
 	return nil

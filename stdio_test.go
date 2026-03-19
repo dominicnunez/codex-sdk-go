@@ -1794,7 +1794,7 @@ func TestStdioErrorNotificationsUseCriticalQueue(t *testing.T) {
 	block := make(chan struct{})
 	var sawError atomic.Bool
 	transport.OnNotify(func(_ context.Context, notif codex.Notification) {
-		if notif.Method == "turn/completed" {
+		if notif.Method == "test/flood" {
 			<-block
 			return
 		}
@@ -1825,9 +1825,9 @@ func TestStdioErrorNotificationsUseCriticalQueue(t *testing.T) {
 
 	waitForOutboundRequest(t, serverReader)
 
-	criticalTurnCompleted := `{"jsonrpc":"2.0","method":"turn/completed","params":{"n":1}}` + "\n"
+	bestEffortFlood := `{"jsonrpc":"2.0","method":"test/flood","params":{"n":1}}` + "\n"
 	for i := 0; i < 200; i++ {
-		_, _ = serverWriter.Write([]byte(criticalTurnCompleted))
+		_, _ = serverWriter.Write([]byte(bestEffortFlood))
 	}
 	_, _ = serverWriter.Write([]byte(`{"jsonrpc":"2.0","method":"error","params":{"message":"boom"}}` + "\n"))
 	_, _ = serverWriter.Write([]byte(`{"jsonrpc":"2.0","id":"critical-error-queue","result":{"ok":true}}` + "\n"))
