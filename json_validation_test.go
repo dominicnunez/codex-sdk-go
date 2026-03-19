@@ -49,3 +49,19 @@ func TestValidateInboundObjectFieldsRejectsMissingRequiredField(t *testing.T) {
 		t.Fatal("expected missing required field error")
 	}
 }
+
+func TestValidateInboundObjectFieldsReportsFirstMissingFieldDeterministically(t *testing.T) {
+	for i := 0; i < 100; i++ {
+		err := validateInboundObjectFields(
+			[]byte(`{"count":2}`),
+			[]string{"summary", "title", "count"},
+			[]string{"summary", "title", "count"},
+		)
+		if err == nil {
+			t.Fatal("expected missing required field error")
+		}
+		if got, want := err.Error(), `missing required field "summary"`; got != want {
+			t.Fatalf("validateInboundObjectFields() error = %q, want %q", got, want)
+		}
+	}
+}

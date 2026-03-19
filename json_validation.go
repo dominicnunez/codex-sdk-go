@@ -15,6 +15,11 @@ type inboundObjectField struct {
 	index []int
 }
 
+type inboundRequiredFields struct {
+	order []string
+	seen  map[string]bool
+}
+
 type objectValidationErrors struct {
 	notObject func(error) error
 	missing   func(string) error
@@ -150,10 +155,17 @@ func inboundObjectFieldName(field reflect.StructField) (string, bool) {
 func inboundObjectValidation(
 	requiredFields []string,
 	nonNullFields []string,
-) (map[string]bool, map[string]struct{}) {
-	required := make(map[string]bool, len(requiredFields))
+) (inboundRequiredFields, map[string]struct{}) {
+	required := inboundRequiredFields{
+		order: make([]string, 0, len(requiredFields)),
+		seen:  make(map[string]bool, len(requiredFields)),
+	}
 	for _, field := range requiredFields {
-		required[field] = false
+		if _, ok := required.seen[field]; ok {
+			continue
+		}
+		required.order = append(required.order, field)
+		required.seen[field] = false
 	}
 
 	nonNull := make(map[string]struct{}, len(nonNullFields))
@@ -205,7 +217,7 @@ func expectInboundObjectStart(decoder *json.Decoder) error {
 
 func decodeInboundObjectField(
 	decoder *json.Decoder,
-	required map[string]bool,
+	required inboundRequiredFields,
 	nonNull map[string]struct{},
 	destValue reflect.Value,
 	fields map[string]inboundObjectField,
@@ -225,8 +237,8 @@ func decodeInboundObjectField(
 		return validation.notObject(err)
 	}
 
-	if _, ok := required[key]; ok {
-		required[key] = true
+	if _, ok := required.seen[key]; ok {
+		required.seen[key] = true
 	}
 	if _, mustBeNonNull := nonNull[key]; mustBeNonNull && isNullJSONValue(raw) {
 		return validation.null(key)
@@ -254,8 +266,9 @@ func expectInboundObjectEnd(decoder *json.Decoder) error {
 	return nil
 }
 
-func validateRequiredInboundObjectFields(required map[string]bool, validation objectValidationErrors) error {
-	for field, seen := range required {
+func validateRequiredInboundObjectFields(required inboundRequiredFields, validation objectValidationErrors) error {
+	for _, field := range required.order {
+		seen := required.seen[field]
 		if !seen {
 			return validation.missing(field)
 		}
