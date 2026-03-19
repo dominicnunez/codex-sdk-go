@@ -748,6 +748,40 @@ func TestAccountLoginCompletedNotification(t *testing.T) {
 	}
 }
 
+func TestAccountLoginCompletedNotificationMissingRequiredFieldReportsHandlerError(t *testing.T) {
+	mock := NewMockTransport()
+
+	var (
+		gotMethod string
+		gotErr    error
+	)
+	client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+		gotMethod = method
+		gotErr = err
+	}))
+
+	var called bool
+	client.OnAccountLoginCompleted(func(codex.AccountLoginCompletedNotification) {
+		called = true
+	})
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "account/login/completed",
+		Params:  json.RawMessage(`{}`),
+	})
+
+	if called {
+		t.Fatal("handler should not be called for malformed payload")
+	}
+	if gotMethod != "account/login/completed" {
+		t.Fatalf("handler error method = %q, want %q", gotMethod, "account/login/completed")
+	}
+	if gotErr == nil || !strings.Contains(gotErr.Error(), "missing required field") {
+		t.Fatalf("handler error = %v; want missing required field failure", gotErr)
+	}
+}
+
 func TestAccountRateLimitsUpdatedNotification(t *testing.T) {
 	transport := NewMockTransport()
 	client := codex.NewClient(transport)
@@ -806,6 +840,39 @@ func TestAccountRateLimitsUpdatedNotification(t *testing.T) {
 	}
 }
 
+func TestAccountRateLimitsUpdatedNotificationMissingRequiredFieldReportsHandlerError(t *testing.T) {
+	mock := NewMockTransport()
+
+	var (
+		gotMethod string
+		gotErr    error
+	)
+	client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+		gotMethod = method
+		gotErr = err
+	}))
+
+	var called bool
+	client.OnAccountRateLimitsUpdated(func(codex.AccountRateLimitsUpdatedNotification) {
+		called = true
+	})
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "account/rateLimits/updated",
+		Params:  json.RawMessage(`{}`),
+	})
+
+	if called {
+		t.Fatal("handler should not be called for malformed payload")
+	}
+	if gotMethod != "account/rateLimits/updated" {
+		t.Fatalf("handler error method = %q, want %q", gotMethod, "account/rateLimits/updated")
+	}
+	if gotErr == nil || !strings.Contains(gotErr.Error(), "missing required field") {
+		t.Fatalf("handler error = %v; want missing required field failure", gotErr)
+	}
+}
 func TestAccountMarshalJSONInjectsTypeDiscriminator(t *testing.T) {
 	tests := []struct {
 		name    string

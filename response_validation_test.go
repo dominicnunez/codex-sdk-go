@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go"
@@ -15,6 +16,7 @@ func TestClientMethodsRejectMalformedSuccessResponses(t *testing.T) {
 		method          string
 		missingObject   interface{}
 		invalidObject   interface{}
+		invalidContains string
 		nullFieldObject interface{}
 		call            func(*codex.Client) error
 	}{
@@ -103,6 +105,22 @@ func TestClientMethodsRejectMalformedSuccessResponses(t *testing.T) {
 			},
 			call: func(client *codex.Client) error {
 				_, err := client.Account.GetRateLimits(context.Background())
+				return err
+			},
+		},
+		{
+			name:          "account login cancel",
+			method:        "account/login/cancel",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"status": "bogus",
+			},
+			invalidContains: "invalid status",
+			nullFieldObject: map[string]interface{}{
+				"status": nil,
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Account.CancelLogin(context.Background(), codex.CancelLoginAccountParams{})
 				return err
 			},
 		},
@@ -373,7 +391,7 @@ func TestClientMethodsRejectMalformedSuccessResponses(t *testing.T) {
 		})
 
 		if tt.invalidObject != nil {
-			t.Run(tt.name+"/nested missing required fields", func(t *testing.T) {
+			t.Run(tt.name+"/invalid object", func(t *testing.T) {
 				mock := NewMockTransport()
 				client := codex.NewClient(mock)
 				if err := mock.SetResponseData(tt.method, tt.invalidObject); err != nil {
@@ -381,6 +399,12 @@ func TestClientMethodsRejectMalformedSuccessResponses(t *testing.T) {
 				}
 
 				err := tt.call(client)
+				if tt.invalidContains != "" {
+					if err == nil || !strings.Contains(err.Error(), tt.invalidContains) {
+						t.Fatalf("error = %v; want to contain %q", err, tt.invalidContains)
+					}
+					return
+				}
 				if !errors.Is(err, codex.ErrMissingResultField) {
 					t.Fatalf("error = %v; want ErrMissingResultField", err)
 				}

@@ -516,6 +516,24 @@ type CancelLoginAccountResponse struct {
 	Status CancelLoginAccountStatus `json:"status"`
 }
 
+func (r *CancelLoginAccountResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "status"); err != nil {
+		return err
+	}
+	type wire CancelLoginAccountResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	switch decoded.Status {
+	case CancelLoginAccountStatusCanceled, CancelLoginAccountStatusNotFound:
+	default:
+		return fmt.Errorf("invalid status %q", decoded.Status)
+	}
+	*r = CancelLoginAccountResponse(decoded)
+	return nil
+}
+
 // CancelLoginAccountStatus represents the cancellation status
 type CancelLoginAccountStatus string
 

@@ -28,9 +28,31 @@ type AccountLoginCompletedNotification struct {
 	Error   *string `json:"error,omitempty"`
 }
 
+func (n *AccountLoginCompletedNotification) UnmarshalJSON(data []byte) error {
+	type wire AccountLoginCompletedNotification
+	var decoded wire
+	required := []string{"success"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = AccountLoginCompletedNotification(decoded)
+	return nil
+}
+
 // AccountRateLimitsUpdatedNotification is sent when rate limits are updated
 type AccountRateLimitsUpdatedNotification struct {
 	RateLimits RateLimitSnapshot `json:"rateLimits"`
+}
+
+func (n *AccountRateLimitsUpdatedNotification) UnmarshalJSON(data []byte) error {
+	type wire AccountRateLimitsUpdatedNotification
+	var decoded wire
+	required := []string{"rateLimits"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = AccountRateLimitsUpdatedNotification(decoded)
+	return nil
 }
 
 // OnAccountUpdated registers a listener for account/updated notifications
