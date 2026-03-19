@@ -187,6 +187,22 @@ func TestPermissionsRequestApprovalParamsRejectRelativeFileSystemRoots(t *testin
 	}
 }
 
+func TestCommandExecutionRequestApprovalParamsRejectInvalidNetworkPolicyAmendments(t *testing.T) {
+	var params codex.CommandExecutionRequestApprovalParams
+	err := json.Unmarshal([]byte(`{
+		"itemId":"item-1",
+		"threadId":"thread-1",
+		"turnId":"turn-1",
+		"proposedNetworkPolicyAmendments":[{"action":"bogus","host":"example.com"}]
+	}`), &params)
+	if err == nil {
+		t.Fatal("expected invalid network policy amendment error")
+	}
+	if !strings.Contains(err.Error(), `proposedNetworkPolicyAmendments[0]: invalid network policy action "bogus"`) {
+		t.Fatalf("error = %v; want invalid action context", err)
+	}
+}
+
 // TestCommandExecutionRequestApprovalRoundTrip tests CommandExecutionRequestApproval params/response
 func TestCommandExecutionRequestApprovalRoundTrip(t *testing.T) {
 	// Test params serialization

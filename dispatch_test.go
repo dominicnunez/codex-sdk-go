@@ -652,6 +652,27 @@ func TestMalformedApprovalRequestReturnsInvalidParams(t *testing.T) {
 			},
 		},
 		{
+			name:   "item/commandExecution/requestApproval invalid network policy amendment",
+			method: "item/commandExecution/requestApproval",
+			params: map[string]interface{}{
+				"itemId":   "item-1",
+				"threadId": "thread-1",
+				"turnId":   "turn-1",
+				"proposedNetworkPolicyAmendments": []interface{}{
+					map[string]interface{}{
+						"action": "bogus",
+						"host":   "example.com",
+					},
+				},
+			},
+			handler: func(ah *codex.ApprovalHandlers, called *bool) {
+				ah.OnCommandExecutionRequestApproval = func(context.Context, codex.CommandExecutionRequestApprovalParams) (codex.CommandExecutionRequestApprovalResponse, error) {
+					*called = true
+					return codex.CommandExecutionRequestApprovalResponse{}, nil
+				}
+			},
+		},
+		{
 			name:   "mcpServer/elicitation/request missing server name",
 			method: "mcpServer/elicitation/request",
 			params: map[string]interface{}{

@@ -400,6 +400,13 @@ func (p *CommandExecutionRequestApprovalParams) UnmarshalJSON(data []byte) error
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
+	if decoded.ProposedNetworkPolicyAmendments != nil {
+		for i, amendment := range *decoded.ProposedNetworkPolicyAmendments {
+			if err := validateNetworkPolicyAmendment(amendment); err != nil {
+				return fmt.Errorf("proposedNetworkPolicyAmendments[%d]: %w", i, err)
+			}
+		}
+	}
 	*p = CommandExecutionRequestApprovalParams(decoded)
 	return nil
 }
