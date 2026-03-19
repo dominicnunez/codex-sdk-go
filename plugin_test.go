@@ -336,7 +336,7 @@ func TestPluginRequiredFieldValidation(t *testing.T) {
 				})
 				return err
 			},
-			wantErr: "missing appsNeedingAuth",
+			wantErr: `required field "appsNeedingAuth"`,
 		},
 		{
 			name:   "install rejects missing authPolicy",
@@ -351,7 +351,7 @@ func TestPluginRequiredFieldValidation(t *testing.T) {
 				})
 				return err
 			},
-			wantErr: "missing authPolicy",
+			wantErr: `required field "authPolicy"`,
 		},
 		{
 			name:   "install rejects app missing id",
@@ -390,28 +390,158 @@ func TestPluginRequiredFieldValidation(t *testing.T) {
 	}
 }
 
+func TestPluginEnumValidation(t *testing.T) {
+	tests := []struct {
+		name     string
+		method   string
+		response map[string]interface{}
+		call     func(*codex.Client) error
+		wantErr  string
+	}{
+		{
+			name:   "list rejects invalid source type",
+			method: "plugin/list",
+			response: map[string]interface{}{
+				"marketplaces": []interface{}{
+					map[string]interface{}{
+						"name": "official",
+						"path": "/plugins",
+						"plugins": []interface{}{
+							map[string]interface{}{
+								"authPolicy":    "ON_INSTALL",
+								"enabled":       true,
+								"id":            "plugin-1",
+								"installPolicy": "AVAILABLE",
+								"installed":     true,
+								"name":          "calendar",
+								"source": map[string]interface{}{
+									"path": "/plugins/calendar",
+									"type": "remote",
+								},
+							},
+						},
+					},
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Plugin.List(context.Background(), codex.PluginListParams{})
+				return err
+			},
+			wantErr: `invalid plugin.source.type "remote"`,
+		},
+		{
+			name:   "read rejects invalid auth policy",
+			method: "plugin/read",
+			response: map[string]interface{}{
+				"plugin": pluginReadPayloadWithSummary(map[string]interface{}{
+					"authPolicy":    "ON_STARTUP",
+					"enabled":       true,
+					"id":            "plugin-1",
+					"installPolicy": "AVAILABLE",
+					"installed":     true,
+					"name":          "calendar",
+					"source": map[string]interface{}{
+						"path": "/plugins/calendar",
+						"type": "local",
+					},
+				}),
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Plugin.Read(context.Background(), codex.PluginReadParams{
+					MarketplacePath: "/plugins",
+					PluginName:      "calendar",
+				})
+				return err
+			},
+			wantErr: `invalid plugin.summary.authPolicy "ON_STARTUP"`,
+		},
+		{
+			name:   "read rejects invalid install policy",
+			method: "plugin/read",
+			response: map[string]interface{}{
+				"plugin": pluginReadPayloadWithSummary(map[string]interface{}{
+					"authPolicy":    "ON_USE",
+					"enabled":       true,
+					"id":            "plugin-1",
+					"installPolicy": "SUSPENDED",
+					"installed":     true,
+					"name":          "calendar",
+					"source": map[string]interface{}{
+						"path": "/plugins/calendar",
+						"type": "local",
+					},
+				}),
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Plugin.Read(context.Background(), codex.PluginReadParams{
+					MarketplacePath: "/plugins",
+					PluginName:      "calendar",
+				})
+				return err
+			},
+			wantErr: `invalid plugin.summary.installPolicy "SUSPENDED"`,
+		},
+		{
+			name:   "install rejects invalid auth policy",
+			method: "plugin/install",
+			response: map[string]interface{}{
+				"appsNeedingAuth": []interface{}{},
+				"authPolicy":      "ON_STARTUP",
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Plugin.Install(context.Background(), codex.PluginInstallParams{
+					MarketplacePath: "/plugins",
+					PluginName:      "calendar",
+				})
+				return err
+			},
+			wantErr: `invalid plugin.install.authPolicy "ON_STARTUP"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := NewMockTransport()
+			client := codex.NewClient(transport)
+			transport.SetResponseData(tt.method, tt.response)
+
+			err := tt.call(client)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %q; want substring %q", err.Error(), tt.wantErr)
+			}
+		})
+	}
+}
+
 func pluginReadResponseWithMissingField(missingField string) map[string]interface{} {
-	plugin := map[string]interface{}{
+	plugin := pluginReadPayloadWithSummary(map[string]interface{}{
+		"authPolicy":    "ON_USE",
+		"enabled":       true,
+		"id":            "plugin-1",
+		"installPolicy": "AVAILABLE",
+		"installed":     true,
+		"name":          "calendar",
+		"source": map[string]interface{}{
+			"path": "/plugins/calendar",
+			"type": "local",
+		},
+	})
+	delete(plugin, missingField)
+	return map[string]interface{}{"plugin": plugin}
+}
+
+func pluginReadPayloadWithSummary(summary map[string]interface{}) map[string]interface{} {
+	return map[string]interface{}{
 		"apps":            []interface{}{},
 		"marketplaceName": "official",
 		"marketplacePath": "/plugins",
 		"mcpServers":      []interface{}{"calendar"},
 		"skills":          []interface{}{},
-		"summary": map[string]interface{}{
-			"authPolicy":    "ON_USE",
-			"enabled":       true,
-			"id":            "plugin-1",
-			"installPolicy": "AVAILABLE",
-			"installed":     true,
-			"name":          "calendar",
-			"source": map[string]interface{}{
-				"path": "/plugins/calendar",
-				"type": "local",
-			},
-		},
+		"summary":         summary,
 	}
-	delete(plugin, missingField)
-	return map[string]interface{}{"plugin": plugin}
 }
 
 func TestPluginUninstall(t *testing.T) {

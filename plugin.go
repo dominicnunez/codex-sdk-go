@@ -14,6 +14,15 @@ const (
 	PluginAuthPolicyOnUse     PluginAuthPolicy = "ON_USE"
 )
 
+var validPluginAuthPolicies = map[PluginAuthPolicy]struct{}{
+	PluginAuthPolicyOnInstall: {},
+	PluginAuthPolicyOnUse:     {},
+}
+
+func validatePluginAuthPolicyField(field string, value PluginAuthPolicy) error {
+	return validateEnumValue(field, value, validPluginAuthPolicies)
+}
+
 // PluginInstallPolicy controls marketplace install availability.
 type PluginInstallPolicy string
 
@@ -22,6 +31,26 @@ const (
 	PluginInstallPolicyAvailable          PluginInstallPolicy = "AVAILABLE"
 	PluginInstallPolicyInstalledByDefault PluginInstallPolicy = "INSTALLED_BY_DEFAULT"
 )
+
+var validPluginInstallPolicies = map[PluginInstallPolicy]struct{}{
+	PluginInstallPolicyNotAvailable:       {},
+	PluginInstallPolicyAvailable:          {},
+	PluginInstallPolicyInstalledByDefault: {},
+}
+
+func validatePluginInstallPolicyField(field string, value PluginInstallPolicy) error {
+	return validateEnumValue(field, value, validPluginInstallPolicies)
+}
+
+const pluginSourceTypeLocal = "local"
+
+var validPluginSourceTypes = map[string]struct{}{
+	pluginSourceTypeLocal: {},
+}
+
+func validatePluginSourceTypeField(field string, value string) error {
+	return validateStringEnumValue(field, value, validPluginSourceTypes)
+}
 
 // MarketplaceInterface contains marketplace display metadata.
 type MarketplaceInterface struct {
@@ -117,6 +146,9 @@ func (p *PluginSource) UnmarshalJSON(data []byte) error {
 
 	p.Path = *wire.Path
 	p.Type = *wire.Type
+	if err := validatePluginSourceTypeField("plugin.source.type", p.Type); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -174,6 +206,12 @@ func (p *PluginSummary) UnmarshalJSON(data []byte) error {
 	p.Interface = wire.Interface
 	p.Name = *wire.Name
 	p.Source = *wire.Source
+	if err := validatePluginAuthPolicyField("plugin.summary.authPolicy", p.AuthPolicy); err != nil {
+		return err
+	}
+	if err := validatePluginInstallPolicyField("plugin.summary.installPolicy", p.InstallPolicy); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -359,6 +397,19 @@ type PluginReadResponse struct {
 	Plugin PluginDetail `json:"plugin"`
 }
 
+func (r *PluginReadResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "plugin"); err != nil {
+		return err
+	}
+	type wire PluginReadResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = PluginReadResponse(decoded)
+	return nil
+}
+
 func (r PluginReadResponse) validate() error {
 	if r.Plugin.Summary.ID == "" {
 		return errors.New("missing plugin.summary.id")
@@ -377,6 +428,22 @@ type PluginInstallParams struct {
 type PluginInstallResponse struct {
 	AppsNeedingAuth []AppSummary     `json:"appsNeedingAuth"`
 	AuthPolicy      PluginAuthPolicy `json:"authPolicy"`
+}
+
+func (r *PluginInstallResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "appsNeedingAuth", "authPolicy"); err != nil {
+		return err
+	}
+	type wire PluginInstallResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	if err := validatePluginAuthPolicyField("plugin.install.authPolicy", decoded.AuthPolicy); err != nil {
+		return err
+	}
+	*r = PluginInstallResponse(decoded)
+	return nil
 }
 
 func (r PluginInstallResponse) validate() error {
