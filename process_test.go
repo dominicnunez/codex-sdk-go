@@ -474,39 +474,6 @@ func TestStartProcessExecArgsWithSingleDashTypedFlags(t *testing.T) {
 	}
 }
 
-// TestStartProcessExecArgsWithAttachedShortValueTypedFlags verifies that short
-// aliases with attached values are rejected alongside split forms.
-func TestStartProcessExecArgsWithAttachedShortValueTypedFlags(t *testing.T) {
-	tests := []struct {
-		arg           string
-		canonicalFlag string
-	}{
-		{arg: "-mfoo", canonicalFlag: "--model"},
-		{arg: "-sread-only", canonicalFlag: "--sandbox"},
-		{arg: "-capproval_policy=never", canonicalFlag: "--config"},
-		{arg: "-aon-request", canonicalFlag: "--ask-for-approval"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.arg, func(t *testing.T) {
-			ctx := context.Background()
-			_, err := codex.StartProcess(ctx, &codex.ProcessOptions{
-				BinaryPath: "/nonexistent/binary",
-				ExecArgs:   []string{tt.arg},
-			})
-			if err == nil {
-				t.Fatalf("expected error when ExecArgs contains %q", tt.arg)
-			}
-			if !strings.Contains(err.Error(), "typed safety flags") {
-				t.Fatalf("error should mention typed safety flags, got: %v", err)
-			}
-			if !strings.Contains(err.Error(), tt.canonicalFlag) {
-				t.Fatalf("error should mention canonical flag %q, got: %v", tt.canonicalFlag, err)
-			}
-		})
-	}
-}
-
 func TestStartProcessApprovalModeRejectsUnknownValue(t *testing.T) {
 	ctx := context.Background()
 	_, err := codex.StartProcess(ctx, &codex.ProcessOptions{
@@ -552,6 +519,22 @@ func TestStartProcessExecArgsAllowsNonSafetyFlags(t *testing.T) {
 		{
 			name:     "short flag with attached value",
 			execArgs: []string{"-xtrace"},
+		},
+		{
+			name:     "single-dash forward compat flag beginning with s",
+			execArgs: []string{"-server"},
+		},
+		{
+			name:     "single-dash forward compat flag beginning with m",
+			execArgs: []string{"-metadata"},
+		},
+		{
+			name:     "single-dash forward compat flag beginning with c",
+			execArgs: []string{"-configurable"},
+		},
+		{
+			name:     "single-dash forward compat flag beginning with a",
+			execArgs: []string{"-all"},
 		},
 		{
 			name:     "short flag with equals value",

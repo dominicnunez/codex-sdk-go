@@ -149,8 +149,10 @@ var windowsChildEnvKeys = []string{
 	"USERNAME",
 }
 
-// rejectedExecArgFlagAliases canonicalizes all blocked safety flags (including
-// short aliases and compatibility aliases) to the preferred long option.
+// rejectedExecArgFlagAliases canonicalizes blocked safety flags that can be
+// identified without guessing how the CLI will parse an opaque ExecArgs token.
+// This keeps exact safety flags blocked while preserving forward compatibility
+// for future single-dash flags such as "-server".
 var rejectedExecArgFlagAliases = map[string]string{
 	"--model":             "--model",
 	"-model":              "--model",
@@ -172,13 +174,6 @@ var rejectedExecArgFlagAliases = map[string]string{
 	"-a": "--ask-for-approval",
 }
 
-var rejectedExecArgShortValueAliases = map[string]string{
-	"-m": "--model",
-	"-s": "--sandbox",
-	"-c": "--config",
-	"-a": "--ask-for-approval",
-}
-
 func canonicalRejectedExecArgFlag(arg string) (string, bool) {
 	if !strings.HasPrefix(arg, "-") || arg == "-" {
 		return "", false
@@ -191,11 +186,6 @@ func canonicalRejectedExecArgFlag(arg string) (string, bool) {
 
 	if canonical, ok := rejectedExecArgFlagAliases[token]; ok {
 		return canonical, true
-	}
-	for shortAlias, canonical := range rejectedExecArgShortValueAliases {
-		if token != shortAlias && strings.HasPrefix(token, shortAlias) {
-			return canonical, true
-		}
 	}
 
 	return "", false
