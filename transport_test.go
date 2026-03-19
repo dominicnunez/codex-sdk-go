@@ -10,9 +10,9 @@ import (
 	"github.com/dominicnunez/codex-sdk-go"
 )
 
-// TestTransportConcurrentSend verifies that multiple goroutines can send requests
-// concurrently and receive correctly matched responses.
-func TestTransportConcurrentSend(t *testing.T) {
+// TestMockTransportConcurrentSend verifies the mock transport stays safe under
+// concurrent Send calls and preserves request IDs in canned responses.
+func TestMockTransportConcurrentSend(t *testing.T) {
 	mock := NewMockTransport()
 
 	// Configure responses for different methods
@@ -83,9 +83,9 @@ func TestTransportConcurrentSend(t *testing.T) {
 	}
 }
 
-// TestTransportConcurrentNotify verifies that multiple goroutines can send
-// notifications concurrently without blocking each other.
-func TestTransportConcurrentNotify(t *testing.T) {
+// TestMockTransportConcurrentNotify verifies the mock transport records
+// concurrent notifications without returning spurious errors.
+func TestMockTransportConcurrentNotify(t *testing.T) {
 	mock := NewMockTransport()
 
 	const numGoroutines = 10
@@ -132,9 +132,9 @@ func TestTransportConcurrentNotify(t *testing.T) {
 	}
 }
 
-// TestTransportConcurrentHandlers verifies that request and notification handlers
-// can be invoked concurrently without race conditions.
-func TestTransportConcurrentHandlers(t *testing.T) {
+// TestMockTransportConcurrentHandlers verifies the mock transport can invoke its
+// injected request and notification handlers from concurrent goroutines.
+func TestMockTransportConcurrentHandlers(t *testing.T) {
 	mock := NewMockTransport()
 
 	var requestCount, notificationCount int
@@ -212,9 +212,9 @@ func TestTransportConcurrentHandlers(t *testing.T) {
 	}
 }
 
-// TestTransportConcurrentSendAndHandlers verifies that client-to-server sends
-// and server-to-client handler invocations can occur concurrently without deadlock.
-func TestTransportConcurrentSendAndHandlers(t *testing.T) {
+// TestMockTransportConcurrentSendAndHandlers verifies concurrent use of the mock
+// transport's Send path and injected server-request handler path.
+func TestMockTransportConcurrentSendAndHandlers(t *testing.T) {
 	mock := NewMockTransport()
 
 	// Configure response for client requests
@@ -288,9 +288,9 @@ func TestTransportConcurrentSendAndHandlers(t *testing.T) {
 	}
 }
 
-// TestTransportRequestResponseIDMatching verifies that response IDs correctly
-// match their corresponding request IDs across different ID types.
-func TestTransportRequestResponseIDMatching(t *testing.T) {
+// TestMockTransportRequestResponseIDMatching verifies the mock transport copies
+// each request ID onto its configured response across supported ID types.
+func TestMockTransportRequestResponseIDMatching(t *testing.T) {
 	mock := NewMockTransport()
 
 	testCases := []struct {
@@ -332,9 +332,9 @@ func TestTransportRequestResponseIDMatching(t *testing.T) {
 	}
 }
 
-// TestTransportConcurrentClose verifies that Close can be called safely
-// while other operations are in progress.
-func TestTransportConcurrentClose(t *testing.T) {
+// TestMockTransportConcurrentClose verifies Close is safe while mock traffic is
+// in flight and that subsequent operations fail.
+func TestMockTransportConcurrentClose(t *testing.T) {
 	mock := NewMockTransport()
 
 	var wg sync.WaitGroup
@@ -387,9 +387,9 @@ func TestTransportConcurrentClose(t *testing.T) {
 	}
 }
 
-// TestTransportHandlerPanic verifies that handler panics don't crash the transport
-// (this tests that the MockTransport is properly isolated for testing).
-func TestTransportHandlerPanic(t *testing.T) {
+// TestMockTransportHandlerPanic verifies a panicking mock handler surfaces to
+// the test instead of being swallowed.
+func TestMockTransportHandlerPanic(t *testing.T) {
 	mock := NewMockTransport()
 
 	// Register a handler that panics
