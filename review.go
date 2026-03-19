@@ -16,6 +16,13 @@ const (
 	ReviewDeliveryDetached ReviewDelivery = "detached"
 )
 
+const (
+	reviewTargetTypeUncommittedChanges = "uncommittedChanges"
+	reviewTargetTypeBaseBranch         = "baseBranch"
+	reviewTargetTypeCommit             = "commit"
+	reviewTargetTypeCustom             = "custom"
+)
+
 // ReviewTarget is a discriminated union for review target types.
 type ReviewTarget interface {
 	reviewTarget()
@@ -29,7 +36,15 @@ func (*UncommittedChangesReviewTarget) reviewTarget() {}
 func (u *UncommittedChangesReviewTarget) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Type string `json:"type"`
-	}{Type: "uncommittedChanges"})
+	}{Type: reviewTargetTypeUncommittedChanges})
+}
+
+func (u *UncommittedChangesReviewTarget) UnmarshalJSON(data []byte) error {
+	if err := validateReviewTargetVariantFields(data, reviewTargetTypeUncommittedChanges); err != nil {
+		return err
+	}
+	*u = UncommittedChangesReviewTarget{}
+	return nil
 }
 
 // BaseBranchReviewTarget reviews changes between the current branch and the given base branch.
@@ -43,7 +58,20 @@ func (b *BaseBranchReviewTarget) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Type   string `json:"type"`
 		Branch string `json:"branch"`
-	}{Type: "baseBranch", Branch: b.Branch})
+	}{Type: reviewTargetTypeBaseBranch, Branch: b.Branch})
+}
+
+func (b *BaseBranchReviewTarget) UnmarshalJSON(data []byte) error {
+	if err := validateReviewTargetVariantFields(data, reviewTargetTypeBaseBranch, "branch"); err != nil {
+		return err
+	}
+	type wire BaseBranchReviewTarget
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*b = BaseBranchReviewTarget(decoded)
+	return nil
 }
 
 // CommitReviewTarget reviews the changes introduced by a specific commit.
@@ -59,7 +87,20 @@ func (c *CommitReviewTarget) MarshalJSON() ([]byte, error) {
 		Type  string  `json:"type"`
 		SHA   string  `json:"sha"`
 		Title *string `json:"title,omitempty"`
-	}{Type: "commit", SHA: c.SHA, Title: c.Title})
+	}{Type: reviewTargetTypeCommit, SHA: c.SHA, Title: c.Title})
+}
+
+func (c *CommitReviewTarget) UnmarshalJSON(data []byte) error {
+	if err := validateReviewTargetVariantFields(data, reviewTargetTypeCommit, "sha"); err != nil {
+		return err
+	}
+	type wire CommitReviewTarget
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*c = CommitReviewTarget(decoded)
+	return nil
 }
 
 // CustomReviewTarget represents arbitrary instructions, equivalent to the old free-form prompt.
@@ -73,7 +114,20 @@ func (c *CustomReviewTarget) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Type         string `json:"type"`
 		Instructions string `json:"instructions"`
-	}{Type: "custom", Instructions: c.Instructions})
+	}{Type: reviewTargetTypeCustom, Instructions: c.Instructions})
+}
+
+func (c *CustomReviewTarget) UnmarshalJSON(data []byte) error {
+	if err := validateReviewTargetVariantFields(data, reviewTargetTypeCustom, "instructions"); err != nil {
+		return err
+	}
+	type wire CustomReviewTarget
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*c = CustomReviewTarget(decoded)
+	return nil
 }
 
 // UnknownReviewTarget represents an unrecognized review target type from a newer protocol version.
@@ -113,21 +167,25 @@ func (w *ReviewTargetWrapper) UnmarshalJSON(data []byte) error {
 	}
 
 	switch raw.Type {
-	case "uncommittedChanges":
-		w.Value = &UncommittedChangesReviewTarget{}
-	case "baseBranch":
+	case reviewTargetTypeUncommittedChanges:
+		var target UncommittedChangesReviewTarget
+		if err := json.Unmarshal(data, &target); err != nil {
+			return err
+		}
+		w.Value = &target
+	case reviewTargetTypeBaseBranch:
 		var target BaseBranchReviewTarget
 		if err := json.Unmarshal(data, &target); err != nil {
 			return err
 		}
 		w.Value = &target
-	case "commit":
+	case reviewTargetTypeCommit:
 		var target CommitReviewTarget
 		if err := json.Unmarshal(data, &target); err != nil {
 			return err
 		}
 		w.Value = &target
-	case "custom":
+	case reviewTargetTypeCustom:
 		var target CustomReviewTarget
 		if err := json.Unmarshal(data, &target); err != nil {
 			return err
@@ -135,6 +193,24 @@ func (w *ReviewTargetWrapper) UnmarshalJSON(data []byte) error {
 		w.Value = &target
 	default:
 		w.Value = &UnknownReviewTarget{Type: raw.Type, Raw: append(json.RawMessage(nil), data...)}
+	}
+
+	return nil
+}
+
+func validateReviewTargetVariantFields(data []byte, wantType string, requiredFields ...string) error {
+	if err := validateRequiredTaggedObjectFields(data, requiredFields...); err != nil {
+		return err
+	}
+
+	var raw struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	if raw.Type != wantType {
+		return fmt.Errorf("review target: type %q does not match %q", raw.Type, wantType)
 	}
 
 	return nil

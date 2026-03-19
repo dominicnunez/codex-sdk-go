@@ -2,7 +2,9 @@ package codex_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/dominicnunez/codex-sdk-go"
@@ -13,6 +15,7 @@ func TestReviewStart(t *testing.T) {
 		name     string
 		params   codex.ReviewStartParams
 		response map[string]interface{}
+		wantJSON map[string]interface{}
 	}{
 		{
 			name: "uncommitted changes review",
@@ -28,6 +31,12 @@ func TestReviewStart(t *testing.T) {
 					"id":     "turn-456",
 					"status": "inProgress",
 					"items":  []interface{}{},
+				},
+			},
+			wantJSON: map[string]interface{}{
+				"threadId": "thread-123",
+				"target": map[string]interface{}{
+					"type": "uncommittedChanges",
 				},
 			},
 		},
@@ -47,6 +56,13 @@ func TestReviewStart(t *testing.T) {
 					"id":     "turn-789",
 					"status": "completed",
 					"items":  []interface{}{},
+				},
+			},
+			wantJSON: map[string]interface{}{
+				"threadId": "thread-123",
+				"target": map[string]interface{}{
+					"type":   "baseBranch",
+					"branch": "main",
 				},
 			},
 		},
@@ -69,6 +85,14 @@ func TestReviewStart(t *testing.T) {
 					"items":  []interface{}{},
 				},
 			},
+			wantJSON: map[string]interface{}{
+				"threadId": "thread-123",
+				"target": map[string]interface{}{
+					"type":  "commit",
+					"sha":   "abc123def456",
+					"title": "feat: add new feature",
+				},
+			},
 		},
 		{
 			name: "custom review",
@@ -88,6 +112,13 @@ func TestReviewStart(t *testing.T) {
 					"items":  []interface{}{},
 				},
 			},
+			wantJSON: map[string]interface{}{
+				"threadId": "thread-123",
+				"target": map[string]interface{}{
+					"type":         "custom",
+					"instructions": "Review for security vulnerabilities",
+				},
+			},
 		},
 		{
 			name: "detached review",
@@ -104,6 +135,13 @@ func TestReviewStart(t *testing.T) {
 					"id":     "turn-303",
 					"status": "inProgress",
 					"items":  []interface{}{},
+				},
+			},
+			wantJSON: map[string]interface{}{
+				"threadId": "thread-123",
+				"delivery": "detached",
+				"target": map[string]interface{}{
+					"type": "uncommittedChanges",
 				},
 			},
 		},
@@ -139,6 +177,47 @@ func TestReviewStart(t *testing.T) {
 
 			if req.Method != "review/start" {
 				t.Errorf("Method = %v, want review/start", req.Method)
+			}
+
+			var got map[string]interface{}
+			if err := json.Unmarshal(req.Params, &got); err != nil {
+				t.Fatalf("request params decode failed: %v", err)
+			}
+			if !reflect.DeepEqual(got, tt.wantJSON) {
+				t.Errorf("request params = %#v, want %#v", got, tt.wantJSON)
+			}
+		})
+	}
+}
+
+func TestReviewTargetWrapperUnmarshalRejectsMissingVariantFields(t *testing.T) {
+	tests := []struct {
+		name string
+		data string
+	}{
+		{
+			name: "base branch missing branch",
+			data: `{"type":"baseBranch"}`,
+		},
+		{
+			name: "commit missing sha",
+			data: `{"type":"commit"}`,
+		},
+		{
+			name: "custom missing instructions",
+			data: `{"type":"custom"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var wrapper codex.ReviewTargetWrapper
+			err := json.Unmarshal([]byte(tt.data), &wrapper)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !errors.Is(err, codex.ErrMissingResultField) {
+				t.Fatalf("error = %v; want ErrMissingResultField", err)
 			}
 		})
 	}
