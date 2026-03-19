@@ -1,8 +1,3 @@
-# Notification Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> This file covers stale notification-validation findings.
-
 ### Hook and guardian review notifications already reject malformed required fields
 
 **Location:** `hook_notifications.go:66` — hook and guardian notification unmarshaling
@@ -14,12 +9,6 @@
 `UnmarshalJSON` implementations. Nested required fields such as `run.id`,
 `run.status`, and `review.status` are enforced before dispatch, and
 `hook_notifications_test.go` exercises the malformed-payload error path.
-
-
-# Validation Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> This file covers stale response and notification validation findings.
 
 ### Thread, turn, and guardian payloads already reject unsupported enum values
 

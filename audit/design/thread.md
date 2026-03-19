@@ -1,14 +1,3 @@
-# Design
-
-> Findings that describe behavior which is correct by design.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Date:** YYYY-MM-DD
-> **Reason:** Explanation (can be multiple lines)
-
 ### Params structs use bare interface instead of wrapper type for approval and sandbox policy fields
 
 **Location:** `thread.go:538`, `thread.go:642`, `thread.go:676`, `turn.go:24`, `turn.go:30` — ApprovalPolicy and SandboxPolicy fields

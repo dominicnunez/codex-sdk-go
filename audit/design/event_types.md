@@ -1,14 +1,3 @@
-# Design
-
-> Findings that describe behavior which is correct by design.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Date:** YYYY-MM-DD
-> **Reason:** Explanation (can be multiple lines)
-
 ### Zero-field union variants skip unmarshal while variants with fields do not
 
 **Location:** `event_types.go:186-204` — PatchChangeKindWrapper.UnmarshalJSON, also `thread.go:287-311` — ThreadStatusWrapper.UnmarshalJSON

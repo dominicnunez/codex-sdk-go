@@ -1,14 +1,3 @@
-# Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Date:** YYYY-MM-DD
-> **Reason:** Explanation (can be multiple lines)
-
 ### turn/completed unmarshal failure path in executeStreamedTurn claimed to lack test coverage
 
 **Location:** `turn_lifecycle.go:181-184` — turn/completed unmarshal failure synthesis

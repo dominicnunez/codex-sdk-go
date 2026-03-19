@@ -1,14 +1,3 @@
-# Design
-
-> Findings that describe behavior which is correct by design.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Date:** YYYY-MM-DD
-> **Reason:** Explanation (can be multiple lines)
-
 ### RPCError.Is matches on error code only, ignoring message and data
 
 **Location:** `errors.go:52-61` — RPCError.Is

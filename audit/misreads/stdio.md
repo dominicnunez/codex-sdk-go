@@ -1,14 +1,3 @@
-# Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Date:** YYYY-MM-DD
-> **Reason:** Explanation (can be multiple lines)
-
 ### Intentional transport shutdown already preserves the closed reader state
 
 **Location:** `stdio.go:485`, `stdio.go:1767` — transport close and reader-stop paths
@@ -32,17 +21,6 @@ goroutine feeds workers from that backlog. That keeps inbound frame decoding and
 response routing independent from handler throughput, so the transport does not
 stall unrelated `Send` calls behind blocked streaming handlers.
 
-
-# Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Reason:** Explanation (can be multiple lines)
-
 ### Malformed response accounting already increments when the pending request can be identified
 
 **Location:** `stdio.go:1486` — `handleMalformedResponse`
@@ -51,18 +29,6 @@ stall unrelated `Send` calls behind blocked streaming handlers.
 normalize the response ID, so malformed server responses are counted even when the transport can
 still attribute the parse error back to a pending request. The stale report line predates this
 behavior, and the transport tests now assert both the parse-error delivery and the counter bump.
-
-
-# Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Date:** YYYY-MM-DD
-> **Reason:** Explanation (can be multiple lines)
 
 ### Intentional transport shutdown leaks internal pipe errors to callers
 

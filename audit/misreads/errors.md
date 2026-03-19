@@ -1,14 +1,3 @@
-# Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Date:** YYYY-MM-DD
-> **Reason:** Explanation (can be multiple lines)
-
 ### RPCError.Is nil-nil path flagged as unreachable dead code
 
 **Location:** `errors.go:61-70` — RPCError.Is nil guard

@@ -1,14 +1,3 @@
-# Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Date:** YYYY-MM-DD
-> **Reason:** Explanation (can be multiple lines)
-
 ### The realtime started notification tests already include the required version field
 
 **Location:** `realtime_test.go:18` — `TestThreadRealtimeStartedNotification`

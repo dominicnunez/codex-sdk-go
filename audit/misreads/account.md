@@ -1,8 +1,3 @@
-# Validation Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> This file covers stale response and notification validation findings.
-
 ### Account login decode failures already include the RPC method name
 
 **Location:** `account.go:614` — `AccountService.Login`
@@ -11,18 +6,6 @@
 `fmt.Errorf("%s: %w", methodAccountLoginStart, err)`, so malformed login results surface as
 `account/login/start: ...` at the service boundary. The stale report line no longer matches the
 checked-in code, and the login tests assert the method-prefixed error text.
-
-
-# Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Date:** YYYY-MM-DD
-> **Reason:** Explanation (can be multiple lines)
 
 ### Formatting nil login parameter pointers does not panic in fmt paths
 

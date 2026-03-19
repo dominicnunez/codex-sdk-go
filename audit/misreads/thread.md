@@ -1,8 +1,3 @@
-# Validation Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> This file covers stale response and notification validation findings.
-
 ### Thread unsubscribe responses already reject unknown status values
 
 **Location:** `thread.go:1378` — `ThreadUnsubscribeResponse.UnmarshalJSON`
@@ -12,18 +7,6 @@
 `unsubscribed`, and returns an error for anything else before the response reaches callers. The
 regression test `TestThreadUnsubscribeRejectsInvalidStatus` in `thread_test.go` also covers the
 invalid-enum path.
-
-
-# Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Date:** YYYY-MM-DD
-> **Reason:** Explanation (can be multiple lines)
 
 ### ThreadStartParams.ApprovalPolicy bare interface marshaling flagged as new finding but already covered
 

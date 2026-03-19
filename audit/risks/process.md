@@ -1,14 +1,3 @@
-# Risks
-
-> Real findings consciously accepted — architectural cost, external constraints, disproportionate effort.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Date:** YYYY-MM-DD
-> **Reason:** Explanation (can be multiple lines)
-
 ### Process.Close discards signal and kill errors during graceful shutdown
 
 **Location:** `process.go:153-164` — Signal and Kill error handling in Close

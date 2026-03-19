@@ -1,14 +1,3 @@
-# Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Date:** YYYY-MM-DD
-> **Reason:** Explanation (can be multiple lines)
-
 ### Resource and Tool untyped interface{} fields described as a new finding but covered by existing exception
 
 **Location:** `mcp.go:26-51` — Resource and Tool type fields

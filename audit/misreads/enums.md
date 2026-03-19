@@ -1,8 +1,3 @@
-# Validation Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> This file covers stale response and notification validation findings.
-
 ### Thread, turn, and guardian payloads already reject unsupported enum values
 
 **Location:** `enums.go:18`, `enums.go:209`, `hook_notifications.go:167` — custom `UnmarshalJSON` on `TurnStatus`, `ThreadActiveFlag`, `GuardianApprovalReviewStatus`, and `GuardianRiskLevel`

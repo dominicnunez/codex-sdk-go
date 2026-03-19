@@ -1,14 +1,3 @@
-# Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Date:** YYYY-MM-DD
-> **Reason:** Explanation (can be multiple lines)
-
 ### Streamed validation failures already populate the collector summary
 
 **Location:** `run_streamed.go:250`, `run_streamed_test.go:154` — synchronous validation path and regression coverage
@@ -19,18 +8,6 @@ the collector before returning the terminal error stream. The checked-in tests
 cover both nil-context and empty-prompt collector cases and assert that
 `Summary().NormalizedErrors` contains the validation error. The finding is stale
 against the current implementation and test suite.
-
-
-# Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Date:** YYYY-MM-DD
-> **Reason:** Explanation (can be multiple lines)
 
 ### Approval flow mid-turn claimed to have no test coverage
 

@@ -1,13 +1,3 @@
-# Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Reason:** Explanation (can be multiple lines)
-
 ### Minimal-environment coverage already verifies required baseline variables and Windows-specific allowlists
 
 **Location:** `process_test.go:70`, `process_test.go:561`, and `process_internal_test.go:100`

@@ -1,14 +1,3 @@
-# Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Date:** YYYY-MM-DD
-> **Reason:** Explanation (can be multiple lines)
-
 ### Turn backlog coverage for Run, Conversation.Turn, and RunStreamed already exists
 
 **Location:** `turn_lifecycle_test.go:803`, `turn_lifecycle_test.go:887`, `turn_lifecycle_test.go:976`

@@ -1,14 +1,3 @@
-# Design
-
-> Findings that describe behavior which is correct by design.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Date:** YYYY-MM-DD
-> **Reason:** Explanation (can be multiple lines)
-
 ### BinaryPath relies on design-by-contract without path validation
 
 **Location:** `process.go:149-153` — BinaryPath resolution in StartProcess

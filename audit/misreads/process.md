@@ -1,7 +1,3 @@
-# Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-
 ### ExecArgs safety does not depend on duplicate-flag parser precedence
 
 **Location:** `process.go:41` — `ProcessOptions.ExecArgs` validation and `process.go:181` — `buildArgs`
@@ -11,18 +7,6 @@ flags from `ExecArgs` before the CLI is ever spawned. That means `ExecArgs` cann
 `--model`, `--sandbox`, `--full-auto`, or `--config` flag for the parser to resolve, so the safety
 boundary does not depend on a last-wins CLI contract. The remaining ordering test only verifies the
 argv shape emitted after validation, and the related comments were tightened to reflect that design.
-
-
-# Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Date:** YYYY-MM-DD
-> **Reason:** Explanation (can be multiple lines)
 
 ### Process shutdown already classifies SDK-initiated interrupt exits before surfacing wait errors
 
@@ -34,17 +18,6 @@ interrupt or escalated to a kill, then classifies `p.waitErr` with
 SDK-initiated interrupt exits are therefore not treated the same as unrelated
 signal or nonzero exits, which is the distinction the report says is missing.
 
-
-# Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Reason:** Explanation (can be multiple lines)
-
 ### The default minimal child environment already preserves Windows profile and app-data variables
 
 **Location:** `process.go:110` and `process.go:351` — OS-specific child env allowlists
@@ -55,18 +28,6 @@ signal or nonzero exits, which is the distinction the report says is missing.
 environment, and `minimalChildEnv()` resolves through that helper at
 `process.go:336-357`. The single cross-platform allowlist described in the report
 is no longer present.
-
-
-# Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Date:** YYYY-MM-DD
-> **Reason:** Explanation (can be multiple lines)
 
 ### Process.Wait claimed to have zero test coverage
 

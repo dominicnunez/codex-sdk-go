@@ -1,14 +1,3 @@
-# Risks
-
-> Real findings consciously accepted — architectural cost, external constraints, disproportionate effort.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Date:** YYYY-MM-DD
-> **Reason:** Explanation (can be multiple lines)
-
 ### Thread ID filtering in notification listeners lacks a cross-thread contamination test
 
 **Location:** `turn_lifecycle.go:34-38`, `run_streamed.go:87-91` — threadID filter

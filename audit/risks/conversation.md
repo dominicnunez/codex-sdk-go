@@ -1,14 +1,3 @@
-# Risks
-
-> Real findings consciously accepted — architectural cost, external constraints, disproportionate effort.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Date:** YYYY-MM-DD
-> **Reason:** Explanation (can be multiple lines)
-
 ### Conversation thread history grows unboundedly
 
 **Location:** `conversation.go:229-233` — turn append in addCompletedTurn

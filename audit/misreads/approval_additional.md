@@ -1,8 +1,3 @@
-# Validation Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> This file covers stale response and notification validation findings.
-
 ### Approval handler responses already fail locally when decision, scope, action, or token fields are invalid
 
 **Location:** `approval.go:199`, `approval.go:583`, `approval.go:947`, `approval.go:978`, `approval.go:1284`, `approval_additional.go:62`, `approval_additional.go:157`, `client.go:584`

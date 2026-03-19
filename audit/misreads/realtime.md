@@ -1,8 +1,3 @@
-# Notification Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> This file covers stale notification-validation findings.
-
 ### Realtime notification payloads are already validated before handlers run
 
 **Location:** `realtime.go:25` — realtime notification unmarshaling
@@ -13,18 +8,6 @@
 do not reach application handlers. The regression coverage in
 `realtime_test.go` also includes missing-required-field handler error tests for
 these notifications.
-
-
-# Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Date:** YYYY-MM-DD
-> **Reason:** Explanation (can be multiple lines)
 
 ### Comment about silently ignoring unmarshal errors claimed to be copy-pasted across 25+ handlers
 

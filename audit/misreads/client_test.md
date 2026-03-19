@@ -1,13 +1,3 @@
-# Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Reason:** Explanation (can be multiple lines)
-
 ### The client test suite no longer locks in forged transport metadata as a TransportError
 
 **Location:** `client_test.go:257` — forged transport metadata regression test

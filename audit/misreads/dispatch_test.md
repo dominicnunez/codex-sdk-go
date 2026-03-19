@@ -1,13 +1,3 @@
-# Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Reason:** Explanation (can be multiple lines)
-
 ### Regression coverage for malformed approval payloads already exists
 
 **Location:** `dispatch_test.go:826`, `approval_test.go:747`
@@ -16,18 +6,6 @@
 zero-value `ToolRequestUserInputResponse`, nested empty answer payloads, and malformed dynamic
 tool content items missing `type`, `text`, or `imageUrl`. The reported testing gap is stale in
 this checkout.
-
-
-# Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Date:** YYYY-MM-DD
-> **Reason:** Explanation (can be multiple lines)
 
 ### Duplicate approval dispatch tests across two files
 

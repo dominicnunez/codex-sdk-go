@@ -1,14 +1,3 @@
-# Risks
-
-> Real findings consciously accepted — architectural cost, external constraints, disproportionate effort.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Date:** YYYY-MM-DD
-> **Reason:** Explanation (can be multiple lines)
-
 ### Conversation and turn tests use time.Sleep for goroutine synchronization
 
 **Location:** `conversation_test.go:42,67,111,256,315,525,554,623,664,715` — and similar in `run_test.go`, `run_streamed_test.go`

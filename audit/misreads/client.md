@@ -1,13 +1,3 @@
-# Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Reason:** Explanation (can be multiple lines)
-
 ### Approval handlers already reject malformed dynamic tool and user-input results
 
 **Location:** `client.go:608`, `approval.go:943`, `approval.go:1166`
@@ -16,17 +6,6 @@
 them onto the wire. `DynamicToolCallResponse.validate` rejects a nil `contentItems` slice, and
 `ToolRequestUserInputResponse.validate` rejects a nil `answers` map plus nested answers with a nil
 `answers` slice. The failure path is covered by `dispatch_test.go:826`.
-
-
-# Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Reason:** Explanation (can be multiple lines)
 
 ### Server responses no longer spoof local transport failures in Client.Send
 
@@ -38,12 +17,6 @@ it always returns `NewRPCError(resp.Error)` at `client.go:337-338`, so a server
 cannot forge `{"transport":"failed","origin":"client"}` and have the client
 reclassify it as a local `TransportError`.
 
-
-# Validation Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> This file covers stale response and notification validation findings.
-
 ### Approval handler responses already fail locally when decision, scope, action, or token fields are invalid
 
 **Location:** `approval.go:199`, `approval.go:583`, `approval.go:947`, `approval.go:978`, `approval.go:1284`, `approval_additional.go:62`, `approval_additional.go:157`, `client.go:584`
@@ -53,18 +26,6 @@ the current code. `handleApproval` calls `validateDecodedResponse` before marsha
 approval response types now implement `validate()` methods for the constrained decision, scope,
 action, and credential fields the report described. The regression test
 `TestApprovalHandlerRejectsInvalidResponsePayloads` exercises those rejection paths.
-
-
-# Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Date:** YYYY-MM-DD
-> **Reason:** Explanation (can be multiple lines)
 
 ### handleApproval marshal error does not leak internal structure
 

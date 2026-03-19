@@ -1,13 +1,3 @@
-# Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Reason:** Explanation (can be multiple lines)
-
 ### Approval handlers already reject malformed dynamic tool and user-input results
 
 **Location:** `client.go:608`, `approval.go:943`, `approval.go:1166`
@@ -26,12 +16,6 @@ them onto the wire. `DynamicToolCallResponse.validate` rejects a nil `contentIte
 wrapper decoder rejects a missing or empty `type` before dispatching. The regression coverage in
 `approval_test.go:747` already checks `{}`, `{"type":"inputText"}`, and `{"type":"inputImage"}`
 and expects all three to fail decoding.
-
-
-# Validation Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> This file covers stale response and notification validation findings.
 
 ### Approval request enums already reject unsupported protocol and refresh reason values
 
@@ -53,18 +37,6 @@ the current code. `handleApproval` calls `validateDecodedResponse` before marsha
 approval response types now implement `validate()` methods for the constrained decision, scope,
 action, and credential fields the report described. The regression test
 `TestApprovalHandlerRejectsInvalidResponsePayloads` exercises those rejection paths.
-
-
-# Misreads
-
-> Findings where the audit misread the code or described behavior that doesn't occur.
-> Managed by sfk willie. Follow the entry format below.
->
-> Entry format:
-> ### Plain language description
-> **Location:** `file/path:line` — optional context
-> **Date:** YYYY-MM-DD
-> **Reason:** Explanation (can be multiple lines)
 
 ### Wrapper MarshalJSON methods do not panic on nil interface Value
 

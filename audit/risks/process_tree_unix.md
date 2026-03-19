@@ -1,7 +1,3 @@
-# Risks
-
-> Real findings consciously accepted — architectural cost, external constraints, disproportionate effort.
-
 ### Unix process-group shutdown cannot safely re-identify a recycled group leader PID
 
 **Location:** `process_tree_unix.go:29` — process-group interrupt/kill path
