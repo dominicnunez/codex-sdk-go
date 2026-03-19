@@ -49,6 +49,11 @@ func (p *ApplyPatchApprovalParams) UnmarshalJSON(data []byte) error {
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
+	var err error
+	decoded.GrantRoot, err = validateInboundAbsolutePathPointerField("grantRoot", decoded.GrantRoot)
+	if err != nil {
+		return err
+	}
 	*p = ApplyPatchApprovalParams(decoded)
 	return nil
 }
@@ -400,6 +405,18 @@ func (p *CommandExecutionRequestApprovalParams) UnmarshalJSON(data []byte) error
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
+	var err error
+	decoded.Cwd, err = validateInboundAbsolutePathPointerField("cwd", decoded.Cwd)
+	if err != nil {
+		return err
+	}
+	if decoded.CommandActions != nil {
+		for i := range *decoded.CommandActions {
+			if err := validateCommandActionWrapperPaths(&(*decoded.CommandActions)[i], decoded.Cwd, fmt.Sprintf("commandActions[%d]", i)); err != nil {
+				return err
+			}
+		}
+	}
 	if decoded.ProposedNetworkPolicyAmendments != nil {
 		for i, amendment := range *decoded.ProposedNetworkPolicyAmendments {
 			if err := validateNetworkPolicyAmendment(amendment); err != nil {
@@ -558,6 +575,30 @@ func (w *CommandActionWrapper) UnmarshalJSON(data []byte) error {
 		w.Value = &unknown
 	}
 
+	return nil
+}
+
+func validateCommandActionWrapperPaths(w *CommandActionWrapper, cwd *string, field string) error {
+	switch value := w.Value.(type) {
+	case *ReadCommandAction:
+		path, err := validateApprovalPathField(value.Path, cwd, field+".path")
+		if err != nil {
+			return err
+		}
+		value.Path = path
+	case *ListFilesCommandAction:
+		path, err := validateApprovalPathPointerField(value.Path, cwd, field+".path")
+		if err != nil {
+			return err
+		}
+		value.Path = path
+	case *SearchCommandAction:
+		path, err := validateApprovalPathPointerField(value.Path, cwd, field+".path")
+		if err != nil {
+			return err
+		}
+		value.Path = path
+	}
 	return nil
 }
 
@@ -788,6 +829,16 @@ func (p *ExecCommandApprovalParams) UnmarshalJSON(data []byte) error {
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
+	validatedCwd, err := validateInboundAbsolutePathField("cwd", decoded.Cwd)
+	if err != nil {
+		return err
+	}
+	decoded.Cwd = validatedCwd
+	for i := range decoded.ParsedCmd {
+		if err := validateParsedCommandWrapperPaths(&decoded.ParsedCmd[i], decoded.Cwd, fmt.Sprintf("parsedCmd[%d]", i)); err != nil {
+			return err
+		}
+	}
 	*p = ExecCommandApprovalParams(decoded)
 	return nil
 }
@@ -942,6 +993,30 @@ func (w *ParsedCommandWrapper) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func validateParsedCommandWrapperPaths(w *ParsedCommandWrapper, cwd string, field string) error {
+	switch value := w.Value.(type) {
+	case *ReadParsedCommand:
+		path, err := validateApprovalPathField(value.Path, &cwd, field+".path")
+		if err != nil {
+			return err
+		}
+		value.Path = path
+	case *ListFilesParsedCommand:
+		path, err := validateApprovalPathPointerField(value.Path, &cwd, field+".path")
+		if err != nil {
+			return err
+		}
+		value.Path = path
+	case *SearchParsedCommand:
+		path, err := validateApprovalPathPointerField(value.Path, &cwd, field+".path")
+		if err != nil {
+			return err
+		}
+		value.Path = path
+	}
+	return nil
+}
+
 // MarshalJSON implements custom marshaling for ParsedCommandWrapper.
 func (w ParsedCommandWrapper) MarshalJSON() ([]byte, error) {
 	return json.Marshal(w.Value)
@@ -977,8 +1052,30 @@ func (p *FileChangeRequestApprovalParams) UnmarshalJSON(data []byte) error {
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
+	var err error
+	decoded.GrantRoot, err = validateInboundAbsolutePathPointerField("grantRoot", decoded.GrantRoot)
+	if err != nil {
+		return err
+	}
 	*p = FileChangeRequestApprovalParams(decoded)
 	return nil
+}
+
+func validateApprovalPathField(value string, cwd *string, field string) (string, error) {
+	if cwd == nil {
+		return validateInboundAbsolutePathField(field, value)
+	}
+	return validateInboundPathFieldWithBase(field, value, *cwd)
+}
+
+func validateApprovalPathPointerField(value *string, cwd *string, field string) (*string, error) {
+	if value == nil {
+		return nil, nil //nolint:nilnil // nil pointer is the valid absence case for optional approval path fields.
+	}
+	if cwd == nil {
+		return validateInboundAbsolutePathPointerField(field, value)
+	}
+	return validateInboundPathPointerFieldWithBase(field, value, *cwd)
 }
 
 // FileChangeRequestApprovalResponse represents the response to a file change approval request.

@@ -141,6 +141,87 @@ func validateInboundAbsolutePathSliceField(field string, values []string) ([]str
 	return validated, nil
 }
 
+func validateInboundPathFieldWithBase(field, value, base string) (string, error) {
+	normalized, err := normalizeAbsolutePath(value)
+	if err == nil {
+		if normalized != value {
+			return "", fmt.Errorf("%s: must be normalized, got %q", field, value)
+		}
+		return normalized, nil
+	}
+	if looksLikeAbsolutePath(value) {
+		return "", fmt.Errorf("%s: %w", field, err)
+	}
+
+	validatedBase, err := validateInboundAbsolutePathField(field+".base", base)
+	if err != nil {
+		return "", err
+	}
+
+	resolved, err := resolveInboundPathAgainstBase(validatedBase, value)
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", field, err)
+	}
+	return resolved, nil
+}
+
+func validateInboundPathPointerFieldWithBase(field string, value *string, base string) (*string, error) {
+	if value == nil {
+		return nil, nil //nolint:nilnil // nil pointer is the valid absence case for optional inbound path fields.
+	}
+
+	validated, err := validateInboundPathFieldWithBase(field, *value, base)
+	if err != nil {
+		return nil, err
+	}
+	return &validated, nil
+}
+
+func looksLikeAbsolutePath(value string) bool {
+	return strings.HasPrefix(value, "/") ||
+		isWindowsExtendedUNCPath(value) ||
+		isWindowsExtendedAbsolutePath(value) ||
+		isWindowsDriveAbsolutePath(value) ||
+		isWindowsUNCPath(value)
+}
+
+func resolveInboundPathAgainstBase(base, value string) (string, error) {
+	switch {
+	case value == "":
+		return "", fmt.Errorf("must be an absolute path, got empty string")
+	case strings.HasPrefix(base, "/"):
+		return pathpkg.Clean(pathpkg.Join(base, value)), nil
+	case isWindowsExtendedUNCPath(base):
+		prefix, rest, ok := splitWindowsUNCPath(`\\` + base[8:])
+		if !ok {
+			return "", fmt.Errorf("must be an absolute path: %q", value)
+		}
+		return normalizeWindowsPath(`\\?\UNC`+prefix[1:], joinWindowsPathRest(rest, value), false), nil
+	case isWindowsExtendedAbsolutePath(base):
+		prefix, rest, ok := splitWindowsExtendedAbsolutePath(base[4:])
+		if !ok {
+			return "", fmt.Errorf("must be an absolute path: %q", value)
+		}
+		return normalizeWindowsPath(`\\?\`+prefix, joinWindowsPathRest(rest, value), true), nil
+	case isWindowsUNCPath(base):
+		prefix, rest, ok := splitWindowsUNCPath(base)
+		if !ok {
+			return "", fmt.Errorf("must be an absolute path: %q", value)
+		}
+		return normalizeWindowsPath(prefix, joinWindowsPathRest(rest, value), false), nil
+	case isWindowsDriveAbsolutePath(base):
+		return normalizeWindowsPath(base[:2], joinWindowsPathRest(base[2:], value), true), nil
+	default:
+		return "", fmt.Errorf("must be an absolute path: %q", value)
+	}
+}
+
+func joinWindowsPathRest(baseRest, value string) string {
+	base := strings.ReplaceAll(baseRest, `\`, "/")
+	relative := strings.ReplaceAll(value, `\`, "/")
+	return strings.ReplaceAll(pathpkg.Clean(pathpkg.Join(base, relative)), "/", `\`)
+}
+
 func normalizeAdditionalFileSystemPermissionsField(
 	field string,
 	value *AdditionalFileSystemPermissions,

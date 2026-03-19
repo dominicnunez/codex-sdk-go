@@ -203,6 +203,258 @@ func TestCommandExecutionRequestApprovalParamsRejectInvalidNetworkPolicyAmendmen
 	}
 }
 
+func TestApprovalParamsNormalizeAndValidatePaths(t *testing.T) {
+	t.Run("command execution approval normalizes action paths against cwd", func(t *testing.T) {
+		var params codex.CommandExecutionRequestApprovalParams
+		err := json.Unmarshal([]byte(`{
+			"itemId":"item-1",
+			"threadId":"thread-1",
+			"turnId":"turn-1",
+			"cwd":"/workspace/project",
+			"commandActions":[
+				{"type":"read","command":"cat","name":"config","path":"../config.yaml"},
+				{"type":"listFiles","command":"ls","path":"./cmd"},
+				{"type":"search","command":"rg","path":"src/../internal","query":"needle"}
+			]
+		}`), &params)
+		if err != nil {
+			t.Fatalf("Unmarshal command execution approval: %v", err)
+		}
+
+		actions := *params.CommandActions
+		read, ok := actions[0].Value.(*codex.ReadCommandAction)
+		if !ok {
+			t.Fatalf("commandActions[0] = %T; want *ReadCommandAction", actions[0].Value)
+		}
+		if got, want := read.Path, "/workspace/config.yaml"; got != want {
+			t.Fatalf("read.Path = %q, want %q", got, want)
+		}
+
+		list, ok := actions[1].Value.(*codex.ListFilesCommandAction)
+		if !ok {
+			t.Fatalf("commandActions[1] = %T; want *ListFilesCommandAction", actions[1].Value)
+		}
+		if got, want := *list.Path, "/workspace/project/cmd"; got != want {
+			t.Fatalf("list.Path = %q, want %q", got, want)
+		}
+
+		search, ok := actions[2].Value.(*codex.SearchCommandAction)
+		if !ok {
+			t.Fatalf("commandActions[2] = %T; want *SearchCommandAction", actions[2].Value)
+		}
+		if got, want := *search.Path, "/workspace/project/internal"; got != want {
+			t.Fatalf("search.Path = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("command execution approval rejects relative path without cwd", func(t *testing.T) {
+		var params codex.CommandExecutionRequestApprovalParams
+		err := json.Unmarshal([]byte(`{
+			"itemId":"item-1",
+			"threadId":"thread-1",
+			"turnId":"turn-1",
+			"commandActions":[{"type":"read","command":"cat","name":"config","path":"../config.yaml"}]
+		}`), &params)
+		if err == nil {
+			t.Fatal("expected invalid path error")
+		}
+		if !strings.Contains(err.Error(), `commandActions[0].path: must be an absolute path`) {
+			t.Fatalf("error = %v; want commandActions[0].path context", err)
+		}
+	})
+
+	t.Run("command execution approval rejects non-normalized cwd", func(t *testing.T) {
+		var params codex.CommandExecutionRequestApprovalParams
+		err := json.Unmarshal([]byte(`{
+			"itemId":"item-1",
+			"threadId":"thread-1",
+			"turnId":"turn-1",
+			"cwd":"/workspace/../project"
+		}`), &params)
+		if err == nil {
+			t.Fatal("expected invalid cwd error")
+		}
+		if !strings.Contains(err.Error(), `cwd: must be normalized`) {
+			t.Fatalf("error = %v; want normalized cwd error", err)
+		}
+	})
+
+	t.Run("command execution approval rejects non-normalized absolute action path", func(t *testing.T) {
+		var params codex.CommandExecutionRequestApprovalParams
+		err := json.Unmarshal([]byte(`{
+			"itemId":"item-1",
+			"threadId":"thread-1",
+			"turnId":"turn-1",
+			"cwd":"/workspace/project",
+			"commandActions":[{"type":"read","command":"cat","name":"config","path":"/workspace/project/../config.yaml"}]
+		}`), &params)
+		if err == nil {
+			t.Fatal("expected invalid path error")
+		}
+		if !strings.Contains(err.Error(), `commandActions[0].path: must be normalized`) {
+			t.Fatalf("error = %v; want normalized action path error", err)
+		}
+	})
+
+	t.Run("legacy exec approval normalizes parsed command paths against cwd", func(t *testing.T) {
+		var params codex.ExecCommandApprovalParams
+		err := json.Unmarshal([]byte(`{
+			"callId":"call-1",
+			"conversationId":"thread-1",
+			"command":["ls"],
+			"cwd":"/workspace/project",
+			"parsedCmd":[
+				{"type":"read","cmd":"cat","name":"config","path":"../config.yaml"},
+				{"type":"list_files","cmd":"ls","path":"./cmd"},
+				{"type":"search","cmd":"rg","path":"src/../internal","query":"needle"}
+			]
+		}`), &params)
+		if err != nil {
+			t.Fatalf("Unmarshal exec command approval: %v", err)
+		}
+
+		read, ok := params.ParsedCmd[0].Value.(*codex.ReadParsedCommand)
+		if !ok {
+			t.Fatalf("parsedCmd[0] = %T; want *ReadParsedCommand", params.ParsedCmd[0].Value)
+		}
+		if got, want := read.Path, "/workspace/config.yaml"; got != want {
+			t.Fatalf("read.Path = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("file change approval rejects relative grant root", func(t *testing.T) {
+		var params codex.FileChangeRequestApprovalParams
+		err := json.Unmarshal([]byte(`{
+			"itemId":"item-1",
+			"threadId":"thread-1",
+			"turnId":"turn-1",
+			"grantRoot":"../secret"
+		}`), &params)
+		if err == nil {
+			t.Fatal("expected invalid grantRoot error")
+		}
+		if !strings.Contains(err.Error(), `grantRoot: must be an absolute path`) {
+			t.Fatalf("error = %v; want grantRoot path error", err)
+		}
+	})
+
+	t.Run("apply patch approval rejects relative grant root", func(t *testing.T) {
+		var params codex.ApplyPatchApprovalParams
+		err := json.Unmarshal([]byte(`{
+			"callId":"call-1",
+			"conversationId":"thread-1",
+			"fileChanges":{},
+			"grantRoot":"../secret"
+		}`), &params)
+		if err == nil {
+			t.Fatal("expected invalid grantRoot error")
+		}
+		if !strings.Contains(err.Error(), `grantRoot: must be an absolute path`) {
+			t.Fatalf("error = %v; want grantRoot path error", err)
+		}
+	})
+}
+
+func TestParsedCommandWrapperUnmarshalVariants(t *testing.T) {
+	tests := []struct {
+		name    string
+		payload string
+		check   func(*testing.T, codex.ParsedCommandWrapper)
+	}{
+		{
+			name:    "read",
+			payload: `{"type":"read","cmd":"cat","name":"config","path":"/workspace/config.yaml"}`,
+			check: func(t *testing.T, wrapper codex.ParsedCommandWrapper) {
+				t.Helper()
+				value, ok := wrapper.Value.(*codex.ReadParsedCommand)
+				if !ok {
+					t.Fatalf("wrapper.Value = %T; want *ReadParsedCommand", wrapper.Value)
+				}
+				if value.Path != "/workspace/config.yaml" {
+					t.Fatalf("Path = %q, want /workspace/config.yaml", value.Path)
+				}
+			},
+		},
+		{
+			name:    "list_files",
+			payload: `{"type":"list_files","cmd":"ls","path":"/workspace"}`,
+			check: func(t *testing.T, wrapper codex.ParsedCommandWrapper) {
+				t.Helper()
+				if _, ok := wrapper.Value.(*codex.ListFilesParsedCommand); !ok {
+					t.Fatalf("wrapper.Value = %T; want *ListFilesParsedCommand", wrapper.Value)
+				}
+			},
+		},
+		{
+			name:    "search",
+			payload: `{"type":"search","cmd":"rg","path":"/workspace","query":"needle"}`,
+			check: func(t *testing.T, wrapper codex.ParsedCommandWrapper) {
+				t.Helper()
+				if _, ok := wrapper.Value.(*codex.SearchParsedCommand); !ok {
+					t.Fatalf("wrapper.Value = %T; want *SearchParsedCommand", wrapper.Value)
+				}
+			},
+		},
+		{
+			name:    "unknown",
+			payload: `{"type":"unknown","cmd":"custom"}`,
+			check: func(t *testing.T, wrapper codex.ParsedCommandWrapper) {
+				t.Helper()
+				if _, ok := wrapper.Value.(*codex.UnknownParsedCommand); !ok {
+					t.Fatalf("wrapper.Value = %T; want *UnknownParsedCommand", wrapper.Value)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var wrapper codex.ParsedCommandWrapper
+			if err := json.Unmarshal([]byte(tt.payload), &wrapper); err != nil {
+				t.Fatalf("Unmarshal parsed command: %v", err)
+			}
+			tt.check(t, wrapper)
+		})
+	}
+}
+
+func TestParsedCommandWrapperRejectsMalformedPayloads(t *testing.T) {
+	tests := []struct {
+		name         string
+		payload      string
+		wantContains string
+	}{
+		{
+			name:         "missing type",
+			payload:      `{"cmd":"cat"}`,
+			wantContains: `missing required field "type"`,
+		},
+		{
+			name:         "read missing required field",
+			payload:      `{"type":"read","cmd":"cat","name":"config"}`,
+			wantContains: `missing required field "path"`,
+		},
+		{
+			name:         "unknown missing cmd",
+			payload:      `{"type":"future"}`,
+			wantContains: `missing required field "cmd"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var wrapper codex.ParsedCommandWrapper
+			err := json.Unmarshal([]byte(tt.payload), &wrapper)
+			if err == nil {
+				t.Fatal("expected unmarshal error")
+			}
+			if !strings.Contains(err.Error(), tt.wantContains) {
+				t.Fatalf("error = %v; want %q", err, tt.wantContains)
+			}
+		})
+	}
+}
+
 // TestCommandExecutionRequestApprovalRoundTrip tests CommandExecutionRequestApproval params/response
 func TestCommandExecutionRequestApprovalRoundTrip(t *testing.T) {
 	// Test params serialization
