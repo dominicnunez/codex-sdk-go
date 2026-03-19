@@ -855,22 +855,79 @@ type ThreadStartResponse struct {
 	Thread            Thread                `json:"thread"`
 }
 
-func (r ThreadStartResponse) validate() error {
+func (r *ThreadStartResponse) UnmarshalJSON(data []byte) error {
+	if err := validateThreadLifecycleResponseObject(data); err != nil {
+		return err
+	}
+	type wire ThreadStartResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = ThreadStartResponse(decoded)
+	return nil
+}
+
+func validateThreadLifecycleResponseObject(data []byte) error {
+	return validateRequiredObjectFields(
+		data,
+		"approvalPolicy",
+		"approvalsReviewer",
+		"cwd",
+		"model",
+		"modelProvider",
+		"sandbox",
+		"thread",
+	)
+}
+
+func validateThreadLifecycleResponseFields(
+	approvalPolicy AskForApprovalWrapper,
+	approvalsReviewer ApprovalsReviewer,
+	cwd string,
+	model string,
+	modelProvider string,
+	sandbox SandboxPolicyWrapper,
+	thread Thread,
+) error {
 	switch {
-	case r.ApprovalPolicy.Value == nil:
+	case approvalPolicy.Value == nil:
 		return errors.New("missing approvalPolicy")
-	case r.Cwd == "":
+	case cwd == "":
 		return errors.New("missing cwd")
-	case r.Model == "":
+	case model == "":
 		return errors.New("missing model")
-	case r.ModelProvider == "":
+	case modelProvider == "":
 		return errors.New("missing modelProvider")
-	case r.Sandbox.Value == nil:
+	case sandbox.Value == nil:
 		return errors.New("missing sandbox")
-	case r.Thread.ID == "":
+	case thread.ID == "":
 		return errors.New("missing thread.id")
 	}
-	return nil
+	return validateApprovalsReviewer(approvalsReviewer)
+}
+
+func validateApprovalsReviewer(reviewer ApprovalsReviewer) error {
+	switch reviewer {
+	case "":
+		return errors.New("missing approvalsReviewer")
+	case ApprovalsReviewerUser, ApprovalsReviewerGuardianSubagent:
+		return nil
+	default:
+		return fmt.Errorf("invalid approvalsReviewer %q", reviewer)
+	}
+}
+
+func (r ThreadStartResponse) validate() error {
+	return validateThreadLifecycleResponseFields(
+		r.ApprovalPolicy,
+		r.ApprovalsReviewer,
+		r.Cwd,
+		r.Model,
+		r.ModelProvider,
+		r.Sandbox,
+		r.Thread,
+	)
 }
 
 // Start initiates a new thread
@@ -1023,22 +1080,29 @@ type ThreadResumeResponse struct {
 	Thread            Thread                `json:"thread"`
 }
 
-func (r ThreadResumeResponse) validate() error {
-	switch {
-	case r.ApprovalPolicy.Value == nil:
-		return errors.New("missing approvalPolicy")
-	case r.Cwd == "":
-		return errors.New("missing cwd")
-	case r.Model == "":
-		return errors.New("missing model")
-	case r.ModelProvider == "":
-		return errors.New("missing modelProvider")
-	case r.Sandbox.Value == nil:
-		return errors.New("missing sandbox")
-	case r.Thread.ID == "":
-		return errors.New("missing thread.id")
+func (r *ThreadResumeResponse) UnmarshalJSON(data []byte) error {
+	if err := validateThreadLifecycleResponseObject(data); err != nil {
+		return err
 	}
+	type wire ThreadResumeResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = ThreadResumeResponse(decoded)
 	return nil
+}
+
+func (r ThreadResumeResponse) validate() error {
+	return validateThreadLifecycleResponseFields(
+		r.ApprovalPolicy,
+		r.ApprovalsReviewer,
+		r.Cwd,
+		r.Model,
+		r.ModelProvider,
+		r.Sandbox,
+		r.Thread,
+	)
 }
 
 // Resume resumes an existing thread
@@ -1083,22 +1147,29 @@ type ThreadForkResponse struct {
 	Thread            Thread                `json:"thread"`
 }
 
-func (r ThreadForkResponse) validate() error {
-	switch {
-	case r.ApprovalPolicy.Value == nil:
-		return errors.New("missing approvalPolicy")
-	case r.Cwd == "":
-		return errors.New("missing cwd")
-	case r.Model == "":
-		return errors.New("missing model")
-	case r.ModelProvider == "":
-		return errors.New("missing modelProvider")
-	case r.Sandbox.Value == nil:
-		return errors.New("missing sandbox")
-	case r.Thread.ID == "":
-		return errors.New("missing thread.id")
+func (r *ThreadForkResponse) UnmarshalJSON(data []byte) error {
+	if err := validateThreadLifecycleResponseObject(data); err != nil {
+		return err
 	}
+	type wire ThreadForkResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = ThreadForkResponse(decoded)
 	return nil
+}
+
+func (r ThreadForkResponse) validate() error {
+	return validateThreadLifecycleResponseFields(
+		r.ApprovalPolicy,
+		r.ApprovalsReviewer,
+		r.Cwd,
+		r.Model,
+		r.ModelProvider,
+		r.Sandbox,
+		r.Thread,
+	)
 }
 
 // Fork creates a fork of a thread

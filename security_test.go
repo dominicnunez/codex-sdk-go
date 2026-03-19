@@ -142,26 +142,7 @@ func (t *concurrentThreadTransport) Send(_ context.Context, req codex.Request) (
 		threadID := fmt.Sprintf("thread-%d", t.threadSeq)
 		t.mu.Unlock()
 
-		result := map[string]interface{}{
-			"approvalPolicy": "never",
-			"cwd":            "/tmp",
-			"model":          "o3",
-			"modelProvider":  "openai",
-			"sandbox":        map[string]interface{}{"type": "readOnly"},
-			"thread": map[string]interface{}{
-				"id":            threadID,
-				"cliVersion":    "1.0.0",
-				"createdAt":     1700000000,
-				"cwd":           "/tmp",
-				"modelProvider": "openai",
-				"preview":       "",
-				"source":        "exec",
-				"status":        map[string]interface{}{"type": "idle"},
-				"turns":         []interface{}{},
-				"updatedAt":     1700000000,
-				"ephemeral":     true,
-			},
-		}
+		result := validProcessThreadStartResponse(validProcessThreadPayload(threadID))
 		payload, err := json.Marshal(result)
 		if err != nil {
 			return codex.Response{}, err

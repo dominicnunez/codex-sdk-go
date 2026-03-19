@@ -19,27 +19,19 @@ func TestThreadStart(t *testing.T) {
 
 		client := codex.NewClient(transport)
 
-		// Inject a mock response (simplified for now - full implementation will parse ThreadStartResponse.json)
-		_ = transport.SetResponseData("thread/start", map[string]interface{}{
-			"thread": map[string]interface{}{
-				"id":            "thread-123",
-				"cliVersion":    "1.0.0",
-				"createdAt":     int64(1234567890),
-				"cwd":           "/test/dir",
-				"ephemeral":     false,
-				"modelProvider": "openai",
-				"preview":       "test preview",
-				"source":        "cli",
-				"status":        map[string]interface{}{"type": "idle"},
-				"turns":         []interface{}{},
-				"updatedAt":     int64(1234567890),
-			},
-			"approvalPolicy": "untrusted",
-			"cwd":            "/test/dir",
-			"model":          "gpt-4",
-			"modelProvider":  "openai",
-			"sandbox":        map[string]interface{}{"type": "dangerFullAccess"},
-		})
+		_ = transport.SetResponseData("thread/start", validThreadLifecycleResponse(map[string]interface{}{
+			"id":            "thread-123",
+			"cliVersion":    "1.0.0",
+			"createdAt":     int64(1234567890),
+			"cwd":           "/test/dir",
+			"ephemeral":     false,
+			"modelProvider": "openai",
+			"preview":       "test preview",
+			"source":        "cli",
+			"status":        map[string]interface{}{"type": "idle"},
+			"turns":         []interface{}{},
+			"updatedAt":     int64(1234567890),
+		}))
 
 		params := codex.ThreadStartParams{
 			// All fields optional per spec
@@ -75,26 +67,24 @@ func TestThreadStart(t *testing.T) {
 
 		client := codex.NewClient(transport)
 
-		_ = transport.SetResponseData("thread/start", map[string]interface{}{
-			"thread": map[string]interface{}{
-				"id":            "thread-456",
-				"cliVersion":    "1.0.0",
-				"createdAt":     int64(1234567890),
-				"cwd":           "/custom/dir",
-				"ephemeral":     true,
-				"modelProvider": "anthropic",
-				"preview":       "test preview",
-				"source":        "cli",
-				"status":        map[string]interface{}{"type": "idle"},
-				"turns":         []interface{}{},
-				"updatedAt":     int64(1234567890),
-			},
-			"approvalPolicy": "never",
-			"cwd":            "/custom/dir",
-			"model":          "claude-4",
-			"modelProvider":  "anthropic",
-			"sandbox":        map[string]interface{}{"type": "dangerFullAccess"},
+		fixture := validThreadLifecycleResponse(map[string]interface{}{
+			"id":            "thread-456",
+			"cliVersion":    "1.0.0",
+			"createdAt":     int64(1234567890),
+			"cwd":           "/custom/dir",
+			"ephemeral":     true,
+			"modelProvider": "anthropic",
+			"preview":       "test preview",
+			"source":        "cli",
+			"status":        map[string]interface{}{"type": "idle"},
+			"turns":         []interface{}{},
+			"updatedAt":     int64(1234567890),
 		})
+		fixture["approvalPolicy"] = "never"
+		fixture["cwd"] = "/custom/dir"
+		fixture["model"] = "claude-4"
+		fixture["modelProvider"] = "anthropic"
+		_ = transport.SetResponseData("thread/start", fixture)
 
 		params := codex.ThreadStartParams{
 			Cwd:                   strPtr("/custom/dir"),
@@ -123,25 +113,18 @@ func TestThreadStart(t *testing.T) {
 		defer func() { _ = transport.Close() }()
 
 		client := codex.NewClient(transport)
-		_ = transport.SetResponseData("thread/start", map[string]interface{}{
-			"approvalPolicy": "never",
-			"cwd":            "/test/dir",
-			"model":          "gpt-4",
-			"modelProvider":  "openai",
-			"sandbox":        map[string]interface{}{"type": "dangerFullAccess"},
-			"thread": map[string]interface{}{
-				"cliVersion":    "1.0.0",
-				"createdAt":     int64(1234567890),
-				"cwd":           "/test/dir",
-				"ephemeral":     false,
-				"modelProvider": "openai",
-				"preview":       "test preview",
-				"source":        "cli",
-				"status":        map[string]interface{}{"type": "idle"},
-				"turns":         []interface{}{},
-				"updatedAt":     int64(1234567890),
-			},
-		})
+		_ = transport.SetResponseData("thread/start", validThreadLifecycleResponse(map[string]interface{}{
+			"cliVersion":    "1.0.0",
+			"createdAt":     int64(1234567890),
+			"cwd":           "/test/dir",
+			"ephemeral":     false,
+			"modelProvider": "openai",
+			"preview":       "test preview",
+			"source":        "cli",
+			"status":        map[string]interface{}{"type": "idle"},
+			"turns":         []interface{}{},
+			"updatedAt":     int64(1234567890),
+		}))
 
 		_, err := client.Thread.Start(context.Background(), codex.ThreadStartParams{})
 		if err == nil {
@@ -277,6 +260,172 @@ func TestThreadResponsesRejectMissingRequiredThreadFields(t *testing.T) {
 			}
 			if !strings.Contains(err.Error(), tt.wantErr) {
 				t.Fatalf("error = %q, want to contain %q", err.Error(), tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestThreadLifecycleResponsesRequireApprovalsReviewer(t *testing.T) {
+	tests := []struct {
+		name    string
+		method  string
+		payload func() map[string]interface{}
+		call    func(*codex.Client) error
+		wantErr error
+	}{
+		{
+			name:   "start rejects omitted approvals reviewer",
+			method: "thread/start",
+			payload: func() map[string]interface{} {
+				response := validThreadLifecycleResponse(validThreadPayload("thread-start"))
+				delete(response, "approvalsReviewer")
+				return response
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Start(context.Background(), codex.ThreadStartParams{})
+				return err
+			},
+			wantErr: codex.ErrMissingResultField,
+		},
+		{
+			name:   "start rejects null approvals reviewer",
+			method: "thread/start",
+			payload: func() map[string]interface{} {
+				response := validThreadLifecycleResponse(validThreadPayload("thread-start"))
+				response["approvalsReviewer"] = nil
+				return response
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Start(context.Background(), codex.ThreadStartParams{})
+				return err
+			},
+			wantErr: codex.ErrNullResultField,
+		},
+		{
+			name:   "resume rejects omitted approvals reviewer",
+			method: "thread/resume",
+			payload: func() map[string]interface{} {
+				response := validThreadLifecycleResponse(validThreadPayload("thread-resume"))
+				delete(response, "approvalsReviewer")
+				return response
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Resume(context.Background(), codex.ThreadResumeParams{ThreadID: "thread-resume"})
+				return err
+			},
+			wantErr: codex.ErrMissingResultField,
+		},
+		{
+			name:   "resume rejects null approvals reviewer",
+			method: "thread/resume",
+			payload: func() map[string]interface{} {
+				response := validThreadLifecycleResponse(validThreadPayload("thread-resume"))
+				response["approvalsReviewer"] = nil
+				return response
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Resume(context.Background(), codex.ThreadResumeParams{ThreadID: "thread-resume"})
+				return err
+			},
+			wantErr: codex.ErrNullResultField,
+		},
+		{
+			name:   "fork rejects omitted approvals reviewer",
+			method: "thread/fork",
+			payload: func() map[string]interface{} {
+				response := validThreadLifecycleResponse(validThreadPayload("thread-fork"))
+				delete(response, "approvalsReviewer")
+				return response
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Fork(context.Background(), codex.ThreadForkParams{ThreadID: "thread-fork"})
+				return err
+			},
+			wantErr: codex.ErrMissingResultField,
+		},
+		{
+			name:   "fork rejects null approvals reviewer",
+			method: "thread/fork",
+			payload: func() map[string]interface{} {
+				response := validThreadLifecycleResponse(validThreadPayload("thread-fork"))
+				response["approvalsReviewer"] = nil
+				return response
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Fork(context.Background(), codex.ThreadForkParams{ThreadID: "thread-fork"})
+				return err
+			},
+			wantErr: codex.ErrNullResultField,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := NewMockTransport()
+			defer func() { _ = transport.Close() }()
+
+			client := codex.NewClient(transport)
+			_ = transport.SetResponseData(tt.method, tt.payload())
+
+			err := tt.call(client)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("error = %v, want %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestThreadLifecycleResponsesRejectInvalidApprovalsReviewer(t *testing.T) {
+	tests := []struct {
+		name   string
+		method string
+		call   func(*codex.Client) error
+	}{
+		{
+			name:   "start",
+			method: "thread/start",
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Start(context.Background(), codex.ThreadStartParams{})
+				return err
+			},
+		},
+		{
+			name:   "resume",
+			method: "thread/resume",
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Resume(context.Background(), codex.ThreadResumeParams{ThreadID: "thread-resume"})
+				return err
+			},
+		},
+		{
+			name:   "fork",
+			method: "thread/fork",
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Fork(context.Background(), codex.ThreadForkParams{ThreadID: "thread-fork"})
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := NewMockTransport()
+			defer func() { _ = transport.Close() }()
+
+			client := codex.NewClient(transport)
+			response := validThreadLifecycleResponse(validThreadPayload("thread-invalid-reviewer"))
+			response["approvalsReviewer"] = "bot"
+			_ = transport.SetResponseData(tt.method, response)
+
+			err := tt.call(client)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), `invalid approvalsReviewer "bot"`) {
+				t.Fatalf("error = %q, want invalid approvalsReviewer", err.Error())
 			}
 		})
 	}

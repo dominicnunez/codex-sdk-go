@@ -313,26 +313,7 @@ func TestRepresentativeRequestMethodOutcomes(t *testing.T) {
 	ctx := context.Background()
 
 	_ = transport.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
-	_ = transport.SetResponseData("thread/start", map[string]interface{}{
-		"thread": map[string]interface{}{
-			"id":            "thread-1",
-			"cliVersion":    "1.0.0",
-			"createdAt":     1700000000,
-			"cwd":           "/tmp",
-			"modelProvider": "openai",
-			"preview":       "",
-			"source":        "exec",
-			"status":        map[string]interface{}{"type": "idle"},
-			"turns":         []interface{}{},
-			"updatedAt":     1700000000,
-			"ephemeral":     true,
-		},
-		"cwd":            "/tmp",
-		"model":          "o3",
-		"modelProvider":  "openai",
-		"approvalPolicy": "never",
-		"sandbox":        map[string]interface{}{"type": "readOnly"},
-	})
+	_ = transport.SetResponseData("thread/start", validProcessThreadStartResponse(validProcessThreadPayload("thread-1")))
 	transport.SetResponse("account/read", codex.Response{
 		JSONRPC: "2.0",
 		Result:  json.RawMessage(`"not-an-object"`),

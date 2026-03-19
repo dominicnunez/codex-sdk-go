@@ -12,6 +12,32 @@ import (
 	codex "github.com/dominicnunez/codex-sdk-go"
 )
 
+func validProcessThreadPayload(threadID string) map[string]interface{} {
+	return map[string]interface{}{
+		"id":            threadID,
+		"cliVersion":    "1.0.0",
+		"createdAt":     1700000000,
+		"cwd":           "/tmp",
+		"modelProvider": "openai",
+		"preview":       "",
+		"source":        "exec",
+		"status":        map[string]interface{}{"type": "idle"},
+		"turns":         []interface{}{},
+		"updatedAt":     1700000000,
+		"ephemeral":     true,
+	}
+}
+
+func validProcessThreadStartResponse(thread map[string]interface{}) map[string]interface{} {
+	response := validThreadLifecycleResponse(thread)
+	response["approvalPolicy"] = "never"
+	response["cwd"] = "/tmp"
+	response["model"] = "o3"
+	response["modelProvider"] = "openai"
+	response["sandbox"] = map[string]interface{}{"type": "readOnly"}
+	return response
+}
+
 // mockProcess creates a Process with a mock transport for testing Run().
 // The mock is pre-configured to respond to initialize, thread/start, and turn/start.
 // It returns the mock so callers can inject notifications.
@@ -20,27 +46,7 @@ func mockProcess(t *testing.T) (*codex.Process, *MockTransport) {
 	mock := NewMockTransport()
 
 	_ = mock.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
-
-	_ = mock.SetResponseData("thread/start", map[string]interface{}{
-		"approvalPolicy": "never",
-		"cwd":            "/tmp",
-		"model":          "o3",
-		"modelProvider":  "openai",
-		"sandbox":        map[string]interface{}{"type": "readOnly"},
-		"thread": map[string]interface{}{
-			"id":            "thread-1",
-			"cliVersion":    "1.0.0",
-			"createdAt":     1700000000,
-			"cwd":           "/tmp",
-			"modelProvider": "openai",
-			"preview":       "",
-			"source":        "exec",
-			"status":        map[string]interface{}{"type": "idle"},
-			"turns":         []interface{}{},
-			"updatedAt":     1700000000,
-			"ephemeral":     true,
-		},
-	})
+	_ = mock.SetResponseData("thread/start", validProcessThreadStartResponse(validProcessThreadPayload("thread-1")))
 
 	_ = mock.SetResponseData("turn/start", map[string]interface{}{
 		"turn": map[string]interface{}{
@@ -303,25 +309,18 @@ func TestRunThreadStartFailure(t *testing.T) {
 func TestRunThreadStartMissingThreadID(t *testing.T) {
 	mock := NewMockTransport()
 	_ = mock.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
-	_ = mock.SetResponseData("thread/start", map[string]interface{}{
-		"approvalPolicy": "never",
-		"cwd":            "/tmp",
-		"model":          "o3",
-		"modelProvider":  "openai",
-		"sandbox":        map[string]interface{}{"type": "readOnly"},
-		"thread": map[string]interface{}{
-			"cliVersion":    "1.0.0",
-			"createdAt":     1700000000,
-			"cwd":           "/tmp",
-			"modelProvider": "openai",
-			"preview":       "",
-			"source":        "exec",
-			"status":        map[string]interface{}{"type": "idle"},
-			"turns":         []interface{}{},
-			"updatedAt":     1700000000,
-			"ephemeral":     true,
-		},
-	})
+	_ = mock.SetResponseData("thread/start", validProcessThreadStartResponse(map[string]interface{}{
+		"cliVersion":    "1.0.0",
+		"createdAt":     1700000000,
+		"cwd":           "/tmp",
+		"modelProvider": "openai",
+		"preview":       "",
+		"source":        "exec",
+		"status":        map[string]interface{}{"type": "idle"},
+		"turns":         []interface{}{},
+		"updatedAt":     1700000000,
+		"ephemeral":     true,
+	}))
 
 	client := codex.NewClient(mock, codex.WithRequestTimeout(2*time.Second))
 	proc := codex.NewProcessFromClient(client)
@@ -339,27 +338,7 @@ func TestRunTurnStartFailure(t *testing.T) {
 	mock := NewMockTransport()
 
 	_ = mock.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
-
-	_ = mock.SetResponseData("thread/start", map[string]interface{}{
-		"approvalPolicy": "never",
-		"cwd":            "/tmp",
-		"model":          "o3",
-		"modelProvider":  "openai",
-		"sandbox":        map[string]interface{}{"type": "readOnly"},
-		"thread": map[string]interface{}{
-			"id":            "thread-1",
-			"cliVersion":    "1.0.0",
-			"createdAt":     1700000000,
-			"cwd":           "/tmp",
-			"modelProvider": "openai",
-			"preview":       "",
-			"source":        "exec",
-			"status":        map[string]interface{}{"type": "idle"},
-			"turns":         []interface{}{},
-			"updatedAt":     1700000000,
-			"ephemeral":     true,
-		},
-	})
+	_ = mock.SetResponseData("thread/start", validProcessThreadStartResponse(validProcessThreadPayload("thread-1")))
 
 	// turn/start returns an RPC error.
 	mock.SetResponse("turn/start", codex.Response{
@@ -567,19 +546,7 @@ func TestRunInitRetry(t *testing.T) {
 	// Fix the transport — second call should retry and succeed.
 	mock.SetSendError(nil)
 	_ = mock.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
-	_ = mock.SetResponseData("thread/start", map[string]interface{}{
-		"approvalPolicy": "never",
-		"cwd":            "/tmp",
-		"model":          "o3",
-		"modelProvider":  "openai",
-		"sandbox":        map[string]interface{}{"type": "readOnly"},
-		"thread": map[string]interface{}{
-			"id": "thread-1", "cliVersion": "1.0.0", "createdAt": 1700000000,
-			"cwd": "/tmp", "modelProvider": "openai", "preview": "", "source": "exec",
-			"status": map[string]interface{}{"type": "idle"}, "turns": []interface{}{},
-			"updatedAt": 1700000000, "ephemeral": true,
-		},
-	})
+	_ = mock.SetResponseData("thread/start", validProcessThreadStartResponse(validProcessThreadPayload("thread-1")))
 	_ = mock.SetResponseData("turn/start", map[string]interface{}{
 		"turn": map[string]interface{}{
 			"id":     "turn-1",

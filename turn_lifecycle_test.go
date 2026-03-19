@@ -59,26 +59,7 @@ func serveLifecycleOverStdio(serverReader io.Reader, serverWriter io.Writer, thr
 				return err
 			}
 		case "thread/start":
-			if err := writeStdioResult(enc, req.ID, map[string]interface{}{
-				"approvalPolicy": "never",
-				"cwd":            "/tmp",
-				"model":          "o3",
-				"modelProvider":  "openai",
-				"sandbox":        map[string]interface{}{"type": "readOnly"},
-				"thread": map[string]interface{}{
-					"id":            threadID,
-					"cliVersion":    "1.0.0",
-					"createdAt":     1700000000,
-					"cwd":           "/tmp",
-					"modelProvider": "openai",
-					"preview":       "",
-					"source":        "exec",
-					"status":        map[string]interface{}{"type": "idle"},
-					"turns":         []interface{}{},
-					"updatedAt":     1700000000,
-					"ephemeral":     true,
-				},
-			}); err != nil {
+			if err := writeStdioResult(enc, req.ID, validProcessThreadStartResponse(validProcessThreadPayload(threadID))); err != nil {
 				return err
 			}
 		case "turn/start":
@@ -140,26 +121,7 @@ func serveBurstLifecycleOverStdio(serverReader io.Reader, serverWriter io.Writer
 				return err
 			}
 		case "thread/start":
-			if err := writeStdioResult(enc, req.ID, map[string]interface{}{
-				"approvalPolicy": "never",
-				"cwd":            "/tmp",
-				"model":          "o3",
-				"modelProvider":  "openai",
-				"sandbox":        map[string]interface{}{"type": "readOnly"},
-				"thread": map[string]interface{}{
-					"id":            threadID,
-					"cliVersion":    "1.0.0",
-					"createdAt":     1700000000,
-					"cwd":           "/tmp",
-					"modelProvider": "openai",
-					"preview":       "",
-					"source":        "exec",
-					"status":        map[string]interface{}{"type": "idle"},
-					"turns":         []interface{}{},
-					"updatedAt":     1700000000,
-					"ephemeral":     true,
-				},
-			}); err != nil {
+			if err := writeStdioResult(enc, req.ID, validProcessThreadStartResponse(validProcessThreadPayload(threadID))); err != nil {
 				return err
 			}
 		case "turn/start":
@@ -330,26 +292,7 @@ func TestRunNotificationBeforeTurnStartResponse(t *testing.T) {
 	base := NewMockTransport()
 
 	_ = base.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
-	_ = base.SetResponseData("thread/start", map[string]interface{}{
-		"approvalPolicy": "never",
-		"cwd":            "/tmp",
-		"model":          "o3",
-		"modelProvider":  "openai",
-		"sandbox":        map[string]interface{}{"type": "readOnly"},
-		"thread": map[string]interface{}{
-			"id":            "thread-1",
-			"cliVersion":    "1.0.0",
-			"createdAt":     1700000000,
-			"cwd":           "/tmp",
-			"modelProvider": "openai",
-			"preview":       "",
-			"source":        "exec",
-			"status":        map[string]interface{}{"type": "idle"},
-			"turns":         []interface{}{},
-			"updatedAt":     1700000000,
-			"ephemeral":     true,
-		},
-	})
+	_ = base.SetResponseData("thread/start", validProcessThreadStartResponse(validProcessThreadPayload("thread-1")))
 	_ = base.SetResponseData("turn/start", map[string]interface{}{
 		"turn": map[string]interface{}{
 			"id":     "turn-1",
@@ -398,26 +341,7 @@ func TestRunStreamedNotificationBeforeTurnStartResponse(t *testing.T) {
 	base := NewMockTransport()
 
 	_ = base.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
-	_ = base.SetResponseData("thread/start", map[string]interface{}{
-		"approvalPolicy": "never",
-		"cwd":            "/tmp",
-		"model":          "o3",
-		"modelProvider":  "openai",
-		"sandbox":        map[string]interface{}{"type": "readOnly"},
-		"thread": map[string]interface{}{
-			"id":            "thread-1",
-			"cliVersion":    "1.0.0",
-			"createdAt":     1700000000,
-			"cwd":           "/tmp",
-			"modelProvider": "openai",
-			"preview":       "",
-			"source":        "exec",
-			"status":        map[string]interface{}{"type": "idle"},
-			"turns":         []interface{}{},
-			"updatedAt":     1700000000,
-			"ephemeral":     true,
-		},
-	})
+	_ = base.SetResponseData("thread/start", validProcessThreadStartResponse(validProcessThreadPayload("thread-1")))
 	_ = base.SetResponseData("turn/start", map[string]interface{}{
 		"turn": map[string]interface{}{
 			"id":     "turn-1",
@@ -482,26 +406,7 @@ func TestConversationTurnIgnoresUnattributableMalformedCompletionOnReusedThread(
 	base := NewMockTransport()
 
 	_ = base.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
-	_ = base.SetResponseData("thread/start", map[string]interface{}{
-		"approvalPolicy": "never",
-		"cwd":            "/tmp",
-		"model":          "o3",
-		"modelProvider":  "openai",
-		"sandbox":        map[string]interface{}{"type": "readOnly"},
-		"thread": map[string]interface{}{
-			"id":            "thread-1",
-			"cliVersion":    "1.0.0",
-			"createdAt":     1700000000,
-			"cwd":           "/tmp",
-			"modelProvider": "openai",
-			"preview":       "",
-			"source":        "exec",
-			"status":        map[string]interface{}{"type": "idle"},
-			"turns":         []interface{}{},
-			"updatedAt":     1700000000,
-			"ephemeral":     true,
-		},
-	})
+	_ = base.SetResponseData("thread/start", validProcessThreadStartResponse(validProcessThreadPayload("thread-1")))
 
 	transport := &staleMalformedTurnCompletedTransport{
 		MockTransport: base,
@@ -543,26 +448,7 @@ func TestConversationTurnStreamedIgnoresUnattributableMalformedCompletionOnReuse
 	base := NewMockTransport()
 
 	_ = base.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
-	_ = base.SetResponseData("thread/start", map[string]interface{}{
-		"approvalPolicy": "never",
-		"cwd":            "/tmp",
-		"model":          "o3",
-		"modelProvider":  "openai",
-		"sandbox":        map[string]interface{}{"type": "readOnly"},
-		"thread": map[string]interface{}{
-			"id":            "thread-1",
-			"cliVersion":    "1.0.0",
-			"createdAt":     1700000000,
-			"cwd":           "/tmp",
-			"modelProvider": "openai",
-			"preview":       "",
-			"source":        "exec",
-			"status":        map[string]interface{}{"type": "idle"},
-			"turns":         []interface{}{},
-			"updatedAt":     1700000000,
-			"ephemeral":     true,
-		},
-	})
+	_ = base.SetResponseData("thread/start", validProcessThreadStartResponse(validProcessThreadPayload("thread-1")))
 
 	transport := &staleMalformedTurnCompletedTransport{
 		MockTransport: base,

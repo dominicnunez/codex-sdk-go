@@ -594,27 +594,7 @@ func TestEnsureInitRetryAfterFailure(t *testing.T) {
 	mock.SetSendError(nil)
 
 	_ = mock.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
-
-	_ = mock.SetResponseData("thread/start", map[string]interface{}{
-		"approvalPolicy": "never",
-		"cwd":            "/tmp",
-		"model":          "o3",
-		"modelProvider":  "openai",
-		"sandbox":        map[string]interface{}{"type": "readOnly"},
-		"thread": map[string]interface{}{
-			"id":            "thread-1",
-			"cliVersion":    "1.0.0",
-			"createdAt":     1700000000,
-			"cwd":           "/tmp",
-			"ephemeral":     true,
-			"modelProvider": "openai",
-			"preview":       "",
-			"source":        "exec",
-			"status":        map[string]interface{}{"type": "idle"},
-			"turns":         []interface{}{},
-			"updatedAt":     1700000000,
-		},
-	})
+	_ = mock.SetResponseData("thread/start", validProcessThreadStartResponse(validProcessThreadPayload("thread-1")))
 
 	// Second call should succeed, proving ensureInit retried.
 	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
@@ -649,26 +629,7 @@ func TestEnsureInitRetryAfterInvalidInitializeResponse(t *testing.T) {
 	}
 
 	_ = mock.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
-	_ = mock.SetResponseData("thread/start", map[string]interface{}{
-		"approvalPolicy": "never",
-		"cwd":            "/tmp",
-		"model":          "o3",
-		"modelProvider":  "openai",
-		"sandbox":        map[string]interface{}{"type": "readOnly"},
-		"thread": map[string]interface{}{
-			"id":            "thread-1",
-			"cliVersion":    "1.0.0",
-			"createdAt":     1700000000,
-			"cwd":           "/tmp",
-			"modelProvider": "openai",
-			"preview":       "",
-			"source":        "exec",
-			"status":        map[string]interface{}{"type": "idle"},
-			"turns":         []interface{}{},
-			"updatedAt":     1700000000,
-			"ephemeral":     true,
-		},
-	})
+	_ = mock.SetResponseData("thread/start", validProcessThreadStartResponse(validProcessThreadPayload("thread-1")))
 
 	conv, err := proc.StartConversation(ctx, codex.ConversationOptions{})
 	if err != nil {
@@ -987,26 +948,9 @@ func TestRunAfterTransportClose(t *testing.T) {
 	mock := NewMockTransport()
 
 	_ = mock.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
-	_ = mock.SetResponseData("thread/start", map[string]interface{}{
-		"approvalPolicy": "never",
-		"cwd":            "/tmp",
-		"model":          "o3",
-		"modelProvider":  "openai",
-		"sandbox":        map[string]interface{}{"type": "readOnly"},
-		"thread": map[string]interface{}{
-			"id":            "thread-1",
-			"cliVersion":    "1.0.0",
-			"createdAt":     1700000000,
-			"cwd":           "/tmp",
-			"modelProvider": "openai",
-			"preview":       "",
-			"source":        "exec",
-			"status":        map[string]interface{}{"type": "idle"},
-			"turns":         []interface{}{},
-			"updatedAt":     1700000000,
-			"ephemeral":     false,
-		},
-	})
+	fixture := validProcessThreadStartResponse(validProcessThreadPayload("thread-1"))
+	fixture["thread"].(map[string]interface{})["ephemeral"] = false
+	_ = mock.SetResponseData("thread/start", fixture)
 
 	client := codex.NewClient(mock, codex.WithRequestTimeout(2*time.Second))
 	proc := codex.NewProcessFromClient(client)
