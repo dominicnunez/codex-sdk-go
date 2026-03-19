@@ -2,6 +2,7 @@ package codex_test
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -502,6 +503,78 @@ func TestWebSearchAction(t *testing.T) {
 			rtType := fmt.Sprintf("%T", roundtrip.Value)
 			if rtType != tt.wantType {
 				t.Errorf("roundtrip variant type = %s, want %s", rtType, tt.wantType)
+			}
+		})
+	}
+}
+
+func TestEventTypesRejectMissingRequiredFields(t *testing.T) {
+	tests := []struct {
+		name    string
+		target  func() interface{}
+		data    string
+		wantErr error
+	}{
+		{
+			name:    "byte range missing end",
+			target:  func() interface{} { return &codex.ByteRange{} },
+			data:    `{"start":0}`,
+			wantErr: codex.ErrMissingResultField,
+		},
+		{
+			name:    "text element missing byteRange",
+			target:  func() interface{} { return &codex.TextElement{} },
+			data:    `{"placeholder":"var"}`,
+			wantErr: codex.ErrMissingResultField,
+		},
+		{
+			name:    "collab agent state missing status",
+			target:  func() interface{} { return &codex.CollabAgentState{} },
+			data:    `{"message":"working"}`,
+			wantErr: codex.ErrMissingResultField,
+		},
+		{
+			name:    "file update change missing path",
+			target:  func() interface{} { return &codex.FileUpdateChange{} },
+			data:    `{"diff":"@@","kind":{"type":"add"}}`,
+			wantErr: codex.ErrMissingResultField,
+		},
+		{
+			name:    "mcp tool call result missing content",
+			target:  func() interface{} { return &codex.McpToolCallResult{} },
+			data:    `{"structuredContent":{"ok":true}}`,
+			wantErr: codex.ErrMissingResultField,
+		},
+		{
+			name:    "mcp tool call error missing message",
+			target:  func() interface{} { return &codex.McpToolCallError{} },
+			data:    `{"details":"boom"}`,
+			wantErr: codex.ErrMissingResultField,
+		},
+		{
+			name:    "patch change kind missing type",
+			target:  func() interface{} { return &codex.PatchChangeKindWrapper{} },
+			data:    `{"move_path":"new.txt"}`,
+			wantErr: codex.ErrMissingResultField,
+		},
+		{
+			name:    "web search action missing type",
+			target:  func() interface{} { return &codex.WebSearchActionWrapper{} },
+			data:    `{"url":"https://example.com"}`,
+			wantErr: codex.ErrMissingResultField,
+		},
+		{
+			name:    "byte range null end",
+			target:  func() interface{} { return &codex.ByteRange{} },
+			data:    `{"start":0,"end":null}`,
+			wantErr: codex.ErrNullResultField,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := json.Unmarshal([]byte(tt.data), tt.target()); !errors.Is(err, tt.wantErr) {
+				t.Fatalf("error = %v; want %v", err, tt.wantErr)
 			}
 		})
 	}

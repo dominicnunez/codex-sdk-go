@@ -2,6 +2,7 @@ package codex_test
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go"
@@ -342,6 +343,61 @@ func TestThreadItemRoundTrip(t *testing.T) {
 			}
 			tt.checkFn(t, w2)
 		})
+	}
+}
+
+func TestThreadItemRejectsMalformedNestedPayloads(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{
+			name:  "user message text element byte range",
+			input: `{"type":"userMessage","id":"u1","content":[{"type":"text","text":"hello","text_elements":[{"byteRange":{"start":0}}]}]}`,
+		},
+		{
+			name:  "file change missing change path",
+			input: `{"type":"fileChange","id":"f1","changes":[{"diff":"+line","kind":{"type":"add"}}],"status":"completed"}`,
+		},
+		{
+			name:  "file change missing kind type",
+			input: `{"type":"fileChange","id":"f1","changes":[{"path":"a.go","diff":"+line","kind":{}}],"status":"completed"}`,
+		},
+		{
+			name:  "mcp tool call missing result content",
+			input: `{"type":"mcpToolCall","id":"m1","server":"srv","tool":"read","status":"completed","arguments":{},"result":{"structuredContent":{"ok":true}}}`,
+		},
+		{
+			name:  "mcp tool call missing error message",
+			input: `{"type":"mcpToolCall","id":"m1","server":"srv","tool":"read","status":"failed","arguments":{},"error":{"code":"boom"}}`,
+		},
+		{
+			name:  "collab agent state missing status",
+			input: `{"type":"collabAgentToolCall","id":"ca1","tool":"spawnAgent","status":"completed","agentsStates":{"agent-1":{"message":"running"}},"receiverThreadIds":["t1"],"senderThreadId":"t0"}`,
+		},
+		{
+			name:  "web search action missing type",
+			input: `{"type":"webSearch","id":"w1","query":"golang","action":{"url":"https://example.com"}}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var item codex.ThreadItemWrapper
+			err := json.Unmarshal([]byte(tt.input), &item)
+			if !errors.Is(err, codex.ErrMissingResultField) {
+				t.Fatalf("error = %v; want ErrMissingResultField", err)
+			}
+		})
+	}
+}
+
+func TestUnmarshalUserInputRejectsMalformedTextElements(t *testing.T) {
+	_, err := codex.UnmarshalUserInput([]byte(
+		`{"type":"text","text":"hello","text_elements":[{"byteRange":{"start":0}}]}`,
+	))
+	if !errors.Is(err, codex.ErrMissingResultField) {
+		t.Fatalf("error = %v; want ErrMissingResultField", err)
 	}
 }
 

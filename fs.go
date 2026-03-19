@@ -84,6 +84,19 @@ type FsReadDirectoryEntry struct {
 	IsFile      bool   `json:"isFile"`
 }
 
+func (e *FsReadDirectoryEntry) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "fileName", "isDirectory", "isFile"); err != nil {
+		return err
+	}
+	type wire FsReadDirectoryEntry
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*e = FsReadDirectoryEntry(decoded)
+	return nil
+}
+
 // FsReadDirectoryResponse contains directory entries.
 type FsReadDirectoryResponse struct {
 	Entries []FsReadDirectoryEntry `json:"entries"`

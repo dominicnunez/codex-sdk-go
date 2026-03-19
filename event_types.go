@@ -2,6 +2,7 @@ package codex
 
 import (
 	"encoding/json"
+	"fmt"
 )
 
 // Shared Event Types
@@ -15,11 +16,31 @@ type ByteRange struct {
 	End   uint `json:"end"`   // End byte offset (exclusive)
 }
 
+func (b *ByteRange) UnmarshalJSON(data []byte) error {
+	type wire ByteRange
+	var decoded wire
+	if err := unmarshalRequiredEventObject(data, &decoded, "start", "end"); err != nil {
+		return err
+	}
+	*b = ByteRange(decoded)
+	return nil
+}
+
 // TextElement represents a span within text used to render or persist special elements.
 // Used in UserInput to mark UI-defined elements within the text.
 type TextElement struct {
 	ByteRange   ByteRange `json:"byteRange"`             // Byte range in the parent text buffer
 	Placeholder *string   `json:"placeholder,omitempty"` // Optional human-readable placeholder for UI
+}
+
+func (t *TextElement) UnmarshalJSON(data []byte) error {
+	type wire TextElement
+	var decoded wire
+	if err := unmarshalRequiredEventObject(data, &decoded, "byteRange"); err != nil {
+		return err
+	}
+	*t = TextElement(decoded)
+	return nil
 }
 
 // MessagePhase classifies an assistant message as interim commentary or final answer text.
@@ -108,11 +129,31 @@ type CollabAgentState struct {
 	Message *string           `json:"message,omitempty"`
 }
 
+func (s *CollabAgentState) UnmarshalJSON(data []byte) error {
+	type wire CollabAgentState
+	var decoded wire
+	if err := unmarshalRequiredEventObject(data, &decoded, "status"); err != nil {
+		return err
+	}
+	*s = CollabAgentState(decoded)
+	return nil
+}
+
 // FileUpdateChange represents a file change with diff and kind.
 type FileUpdateChange struct {
 	Path string                 `json:"path"`
 	Diff string                 `json:"diff"`
 	Kind PatchChangeKindWrapper `json:"kind"`
+}
+
+func (c *FileUpdateChange) UnmarshalJSON(data []byte) error {
+	type wire FileUpdateChange
+	var decoded wire
+	if err := unmarshalRequiredEventObject(data, &decoded, "path", "diff", "kind"); err != nil {
+		return err
+	}
+	*c = FileUpdateChange(decoded)
+	return nil
 }
 
 // PatchChangeKind is a discriminated union for patch change types.
@@ -177,6 +218,10 @@ type PatchChangeKindWrapper struct {
 }
 
 func (w *PatchChangeKindWrapper) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "type"); err != nil {
+		return err
+	}
+
 	var typeCheck struct {
 		Type string `json:"type"`
 	}
@@ -214,9 +259,29 @@ type McpToolCallResult struct {
 	StructuredContent interface{}   `json:"structuredContent,omitempty"`
 }
 
+func (r *McpToolCallResult) UnmarshalJSON(data []byte) error {
+	type wire McpToolCallResult
+	var decoded wire
+	if err := unmarshalRequiredEventObject(data, &decoded, "content"); err != nil {
+		return err
+	}
+	*r = McpToolCallResult(decoded)
+	return nil
+}
+
 // McpToolCallError represents an error from an MCP tool call.
 type McpToolCallError struct {
 	Message string `json:"message"`
+}
+
+func (e *McpToolCallError) UnmarshalJSON(data []byte) error {
+	type wire McpToolCallError
+	var decoded wire
+	if err := unmarshalRequiredEventObject(data, &decoded, "message"); err != nil {
+		return err
+	}
+	*e = McpToolCallError(decoded)
+	return nil
 }
 
 // WebSearchAction is a discriminated union for web search actions.
@@ -302,6 +367,10 @@ type WebSearchActionWrapper struct {
 }
 
 func (w *WebSearchActionWrapper) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "type"); err != nil {
+		return err
+	}
+
 	var typeCheck struct {
 		Type string `json:"type"`
 	}
@@ -342,4 +411,14 @@ func (w *WebSearchActionWrapper) UnmarshalJSON(data []byte) error {
 
 func (w WebSearchActionWrapper) MarshalJSON() ([]byte, error) {
 	return json.Marshal(w.Value)
+}
+
+func unmarshalRequiredEventObject(data []byte, dest interface{}, requiredFields ...string) error {
+	if err := validateRequiredObjectFields(data, requiredFields...); err != nil {
+		return err
+	}
+	if err := json.Unmarshal(data, dest); err != nil {
+		return fmt.Errorf("unmarshal required event object: %w", err)
+	}
+	return nil
 }

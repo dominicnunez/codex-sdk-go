@@ -320,6 +320,47 @@ func TestFsReadDirectory(t *testing.T) {
 		}
 	})
 
+	t.Run("missing required entry field", func(t *testing.T) {
+		tests := []struct {
+			name  string
+			entry string
+		}{
+			{name: "missing fileName", entry: `{"isDirectory":false,"isFile":true}`},
+			{name: "missing isDirectory", entry: `{"fileName":"a.txt","isFile":true}`},
+			{name: "missing isFile", entry: `{"fileName":"a.txt","isDirectory":false}`},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				transport := NewMockTransport()
+				client := codex.NewClient(transport)
+				transport.SetResponse("fs/readDirectory", codex.Response{
+					JSONRPC: "2.0",
+					Result:  json.RawMessage(`{"entries":[` + tt.entry + `]}`),
+				})
+
+				_, err := client.Fs.ReadDirectory(context.Background(), codex.FsReadDirectoryParams{Path: "/tmp"})
+				if !errors.Is(err, codex.ErrMissingResultField) {
+					t.Fatalf("error = %v; want ErrMissingResultField", err)
+				}
+			})
+		}
+	})
+
+	t.Run("null required entry field", func(t *testing.T) {
+		transport := NewMockTransport()
+		client := codex.NewClient(transport)
+		transport.SetResponse("fs/readDirectory", codex.Response{
+			JSONRPC: "2.0",
+			Result:  json.RawMessage(`{"entries":[{"fileName":"a.txt","isDirectory":false,"isFile":null}]}`),
+		})
+
+		_, err := client.Fs.ReadDirectory(context.Background(), codex.FsReadDirectoryParams{Path: "/tmp"})
+		if !errors.Is(err, codex.ErrNullResultField) {
+			t.Fatalf("error = %v; want ErrNullResultField", err)
+		}
+	})
+
 	t.Run("rpc error", func(t *testing.T) {
 		transport := NewMockTransport()
 		client := codex.NewClient(transport)
