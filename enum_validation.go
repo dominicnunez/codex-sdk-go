@@ -40,3 +40,10 @@ func unmarshalEnumString[T ~string](data []byte, field string, allowed map[T]str
 	*dest = enumValue
 	return nil
 }
+
+func marshalEnumString[T ~string](field string, value T, allowed map[T]struct{}) ([]byte, error) {
+	if err := validateEnumValue(field, value, allowed); err != nil {
+		return nil, err
+	}
+	return json.Marshal(string(value))
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -261,6 +262,33 @@ func TestLoginParamsHardcodeTypeDiscriminator(t *testing.T) {
 			}
 			if envelope.Type != tt.wantType {
 				t.Errorf("wire type = %q, want %q", envelope.Type, tt.wantType)
+			}
+		})
+	}
+}
+
+func TestLoginParamsStringUsesCanonicalType(t *testing.T) {
+	tests := []struct {
+		name string
+		got  string
+		want string
+	}{
+		{
+			name: "api key",
+			got:  fmt.Sprint(&codex.ApiKeyLoginAccountParams{ApiKey: "sk-xxx"}),
+			want: "ApiKeyLoginAccountParams{Type:apiKey, ApiKey:[REDACTED]}",
+		},
+		{
+			name: "chatgpt auth tokens",
+			got:  fmt.Sprint(&codex.ChatgptAuthTokensLoginAccountParams{AccessToken: "tok", ChatgptAccountId: "acct"}),
+			want: "ChatgptAuthTokensLoginAccountParams{Type:chatgptAuthTokens, AccessToken:[REDACTED], ChatgptAccountId:acct}",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.got != tt.want {
+				t.Fatalf("fmt.Sprint() = %q, want %q", tt.got, tt.want)
 			}
 		})
 	}

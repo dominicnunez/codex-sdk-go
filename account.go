@@ -334,7 +334,7 @@ func (p *ApiKeyLoginAccountParams) marshalWire() ([]byte, error) {
 
 // String redacts the API key to prevent accidental credential leaks in logs.
 func (p *ApiKeyLoginAccountParams) String() string {
-	return fmt.Sprintf("ApiKeyLoginAccountParams{Type:%s, ApiKey:[REDACTED]}", p.Type)
+	return fmt.Sprintf("ApiKeyLoginAccountParams{Type:%s, ApiKey:[REDACTED]}", loginTypeApiKey)
 }
 
 // GoString implements fmt.GoStringer to redact credentials from %#v.
@@ -404,7 +404,7 @@ func (p *ChatgptAuthTokensLoginAccountParams) marshalWire() ([]byte, error) {
 
 // String redacts the access token to prevent accidental credential leaks in logs.
 func (p *ChatgptAuthTokensLoginAccountParams) String() string {
-	return fmt.Sprintf("ChatgptAuthTokensLoginAccountParams{Type:%s, AccessToken:[REDACTED], ChatgptAccountId:%s}", p.Type, p.ChatgptAccountId)
+	return fmt.Sprintf("ChatgptAuthTokensLoginAccountParams{Type:%s, AccessToken:[REDACTED], ChatgptAccountId:%s}", loginTypeChatgptAuthTokens, p.ChatgptAccountId)
 }
 
 // GoString implements fmt.GoStringer to redact credentials from %#v.

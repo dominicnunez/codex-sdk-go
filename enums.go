@@ -60,6 +60,19 @@ const (
 	ServiceTierFlex ServiceTier = "flex"
 )
 
+var validServiceTiers = map[ServiceTier]struct{}{
+	ServiceTierFast: {},
+	ServiceTierFlex: {},
+}
+
+func (s ServiceTier) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("serviceTier", s, validServiceTiers)
+}
+
+func (s *ServiceTier) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "serviceTier", validServiceTiers, s)
+}
+
 // ModeKind represents the initial collaboration mode.
 type ModeKind string
 
@@ -85,6 +98,20 @@ const (
 	VerbosityHigh   Verbosity = "high"
 )
 
+var validVerbosityLevels = map[Verbosity]struct{}{
+	VerbosityLow:    {},
+	VerbosityMedium: {},
+	VerbosityHigh:   {},
+}
+
+func (v Verbosity) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("verbosity", v, validVerbosityLevels)
+}
+
+func (v *Verbosity) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "verbosity", validVerbosityLevels, v)
+}
+
 // SandboxMode represents the sandbox access mode.
 type SandboxMode string
 
@@ -94,6 +121,20 @@ const (
 	SandboxModeDangerFullAccess SandboxMode = "danger-full-access"
 )
 
+var validSandboxModes = map[SandboxMode]struct{}{
+	SandboxModeReadOnly:         {},
+	SandboxModeWorkspaceWrite:   {},
+	SandboxModeDangerFullAccess: {},
+}
+
+func (m SandboxMode) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("sandboxMode", m, validSandboxModes)
+}
+
+func (m *SandboxMode) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "sandboxMode", validSandboxModes, m)
+}
+
 // WebSearchMode represents the web search behavior mode.
 type WebSearchMode string
 
@@ -102,6 +143,20 @@ const (
 	WebSearchModeCached   WebSearchMode = "cached"
 	WebSearchModeLive     WebSearchMode = "live"
 )
+
+var validWebSearchModes = map[WebSearchMode]struct{}{
+	WebSearchModeDisabled: {},
+	WebSearchModeCached:   {},
+	WebSearchModeLive:     {},
+}
+
+func (m WebSearchMode) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("webSearchMode", m, validWebSearchModes)
+}
+
+func (m *WebSearchMode) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "webSearchMode", validWebSearchModes, m)
+}
 
 // WriteStatus represents the result of a config write operation.
 type WriteStatus string
@@ -252,6 +307,19 @@ const (
 	ForcedLoginMethodAPI     ForcedLoginMethod = "api"
 )
 
+var validForcedLoginMethods = map[ForcedLoginMethod]struct{}{
+	ForcedLoginMethodChatGPT: {},
+	ForcedLoginMethodAPI:     {},
+}
+
+func (m ForcedLoginMethod) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("forcedLoginMethod", m, validForcedLoginMethods)
+}
+
+func (m *ForcedLoginMethod) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "forcedLoginMethod", validForcedLoginMethods, m)
+}
+
 // ChatgptAuthTokensRefreshReason represents the reason for auth token refresh.
 type ChatgptAuthTokensRefreshReason string
 
@@ -303,6 +371,18 @@ type ResidencyRequirement string
 const (
 	ResidencyRequirementUS ResidencyRequirement = "us"
 )
+
+var validResidencyRequirements = map[ResidencyRequirement]struct{}{
+	ResidencyRequirementUS: {},
+}
+
+func (r ResidencyRequirement) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("residencyRequirement", r, validResidencyRequirements)
+}
+
+func (r *ResidencyRequirement) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "residencyRequirement", validResidencyRequirements, r)
+}
 
 // ReasoningEffort represents the reasoning effort level for a model.
 type ReasoningEffort string

@@ -140,6 +140,84 @@ func TestConfigReadRejectsMalformedApprovalPolicy(t *testing.T) {
 	}
 }
 
+func TestConfigReadRejectsInvalidEnums(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  map[string]interface{}
+		wantErr string
+	}{
+		{
+			name: "forced login method",
+			config: map[string]interface{}{
+				"forced_login_method": "totally-invalid",
+			},
+			wantErr: `invalid forcedLoginMethod "totally-invalid"`,
+		},
+		{
+			name: "model verbosity",
+			config: map[string]interface{}{
+				"model_verbosity": "totally-invalid",
+			},
+			wantErr: `invalid verbosity "totally-invalid"`,
+		},
+		{
+			name: "sandbox mode",
+			config: map[string]interface{}{
+				"sandbox_mode": "totally-invalid",
+			},
+			wantErr: `invalid sandboxMode "totally-invalid"`,
+		},
+		{
+			name: "web search mode",
+			config: map[string]interface{}{
+				"web_search": "totally-invalid",
+			},
+			wantErr: `invalid webSearchMode "totally-invalid"`,
+		},
+		{
+			name: "nested profile verbosity",
+			config: map[string]interface{}{
+				"profiles": map[string]interface{}{
+					"default": map[string]interface{}{
+						"model_verbosity": "totally-invalid",
+					},
+				},
+			},
+			wantErr: `invalid verbosity "totally-invalid"`,
+		},
+		{
+			name: "nested profile web search",
+			config: map[string]interface{}{
+				"profiles": map[string]interface{}{
+					"default": map[string]interface{}{
+						"web_search": "totally-invalid",
+					},
+				},
+			},
+			wantErr: `invalid webSearchMode "totally-invalid"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := NewMockTransport()
+			_ = mock.SetResponseData("config/read", map[string]interface{}{
+				"config":  tt.config,
+				"origins": map[string]interface{}{},
+			})
+			client := codex.NewClient(mock)
+
+			_, err := client.Config.Read(context.Background(), codex.ConfigReadParams{})
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %q, want substring %q", err.Error(), tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestConfigReadRequirements(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -204,6 +282,54 @@ func TestConfigReadRequirements(t *testing.T) {
 			req := mock.GetSentRequest(0)
 			if req == nil || req.Method != "configRequirements/read" {
 				t.Errorf("expected method configRequirements/read, got %v", req)
+			}
+		})
+	}
+}
+
+func TestConfigReadRequirementsRejectsInvalidEnums(t *testing.T) {
+	tests := []struct {
+		name         string
+		requirements map[string]interface{}
+		wantErr      string
+	}{
+		{
+			name: "sandbox mode",
+			requirements: map[string]interface{}{
+				"allowedSandboxModes": []interface{}{"totally-invalid"},
+			},
+			wantErr: `invalid sandboxMode "totally-invalid"`,
+		},
+		{
+			name: "web search mode",
+			requirements: map[string]interface{}{
+				"allowedWebSearchModes": []interface{}{"totally-invalid"},
+			},
+			wantErr: `invalid webSearchMode "totally-invalid"`,
+		},
+		{
+			name: "residency requirement",
+			requirements: map[string]interface{}{
+				"enforceResidency": "totally-invalid",
+			},
+			wantErr: `invalid residencyRequirement "totally-invalid"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := NewMockTransport()
+			_ = mock.SetResponseData("configRequirements/read", map[string]interface{}{
+				"requirements": tt.requirements,
+			})
+			client := codex.NewClient(mock)
+
+			_, err := client.Config.ReadRequirements(context.Background())
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %q, want substring %q", err.Error(), tt.wantErr)
 			}
 		})
 	}

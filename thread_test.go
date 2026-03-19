@@ -1084,6 +1084,78 @@ func TestThreadFork(t *testing.T) {
 	}
 }
 
+func TestThreadLifecycleRejectsInvalidServiceTier(t *testing.T) {
+	tests := []struct {
+		name   string
+		method string
+		call   func(client *codex.Client) error
+	}{
+		{
+			name:   "start",
+			method: "thread/start",
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Start(context.Background(), codex.ThreadStartParams{})
+				return err
+			},
+		},
+		{
+			name:   "resume",
+			method: "thread/resume",
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Resume(context.Background(), codex.ThreadResumeParams{ThreadID: "thread-123"})
+				return err
+			},
+		},
+		{
+			name:   "fork",
+			method: "thread/fork",
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Fork(context.Background(), codex.ThreadForkParams{ThreadID: "thread-123"})
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := NewMockTransport()
+			defer func() { _ = transport.Close() }()
+
+			client := codex.NewClient(transport)
+			_ = transport.SetResponseData(tt.method, map[string]interface{}{
+				"approvalPolicy":    "untrusted",
+				"approvalsReviewer": "user",
+				"cwd":               "/test/dir",
+				"model":             "gpt-4",
+				"modelProvider":     "openai",
+				"sandbox":           map[string]interface{}{"type": "dangerFullAccess"},
+				"serviceTier":       "totally-invalid",
+				"thread": map[string]interface{}{
+					"id":            "thread-123",
+					"cliVersion":    "1.0.0",
+					"createdAt":     int64(1234567890),
+					"cwd":           "/test/dir",
+					"ephemeral":     false,
+					"modelProvider": "openai",
+					"preview":       "thread preview",
+					"source":        "cli",
+					"status":        map[string]interface{}{"type": "idle"},
+					"turns":         []interface{}{},
+					"updatedAt":     int64(1234567890),
+				},
+			})
+
+			err := tt.call(client)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), `invalid serviceTier "totally-invalid"`) {
+				t.Fatalf("error = %q, want invalid serviceTier", err.Error())
+			}
+		})
+	}
+}
+
 // TestThreadRollback tests the ThreadService.Rollback method
 func TestThreadRollback(t *testing.T) {
 	transport := NewMockTransport()
