@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
-	"testing"
 	"strings"
+	"testing"
 )
 
 func repoRoot(t *testing.T) string {
