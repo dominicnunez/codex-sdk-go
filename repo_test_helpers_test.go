@@ -3,10 +3,10 @@ package codex_test
 import (
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strconv"
 	"testing"
+	"strings"
 )
 
 func repoRoot(t *testing.T) string {
@@ -35,19 +35,31 @@ func moduleGoVersion(t *testing.T) (major int, minor int, raw string) {
 		t.Fatalf("read go.mod: %v", err)
 	}
 
-	matches := regexp.MustCompile(`(?m)^go (\d+)\.(\d+)$`).FindStringSubmatch(string(data))
-	if len(matches) != 3 {
-		t.Fatalf("go.mod is missing a valid go directive")
+	for _, rawLine := range strings.Split(string(data), "\n") {
+		line := strings.TrimSpace(strings.TrimSuffix(rawLine, "\r"))
+		parts := strings.Fields(line)
+		if len(parts) < 2 || parts[0] != "go" {
+			continue
+		}
+
+		versionParts := strings.SplitN(parts[1], ".", 2)
+		if len(versionParts) != 2 {
+			continue
+		}
+
+		major, err = strconv.Atoi(versionParts[0])
+		if err != nil {
+			t.Fatalf("parse go.mod major version %q: %v", versionParts[0], err)
+		}
+		minor, err = strconv.Atoi(versionParts[1])
+		if err != nil {
+			t.Fatalf("parse go.mod minor version %q: %v", versionParts[1], err)
+		}
+
+		return major, minor, parts[1]
 	}
 
-	major, err = strconv.Atoi(matches[1])
-	if err != nil {
-		t.Fatalf("parse go.mod major version %q: %v", matches[1], err)
-	}
-	minor, err = strconv.Atoi(matches[2])
-	if err != nil {
-		t.Fatalf("parse go.mod minor version %q: %v", matches[2], err)
-	}
+	t.Fatalf("go.mod is missing a valid go directive")
 
-	return major, minor, matches[1] + "." + matches[2]
+	return 0, 0, ""
 }
