@@ -1,7 +1,6 @@
 ### go.mod specifies go 1.25 which does not exist
 
-**Location:** `go.mod:3` — go directive version
-**Date:** 2026-02-27
+**Location:** `3`
 
 **Reason:** The audit claims "Go 1.25 has not been released" and "As of February 2026, Go 1.24
 is the latest stable release." This is factually incorrect. Go 1.25 was released on August 12,

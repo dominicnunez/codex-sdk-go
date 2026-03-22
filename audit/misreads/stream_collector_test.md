@@ -1,6 +1,6 @@
 ### Collector tests never exercise RunStreamedWithCollector overflow handling
 
-**Location:** `stream_collector_test.go:358` — `TestRunStreamedWithCollectorReportsOverflowInSummary`
+**Location:** `358`
 
 **Reason:** The collector suite already starts `RunStreamedWithCollector`, withholds event
 consumption, overflows the bounded queue, and asserts that both `Events()` and

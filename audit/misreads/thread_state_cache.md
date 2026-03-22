@@ -1,6 +1,6 @@
 ### Server-driven thread closure leaves conversations usable after the server closes the thread
 
-**Location:** `thread_state_cache.go:261` — `thread/closed` handling and conversation state propagation
+**Location:** `261`
 
 **Reason:** This does not match the current code. `installThreadStateCache` registers a
 `notifyThreadClosed` listener, `closeThreadState` marks the cached thread closed and notifies

@@ -1,7 +1,6 @@
 ### LoginId field uses spec casing instead of Go acronym convention
 
-**Location:** `account_notifications.go:25` — AccountLoginCompletedNotification.LoginId
-**Date:** 2026-02-27
+**Location:** `25`
 
 **Reason:** The spec schema (`AccountLoginCompletedNotification.json`) defines the wire field
 as `"loginId"`. The Go field name `LoginId` mirrors the spec. Renaming to `LoginID` would be

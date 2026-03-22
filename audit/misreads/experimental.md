@@ -1,6 +1,6 @@
 ### Experimental feature stages are already validated during decode
 
-**Location:** `experimental.go:27` — `ExperimentalFeatureStage.UnmarshalJSON`
+**Location:** `27`
 
 **Reason:** The current code already defines `ExperimentalFeatureStage.UnmarshalJSON`, backed by the
 closed `validExperimentalFeatureStages` set in `experimental.go:19-25`. `ExperimentalFeature` uses

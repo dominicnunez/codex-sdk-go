@@ -1,7 +1,6 @@
 ### Stream summary takes a full snapshot on each call
 
-**Location:** `stream_collector.go:151` — `Summary()`
-**Date:** 2026-03-03
+**Location:** `151`
 
 **Reason:** `Summary()` intentionally returns a deep copy so callers can mutate the returned
 value without racing or corrupting collector state. Eliminating full-copy work would require

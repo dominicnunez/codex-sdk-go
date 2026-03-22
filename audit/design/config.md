@@ -1,7 +1,6 @@
 ### ReasoningSummaryWrapper accepts any string without validation
 
-**Location:** `config.go:62-69` — ReasoningSummaryWrapper.UnmarshalJSON
-**Date:** 2026-02-27
+**Location:** `62-69`
 
 **Reason:** Same forward-compatibility design as SessionSourceWrapper. The server may add new
 reasoning summary modes. Rejecting unknown strings would break the SDK on server upgrades.

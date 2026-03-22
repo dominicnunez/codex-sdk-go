@@ -1,7 +1,6 @@
 ### AuthorizationUrl field uses spec casing instead of Go acronym convention
 
-**Location:** `mcp.go:83` — McpServerOauthLoginResponse.AuthorizationUrl
-**Date:** 2026-02-27
+**Location:** `83`
 
 **Reason:** The spec schema (`McpServerOauthLoginResponse.json`) defines the wire field as
 `"authorizationUrl"`. The Go field name `AuthorizationUrl` mirrors the spec. Renaming to

@@ -1,6 +1,6 @@
 ### Thread unsubscribe responses already reject unknown status values
 
-**Location:** `thread.go:1378` — `ThreadUnsubscribeResponse.UnmarshalJSON`
+**Location:** `1378`
 
 **Reason:** The current unmarshal path does not accept arbitrary status strings. It calls
 `validateThreadUnsubscribeStatus`, which only allows `notLoaded`, `notSubscribed`, and
@@ -10,8 +10,7 @@ invalid-enum path.
 
 ### ThreadStartParams.ApprovalPolicy bare interface marshaling flagged as new finding but already covered
 
-**Location:** `thread.go:586` — ThreadStartParams.ApprovalPolicy field type
-**Date:** 2026-02-27
+**Location:** `586`
 
 **Reason:** The audit re-flagged the bare interface typing of `ApprovalPolicy` on params structs
 as a new Medium-severity bug. The audit itself acknowledges "This finding is already covered by
@@ -21,8 +20,7 @@ covers this exact issue. This is a duplicate, not a new finding.
 
 ### SessionSourceSubAgent round-trip serialization described as losing type discriminator
 
-**Location:** `thread.go:263-277` — SessionSourceWrapper.MarshalJSON SubAgent case
-**Date:** 2026-03-01
+**Location:** `263-277`
 
 **Reason:** The finding claims `json.Marshal(v)` for `SessionSourceSubAgent` "may not produce the
 correct wire format with type discriminators." This is incorrect. `SessionSourceSubAgent` has a
@@ -34,8 +32,7 @@ exception "SessionSourceSubAgent relies on implicit marshaling for SubAgentSourc
 
 ### ThreadStartParams.ApprovalPolicy uses interface type described as code quality issue
 
-**Location:** `thread.go:659` — ThreadStartParams.ApprovalPolicy field type
-**Date:** 2026-03-01
+**Location:** `659`
 
 **Reason:** Same duplicate as above. The known exception "Params structs use bare interface instead
 of wrapper type" at `thread.go:538` et al. covers this field. `ThreadStartParams.ApprovalPolicy`
@@ -43,7 +40,7 @@ is explicitly listed in the exception's location set.
 
 ### Thread response methods return zero-value threads when required fields are missing
 
-**Location:** `thread.go:40` — `Thread.UnmarshalJSON` and thread response validation
+**Location:** `40`
 
 **Reason:** This behavior does not occur in the current worktree. `Thread.UnmarshalJSON`
 rejects missing required thread fields such as `id`, `cliVersion`, `cwd`, `status`, and

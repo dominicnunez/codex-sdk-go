@@ -1,7 +1,6 @@
 ### AgentTracker.ProcessEvent ignores non-CollabToolCallEvent events silently
 
-**Location:** `collab_tracker.go:46-49` — ProcessEvent type switch
-**Date:** 2026-02-28
+**Location:** `46-49`
 
 **Reason:** The finding claims "no test verifies that passing non-collab events is a no-op."
 This is factually wrong. `TestAgentTrackerIgnoresNonCollabEvents` (collab_tracker_test.go:182-193)

@@ -1,7 +1,6 @@
 ### RPCError.Is nil-nil path flagged as unreachable dead code
 
-**Location:** `errors.go:61-70` — RPCError.Is nil guard
-**Date:** 2026-03-01
+**Location:** `61-70`
 
 **Reason:** This is covered by the existing exception for RPCError.Is which states: "The nil-nil
 comparison path is unreachable since `NewRPCError` is never called with nil, but the nil guard is

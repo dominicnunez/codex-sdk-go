@@ -1,6 +1,6 @@
 ### Thread rollback does not violate the source-of-truth schema by allowing zero turns
 
-**Location:** `request_paths.go:557` — `ThreadRollbackParams.prepareRequest()`
+**Location:** `557`
 
 **Reason:** This finding relies on treating `numTurns >= 1` as a protocol requirement, but the
 repo’s source of truth says otherwise. `specs/v2/ThreadRollbackParams.json` defines `numTurns` with

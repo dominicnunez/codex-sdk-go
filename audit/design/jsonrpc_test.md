@@ -1,7 +1,6 @@
 ### TestErrorCodeConstants verifies constants against their literal definitions
 
-**Location:** `jsonrpc_test.go:230-250` — table-driven test comparing ErrCode* constants to integer values
-**Date:** 2026-03-01
+**Location:** `230-250`
 
 **Reason:** The test compares `ErrCodeParseError` against `-32700`, etc. These values are defined
 as constants, so the test is tautological — it can only fail if someone changes the constant but not

@@ -1,6 +1,6 @@
 ### External-agent migration item types are already validated during decode
 
-**Location:** `external_agent.go:25` — `ExternalAgentConfigMigrationItemType.UnmarshalJSON`
+**Location:** `25`
 
 **Reason:** The current implementation already validates `itemType` against the closed enum set in
 `validExternalAgentConfigMigrationItemTypes`. Because `ExternalAgentConfigMigrationItem.ItemType`

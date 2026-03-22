@@ -1,7 +1,6 @@
 ### Unbounded agent map growth in AgentTracker
 
-**Location:** `collab_tracker.go:51-73` — agents map never prunes terminal entries
-**Date:** 2026-03-01
+**Location:** `51-73`
 
 **Reason:** `AgentTracker.agents` grows without bound as agents reach terminal states. Adding
 automatic pruning requires choosing a retention policy (time-based? count-based? immediate on

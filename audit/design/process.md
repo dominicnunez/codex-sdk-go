@@ -1,7 +1,6 @@
 ### BinaryPath relies on design-by-contract without path validation
 
-**Location:** `process.go:149-153` — BinaryPath resolution in StartProcess
-**Date:** 2026-03-01
+**Location:** `149-153`
 
 **Reason:** `ProcessOptions.BinaryPath` is documented as "must be a trusted value — passed directly
 to exec.CommandContext." The SDK is a library where callers control all inputs. Adding path

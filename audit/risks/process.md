@@ -1,7 +1,6 @@
 ### Process.Close discards signal and kill errors during graceful shutdown
 
-**Location:** `process.go:153-164` — Signal and Kill error handling in Close
-**Date:** 2026-02-28
+**Location:** `153-164`
 
 **Reason:** `Close()` discards errors from `Signal(os.Interrupt)` and `Process.Kill()` with `_ =`.
 The transport close error takes priority (returned to caller). Signal errors are typically
@@ -13,8 +12,7 @@ not about the intermediate signaling steps.
 
 ### Config flag values containing "=" are ambiguous on the CLI
 
-**Location:** `process.go:87` — buildArgs config flag construction
-**Date:** 2026-02-28
+**Location:** `87`
 
 **Reason:** Config flags are constructed as `--config k=v`. If the value itself contains `=`,
 the CLI may split on the first `=` and misinterpret the value. This is a CLI-side parsing
@@ -25,8 +23,7 @@ speculative and could introduce new ambiguity.
 
 ### ensureInit holds mutex across RPC round-trip, serializing concurrent callers
 
-**Location:** `process.go:192-206` — ensureInit
-**Date:** 2026-03-01
+**Location:** `192-206`
 
 **Reason:** `ensureInit` holds `initMu` across the `Initialize` RPC call. Concurrent
 `Run`/`RunStreamed` callers serialize behind this lock, and if the first caller's context
@@ -39,8 +36,7 @@ startup path.
 
 ### Process.Close transport error propagation lacks a unit test
 
-**Location:** `process.go:156-187` — Close transport.Close error path
-**Date:** 2026-03-01
+**Location:** `156-187`
 
 **Reason:** Testing that `transport.Close()` errors propagate through `Process.Close()`
 requires injecting a mock transport into the unexported `transport` field. The field is
@@ -51,8 +47,7 @@ and is exercised indirectly by integration tests with real processes.
 
 ### ExecArgs flag rejection does not cover abbreviated or prefix flags
 
-**Location:** `process.go:96-103` — buildArgs flag rejection loop
-**Date:** 2026-03-01
+**Location:** `96-103`
 
 **Reason:** The rejection logic already blocks `--model`, `-model`, and `=` variants. Prefix-matching
 (e.g. rejecting any arg starting with `--mod`) would create false positives for legitimate flags

@@ -1,6 +1,6 @@
 ### The client test suite no longer locks in forged transport metadata as a TransportError
 
-**Location:** `client_test.go:257` — forged transport metadata regression test
+**Location:** `257`
 
 **Reason:** The checked-in test now verifies the opposite behavior. The test at
 `client_test.go:257-291` is `TestClientSendForgedTransportFailureResponseReturnsRPCError`,

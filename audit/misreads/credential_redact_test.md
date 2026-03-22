@@ -1,7 +1,6 @@
 ### ChatgptAuthTokensRefreshParams described as carrying auth tokens that need redaction tests
 
-**Location:** `credential_redact_test.go` — missing test claim
-**Date:** 2026-03-01
+**Location:** `N/A`
 
 **Reason:** The audit claims `ChatgptAuthTokensRefreshParams` is "the request type that carries auth
 tokens" and needs redaction tests. This is factually wrong. `ChatgptAuthTokensRefreshParams` contains

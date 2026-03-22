@@ -1,6 +1,6 @@
 ### Unix process-group shutdown cannot safely re-identify a recycled group leader PID
 
-**Location:** `process_tree_unix.go:29` — process-group interrupt/kill path
+**Location:** `29`
 
 **Reason:** Portable Unix APIs do not expose a stable handle for a process group after the original
 leader exits. The current implementation can only address the group by PGID, and a complete fix

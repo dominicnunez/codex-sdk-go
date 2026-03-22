@@ -1,7 +1,6 @@
 ### Resource and Tool untyped interface{} fields described as a new finding but covered by existing exception
 
-**Location:** `mcp.go:26-51` — Resource and Tool type fields
-**Date:** 2026-03-01
+**Location:** `26-51`
 
 **Reason:** The audit describes multiple `interface{}` fields on Resource and Tool types as a code
 quality issue. These fields (`Icons`, `Meta`, `Annotations`, `InputSchema`, `OutputSchema`) are all
@@ -11,7 +10,7 @@ uses open schemas (`true`) for these fields. Duplicate of existing exception.
 
 ### MCP server auth status is already validated during response decoding
 
-**Location:** `mcp.go:26` — `McpAuthStatus.UnmarshalJSON`
+**Location:** `26`
 
 **Reason:** The report missed the existing enum validator. `McpAuthStatus` already rejects unknown
 wire values via `unmarshalEnumString`, and `McpServerStatus.AuthStatus` uses that type directly, so

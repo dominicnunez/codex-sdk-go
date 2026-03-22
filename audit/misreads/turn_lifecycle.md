@@ -1,7 +1,6 @@
 ### turn/completed unmarshal failure path in executeStreamedTurn claimed to lack test coverage
 
-**Location:** `turn_lifecycle.go:181-184` — turn/completed unmarshal failure synthesis
-**Date:** 2026-02-28
+**Location:** `181-184`
 
 **Reason:** The audit claims "This path is not tested." This is factually wrong.
 `TestRunStreamedMalformedTurnCompleted` (run_streamed_test.go:763-786) injects a `turn/completed`
@@ -12,8 +11,7 @@ an error containing "unmarshal turn/completed." The blocking path is also tested
 
 ### Notification listener registration race in executeStreamedTurn claimed but all listeners registered before RPC
 
-**Location:** `turn_lifecycle.go:101-234` — executeStreamedTurn listener registration order
-**Date:** 2026-03-01
+**Location:** `101-234`
 
 **Reason:** The audit claims a "narrow window" where the `turnDone` channel listener (registered
 "last") might not be wired when an early `turn/completed` arrives. This is factually wrong about

@@ -1,6 +1,6 @@
 ### Config warning notifications already require a summary
 
-**Location:** `config.go:497` — config warning unmarshaling
+**Location:** `497`
 
 **Reason:** `ConfigWarningNotification` already implements `UnmarshalJSON` and
 requires `summary` through `unmarshalInboundObject`. The same file also
@@ -10,7 +10,7 @@ reporting for missing `summary`.
 
 ### Config write responses already reject unknown status values
 
-**Location:** `config.go:457` — `ConfigWriteResponse.UnmarshalJSON`
+**Location:** `457`
 
 **Reason:** The current config write decode path validates `status` against the `WriteStatus`
 enum before returning a successful response. Unsupported values are rejected during unmarshaling
@@ -19,7 +19,7 @@ for both `config/value/write` and `config/batchWrite`. The regression test
 
 ### Config warning notifications do not use AbsolutePathBuf for the optional path field
 
-**Location:** `config.go:493` — `ConfigWarningNotification.UnmarshalJSON`
+**Location:** `493`
 
 **Reason:** The audit grouped `ConfigWarningNotification.UnmarshalJSON` with inbound path decoders
 that are backed by `AbsolutePathBuf`. That specific claim is wrong in the current specs.

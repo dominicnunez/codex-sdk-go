@@ -1,7 +1,6 @@
 ### AgentTracker signals on every collab event including empty state updates
 
-**Location:** `collab_tracker.go:71-72` — unconditional close(t.updated) signal
-**Date:** 2026-02-28
+**Location:** `71-72`
 
 **Reason:** The `close(t.updated)` signal fires even when `states` is empty, causing a spurious
 wakeup in `WaitAllDone`. This is standard Go condition-variable semantics — waiters must recheck

@@ -1,7 +1,6 @@
 ### Handler errors in handleApproval are invisible to SDK consumers
 
-**Location:** `client.go:273-274` — handleApproval error return path
-**Date:** 2026-02-27
+**Location:** `273-274`
 
 **Reason:** When a user-supplied approval handler returns an error, it propagates to `handleRequest`
 in `stdio.go` which replaces it with a generic `"internal handler error"` response on the wire.
@@ -14,8 +13,7 @@ wrap their handler functions with their own error logging before passing them to
 
 ### handleApproval includes server-controlled method name in internal error strings
 
-**Location:** `client.go:274,279,284` — error wrapping in handleApproval
-**Date:** 2026-02-27
+**Location:** `274,279,284`
 
 **Reason:** The `req.Method` string from the server is included in error messages, but these
 errors never cross a trust boundary. `handleRequest` in `stdio.go` replaces all handler errors
@@ -26,8 +24,7 @@ complexity without mitigating any concrete risk.
 
 ### Internal listener sequence counter can theoretically wrap around and collide
 
-**Location:** `client.go:217` — internalListenerSeq uint64 increment
-**Date:** 2026-02-28
+**Location:** `217`
 
 **Reason:** `internalListenerSeq` is incremented without overflow checking. After 2^64
 increments it wraps to 0 and subsequent IDs could collide with still-registered listeners.

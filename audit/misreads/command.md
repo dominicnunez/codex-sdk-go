@@ -1,6 +1,6 @@
 ### Command exec output delta notifications already reject unknown stream values
 
-**Location:** `command.go:104` — `CommandExecOutputDeltaNotification.UnmarshalJSON`
+**Location:** `104`
 
 **Reason:** The current notification unmarshal path validates `stream` with
 `validateCommandExecOutputStream`, which only accepts `stdout` and `stderr`. Invalid values are

@@ -1,6 +1,6 @@
 ### The realtime started notification tests already include the required version field
 
-**Location:** `realtime_test.go:18` — `TestThreadRealtimeStartedNotification`
+**Location:** `18`
 
 **Reason:** The current test fixtures already include `"version"` in both direct
 unmarshal cases and in the listener-dispatch payload. The production type also

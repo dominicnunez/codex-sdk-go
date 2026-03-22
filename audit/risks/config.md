@@ -1,7 +1,6 @@
 ### ConfigLayerSource type discriminator strings are hardcoded in each MarshalJSON
 
-**Location:** `config.go:134-218` — seven ConfigLayerSource MarshalJSON methods
-**Date:** 2026-02-27
+**Location:** `134-218`
 
 **Reason:** Each variant hardcodes its type string (e.g. `"mdm"`, `"system"`) in an anonymous
 struct literal. The audit suggests extracting named constants so marshal and unmarshal reference

@@ -1,6 +1,6 @@
 ### Plugin read/install responses succeed with missing required fields
 
-**Location:** `plugin.go:291` — plugin response decoding and validation
+**Location:** `291`
 
 **Reason:** The report is stale against the current code. `PluginDetail`,
 `PluginSummary`, `PluginSource`, `AppSummary`, and `SkillSummary` now reject missing

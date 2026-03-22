@@ -1,6 +1,6 @@
 ### Thread item enum decoding already rejects unknown phase and status values
 
-**Location:** `thread_item.go:46` — thread-item structs with enum-typed fields
+**Location:** `46`
 
 **Reason:** The finding assumes `json.Unmarshal` accepts arbitrary strings for these fields, but the
 enum types already implement validating `UnmarshalJSON` methods. `MessagePhase`,

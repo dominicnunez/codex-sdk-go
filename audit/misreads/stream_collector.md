@@ -1,6 +1,6 @@
 ### Stream collector retention for output deltas and latest plan text is already byte-bounded
 
-**Location:** `stream_collector.go:12` — collector retention limits
+**Location:** `12`
 
 **Reason:** The current collector already enforces byte budgets for retained command output deltas
 and latest plan text. `streamCollectorOutputDeltaBytesLimit`,

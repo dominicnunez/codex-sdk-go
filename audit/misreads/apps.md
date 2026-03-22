@@ -1,7 +1,6 @@
 ### AppsListParams.ForceRefetch described as missing omitempty but it has omitempty
 
-**Location:** `apps.go:11` — ForceRefetch field tag
-**Date:** 2026-02-27
+**Location:** `11`
 
 **Reason:** The audit claims `ForceRefetch bool` has "no `omitempty` tag" and that "the zero value
 `false` is always serialized." This is factually wrong. The actual field declaration is

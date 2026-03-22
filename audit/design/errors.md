@@ -1,7 +1,6 @@
 ### RPCError.Is matches on error code only, ignoring message and data
 
-**Location:** `errors.go:52-61` — RPCError.Is
-**Date:** 2026-02-27
+**Location:** `52-61`
 
 **Reason:** Code-only matching is the intentional semantic contract for RPCError. JSON-RPC error
 codes define the error category (-32600, -32601, etc.), while messages are human-readable context

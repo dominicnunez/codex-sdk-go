@@ -1,7 +1,6 @@
 ### SessionSourceSubAgent relies on implicit marshaling for SubAgentSource variants
 
-**Location:** `thread.go:231-243` — SessionSourceWrapper.MarshalJSON
-**Date:** 2026-02-27
+**Location:** `231-243`
 
 **Reason:** The marshal path for `SessionSourceSubAgent` delegates to default `json.Marshal`,
 while the unmarshal path uses explicit dispatch. The audit flags this asymmetry as fragile,

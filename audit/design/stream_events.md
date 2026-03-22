@@ -1,7 +1,6 @@
 ### newCollabEvent copies AgentsStates map on every collab event
 
-**Location:** `stream_events.go:99-116` — defensive shallow copy of AgentsStates and ReceiverThreadIds
-**Date:** 2026-03-01
+**Location:** `99-116`
 
 **Reason:** The defensive copy ensures event isolation — consumers cannot mutate the
 internal state by modifying an emitted event's map or slice. The copy allocates on every

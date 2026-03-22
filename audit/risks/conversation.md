@@ -1,7 +1,6 @@
 ### Conversation thread history grows unboundedly
 
-**Location:** `conversation.go:229-233` — turn append in addCompletedTurn
-**Date:** 2026-03-01
+**Location:** `229-233`
 
 **Reason:** Adding a cap or compaction strategy changes the observable behavior of `Conversation` —
 callers may depend on accessing the full turn history. A max-turns option would add a configuration
