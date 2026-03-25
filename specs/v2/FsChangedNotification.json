@@ -6,32 +6,24 @@
       "type": "string"
     }
   },
+  "description": "Filesystem watch notification emitted for `fs/watch` subscribers.",
   "properties": {
-    "enabled": {
-      "type": "boolean"
+    "changedPaths": {
+      "description": "File or directory paths associated with this event.",
+      "items": {
+        "$ref": "#/definitions/AbsolutePathBuf"
+      },
+      "type": "array"
     },
-    "name": {
-      "description": "Name-based selector.",
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "path": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/AbsolutePathBuf"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "description": "Path-based selector."
+    "watchId": {
+      "description": "Watch identifier returned by `fs/watch`.",
+      "type": "string"
     }
   },
   "required": [
-    "enabled"
+    "changedPaths",
+    "watchId"
   ],
-  "title": "SkillsConfigWriteParams",
+  "title": "FsChangedNotification",
   "type": "object"
 }
