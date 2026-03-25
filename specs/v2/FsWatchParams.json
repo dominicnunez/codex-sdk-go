@@ -6,33 +6,20 @@
       "type": "string"
     }
   },
+  "description": "Start filesystem watch notifications for an absolute path.",
   "properties": {
-    "codexHome": {
+    "path": {
       "allOf": [
         {
           "$ref": "#/definitions/AbsolutePathBuf"
         }
       ],
-      "description": "Absolute path to the server's $CODEX_HOME directory."
-    },
-    "platformFamily": {
-      "description": "Platform family for the running app-server target, for example `\"unix\"` or `\"windows\"`.",
-      "type": "string"
-    },
-    "platformOs": {
-      "description": "Operating system for the running app-server target, for example `\"macos\"`, `\"linux\"`, or `\"windows\"`.",
-      "type": "string"
-    },
-    "userAgent": {
-      "type": "string"
+      "description": "Absolute file or directory path to watch."
     }
   },
   "required": [
-    "codexHome",
-    "platformFamily",
-    "platformOs",
-    "userAgent"
+    "path"
   ],
-  "title": "InitializeResponse",
+  "title": "FsWatchParams",
   "type": "object"
 }
