@@ -6,33 +6,25 @@
       "type": "string"
     }
   },
+  "description": "Created watch handle returned by `fs/watch`.",
   "properties": {
-    "codexHome": {
+    "path": {
       "allOf": [
         {
           "$ref": "#/definitions/AbsolutePathBuf"
         }
       ],
-      "description": "Absolute path to the server's $CODEX_HOME directory."
+      "description": "Canonicalized path associated with the watch."
     },
-    "platformFamily": {
-      "description": "Platform family for the running app-server target, for example `\"unix\"` or `\"windows\"`.",
-      "type": "string"
-    },
-    "platformOs": {
-      "description": "Operating system for the running app-server target, for example `\"macos\"`, `\"linux\"`, or `\"windows\"`.",
-      "type": "string"
-    },
-    "userAgent": {
+    "watchId": {
+      "description": "Connection-scoped watch identifier used for `fs/unwatch` and `fs/changed`.",
       "type": "string"
     }
   },
   "required": [
-    "codexHome",
-    "platformFamily",
-    "platformOs",
-    "userAgent"
+    "path",
+    "watchId"
   ],
-  "title": "InitializeResponse",
+  "title": "FsWatchResponse",
   "type": "object"
 }
