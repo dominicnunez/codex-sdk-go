@@ -70,6 +70,12 @@
         "inputSchema": true,
         "name": {
           "type": "string"
+        },
+        "namespace": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
       "required": [
@@ -99,6 +105,13 @@
       "enum": [
         "fast",
         "flex"
+      ],
+      "type": "string"
+    },
+    "ThreadStartSource": {
+      "enum": [
+        "startup",
+        "clear"
       ],
       "type": "string"
     }
@@ -205,6 +218,16 @@
               "type": "null"
             }
           ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "sessionStartSource": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/ThreadStartSource"
         },
         {
           "type": "null"
