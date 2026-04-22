@@ -7,6 +7,23 @@
     },
     "AdditionalFileSystemPermissions": {
       "properties": {
+        "entries": {
+          "items": {
+            "$ref": "#/definitions/FileSystemSandboxEntry"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "globScanMaxDepth": {
+          "format": "uint",
+          "minimum": 1.0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "read": {
           "items": {
             "$ref": "#/definitions/AbsolutePathBuf"
@@ -28,41 +45,6 @@
       },
       "type": "object"
     },
-    "AdditionalMacOsPermissions": {
-      "properties": {
-        "accessibility": {
-          "type": "boolean"
-        },
-        "automations": {
-          "$ref": "#/definitions/MacOsAutomationPermission"
-        },
-        "calendar": {
-          "type": "boolean"
-        },
-        "contacts": {
-          "$ref": "#/definitions/MacOsContactsPermission"
-        },
-        "launchServices": {
-          "type": "boolean"
-        },
-        "preferences": {
-          "$ref": "#/definitions/MacOsPreferencesPermission"
-        },
-        "reminders": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "accessibility",
-        "automations",
-        "calendar",
-        "contacts",
-        "launchServices",
-        "preferences",
-        "reminders"
-      ],
-      "type": "object"
-    },
     "AdditionalNetworkPermissions": {
       "properties": {
         "enabled": {
@@ -80,16 +62,6 @@
           "anyOf": [
             {
               "$ref": "#/definitions/AdditionalFileSystemPermissions"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "macos": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/AdditionalMacOsPermissions"
             },
             {
               "type": "null"
@@ -186,7 +158,7 @@
               "type": "string"
             },
             "path": {
-              "type": "string"
+              "$ref": "#/definitions/AbsolutePathBuf"
             },
             "type": {
               "enum": [
@@ -391,11 +363,15 @@
           ]
         },
         "cwd": {
-          "description": "The command's working directory.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AbsolutePathBuf"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The command's working directory."
         },
         "itemId": {
           "type": "string"
@@ -452,22 +428,17 @@
       ],
       "type": "object"
     },
-    "CommandExecutionRequestApprovalSkillMetadata": {
-      "properties": {
-        "pathToSkillsMd": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "pathToSkillsMd"
-      ],
-      "type": "object"
-    },
     "DynamicToolCallParams": {
       "properties": {
         "arguments": true,
         "callId": {
           "type": "string"
+        },
+        "namespace": {
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "threadId": {
           "type": "string"
@@ -638,48 +609,216 @@
       ],
       "type": "object"
     },
-    "MacOsAutomationPermission": {
+    "FileSystemAccessMode": {
+      "enum": [
+        "read",
+        "write",
+        "none"
+      ],
+      "type": "string"
+    },
+    "FileSystemPath": {
       "oneOf": [
         {
-          "enum": [
-            "none",
-            "all"
-          ],
-          "type": "string"
-        },
-        {
-          "additionalProperties": false,
           "properties": {
-            "bundle_ids": {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
+            "path": {
+              "$ref": "#/definitions/AbsolutePathBuf"
+            },
+            "type": {
+              "enum": [
+                "path"
+              ],
+              "title": "PathFileSystemPathType",
+              "type": "string"
             }
           },
           "required": [
-            "bundle_ids"
+            "path",
+            "type"
           ],
-          "title": "BundleIdsMacOsAutomationPermission",
+          "title": "PathFileSystemPath",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "pattern": {
+              "type": "string"
+            },
+            "type": {
+              "enum": [
+                "glob_pattern"
+              ],
+              "title": "GlobPatternFileSystemPathType",
+              "type": "string"
+            }
+          },
+          "required": [
+            "pattern",
+            "type"
+          ],
+          "title": "GlobPatternFileSystemPath",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "enum": [
+                "special"
+              ],
+              "title": "SpecialFileSystemPathType",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/definitions/FileSystemSpecialPath"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "title": "SpecialFileSystemPath",
           "type": "object"
         }
       ]
     },
-    "MacOsContactsPermission": {
-      "enum": [
-        "none",
-        "read_only",
-        "read_write"
+    "FileSystemSandboxEntry": {
+      "properties": {
+        "access": {
+          "$ref": "#/definitions/FileSystemAccessMode"
+        },
+        "path": {
+          "$ref": "#/definitions/FileSystemPath"
+        }
+      },
+      "required": [
+        "access",
+        "path"
       ],
-      "type": "string"
+      "type": "object"
     },
-    "MacOsPreferencesPermission": {
-      "enum": [
-        "none",
-        "read_only",
-        "read_write"
-      ],
-      "type": "string"
+    "FileSystemSpecialPath": {
+      "oneOf": [
+        {
+          "properties": {
+            "kind": {
+              "enum": [
+                "root"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "title": "RootFileSystemSpecialPath",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "enum": [
+                "minimal"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "title": "MinimalFileSystemSpecialPath",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "enum": [
+                "current_working_directory"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "title": "CurrentWorkingDirectoryFileSystemSpecialPath",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "enum": [
+                "project_roots"
+              ],
+              "type": "string"
+            },
+            "subpath": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "title": "KindFileSystemSpecialPath",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "enum": [
+                "tmpdir"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "title": "TmpdirFileSystemSpecialPath",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "enum": [
+                "slash_tmp"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "title": "SlashTmpFileSystemSpecialPath",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "enum": [
+                "unknown"
+              ],
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            },
+            "subpath": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "path"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "McpElicitationArrayType": {
       "enum": [
@@ -1445,6 +1584,9 @@
     },
     "PermissionsRequestApprovalParams": {
       "properties": {
+        "cwd": {
+          "$ref": "#/definitions/AbsolutePathBuf"
+        },
         "itemId": {
           "type": "string"
         },
@@ -1465,6 +1607,7 @@
         }
       },
       "required": [
+        "cwd",
         "itemId",
         "permissions",
         "threadId",
