@@ -116,8 +116,9 @@ func TestInitializeResponseDeserialization(t *testing.T) {
 	}{
 		{
 			name:  "valid response with required fields",
-			input: `{"platformFamily":"unix","platformOs":"linux","userAgent":"codex-server/1.0.0"}`,
+			input: `{"codexHome":"/tmp/codex-home","platformFamily":"unix","platformOs":"linux","userAgent":"codex-server/1.0.0"}`,
 			expected: codex.InitializeResponse{
+				CodexHome:      "/tmp/codex-home",
 				PlatformFamily: "unix",
 				PlatformOS:     "linux",
 				UserAgent:      "codex-server/1.0.0",
@@ -125,8 +126,9 @@ func TestInitializeResponseDeserialization(t *testing.T) {
 		},
 		{
 			name:  "response with extra fields (forward compatibility)",
-			input: `{"platformFamily":"unix","platformOs":"linux","userAgent":"codex-server/1.0.0","extra":"field"}`,
+			input: `{"codexHome":"/tmp/codex-home","platformFamily":"unix","platformOs":"linux","userAgent":"codex-server/1.0.0","extra":"field"}`,
 			expected: codex.InitializeResponse{
+				CodexHome:      "/tmp/codex-home",
 				PlatformFamily: "unix",
 				PlatformOS:     "linux",
 				UserAgent:      "codex-server/1.0.0",
@@ -163,6 +165,7 @@ func TestClientInitialize(t *testing.T) {
 
 	// Set up expected response
 	responseData := codex.InitializeResponse{
+		CodexHome:      "/tmp/codex-home",
 		PlatformFamily: "unix",
 		PlatformOS:     "linux",
 		UserAgent:      "codex-server/1.0.0",
@@ -236,6 +239,7 @@ func TestClientInitializeCachesSuccessfulHandshake(t *testing.T) {
 	client := codex.NewClient(mock)
 
 	_ = mock.SetResponseData("initialize", codex.InitializeResponse{
+		CodexHome:      "/tmp/codex-home",
 		PlatformFamily: "unix",
 		PlatformOS:     "linux",
 		UserAgent:      "codex-server/1.0.0",
@@ -305,6 +309,7 @@ func TestClientInitializeRejectsMismatchedHandshakeParams(t *testing.T) {
 			client := codex.NewClient(mock)
 
 			_ = mock.SetResponseData("initialize", codex.InitializeResponse{
+				CodexHome:      "/tmp/codex-home",
 				PlatformFamily: "unix",
 				PlatformOS:     "linux",
 				UserAgent:      "codex-server/1.0.0",
@@ -338,6 +343,7 @@ func TestClientInitializeTreatsDefaultCapabilitiesAsEquivalent(t *testing.T) {
 	client := codex.NewClient(mock)
 
 	_ = mock.SetResponseData("initialize", codex.InitializeResponse{
+		CodexHome:      "/tmp/codex-home",
 		PlatformFamily: "unix",
 		PlatformOS:     "linux",
 		UserAgent:      "codex-server/1.0.0",
@@ -367,6 +373,7 @@ func TestClientInitializeTreatsOptOutNotificationMethodsAsASet(t *testing.T) {
 	client := codex.NewClient(mock)
 
 	_ = mock.SetResponseData("initialize", codex.InitializeResponse{
+		CodexHome:      "/tmp/codex-home",
 		PlatformFamily: "unix",
 		PlatformOS:     "linux",
 		UserAgent:      "codex-server/1.0.0",
@@ -410,6 +417,7 @@ func TestClientInitializeCanonicalizesOptOutNotificationMethods(t *testing.T) {
 	client := codex.NewClient(mock)
 
 	_ = mock.SetResponseData("initialize", codex.InitializeResponse{
+		CodexHome:      "/tmp/codex-home",
 		PlatformFamily: "unix",
 		PlatformOS:     "linux",
 		UserAgent:      "codex-server/1.0.0",
@@ -529,18 +537,23 @@ func TestClientInitializeRejectsMissingRequiredFields(t *testing.T) {
 		want   string
 	}{
 		{
+			name:   "missing codexHome",
+			result: `{"platformFamily":"unix","platformOs":"linux","userAgent":"codex-server/1.0.0"}`,
+			want:   "missing codexHome",
+		},
+		{
 			name:   "missing platformFamily",
-			result: `{"platformOs":"linux","userAgent":"codex-server/1.0.0"}`,
+			result: `{"codexHome":"/tmp/codex-home","platformOs":"linux","userAgent":"codex-server/1.0.0"}`,
 			want:   "missing platformFamily",
 		},
 		{
 			name:   "missing platformOs",
-			result: `{"platformFamily":"unix","userAgent":"codex-server/1.0.0"}`,
+			result: `{"codexHome":"/tmp/codex-home","platformFamily":"unix","userAgent":"codex-server/1.0.0"}`,
 			want:   "missing platformOs",
 		},
 		{
 			name:   "missing userAgent",
-			result: `{"platformFamily":"unix","platformOs":"linux"}`,
+			result: `{"codexHome":"/tmp/codex-home","platformFamily":"unix","platformOs":"linux"}`,
 			want:   "missing userAgent",
 		},
 	}

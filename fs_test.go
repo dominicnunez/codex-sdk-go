@@ -188,7 +188,7 @@ func TestFsGetMetadata(t *testing.T) {
 		client := codex.NewClient(transport)
 		transport.SetResponse("fs/getMetadata", codex.Response{
 			JSONRPC: "2.0",
-			Result:  json.RawMessage(`{"createdAtMs":1,"isDirectory":false,"isFile":true,"modifiedAtMs":2}`),
+			Result:  json.RawMessage(`{"createdAtMs":1,"isDirectory":false,"isFile":true,"isSymlink":false,"modifiedAtMs":2}`),
 		})
 
 		resp, err := client.Fs.GetMetadata(context.Background(), codex.FsGetMetadataParams{Path: "/tmp/file.txt"})

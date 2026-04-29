@@ -940,19 +940,29 @@ type ThreadStartParams struct {
 	Sandbox               *SandboxMode       `json:"sandbox,omitempty"`
 	ServiceName           *string            `json:"serviceName,omitempty"`
 	ServiceTier           *ServiceTier       `json:"serviceTier,omitempty"`
+	SessionStartSource    *ThreadStartSource `json:"sessionStartSource,omitempty"`
 }
+
+// ThreadStartSource identifies why a thread was started.
+type ThreadStartSource string
+
+const (
+	ThreadStartSourceStartup ThreadStartSource = "startup"
+	ThreadStartSourceClear   ThreadStartSource = "clear"
+)
 
 // ThreadStartResponse is the response from starting a thread
 type ThreadStartResponse struct {
-	ApprovalPolicy    AskForApprovalWrapper `json:"approvalPolicy"`
-	ApprovalsReviewer ApprovalsReviewer     `json:"approvalsReviewer"`
-	Cwd               string                `json:"cwd"`
-	Model             string                `json:"model"`
-	ModelProvider     string                `json:"modelProvider"`
-	ReasoningEffort   *ReasoningEffort      `json:"reasoningEffort,omitempty"`
-	Sandbox           SandboxPolicyWrapper  `json:"sandbox"`
-	ServiceTier       *ServiceTier          `json:"serviceTier,omitempty"`
-	Thread            Thread                `json:"thread"`
+	ApprovalPolicy     AskForApprovalWrapper `json:"approvalPolicy"`
+	ApprovalsReviewer  ApprovalsReviewer     `json:"approvalsReviewer"`
+	Cwd                string                `json:"cwd"`
+	InstructionSources []string              `json:"instructionSources,omitempty"`
+	Model              string                `json:"model"`
+	ModelProvider      string                `json:"modelProvider"`
+	ReasoningEffort    *ReasoningEffort      `json:"reasoningEffort,omitempty"`
+	Sandbox            SandboxPolicyWrapper  `json:"sandbox"`
+	ServiceTier        *ServiceTier          `json:"serviceTier,omitempty"`
+	Thread             Thread                `json:"thread"`
 }
 
 func (r *ThreadStartResponse) UnmarshalJSON(data []byte) error {
@@ -1082,14 +1092,17 @@ type ThreadListParams struct {
 	Limit          *uint32            `json:"limit,omitempty"`
 	ModelProviders []string           `json:"modelProviders,omitempty"`
 	SearchTerm     *string            `json:"searchTerm,omitempty"`
+	SortDirection  *SortDirection     `json:"sortDirection,omitempty"`
 	SortKey        *ThreadSortKey     `json:"sortKey,omitempty"`
 	SourceKinds    []ThreadSourceKind `json:"sourceKinds,omitempty"`
+	UseStateDbOnly *bool              `json:"useStateDbOnly,omitempty"`
 }
 
 // ThreadListResponse is the response from listing threads
 type ThreadListResponse struct {
-	Data       []Thread `json:"data"`
-	NextCursor *string  `json:"nextCursor,omitempty"`
+	BackwardsCursor *string  `json:"backwardsCursor,omitempty"`
+	Data            []Thread `json:"data"`
+	NextCursor      *string  `json:"nextCursor,omitempty"`
 }
 
 func (r *ThreadListResponse) UnmarshalJSON(data []byte) error {
@@ -1151,6 +1164,102 @@ func (s *ThreadService) LoadedList(ctx context.Context, params ThreadLoadedListP
 	return response, nil
 }
 
+// SortDirection controls thread turn pagination direction.
+type SortDirection string
+
+const (
+	SortDirectionAsc  SortDirection = "asc"
+	SortDirectionDesc SortDirection = "desc"
+)
+
+// ThreadTurnsListParams are parameters for listing turns in a thread.
+type ThreadTurnsListParams struct {
+	Cursor        *string        `json:"cursor,omitempty"`
+	Limit         *uint32        `json:"limit,omitempty"`
+	SortDirection *SortDirection `json:"sortDirection,omitempty"`
+	ThreadID      string         `json:"threadId"`
+}
+
+// ThreadTurnsListResponse is the response from thread/turns/list.
+type ThreadTurnsListResponse struct {
+	BackwardsCursor *string `json:"backwardsCursor,omitempty"`
+	Data            []Turn  `json:"data"`
+	NextCursor      *string `json:"nextCursor,omitempty"`
+}
+
+func (r *ThreadTurnsListResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "data"); err != nil {
+		return err
+	}
+	type wire ThreadTurnsListResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = ThreadTurnsListResponse(decoded)
+	return nil
+}
+
+// TurnsList lists turns in a thread.
+func (s *ThreadService) TurnsList(ctx context.Context, params ThreadTurnsListParams) (ThreadTurnsListResponse, error) {
+	var response ThreadTurnsListResponse
+	if err := s.client.sendRequest(ctx, methodThreadTurnsList, params, &response); err != nil {
+		return ThreadTurnsListResponse{}, err
+	}
+	return response, nil
+}
+
+// ThreadShellCommandParams runs a shell command in a thread context.
+type ThreadShellCommandParams struct {
+	Command  string `json:"command"`
+	ThreadID string `json:"threadId"`
+}
+
+// ThreadShellCommandResponse is the empty response from thread/shellCommand.
+type ThreadShellCommandResponse struct{}
+
+// ShellCommand runs a shell command in a thread context.
+func (s *ThreadService) ShellCommand(ctx context.Context, params ThreadShellCommandParams) (ThreadShellCommandResponse, error) {
+	if err := s.client.sendEmptyObjectRequest(ctx, methodThreadShellCommand, params); err != nil {
+		return ThreadShellCommandResponse{}, err
+	}
+	return ThreadShellCommandResponse{}, nil
+}
+
+// ThreadApproveGuardianDeniedActionParams approves a guardian-denied action.
+type ThreadApproveGuardianDeniedActionParams struct {
+	Event    json.RawMessage `json:"event"`
+	ThreadID string          `json:"threadId"`
+}
+
+// ThreadApproveGuardianDeniedActionResponse is the empty response from thread/approveGuardianDeniedAction.
+type ThreadApproveGuardianDeniedActionResponse struct{}
+
+// ApproveGuardianDeniedAction approves a guardian-denied action.
+func (s *ThreadService) ApproveGuardianDeniedAction(ctx context.Context, params ThreadApproveGuardianDeniedActionParams) (ThreadApproveGuardianDeniedActionResponse, error) {
+	if err := s.client.sendEmptyObjectRequest(ctx, methodThreadApproveGuardianDeniedAction, params); err != nil {
+		return ThreadApproveGuardianDeniedActionResponse{}, err
+	}
+	return ThreadApproveGuardianDeniedActionResponse{}, nil
+}
+
+// ThreadInjectItemsParams appends raw Responses API items to a thread's history.
+type ThreadInjectItemsParams struct {
+	Items    []json.RawMessage `json:"items"`
+	ThreadID string            `json:"threadId"`
+}
+
+// ThreadInjectItemsResponse is the empty response from thread/inject_items.
+type ThreadInjectItemsResponse struct{}
+
+// InjectItems appends raw Responses API items to a thread's history.
+func (s *ThreadService) InjectItems(ctx context.Context, params ThreadInjectItemsParams) (ThreadInjectItemsResponse, error) {
+	if err := s.client.sendEmptyObjectRequest(ctx, methodThreadInjectItems, params); err != nil {
+		return ThreadInjectItemsResponse{}, err
+	}
+	return ThreadInjectItemsResponse{}, nil
+}
+
 // ThreadResumeParams are parameters for resuming a thread
 type ThreadResumeParams struct {
 	ThreadID              string             `json:"threadId"`
@@ -1160,6 +1269,7 @@ type ThreadResumeParams struct {
 	Config                json.RawMessage    `json:"config,omitempty"`
 	Cwd                   *string            `json:"cwd,omitempty"`
 	DeveloperInstructions *string            `json:"developerInstructions,omitempty"`
+	ExcludeTurns          *bool              `json:"excludeTurns,omitempty"`
 	Model                 *string            `json:"model,omitempty"`
 	ModelProvider         *string            `json:"modelProvider,omitempty"`
 	Personality           *Personality       `json:"personality,omitempty"`
@@ -1169,15 +1279,16 @@ type ThreadResumeParams struct {
 
 // ThreadResumeResponse is the response from resuming a thread
 type ThreadResumeResponse struct {
-	ApprovalPolicy    AskForApprovalWrapper `json:"approvalPolicy"`
-	ApprovalsReviewer ApprovalsReviewer     `json:"approvalsReviewer"`
-	Cwd               string                `json:"cwd"`
-	Model             string                `json:"model"`
-	ModelProvider     string                `json:"modelProvider"`
-	ReasoningEffort   *ReasoningEffort      `json:"reasoningEffort,omitempty"`
-	Sandbox           SandboxPolicyWrapper  `json:"sandbox"`
-	ServiceTier       *ServiceTier          `json:"serviceTier,omitempty"`
-	Thread            Thread                `json:"thread"`
+	ApprovalPolicy     AskForApprovalWrapper `json:"approvalPolicy"`
+	ApprovalsReviewer  ApprovalsReviewer     `json:"approvalsReviewer"`
+	Cwd                string                `json:"cwd"`
+	InstructionSources []string              `json:"instructionSources,omitempty"`
+	Model              string                `json:"model"`
+	ModelProvider      string                `json:"modelProvider"`
+	ReasoningEffort    *ReasoningEffort      `json:"reasoningEffort,omitempty"`
+	Sandbox            SandboxPolicyWrapper  `json:"sandbox"`
+	ServiceTier        *ServiceTier          `json:"serviceTier,omitempty"`
+	Thread             Thread                `json:"thread"`
 }
 
 func (r *ThreadResumeResponse) UnmarshalJSON(data []byte) error {
@@ -1231,6 +1342,7 @@ type ThreadForkParams struct {
 	Cwd                   *string            `json:"cwd,omitempty"`
 	DeveloperInstructions *string            `json:"developerInstructions,omitempty"`
 	Ephemeral             *bool              `json:"ephemeral,omitempty"`
+	ExcludeTurns          *bool              `json:"excludeTurns,omitempty"`
 	Model                 *string            `json:"model,omitempty"`
 	ModelProvider         *string            `json:"modelProvider,omitempty"`
 	Sandbox               *SandboxMode       `json:"sandbox,omitempty"`
@@ -1239,15 +1351,16 @@ type ThreadForkParams struct {
 
 // ThreadForkResponse is the response from forking a thread
 type ThreadForkResponse struct {
-	ApprovalPolicy    AskForApprovalWrapper `json:"approvalPolicy"`
-	ApprovalsReviewer ApprovalsReviewer     `json:"approvalsReviewer"`
-	Cwd               string                `json:"cwd"`
-	Model             string                `json:"model"`
-	ModelProvider     string                `json:"modelProvider"`
-	ReasoningEffort   *ReasoningEffort      `json:"reasoningEffort,omitempty"`
-	Sandbox           SandboxPolicyWrapper  `json:"sandbox"`
-	ServiceTier       *ServiceTier          `json:"serviceTier,omitempty"`
-	Thread            Thread                `json:"thread"`
+	ApprovalPolicy     AskForApprovalWrapper `json:"approvalPolicy"`
+	ApprovalsReviewer  ApprovalsReviewer     `json:"approvalsReviewer"`
+	Cwd                string                `json:"cwd"`
+	InstructionSources []string              `json:"instructionSources,omitempty"`
+	Model              string                `json:"model"`
+	ModelProvider      string                `json:"modelProvider"`
+	ReasoningEffort    *ReasoningEffort      `json:"reasoningEffort,omitempty"`
+	Sandbox            SandboxPolicyWrapper  `json:"sandbox"`
+	ServiceTier        *ServiceTier          `json:"serviceTier,omitempty"`
+	Thread             Thread                `json:"thread"`
 }
 
 func (r *ThreadForkResponse) UnmarshalJSON(data []byte) error {

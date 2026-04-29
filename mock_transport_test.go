@@ -12,6 +12,7 @@ import (
 
 func validInitializeResponseData(userAgent string) map[string]interface{} {
 	return map[string]interface{}{
+		"codexHome":      "/tmp/codex-home",
 		"platformFamily": "unix",
 		"platformOs":     "linux",
 		"userAgent":      userAgent,

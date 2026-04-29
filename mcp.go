@@ -27,6 +27,14 @@ func (s *McpAuthStatus) UnmarshalJSON(data []byte) error {
 	return unmarshalEnumString(data, "mcpServerStatus.authStatus", validMcpAuthStatuses, s)
 }
 
+// McpServerStatusDetail controls how much MCP inventory data is returned.
+type McpServerStatusDetail string
+
+const (
+	McpServerStatusDetailFull             McpServerStatusDetail = "full"
+	McpServerStatusDetailToolsAndAuthOnly McpServerStatusDetail = "toolsAndAuthOnly"
+)
+
 // Resource represents a resource exposed by an MCP server.
 type Resource struct {
 	Name        string      `json:"name"`
@@ -125,8 +133,9 @@ func (s *McpServerStatus) UnmarshalJSON(data []byte) error {
 
 // ListMcpServerStatusParams are parameters for the mcpServerStatus/list request.
 type ListMcpServerStatusParams struct {
-	Cursor *string `json:"cursor,omitempty"`
-	Limit  *uint32 `json:"limit,omitempty"`
+	Cursor *string                `json:"cursor,omitempty"`
+	Detail *McpServerStatusDetail `json:"detail,omitempty"`
+	Limit  *uint32                `json:"limit,omitempty"`
 }
 
 // ListMcpServerStatusResponse is the response from mcpServerStatus/list.
@@ -175,6 +184,98 @@ func (r *McpServerOauthLoginResponse) UnmarshalJSON(data []byte) error {
 
 // McpServerRefreshResponse is the response from config/mcpServer/reload.
 type McpServerRefreshResponse struct{}
+
+// McpResourceReadParams reads a resource from an MCP server.
+type McpResourceReadParams struct {
+	Server   string  `json:"server"`
+	ThreadID *string `json:"threadId,omitempty"`
+	URI      string  `json:"uri"`
+}
+
+// ResourceContent is one content item returned from an MCP resource read.
+type ResourceContent struct {
+	Meta     json.RawMessage `json:"_meta,omitempty"`
+	Blob     *string         `json:"blob,omitempty"`
+	MimeType *string         `json:"mimeType,omitempty"`
+	Text     *string         `json:"text,omitempty"`
+	URI      string          `json:"uri"`
+}
+
+// McpResourceReadResponse is the response from mcpServer/resource/read.
+type McpResourceReadResponse struct {
+	Contents []ResourceContent `json:"contents"`
+}
+
+func (r *McpResourceReadResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "contents"); err != nil {
+		return err
+	}
+	type wire McpResourceReadResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = McpResourceReadResponse(decoded)
+	return nil
+}
+
+// McpServerToolCallParams calls an MCP server tool.
+type McpServerToolCallParams struct {
+	Meta      json.RawMessage `json:"_meta,omitempty"`
+	Arguments json.RawMessage `json:"arguments,omitempty"`
+	Server    string          `json:"server"`
+	ThreadID  string          `json:"threadId"`
+	Tool      string          `json:"tool"`
+}
+
+// McpServerToolCallResponse is the response from mcpServer/tool/call.
+type McpServerToolCallResponse struct {
+	Meta              json.RawMessage   `json:"_meta,omitempty"`
+	Content           []json.RawMessage `json:"content"`
+	IsError           *bool             `json:"isError,omitempty"`
+	StructuredContent json.RawMessage   `json:"structuredContent,omitempty"`
+}
+
+func (r *McpServerToolCallResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "content"); err != nil {
+		return err
+	}
+	type wire McpServerToolCallResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = McpServerToolCallResponse(decoded)
+	return nil
+}
+
+// McpServerStartupState is the startup state of an MCP server.
+type McpServerStartupState string
+
+const (
+	McpServerStartupStateStarting  McpServerStartupState = "starting"
+	McpServerStartupStateReady     McpServerStartupState = "ready"
+	McpServerStartupStateFailed    McpServerStartupState = "failed"
+	McpServerStartupStateCancelled McpServerStartupState = "cancelled"
+)
+
+// McpServerStatusUpdatedNotification reports MCP server startup status updates.
+type McpServerStatusUpdatedNotification struct {
+	Error  *string               `json:"error,omitempty"`
+	Name   string                `json:"name"`
+	Status McpServerStartupState `json:"status"`
+}
+
+func (n *McpServerStatusUpdatedNotification) UnmarshalJSON(data []byte) error {
+	type wire McpServerStatusUpdatedNotification
+	var decoded wire
+	required := []string{"name", "status"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = McpServerStatusUpdatedNotification(decoded)
+	return nil
+}
 
 // McpServerOauthLoginCompletedNotification is sent when OAuth login completes.
 type McpServerOauthLoginCompletedNotification struct {
@@ -248,6 +349,24 @@ func (s *McpService) Refresh(ctx context.Context) (McpServerRefreshResponse, err
 	return McpServerRefreshResponse{}, nil
 }
 
+// ResourceRead reads a resource from an MCP server.
+func (s *McpService) ResourceRead(ctx context.Context, params McpResourceReadParams) (McpResourceReadResponse, error) {
+	var resp McpResourceReadResponse
+	if err := s.client.sendRequest(ctx, methodMcpResourceRead, params, &resp); err != nil {
+		return McpResourceReadResponse{}, err
+	}
+	return resp, nil
+}
+
+// ToolCall calls a tool on an MCP server.
+func (s *McpService) ToolCall(ctx context.Context, params McpServerToolCallParams) (McpServerToolCallResponse, error) {
+	var resp McpServerToolCallResponse
+	if err := s.client.sendRequest(ctx, methodMcpServerToolCall, params, &resp); err != nil {
+		return McpServerToolCallResponse{}, err
+	}
+	return resp, nil
+}
+
 // OnMcpServerOauthLoginCompleted registers a listener for OAuth login completion notifications.
 func (c *Client) OnMcpServerOauthLoginCompleted(handler func(McpServerOauthLoginCompletedNotification)) {
 	if handler == nil {
@@ -258,6 +377,22 @@ func (c *Client) OnMcpServerOauthLoginCompleted(handler func(McpServerOauthLogin
 		var params McpServerOauthLoginCompletedNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyMcpServerOauthLoginCompleted, fmt.Errorf("unmarshal %s: %w", notifyMcpServerOauthLoginCompleted, err))
+			return
+		}
+		handler(params)
+	})
+}
+
+// OnMcpServerStatusUpdated registers a listener for MCP server startup status updates.
+func (c *Client) OnMcpServerStatusUpdated(handler func(McpServerStatusUpdatedNotification)) {
+	if handler == nil {
+		c.OnNotification(notifyMcpServerStatusUpdated, nil)
+		return
+	}
+	c.OnNotification(notifyMcpServerStatusUpdated, func(ctx context.Context, notif Notification) {
+		var params McpServerStatusUpdatedNotification
+		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifyMcpServerStatusUpdated, fmt.Errorf("unmarshal %s: %w", notifyMcpServerStatusUpdated, err))
 			return
 		}
 		handler(params)

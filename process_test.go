@@ -159,7 +159,7 @@ func TestStartProcess(t *testing.T) {
 	// JSON-RPC initialize response back.
 	script := `#!/bin/sh
 read line
-echo '{"jsonrpc":"2.0","id":1,"result":{"platformFamily":"unix","platformOs":"linux","userAgent":"fake-codex/0.0.1"}}'
+echo '{"jsonrpc":"2.0","id":1,"result":{"codexHome":"/tmp/codex-home","platformFamily":"unix","platformOs":"linux","userAgent":"fake-codex/0.0.1"}}'
 # Keep running until killed
 while true; do sleep 1; done
 `
@@ -865,7 +865,7 @@ func TestEnsureInitRetryAfterInvalidInitializeResponse(t *testing.T) {
 	mock := NewMockTransport()
 	mock.SetResponse("initialize", codex.Response{
 		JSONRPC: "2.0",
-		Result:  json.RawMessage(`{"userAgent":"codex-test/1.0"}`),
+		Result:  json.RawMessage(`{"codexHome":"/tmp/codex-home","platformOs":"linux","userAgent":"codex-test/1.0"}`),
 	})
 
 	client := codex.NewClient(mock, codex.WithRequestTimeout(2*time.Second))
@@ -1015,7 +1015,7 @@ emit_shutdown() {
 }
 trap 'emit_shutdown; sleep 1; exit 0' INT
 IFS= read -r line || exit 1
-printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"platformFamily":"unix","platformOs":"linux","userAgent":"fake-codex/0.0.1"}}'
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"codexHome":"/tmp/codex-home","platformFamily":"unix","platformOs":"linux","userAgent":"fake-codex/0.0.1"}}'
 while :; do :; done
 `)
 
@@ -1061,7 +1061,7 @@ emit_shutdown() {
 }
 trap 'emit_shutdown; sleep 1; exit 130' INT
 IFS= read -r line || exit 1
-printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"platformFamily":"unix","platformOs":"linux","userAgent":"fake-codex/0.0.1"}}'
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"codexHome":"/tmp/codex-home","platformFamily":"unix","platformOs":"linux","userAgent":"fake-codex/0.0.1"}}'
 while :; do :; done
 `)
 
@@ -1104,7 +1104,7 @@ func TestProcessCloseDrainsFinalStdoutOnStdinEOFShutdown(t *testing.T) {
 	fakeBinary := writeProcessScriptBinary(t, dir, `#!/bin/sh
 trap '' INT
 IFS= read -r line || exit 1
-printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"platformFamily":"unix","platformOs":"linux","userAgent":"fake-codex/0.0.1"}}'
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"codexHome":"/tmp/codex-home","platformFamily":"unix","platformOs":"linux","userAgent":"fake-codex/0.0.1"}}'
 while IFS= read -r line; do
   :
 done
@@ -1298,7 +1298,7 @@ func (d *delayedCountingTransport) Send(ctx context.Context, req codex.Request) 
 	return codex.Response{
 		JSONRPC: "2.0",
 		ID:      req.ID,
-		Result:  json.RawMessage(`{"platformFamily":"unix","platformOs":"linux","userAgent":"test"}`),
+		Result:  json.RawMessage(`{"codexHome":"/tmp/codex-home","platformFamily":"unix","platformOs":"linux","userAgent":"test"}`),
 	}, nil
 }
 

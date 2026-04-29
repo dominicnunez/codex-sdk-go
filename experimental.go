@@ -83,6 +83,29 @@ type ExperimentalFeatureListResponse struct {
 	NextCursor *string `json:"nextCursor,omitempty"`
 }
 
+// ExperimentalFeatureEnablementSetParams updates runtime feature enablement.
+type ExperimentalFeatureEnablementSetParams struct {
+	Enablement map[string]bool `json:"enablement"`
+}
+
+// ExperimentalFeatureEnablementSetResponse returns the resulting runtime feature enablement.
+type ExperimentalFeatureEnablementSetResponse struct {
+	Enablement map[string]bool `json:"enablement"`
+}
+
+func (r *ExperimentalFeatureEnablementSetResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "enablement"); err != nil {
+		return err
+	}
+	type wire ExperimentalFeatureEnablementSetResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = ExperimentalFeatureEnablementSetResponse(decoded)
+	return nil
+}
+
 func (r *ExperimentalFeatureListResponse) UnmarshalJSON(data []byte) error {
 	if err := validateRequiredObjectFields(data, "data"); err != nil {
 		return err
@@ -110,6 +133,15 @@ func (s *ExperimentalService) FeatureList(ctx context.Context, params Experiment
 	var resp ExperimentalFeatureListResponse
 	if err := s.client.sendRequest(ctx, methodExperimentalFeatureList, params, &resp); err != nil {
 		return ExperimentalFeatureListResponse{}, err
+	}
+	return resp, nil
+}
+
+// FeatureEnablementSet updates runtime feature enablement.
+func (s *ExperimentalService) FeatureEnablementSet(ctx context.Context, params ExperimentalFeatureEnablementSetParams) (ExperimentalFeatureEnablementSetResponse, error) {
+	var resp ExperimentalFeatureEnablementSetResponse
+	if err := s.client.sendRequest(ctx, methodExperimentalFeatureEnablementSet, params, &resp); err != nil {
+		return ExperimentalFeatureEnablementSetResponse{}, err
 	}
 	return resp, nil
 }

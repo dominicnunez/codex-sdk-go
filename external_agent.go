@@ -14,6 +14,11 @@ const (
 	MigrationItemTypeConfig          ExternalAgentConfigMigrationItemType = "CONFIG"
 	MigrationItemTypeSkills          ExternalAgentConfigMigrationItemType = "SKILLS"
 	MigrationItemTypeMcpServerConfig ExternalAgentConfigMigrationItemType = "MCP_SERVER_CONFIG"
+	MigrationItemTypePlugins         ExternalAgentConfigMigrationItemType = "PLUGINS"
+	MigrationItemTypeSubagents       ExternalAgentConfigMigrationItemType = "SUBAGENTS"
+	MigrationItemTypeHooks           ExternalAgentConfigMigrationItemType = "HOOKS"
+	MigrationItemTypeCommands        ExternalAgentConfigMigrationItemType = "COMMANDS"
+	MigrationItemTypeSessions        ExternalAgentConfigMigrationItemType = "SESSIONS"
 )
 
 var validExternalAgentConfigMigrationItemTypes = map[ExternalAgentConfigMigrationItemType]struct{}{
@@ -21,6 +26,11 @@ var validExternalAgentConfigMigrationItemTypes = map[ExternalAgentConfigMigratio
 	MigrationItemTypeConfig:          {},
 	MigrationItemTypeSkills:          {},
 	MigrationItemTypeMcpServerConfig: {},
+	MigrationItemTypePlugins:         {},
+	MigrationItemTypeSubagents:       {},
+	MigrationItemTypeHooks:           {},
+	MigrationItemTypeCommands:        {},
+	MigrationItemTypeSessions:        {},
 }
 
 func (t *ExternalAgentConfigMigrationItemType) UnmarshalJSON(data []byte) error {
@@ -132,6 +142,9 @@ func (p ExternalAgentConfigImportParams) prepareRequest() (interface{}, error) {
 // ExternalAgentConfigImportResponse is an empty response from config import.
 type ExternalAgentConfigImportResponse struct{}
 
+// ExternalAgentConfigImportCompletedNotification is sent when config import completes.
+type ExternalAgentConfigImportCompletedNotification struct{}
+
 // ExternalAgentService handles external agent configuration detection and import.
 type ExternalAgentService struct {
 	client *Client
@@ -156,4 +169,20 @@ func (s *ExternalAgentService) ConfigImport(ctx context.Context, params External
 		return ExternalAgentConfigImportResponse{}, err
 	}
 	return ExternalAgentConfigImportResponse{}, nil
+}
+
+// OnExternalAgentConfigImportCompleted registers a listener for config import completion notifications.
+func (c *Client) OnExternalAgentConfigImportCompleted(handler func(ExternalAgentConfigImportCompletedNotification)) {
+	if handler == nil {
+		c.OnNotification(notifyExternalAgentConfigImportCompleted, nil)
+		return
+	}
+	c.OnNotification(notifyExternalAgentConfigImportCompleted, func(ctx context.Context, notif Notification) {
+		var params ExternalAgentConfigImportCompletedNotification
+		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifyExternalAgentConfigImportCompleted, fmt.Errorf("unmarshal %s: %w", notifyExternalAgentConfigImportCompleted, err))
+			return
+		}
+		handler(params)
+	})
 }

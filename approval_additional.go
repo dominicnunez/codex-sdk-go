@@ -24,6 +24,7 @@ type RequestPermissionProfile struct {
 
 // PermissionsRequestApprovalParams represents an item/permissions/requestApproval request.
 type PermissionsRequestApprovalParams struct {
+	Cwd         string                   `json:"cwd"`
 	ItemID      string                   `json:"itemId"`
 	Permissions RequestPermissionProfile `json:"permissions"`
 	Reason      *string                  `json:"reason,omitempty"`
@@ -34,7 +35,7 @@ type PermissionsRequestApprovalParams struct {
 func (p *PermissionsRequestApprovalParams) UnmarshalJSON(data []byte) error {
 	type wire PermissionsRequestApprovalParams
 	var decoded wire
-	required := []string{"itemId", "permissions", "threadId", "turnId"}
+	required := []string{"cwd", "itemId", "permissions", "threadId", "turnId"}
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
@@ -63,8 +64,9 @@ const (
 
 // PermissionsRequestApprovalResponse represents the approval response for additional permissions.
 type PermissionsRequestApprovalResponse struct {
-	Permissions GrantedPermissionProfile `json:"permissions"`
-	Scope       *PermissionGrantScope    `json:"scope,omitempty"`
+	Permissions      GrantedPermissionProfile `json:"permissions"`
+	Scope            *PermissionGrantScope    `json:"scope,omitempty"`
+	StrictAutoReview *bool                    `json:"strictAutoReview,omitempty"`
 }
 
 func (r PermissionsRequestApprovalResponse) validate() error {

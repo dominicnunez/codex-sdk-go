@@ -125,27 +125,33 @@ func (u *UnknownAccount) MarshalJSON() ([]byte, error) {
 type PlanType string
 
 const (
-	PlanTypeFree       PlanType = "free"
-	PlanTypeGo         PlanType = "go"
-	PlanTypePlus       PlanType = "plus"
-	PlanTypePro        PlanType = "pro"
-	PlanTypeTeam       PlanType = "team"
-	PlanTypeBusiness   PlanType = "business"
-	PlanTypeEnterprise PlanType = "enterprise"
-	PlanTypeEdu        PlanType = "edu"
-	PlanTypeUnknown    PlanType = "unknown"
+	PlanTypeFree                        PlanType = "free"
+	PlanTypeGo                          PlanType = "go"
+	PlanTypePlus                        PlanType = "plus"
+	PlanTypePro                         PlanType = "pro"
+	PlanTypeProLite                     PlanType = "prolite"
+	PlanTypeTeam                        PlanType = "team"
+	PlanTypeBusiness                    PlanType = "business"
+	PlanTypeEnterprise                  PlanType = "enterprise"
+	PlanTypeEdu                         PlanType = "edu"
+	PlanTypeSelfServeBusinessUsageBased PlanType = "self_serve_business_usage_based"
+	PlanTypeEnterpriseCBPUsageBased     PlanType = "enterprise_cbp_usage_based"
+	PlanTypeUnknown                     PlanType = "unknown"
 )
 
 var validPlanTypes = map[PlanType]struct{}{
-	PlanTypeFree:       {},
-	PlanTypeGo:         {},
-	PlanTypePlus:       {},
-	PlanTypePro:        {},
-	PlanTypeTeam:       {},
-	PlanTypeBusiness:   {},
-	PlanTypeEnterprise: {},
-	PlanTypeEdu:        {},
-	PlanTypeUnknown:    {},
+	PlanTypeFree:                        {},
+	PlanTypeGo:                          {},
+	PlanTypePlus:                        {},
+	PlanTypePro:                         {},
+	PlanTypeProLite:                     {},
+	PlanTypeTeam:                        {},
+	PlanTypeBusiness:                    {},
+	PlanTypeEnterprise:                  {},
+	PlanTypeEdu:                         {},
+	PlanTypeSelfServeBusinessUsageBased: {},
+	PlanTypeEnterpriseCBPUsageBased:     {},
+	PlanTypeUnknown:                     {},
 }
 
 func validatePlanTypeField(field string, value PlanType) error {
@@ -269,6 +275,45 @@ type RateLimitWindow struct {
 	UsedPercent        int32  `json:"usedPercent"`
 	ResetsAt           *int64 `json:"resetsAt,omitempty"`
 	WindowDurationMins *int64 `json:"windowDurationMins,omitempty"`
+}
+
+// AddCreditsNudgeCreditType identifies which credit category should be nudged.
+type AddCreditsNudgeCreditType string
+
+const (
+	AddCreditsNudgeCreditTypeCredits    AddCreditsNudgeCreditType = "credits"
+	AddCreditsNudgeCreditTypeUsageLimit AddCreditsNudgeCreditType = "usage_limit"
+)
+
+// SendAddCreditsNudgeEmailParams sends an add-credits nudge email.
+type SendAddCreditsNudgeEmailParams struct {
+	CreditType AddCreditsNudgeCreditType `json:"creditType"`
+}
+
+// AddCreditsNudgeEmailStatus is the result of sending an add-credits nudge email.
+type AddCreditsNudgeEmailStatus string
+
+const (
+	AddCreditsNudgeEmailStatusSent           AddCreditsNudgeEmailStatus = "sent"
+	AddCreditsNudgeEmailStatusCooldownActive AddCreditsNudgeEmailStatus = "cooldown_active"
+)
+
+// SendAddCreditsNudgeEmailResponse is the response from account/sendAddCreditsNudgeEmail.
+type SendAddCreditsNudgeEmailResponse struct {
+	Status AddCreditsNudgeEmailStatus `json:"status"`
+}
+
+func (r *SendAddCreditsNudgeEmailResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "status"); err != nil {
+		return err
+	}
+	type wire SendAddCreditsNudgeEmailResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = SendAddCreditsNudgeEmailResponse(decoded)
+	return nil
 }
 
 func (w *RateLimitWindow) UnmarshalJSON(data []byte) error {
@@ -606,6 +651,15 @@ func (s *AccountService) GetRateLimits(ctx context.Context) (GetAccountRateLimit
 	var resp GetAccountRateLimitsResponse
 	if err := s.client.sendRequest(ctx, methodAccountRateLimitsRead, nil, &resp); err != nil {
 		return GetAccountRateLimitsResponse{}, err
+	}
+	return resp, nil
+}
+
+// SendAddCreditsNudgeEmail sends an add-credits nudge email.
+func (s *AccountService) SendAddCreditsNudgeEmail(ctx context.Context, params SendAddCreditsNudgeEmailParams) (SendAddCreditsNudgeEmailResponse, error) {
+	var resp SendAddCreditsNudgeEmailResponse
+	if err := s.client.sendRequest(ctx, methodAccountSendAddCreditsNudgeEmail, params, &resp); err != nil {
+		return SendAddCreditsNudgeEmailResponse{}, err
 	}
 	return resp, nil
 }

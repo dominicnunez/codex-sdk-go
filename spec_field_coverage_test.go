@@ -360,6 +360,8 @@ func testStructFields(t *testing.T) {
 		{"specs/v2/GetAccountParams.json", reflect.TypeOf(GetAccountParams{})},
 		{"specs/v2/GetAccountResponse.json", reflect.TypeOf(GetAccountResponse{})},
 		{"specs/v2/GetAccountRateLimitsResponse.json", reflect.TypeOf(GetAccountRateLimitsResponse{})},
+		{"specs/v2/SendAddCreditsNudgeEmailParams.json", reflect.TypeOf(SendAddCreditsNudgeEmailParams{})},
+		{"specs/v2/SendAddCreditsNudgeEmailResponse.json", reflect.TypeOf(SendAddCreditsNudgeEmailResponse{})},
 		{"specs/v2/CancelLoginAccountParams.json", reflect.TypeOf(CancelLoginAccountParams{})},
 		{"specs/v2/CancelLoginAccountResponse.json", reflect.TypeOf(CancelLoginAccountResponse{})},
 
@@ -372,6 +374,14 @@ func testStructFields(t *testing.T) {
 		{"specs/v2/AppsListParams.json", reflect.TypeOf(AppsListParams{})},
 		{"specs/v2/AppsListResponse.json", reflect.TypeOf(AppsListResponse{})},
 		{"specs/v2/AppListUpdatedNotification.json", reflect.TypeOf(AppListUpdatedNotification{})},
+
+		// v2 device key
+		{"specs/v2/DeviceKeyCreateParams.json", reflect.TypeOf(DeviceKeyCreateParams{})},
+		{"specs/v2/DeviceKeyCreateResponse.json", reflect.TypeOf(DeviceKeyCreateResponse{})},
+		{"specs/v2/DeviceKeyPublicParams.json", reflect.TypeOf(DeviceKeyPublicParams{})},
+		{"specs/v2/DeviceKeyPublicResponse.json", reflect.TypeOf(DeviceKeyPublicResponse{})},
+		{"specs/v2/DeviceKeySignParams.json", reflect.TypeOf(DeviceKeySignParams{})},
+		{"specs/v2/DeviceKeySignResponse.json", reflect.TypeOf(DeviceKeySignResponse{})},
 
 		// v2 command
 		{"specs/v2/CommandExecParams.json", reflect.TypeOf(CommandExecParams{})},
@@ -397,11 +407,14 @@ func testStructFields(t *testing.T) {
 		// v2 experimental
 		{"specs/v2/ExperimentalFeatureListParams.json", reflect.TypeOf(ExperimentalFeatureListParams{})},
 		{"specs/v2/ExperimentalFeatureListResponse.json", reflect.TypeOf(ExperimentalFeatureListResponse{})},
+		{"specs/v2/ExperimentalFeatureEnablementSetParams.json", reflect.TypeOf(ExperimentalFeatureEnablementSetParams{})},
+		{"specs/v2/ExperimentalFeatureEnablementSetResponse.json", reflect.TypeOf(ExperimentalFeatureEnablementSetResponse{})},
 
 		// v2 external agent
 		{"specs/v2/ExternalAgentConfigDetectParams.json", reflect.TypeOf(ExternalAgentConfigDetectParams{})},
 		{"specs/v2/ExternalAgentConfigDetectResponse.json", reflect.TypeOf(ExternalAgentConfigDetectResponse{})},
 		{"specs/v2/ExternalAgentConfigImportParams.json", reflect.TypeOf(ExternalAgentConfigImportParams{})},
+		{"specs/v2/ExternalAgentConfigImportCompletedNotification.json", reflect.TypeOf(ExternalAgentConfigImportCompletedNotification{})},
 
 		// v2 feedback
 		{"specs/v2/FeedbackUploadParams.json", reflect.TypeOf(FeedbackUploadParams{})},
@@ -422,10 +435,16 @@ func testStructFields(t *testing.T) {
 		{"specs/v2/FsRemoveResponse.json", reflect.TypeOf(FsRemoveResponse{})},
 		{"specs/v2/FsCopyParams.json", reflect.TypeOf(FsCopyParams{})},
 		{"specs/v2/FsCopyResponse.json", reflect.TypeOf(FsCopyResponse{})},
+		{"specs/v2/FsWatchParams.json", reflect.TypeOf(FsWatchParams{})},
+		{"specs/v2/FsWatchResponse.json", reflect.TypeOf(FsWatchResponse{})},
+		{"specs/v2/FsUnwatchParams.json", reflect.TypeOf(FsUnwatchParams{})},
+		{"specs/v2/FsUnwatchResponse.json", reflect.TypeOf(FsUnwatchResponse{})},
+		{"specs/v2/FsChangedNotification.json", reflect.TypeOf(FsChangedNotification{})},
 
 		// v2 streaming notifications
 		{"specs/v2/AgentMessageDeltaNotification.json", reflect.TypeOf(AgentMessageDeltaNotification{})},
 		{"specs/v2/FileChangeOutputDeltaNotification.json", reflect.TypeOf(FileChangeOutputDeltaNotification{})},
+		{"specs/v2/FileChangePatchUpdatedNotification.json", reflect.TypeOf(FileChangePatchUpdatedNotification{})},
 		{"specs/v2/PlanDeltaNotification.json", reflect.TypeOf(PlanDeltaNotification{})},
 		{"specs/v2/ReasoningTextDeltaNotification.json", reflect.TypeOf(ReasoningTextDeltaNotification{})},
 		{"specs/v2/ReasoningSummaryTextDeltaNotification.json", reflect.TypeOf(ReasoningSummaryTextDeltaNotification{})},
@@ -438,13 +457,21 @@ func testStructFields(t *testing.T) {
 		{"specs/v2/ListMcpServerStatusResponse.json", reflect.TypeOf(ListMcpServerStatusResponse{})},
 		{"specs/v2/McpServerOauthLoginParams.json", reflect.TypeOf(McpServerOauthLoginParams{})},
 		{"specs/v2/McpServerOauthLoginResponse.json", reflect.TypeOf(McpServerOauthLoginResponse{})},
+		{"specs/v2/McpResourceReadParams.json", reflect.TypeOf(McpResourceReadParams{})},
+		{"specs/v2/McpResourceReadResponse.json", reflect.TypeOf(McpResourceReadResponse{})},
+		{"specs/v2/McpServerToolCallParams.json", reflect.TypeOf(McpServerToolCallParams{})},
+		{"specs/v2/McpServerToolCallResponse.json", reflect.TypeOf(McpServerToolCallResponse{})},
 		{"specs/v2/McpServerOauthLoginCompletedNotification.json", reflect.TypeOf(McpServerOauthLoginCompletedNotification{})},
+		{"specs/v2/McpServerStatusUpdatedNotification.json", reflect.TypeOf(McpServerStatusUpdatedNotification{})},
 		{"specs/v2/McpToolCallProgressNotification.json", reflect.TypeOf(McpToolCallProgressNotification{})},
 
 		// v2 model
 		{"specs/v2/ModelListParams.json", reflect.TypeOf(ModelListParams{})},
 		{"specs/v2/ModelListResponse.json", reflect.TypeOf(ModelListResponse{})},
+		{"specs/v2/ModelProviderCapabilitiesReadParams.json", reflect.TypeOf(ModelProviderCapabilitiesReadParams{})},
+		{"specs/v2/ModelProviderCapabilitiesReadResponse.json", reflect.TypeOf(ModelProviderCapabilitiesReadResponse{})},
 		{"specs/v2/ModelReroutedNotification.json", reflect.TypeOf(ModelReroutedNotification{})},
+		{"specs/v2/ModelVerificationNotification.json", reflect.TypeOf(ModelVerificationNotification{})},
 
 		// v2 review
 		{"specs/v2/ReviewStartParams.json", reflect.TypeOf(ReviewStartParams{})},
@@ -459,6 +486,14 @@ func testStructFields(t *testing.T) {
 		{"specs/v2/PluginInstallResponse.json", reflect.TypeOf(PluginInstallResponse{})},
 		{"specs/v2/PluginUninstallParams.json", reflect.TypeOf(PluginUninstallParams{})},
 		{"specs/v2/PluginUninstallResponse.json", reflect.TypeOf(PluginUninstallResponse{})},
+
+		// v2 marketplace
+		{"specs/v2/MarketplaceAddParams.json", reflect.TypeOf(MarketplaceAddParams{})},
+		{"specs/v2/MarketplaceAddResponse.json", reflect.TypeOf(MarketplaceAddResponse{})},
+		{"specs/v2/MarketplaceRemoveParams.json", reflect.TypeOf(MarketplaceRemoveParams{})},
+		{"specs/v2/MarketplaceRemoveResponse.json", reflect.TypeOf(MarketplaceRemoveResponse{})},
+		{"specs/v2/MarketplaceUpgradeParams.json", reflect.TypeOf(MarketplaceUpgradeParams{})},
+		{"specs/v2/MarketplaceUpgradeResponse.json", reflect.TypeOf(MarketplaceUpgradeResponse{})},
 
 		// v2 skills
 		{"specs/v2/SkillsListParams.json", reflect.TypeOf(SkillsListParams{})},
@@ -479,6 +514,9 @@ func testStructFields(t *testing.T) {
 		{"specs/v2/ContextCompactedNotification.json", reflect.TypeOf(ContextCompactedNotification{})},
 		{"specs/v2/DeprecationNoticeNotification.json", reflect.TypeOf(DeprecationNoticeNotification{})},
 		{"specs/v2/ErrorNotification.json", reflect.TypeOf(ErrorNotification{})},
+		{"specs/v2/WarningNotification.json", reflect.TypeOf(WarningNotification{})},
+		{"specs/v2/GuardianWarningNotification.json", reflect.TypeOf(GuardianWarningNotification{})},
+		{"specs/v2/RemoteControlStatusChangedNotification.json", reflect.TypeOf(RemoteControlStatusChangedNotification{})},
 		{"specs/v2/TerminalInteractionNotification.json", reflect.TypeOf(TerminalInteractionNotification{})},
 
 		// v2 thread
@@ -490,6 +528,14 @@ func testStructFields(t *testing.T) {
 		{"specs/v2/ThreadListResponse.json", reflect.TypeOf(ThreadListResponse{})},
 		{"specs/v2/ThreadLoadedListParams.json", reflect.TypeOf(ThreadLoadedListParams{})},
 		{"specs/v2/ThreadLoadedListResponse.json", reflect.TypeOf(ThreadLoadedListResponse{})},
+		{"specs/v2/ThreadTurnsListParams.json", reflect.TypeOf(ThreadTurnsListParams{})},
+		{"specs/v2/ThreadTurnsListResponse.json", reflect.TypeOf(ThreadTurnsListResponse{})},
+		{"specs/v2/ThreadShellCommandParams.json", reflect.TypeOf(ThreadShellCommandParams{})},
+		{"specs/v2/ThreadShellCommandResponse.json", reflect.TypeOf(ThreadShellCommandResponse{})},
+		{"specs/v2/ThreadApproveGuardianDeniedActionParams.json", reflect.TypeOf(ThreadApproveGuardianDeniedActionParams{})},
+		{"specs/v2/ThreadApproveGuardianDeniedActionResponse.json", reflect.TypeOf(ThreadApproveGuardianDeniedActionResponse{})},
+		{"specs/v2/ThreadInjectItemsParams.json", reflect.TypeOf(ThreadInjectItemsParams{})},
+		{"specs/v2/ThreadInjectItemsResponse.json", reflect.TypeOf(ThreadInjectItemsResponse{})},
 		{"specs/v2/ThreadResumeParams.json", reflect.TypeOf(ThreadResumeParams{})},
 		{"specs/v2/ThreadResumeResponse.json", reflect.TypeOf(ThreadResumeResponse{})},
 		{"specs/v2/ThreadForkParams.json", reflect.TypeOf(ThreadForkParams{})},
@@ -511,6 +557,8 @@ func testStructFields(t *testing.T) {
 		{"specs/v2/ThreadClosedNotification.json", reflect.TypeOf(ThreadClosedNotification{})},
 		{"specs/v2/ThreadArchivedNotification.json", reflect.TypeOf(ThreadArchivedNotification{})},
 		{"specs/v2/ThreadUnarchivedNotification.json", reflect.TypeOf(ThreadUnarchivedNotification{})},
+		{"specs/v2/ThreadGoalUpdatedNotification.json", reflect.TypeOf(ThreadGoalUpdatedNotification{})},
+		{"specs/v2/ThreadGoalClearedNotification.json", reflect.TypeOf(ThreadGoalClearedNotification{})},
 		{"specs/v2/ThreadNameUpdatedNotification.json", reflect.TypeOf(ThreadNameUpdatedNotification{})},
 		{"specs/v2/ThreadStatusChangedNotification.json", reflect.TypeOf(ThreadStatusChangedNotification{})},
 		{"specs/v2/ThreadTokenUsageUpdatedNotification.json", reflect.TypeOf(ThreadTokenUsageUpdatedNotification{})},
@@ -522,6 +570,9 @@ func testStructFields(t *testing.T) {
 		{"specs/v2/ThreadRealtimeErrorNotification.json", reflect.TypeOf(ThreadRealtimeErrorNotification{})},
 		{"specs/v2/ThreadRealtimeItemAddedNotification.json", reflect.TypeOf(ThreadRealtimeItemAddedNotification{})},
 		{"specs/v2/ThreadRealtimeOutputAudioDeltaNotification.json", reflect.TypeOf(ThreadRealtimeOutputAudioDeltaNotification{})},
+		{"specs/v2/ThreadRealtimeSdpNotification.json", reflect.TypeOf(ThreadRealtimeSdpNotification{})},
+		{"specs/v2/ThreadRealtimeTranscriptDeltaNotification.json", reflect.TypeOf(ThreadRealtimeTranscriptDeltaNotification{})},
+		{"specs/v2/ThreadRealtimeTranscriptDoneNotification.json", reflect.TypeOf(ThreadRealtimeTranscriptDoneNotification{})},
 
 		// v2 turn
 		{"specs/v2/TurnStartParams.json", reflect.TypeOf(TurnStartParams{})},
@@ -690,7 +741,12 @@ func testStructFields(t *testing.T) {
 		{"specs/v2/ConfigRequirementsReadResponse.json", "ConfigRequirements", reflect.TypeOf(ConfigRequirements{})},
 		{"specs/v2/HookStartedNotification.json", "HookOutputEntry", reflect.TypeOf(HookOutputEntry{})},
 		{"specs/v2/HookStartedNotification.json", "HookRunSummary", reflect.TypeOf(HookRunSummary{})},
+		{"specs/v2/ItemStartedNotification.json", "MemoryCitation", reflect.TypeOf(MemoryCitation{})},
+		{"specs/v2/ItemStartedNotification.json", "MemoryCitationEntry", reflect.TypeOf(MemoryCitationEntry{})},
 		{"specs/v2/ItemGuardianApprovalReviewStartedNotification.json", "GuardianApprovalReview", reflect.TypeOf(GuardianApprovalReview{})},
+		{"specs/v2/MarketplaceUpgradeResponse.json", "MarketplaceUpgradeErrorInfo", reflect.TypeOf(MarketplaceUpgradeErrorInfo{})},
+		{"specs/v2/PluginListResponse.json", "MarketplaceLoadErrorInfo", reflect.TypeOf(MarketplaceLoadErrorInfo{})},
+		{"specs/v2/ThreadGoalUpdatedNotification.json", "ThreadGoal", reflect.TypeOf(ThreadGoal{})},
 		{"specs/v2/ThreadRealtimeOutputAudioDeltaNotification.json", "ThreadRealtimeAudioChunk", reflect.TypeOf(ThreadRealtimeAudioChunk{})},
 	}
 
@@ -746,18 +802,20 @@ func testEnumValues(t *testing.T) {
 			specPath: "specs/v2/AccountRateLimitsUpdatedNotification.json",
 			defName:  "PlanType",
 			goValues: enumStrings(
-				PlanTypeFree, PlanTypeGo, PlanTypePlus, PlanTypePro,
+				PlanTypeFree, PlanTypeGo, PlanTypePlus, PlanTypePro, PlanTypeProLite,
 				PlanTypeTeam, PlanTypeBusiness, PlanTypeEnterprise,
-				PlanTypeEdu, PlanTypeUnknown,
+				PlanTypeEdu, PlanTypeSelfServeBusinessUsageBased,
+				PlanTypeEnterpriseCBPUsageBased, PlanTypeUnknown,
 			),
 		},
 		{
 			specPath: "specs/v2/AccountUpdatedNotification.json",
 			defName:  "PlanType",
 			goValues: enumStrings(
-				PlanTypeFree, PlanTypeGo, PlanTypePlus, PlanTypePro,
+				PlanTypeFree, PlanTypeGo, PlanTypePlus, PlanTypePro, PlanTypeProLite,
 				PlanTypeTeam, PlanTypeBusiness, PlanTypeEnterprise,
-				PlanTypeEdu, PlanTypeUnknown,
+				PlanTypeEdu, PlanTypeSelfServeBusinessUsageBased,
+				PlanTypeEnterpriseCBPUsageBased, PlanTypeUnknown,
 			),
 		},
 		{
@@ -765,6 +823,7 @@ func testEnumValues(t *testing.T) {
 			defName:  "AuthMode",
 			goValues: enumStrings(
 				AuthModeAPIKey, AuthModeChatGPT, AuthModeChatGPTAuthTokens,
+				AuthModeAgentIdentity,
 			),
 		},
 		{
@@ -778,7 +837,9 @@ func testEnumValues(t *testing.T) {
 			specPath: "specs/v2/HookStartedNotification.json",
 			defName:  "HookEventName",
 			goValues: enumStrings(
-				HookEventNameSessionStart, HookEventNameUserPromptSubmit, HookEventNameStop,
+				HookEventNameSessionStart, HookEventNameUserPromptSubmit,
+				HookEventNamePreToolUse, HookEventNamePermissionRequest,
+				HookEventNamePostToolUse, HookEventNameStop,
 			),
 		},
 		{
@@ -824,6 +885,7 @@ func testEnumValues(t *testing.T) {
 			goValues: enumStrings(
 				GuardianApprovalReviewStatusInProgress, GuardianApprovalReviewStatusApproved,
 				GuardianApprovalReviewStatusDenied, GuardianApprovalReviewStatusAborted,
+				GuardianApprovalReviewStatusTimedOut,
 			),
 		},
 		{
@@ -831,6 +893,7 @@ func testEnumValues(t *testing.T) {
 			defName:  "GuardianRiskLevel",
 			goValues: enumStrings(
 				GuardianRiskLevelLow, GuardianRiskLevelMedium, GuardianRiskLevelHigh,
+				GuardianRiskLevelCritical,
 			),
 		},
 
@@ -1084,6 +1147,9 @@ func testEnumValues(t *testing.T) {
 			goValues: enumStrings(
 				MigrationItemTypeAgentsMd, MigrationItemTypeConfig,
 				MigrationItemTypeSkills, MigrationItemTypeMcpServerConfig,
+				MigrationItemTypePlugins, MigrationItemTypeSubagents,
+				MigrationItemTypeHooks, MigrationItemTypeCommands,
+				MigrationItemTypeSessions,
 			),
 		},
 		{

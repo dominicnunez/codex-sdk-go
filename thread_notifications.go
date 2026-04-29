@@ -70,6 +70,62 @@ func (n *ThreadUnarchivedNotification) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// ThreadGoalStatus is the status of a thread goal.
+type ThreadGoalStatus string
+
+const (
+	ThreadGoalStatusActive        ThreadGoalStatus = "active"
+	ThreadGoalStatusPaused        ThreadGoalStatus = "paused"
+	ThreadGoalStatusBudgetLimited ThreadGoalStatus = "budgetLimited"
+	ThreadGoalStatusComplete      ThreadGoalStatus = "complete"
+)
+
+// ThreadGoal describes goal-tracking state for a thread.
+type ThreadGoal struct {
+	CreatedAt       int64            `json:"createdAt"`
+	Objective       string           `json:"objective"`
+	Status          ThreadGoalStatus `json:"status"`
+	ThreadID        string           `json:"threadId"`
+	TimeUsedSeconds int64            `json:"timeUsedSeconds"`
+	TokenBudget     *int64           `json:"tokenBudget,omitempty"`
+	TokensUsed      int64            `json:"tokensUsed"`
+	UpdatedAt       int64            `json:"updatedAt"`
+}
+
+// ThreadGoalUpdatedNotification is sent when a thread goal is updated.
+type ThreadGoalUpdatedNotification struct {
+	Goal     ThreadGoal `json:"goal"`
+	ThreadID string     `json:"threadId"`
+	TurnID   *string    `json:"turnId,omitempty"`
+}
+
+func (n *ThreadGoalUpdatedNotification) UnmarshalJSON(data []byte) error {
+	type wire ThreadGoalUpdatedNotification
+	var decoded wire
+	required := []string{"goal", "threadId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = ThreadGoalUpdatedNotification(decoded)
+	return nil
+}
+
+// ThreadGoalClearedNotification is sent when a thread goal is cleared.
+type ThreadGoalClearedNotification struct {
+	ThreadID string `json:"threadId"`
+}
+
+func (n *ThreadGoalClearedNotification) UnmarshalJSON(data []byte) error {
+	type wire ThreadGoalClearedNotification
+	var decoded wire
+	required := []string{"threadId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = ThreadGoalClearedNotification(decoded)
+	return nil
+}
+
 // ThreadNameUpdatedNotification is sent when a thread's name is updated
 type ThreadNameUpdatedNotification struct {
 	ThreadID   string  `json:"threadId"`
@@ -218,6 +274,38 @@ func (c *Client) OnThreadUnarchived(handler func(ThreadUnarchivedNotification)) 
 		var notification ThreadUnarchivedNotification
 		if err := json.Unmarshal(notif.Params, &notification); err != nil {
 			c.reportHandlerError(notifyThreadUnarchived, fmt.Errorf("unmarshal %s: %w", notifyThreadUnarchived, err))
+			return
+		}
+		handler(notification)
+	})
+}
+
+// OnThreadGoalUpdated registers a listener for thread/goal/updated notifications.
+func (c *Client) OnThreadGoalUpdated(handler func(ThreadGoalUpdatedNotification)) {
+	if handler == nil {
+		c.OnNotification(notifyThreadGoalUpdated, nil)
+		return
+	}
+	c.OnNotification(notifyThreadGoalUpdated, func(ctx context.Context, notif Notification) {
+		var notification ThreadGoalUpdatedNotification
+		if err := json.Unmarshal(notif.Params, &notification); err != nil {
+			c.reportHandlerError(notifyThreadGoalUpdated, fmt.Errorf("unmarshal %s: %w", notifyThreadGoalUpdated, err))
+			return
+		}
+		handler(notification)
+	})
+}
+
+// OnThreadGoalCleared registers a listener for thread/goal/cleared notifications.
+func (c *Client) OnThreadGoalCleared(handler func(ThreadGoalClearedNotification)) {
+	if handler == nil {
+		c.OnNotification(notifyThreadGoalCleared, nil)
+		return
+	}
+	c.OnNotification(notifyThreadGoalCleared, func(ctx context.Context, notif Notification) {
+		var notification ThreadGoalClearedNotification
+		if err := json.Unmarshal(notif.Params, &notification); err != nil {
+			c.reportHandlerError(notifyThreadGoalCleared, fmt.Errorf("unmarshal %s: %w", notifyThreadGoalCleared, err))
 			return
 		}
 		handler(notification)

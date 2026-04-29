@@ -63,11 +63,13 @@ type ApprovalsReviewer string
 
 const (
 	ApprovalsReviewerUser             ApprovalsReviewer = "user"
+	ApprovalsReviewerAutoReview       ApprovalsReviewer = "auto_review"
 	ApprovalsReviewerGuardianSubagent ApprovalsReviewer = "guardian_subagent"
 )
 
 var validApprovalsReviewers = map[ApprovalsReviewer]struct{}{
 	ApprovalsReviewerUser:             {},
+	ApprovalsReviewerAutoReview:       {},
 	ApprovalsReviewerGuardianSubagent: {},
 }
 

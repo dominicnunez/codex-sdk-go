@@ -31,6 +31,7 @@ type InitializeParams struct {
 
 // InitializeResponse is the response from the initialize request.
 type InitializeResponse struct {
+	CodexHome      string `json:"codexHome"`
 	PlatformFamily string `json:"platformFamily"`
 	PlatformOS     string `json:"platformOs"`
 	UserAgent      string `json:"userAgent"`
@@ -49,6 +50,8 @@ func (e *InitializeParamsMismatchError) Error() string {
 
 func (r InitializeResponse) validate() error {
 	switch {
+	case r.CodexHome == "":
+		return errors.New("missing codexHome")
 	case r.PlatformFamily == "":
 		return errors.New("missing platformFamily")
 	case r.PlatformOS == "":

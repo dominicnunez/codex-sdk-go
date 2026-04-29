@@ -226,6 +226,30 @@ func (s *CollabAgentState) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// MemoryCitationEntry identifies a cited memory location.
+type MemoryCitationEntry struct {
+	LineEnd   uint32 `json:"lineEnd"`
+	LineStart uint32 `json:"lineStart"`
+	Note      string `json:"note"`
+	Path      string `json:"path"`
+}
+
+// MemoryCitation contains memory citation entries referenced by a message.
+type MemoryCitation struct {
+	Entries   []MemoryCitationEntry `json:"entries"`
+	ThreadIDs []string              `json:"threadIds"`
+}
+
+// CommandExecutionSource identifies what initiated a command execution.
+type CommandExecutionSource string
+
+const (
+	CommandExecutionSourceAgent                  CommandExecutionSource = "agent"
+	CommandExecutionSourceUserShell              CommandExecutionSource = "userShell"
+	CommandExecutionSourceUnifiedExecStartup     CommandExecutionSource = "unifiedExecStartup"
+	CommandExecutionSourceUnifiedExecInteraction CommandExecutionSource = "unifiedExecInteraction"
+)
+
 // FileUpdateChange represents a file change with diff and kind.
 type FileUpdateChange struct {
 	Path string                 `json:"path"`

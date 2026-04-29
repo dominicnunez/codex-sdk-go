@@ -13,6 +13,8 @@ type FeedbackUploadParams struct {
 	IncludeLogs bool `json:"includeLogs"`
 	// Reason provides additional context for the feedback (optional).
 	Reason *string `json:"reason,omitempty"`
+	// Tags provides additional structured context for the feedback (optional).
+	Tags map[string]string `json:"tags,omitempty"`
 	// ThreadID is the ID of the thread related to this feedback (optional).
 	ThreadID *string `json:"threadId,omitempty"`
 	// ExtraLogFiles is a list of additional log file paths to include (optional).

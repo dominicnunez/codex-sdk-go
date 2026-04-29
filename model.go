@@ -192,6 +192,31 @@ func (r *ModelRerouteReason) UnmarshalJSON(data []byte) error {
 	return unmarshalEnumString(data, "model.rerouted.reason", validModelRerouteReasons, r)
 }
 
+// ModelVerification describes a verification attached to a model response.
+type ModelVerification string
+
+const (
+	ModelVerificationTrustedAccessForCyber ModelVerification = "trustedAccessForCyber"
+)
+
+// ModelVerificationNotification is sent when model verifications are available.
+type ModelVerificationNotification struct {
+	ThreadID      string              `json:"threadId"`
+	TurnID        string              `json:"turnId"`
+	Verifications []ModelVerification `json:"verifications"`
+}
+
+func (n *ModelVerificationNotification) UnmarshalJSON(data []byte) error {
+	type wire ModelVerificationNotification
+	var decoded wire
+	required := []string{"threadId", "turnId", "verifications"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = ModelVerificationNotification(decoded)
+	return nil
+}
+
 // ModelService provides access to model listing and notifications.
 type ModelService struct {
 	client *Client
@@ -220,6 +245,22 @@ func (c *Client) OnModelRerouted(handler func(ModelReroutedNotification)) {
 		var n ModelReroutedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyModelRerouted, fmt.Errorf("unmarshal %s: %w", notifyModelRerouted, err))
+			return
+		}
+		handler(n)
+	})
+}
+
+// OnModelVerification registers a listener for model/verification notifications.
+func (c *Client) OnModelVerification(handler func(ModelVerificationNotification)) {
+	if handler == nil {
+		c.OnNotification(notifyModelVerification, nil)
+		return
+	}
+	c.OnNotification(notifyModelVerification, func(ctx context.Context, notif Notification) {
+		var n ModelVerificationNotification
+		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			c.reportHandlerError(notifyModelVerification, fmt.Errorf("unmarshal %s: %w", notifyModelVerification, err))
 			return
 		}
 		handler(n)

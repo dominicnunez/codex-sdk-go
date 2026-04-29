@@ -1094,6 +1094,7 @@ type DynamicToolCallParams struct {
 	Tool      string      `json:"tool"`
 	Arguments interface{} `json:"arguments"` // any JSON structure
 	CallID    string      `json:"callId"`
+	Namespace *string     `json:"namespace,omitempty"`
 	ThreadID  string      `json:"threadId"`
 	TurnID    string      `json:"turnId"`
 }

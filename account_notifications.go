@@ -13,12 +13,14 @@ const (
 	AuthModeAPIKey            AuthMode = "apikey"
 	AuthModeChatGPT           AuthMode = "chatgpt"
 	AuthModeChatGPTAuthTokens AuthMode = "chatgptAuthTokens"
+	AuthModeAgentIdentity     AuthMode = "agentIdentity"
 )
 
 var validAuthModes = map[AuthMode]struct{}{
 	AuthModeAPIKey:            {},
 	AuthModeChatGPT:           {},
 	AuthModeChatGPTAuthTokens: {},
+	AuthModeAgentIdentity:     {},
 }
 
 func validateOptionalAuthModeField(field string, value *AuthMode) error {

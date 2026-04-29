@@ -217,11 +217,15 @@ func (r *SkillsListResponse) UnmarshalJSON(data []byte) error {
 
 // SkillsConfigWriteParams defines parameters for enabling/disabling a skill
 type SkillsConfigWriteParams struct {
-	Path    string `json:"path"`
-	Enabled bool   `json:"enabled"`
+	Enabled bool    `json:"enabled"`
+	Name    *string `json:"name,omitempty"`
+	Path    string  `json:"path,omitempty"`
 }
 
 func (p SkillsConfigWriteParams) prepareRequest() (interface{}, error) {
+	if p.Path == "" {
+		return p, nil
+	}
 	var err error
 	p.Path, err = normalizeAbsolutePathField("path", p.Path)
 	if err != nil {

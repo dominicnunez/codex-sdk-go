@@ -36,6 +36,9 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 	verified["account/rateLimits/read"] = verifyMethod(t, transport, "account/rateLimits/read", func() {
 		_, _ = client.Account.GetRateLimits(context.Background())
 	})
+	verified["account/sendAddCreditsNudgeEmail"] = verifyMethod(t, transport, "account/sendAddCreditsNudgeEmail", func() {
+		_, _ = client.Account.SendAddCreditsNudgeEmail(context.Background(), codex.SendAddCreditsNudgeEmailParams{CreditType: codex.AddCreditsNudgeCreditTypeCredits})
+	})
 	verified["account/login/start"] = verifyMethod(t, transport, "account/login/start", func() {
 		_, _ = client.Account.Login(context.Background(), &codex.ChatgptLoginAccountParams{Type: "chatgpt"})
 	})
@@ -49,6 +52,31 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 	// Verify Apps service
 	verified["app/list"] = verifyMethod(t, transport, "app/list", func() {
 		_, _ = client.Apps.List(context.Background(), codex.AppsListParams{})
+	})
+
+	// Verify Device Key service
+	verified["device/key/create"] = verifyMethod(t, transport, "device/key/create", func() {
+		_, _ = client.DeviceKey.Create(context.Background(), codex.DeviceKeyCreateParams{AccountUserID: "user-1", ClientID: "client-1"})
+	})
+	verified["device/key/public"] = verifyMethod(t, transport, "device/key/public", func() {
+		_, _ = client.DeviceKey.Public(context.Background(), codex.DeviceKeyPublicParams{KeyID: "key-1"})
+	})
+	verified["device/key/sign"] = verifyMethod(t, transport, "device/key/sign", func() {
+		_, _ = client.DeviceKey.Sign(context.Background(), codex.DeviceKeySignParams{
+			KeyID: "key-1",
+			Payload: &codex.RemoteControlClientEnrollmentDeviceKeySignPayload{
+				Type:                          "remoteControlClientEnrollment",
+				AccountUserID:                 "user-1",
+				Audience:                      codex.RemoteControlClientEnrollmentAudienceEnrollment,
+				ChallengeExpiresAt:            1,
+				ChallengeID:                   "challenge-1",
+				ClientID:                      "client-1",
+				DeviceIdentitySha256Base64url: "digest",
+				Nonce:                         "nonce",
+				TargetOrigin:                  "https://example.com",
+				TargetPath:                    "/client/enroll",
+			},
+		})
 	})
 
 	// Verify Command service
@@ -101,6 +129,9 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 	verified["experimentalFeature/list"] = verifyMethod(t, transport, "experimentalFeature/list", func() {
 		_, _ = client.Experimental.FeatureList(context.Background(), codex.ExperimentalFeatureListParams{})
 	})
+	verified["experimentalFeature/enablement/set"] = verifyMethod(t, transport, "experimentalFeature/enablement/set", func() {
+		_, _ = client.Experimental.FeatureEnablementSet(context.Background(), codex.ExperimentalFeatureEnablementSetParams{Enablement: map[string]bool{}})
+	})
 
 	// Verify External Agent service
 	verified["externalAgentConfig/detect"] = verifyMethod(t, transport, "externalAgentConfig/detect", func() {
@@ -142,6 +173,12 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 	verified["fs/copy"] = verifyMethod(t, transport, "fs/copy", func() {
 		_, _ = client.Fs.Copy(context.Background(), codex.FsCopyParams{SourcePath: "/tmp/src", DestinationPath: "/tmp/dst"})
 	})
+	verified["fs/watch"] = verifyMethod(t, transport, "fs/watch", func() {
+		_, _ = client.Fs.Watch(context.Background(), codex.FsWatchParams{Path: "/tmp", WatchID: "watch-1"})
+	})
+	verified["fs/unwatch"] = verifyMethod(t, transport, "fs/unwatch", func() {
+		_, _ = client.Fs.Unwatch(context.Background(), codex.FsUnwatchParams{WatchID: "watch-1"})
+	})
 
 	// Verify FuzzyFileSearch service
 	verified["fuzzyFileSearch"] = verifyMethod(t, transport, "fuzzyFileSearch", func() {
@@ -158,10 +195,19 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 	verified["mcpServer/oauth/login"] = verifyMethod(t, transport, "mcpServer/oauth/login", func() {
 		_, _ = client.Mcp.OauthLogin(context.Background(), codex.McpServerOauthLoginParams{})
 	})
+	verified["mcpServer/resource/read"] = verifyMethod(t, transport, "mcpServer/resource/read", func() {
+		_, _ = client.Mcp.ResourceRead(context.Background(), codex.McpResourceReadParams{Server: "server-1", URI: "file://resource"})
+	})
+	verified["mcpServer/tool/call"] = verifyMethod(t, transport, "mcpServer/tool/call", func() {
+		_, _ = client.Mcp.ToolCall(context.Background(), codex.McpServerToolCallParams{Server: "server-1", ThreadID: "thread-1", Tool: "tool-1"})
+	})
 
 	// Verify Model service
 	verified["model/list"] = verifyMethod(t, transport, "model/list", func() {
 		_, _ = client.Model.List(context.Background(), codex.ModelListParams{})
+	})
+	verified["modelProvider/capabilities/read"] = verifyMethod(t, transport, "modelProvider/capabilities/read", func() {
+		_, _ = client.ModelProvider.CapabilitiesRead(context.Background(), codex.ModelProviderCapabilitiesReadParams{})
 	})
 
 	// Verify Review service
@@ -188,6 +234,17 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 		_, _ = client.Plugin.Uninstall(context.Background(), codex.PluginUninstallParams{PluginID: "plugin-1"})
 	})
 
+	// Verify Marketplace service
+	verified["marketplace/add"] = verifyMethod(t, transport, "marketplace/add", func() {
+		_, _ = client.Marketplace.Add(context.Background(), codex.MarketplaceAddParams{Source: "https://example.com/marketplace.git"})
+	})
+	verified["marketplace/remove"] = verifyMethod(t, transport, "marketplace/remove", func() {
+		_, _ = client.Marketplace.Remove(context.Background(), codex.MarketplaceRemoveParams{MarketplaceName: "marketplace"})
+	})
+	verified["marketplace/upgrade"] = verifyMethod(t, transport, "marketplace/upgrade", func() {
+		_, _ = client.Marketplace.Upgrade(context.Background(), codex.MarketplaceUpgradeParams{})
+	})
+
 	// Verify Skills service
 	verified["skills/list"] = verifyMethod(t, transport, "skills/list", func() {
 		_, _ = client.Skills.List(context.Background(), codex.SkillsListParams{})
@@ -211,6 +268,18 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 	})
 	verified["thread/loaded/list"] = verifyMethod(t, transport, "thread/loaded/list", func() {
 		_, _ = client.Thread.LoadedList(context.Background(), codex.ThreadLoadedListParams{})
+	})
+	verified["thread/turns/list"] = verifyMethod(t, transport, "thread/turns/list", func() {
+		_, _ = client.Thread.TurnsList(context.Background(), codex.ThreadTurnsListParams{ThreadID: "thread-1"})
+	})
+	verified["thread/shellCommand"] = verifyMethod(t, transport, "thread/shellCommand", func() {
+		_, _ = client.Thread.ShellCommand(context.Background(), codex.ThreadShellCommandParams{ThreadID: "thread-1", Command: "pwd"})
+	})
+	verified["thread/approveGuardianDeniedAction"] = verifyMethod(t, transport, "thread/approveGuardianDeniedAction", func() {
+		_, _ = client.Thread.ApproveGuardianDeniedAction(context.Background(), codex.ThreadApproveGuardianDeniedActionParams{ThreadID: "thread-1", Event: json.RawMessage(`{}`)})
+	})
+	verified["thread/inject_items"] = verifyMethod(t, transport, "thread/inject_items", func() {
+		_, _ = client.Thread.InjectItems(context.Background(), codex.ThreadInjectItemsParams{ThreadID: "thread-1", Items: []json.RawMessage{json.RawMessage(`{}`)}})
 	})
 	verified["thread/resume"] = verifyMethod(t, transport, "thread/resume", func() {
 		_, _ = client.Thread.Resume(context.Background(), codex.ThreadResumeParams{ThreadID: "thread-1"})

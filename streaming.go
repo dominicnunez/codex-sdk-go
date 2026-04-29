@@ -49,6 +49,26 @@ func (n *FileChangeOutputDeltaNotification) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// FileChangePatchUpdatedNotification is sent when file change patch details update.
+// Method: item/fileChange/patchUpdated
+type FileChangePatchUpdatedNotification struct {
+	Changes  []FileUpdateChange `json:"changes"`
+	ItemID   string             `json:"itemId"`
+	ThreadID string             `json:"threadId"`
+	TurnID   string             `json:"turnId"`
+}
+
+func (n *FileChangePatchUpdatedNotification) UnmarshalJSON(data []byte) error {
+	type wire FileChangePatchUpdatedNotification
+	var decoded wire
+	required := []string{"changes", "itemId", "threadId", "turnId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = FileChangePatchUpdatedNotification(decoded)
+	return nil
+}
+
 // PlanDeltaNotification is sent when plan text is streamed.
 // Method: item/plan/delta
 // EXPERIMENTAL - proposed plan streaming deltas for plan items.
@@ -199,6 +219,22 @@ func (c *Client) OnFileChangeOutputDelta(handler func(FileChangeOutputDeltaNotif
 		var n FileChangeOutputDeltaNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyFileChangeOutputDelta, fmt.Errorf("unmarshal %s: %w", notifyFileChangeOutputDelta, err))
+			return
+		}
+		handler(n)
+	})
+}
+
+// OnFileChangePatchUpdated registers a listener for item/fileChange/patchUpdated notifications.
+func (c *Client) OnFileChangePatchUpdated(handler func(FileChangePatchUpdatedNotification)) {
+	if handler == nil {
+		c.OnNotification(notifyFileChangePatchUpdated, nil)
+		return
+	}
+	c.OnNotification(notifyFileChangePatchUpdated, func(ctx context.Context, notif Notification) {
+		var n FileChangePatchUpdatedNotification
+		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			c.reportHandlerError(notifyFileChangePatchUpdated, fmt.Errorf("unmarshal %s: %w", notifyFileChangePatchUpdated, err))
 			return
 		}
 		handler(n)

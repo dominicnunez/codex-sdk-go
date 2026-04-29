@@ -346,6 +346,7 @@ func TestKnownApprovalHandlerDispatch(t *testing.T) {
 			name:   "item/permissions/requestApproval",
 			method: "item/permissions/requestApproval",
 			params: map[string]interface{}{
+				"cwd":         "/tmp",
 				"itemId":      "item-1",
 				"permissions": map[string]interface{}{},
 				"threadId":    "thread-1",
@@ -620,6 +621,7 @@ func TestMalformedApprovalRequestReturnsInvalidParams(t *testing.T) {
 			name:   "item/permissions/requestApproval missing permissions",
 			method: "item/permissions/requestApproval",
 			params: map[string]interface{}{
+				"cwd":      "/tmp",
 				"itemId":   "item-1",
 				"threadId": "thread-1",
 				"turnId":   "turn-1",
@@ -635,6 +637,7 @@ func TestMalformedApprovalRequestReturnsInvalidParams(t *testing.T) {
 			name:   "item/permissions/requestApproval relative filesystem root",
 			method: "item/permissions/requestApproval",
 			params: map[string]interface{}{
+				"cwd":      "/tmp",
 				"itemId":   "item-1",
 				"threadId": "thread-1",
 				"turnId":   "turn-1",
@@ -929,7 +932,7 @@ func TestApprovalHandlerRejectsInvalidResponsePayloads(t *testing.T) {
 		{
 			name:   "permissions approval invalid scope",
 			method: "item/permissions/requestApproval",
-			params: `{"itemId":"item-1","permissions":{},"threadId":"thread-1","turnId":"turn-1"}`,
+			params: `{"cwd":"/tmp","itemId":"item-1","permissions":{},"threadId":"thread-1","turnId":"turn-1"}`,
 			register: func(client *codex.Client) {
 				client.SetApprovalHandlers(codex.ApprovalHandlers{
 					OnPermissionsRequestApproval: func(context.Context, codex.PermissionsRequestApprovalParams) (codex.PermissionsRequestApprovalResponse, error) {
@@ -943,7 +946,7 @@ func TestApprovalHandlerRejectsInvalidResponsePayloads(t *testing.T) {
 		{
 			name:   "permissions approval relative granted filesystem root",
 			method: "item/permissions/requestApproval",
-			params: `{"itemId":"item-1","permissions":{},"threadId":"thread-1","turnId":"turn-1"}`,
+			params: `{"cwd":"/tmp","itemId":"item-1","permissions":{},"threadId":"thread-1","turnId":"turn-1"}`,
 			register: func(client *codex.Client) {
 				client.SetApprovalHandlers(codex.ApprovalHandlers{
 					OnPermissionsRequestApproval: func(context.Context, codex.PermissionsRequestApprovalParams) (codex.PermissionsRequestApprovalResponse, error) {

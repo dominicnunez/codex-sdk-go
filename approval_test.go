@@ -149,6 +149,7 @@ func TestChatgptAuthTokensRefreshParamsRejectInvalidReason(t *testing.T) {
 func TestPermissionsRequestApprovalParamsNormalizeFileSystemRoots(t *testing.T) {
 	var params codex.PermissionsRequestApprovalParams
 	err := json.Unmarshal([]byte(`{
+		"cwd":"/tmp",
 		"itemId":"item-1",
 		"threadId":"thread-1",
 		"turnId":"turn-1",
@@ -174,6 +175,7 @@ func TestPermissionsRequestApprovalParamsNormalizeFileSystemRoots(t *testing.T) 
 func TestPermissionsRequestApprovalParamsRejectRelativeFileSystemRoots(t *testing.T) {
 	var params codex.PermissionsRequestApprovalParams
 	err := json.Unmarshal([]byte(`{
+		"cwd":"/tmp",
 		"itemId":"item-1",
 		"threadId":"thread-1",
 		"turnId":"turn-1",
@@ -829,7 +831,7 @@ func TestApprovalHandlerDispatch(t *testing.T) {
 		JSONRPC: "2.0",
 		ID:      codex.RequestID{Value: 7},
 		Method:  "item/permissions/requestApproval",
-		Params:  json.RawMessage(`{"itemId":"i1","threadId":"t1","turnId":"tu1","permissions":{"network":{"enabled":true}}}`),
+		Params:  json.RawMessage(`{"cwd":"/tmp","itemId":"i1","threadId":"t1","turnId":"tu1","permissions":{"network":{"enabled":true}}}`),
 	})
 
 	// 8. ChatgptAuthTokensRefresh
@@ -1002,7 +1004,7 @@ func TestAdditionalApprovalEndToEnd(t *testing.T) {
 			JSONRPC: "2.0",
 			ID:      codex.RequestID{Value: 101},
 			Method:  "item/permissions/requestApproval",
-			Params:  json.RawMessage(`{"itemId":"item-abc","threadId":"t1","turnId":"tu1","permissions":{"fileSystem":{"read":["/tmp/../sandbox"]},"network":{"enabled":true}}}`),
+			Params:  json.RawMessage(`{"cwd":"/tmp","itemId":"item-abc","threadId":"t1","turnId":"tu1","permissions":{"fileSystem":{"read":["/tmp/../sandbox"]},"network":{"enabled":true}}}`),
 		})
 		if err != nil {
 			t.Fatalf("InjectServerRequest() error = %v", err)

@@ -217,9 +217,12 @@ type Client struct {
 	Turn            *TurnService
 	Account         *AccountService
 	Config          *ConfigService
+	DeviceKey       *DeviceKeyService
 	Model           *ModelService
+	ModelProvider   *ModelProviderService
 	Skills          *SkillsService
 	Apps            *AppsService
+	Marketplace     *MarketplaceService
 	Mcp             *McpService
 	Command         *CommandService
 	Review          *ReviewService
@@ -277,9 +280,12 @@ func NewClient(transport Transport, opts ...ClientOption) *Client {
 	c.Turn = newTurnService(c)
 	c.Account = newAccountService(c)
 	c.Config = newConfigService(c)
+	c.DeviceKey = newDeviceKeyService(c)
 	c.Model = newModelService(c)
+	c.ModelProvider = newModelProviderService(c)
 	c.Skills = newSkillsService(c)
 	c.Apps = newAppsService(c)
+	c.Marketplace = newMarketplaceService(c)
 	c.Mcp = newMcpService(c)
 	c.Command = newCommandService(c)
 	c.Review = newReviewService(c)

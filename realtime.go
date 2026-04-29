@@ -137,6 +137,62 @@ func (n *ThreadRealtimeOutputAudioDeltaNotification) UnmarshalJSON(data []byte) 
 	return nil
 }
 
+// ThreadRealtimeSdpNotification is sent when realtime SDP data is available.
+// Method: thread/realtime/sdp
+type ThreadRealtimeSdpNotification struct {
+	Sdp      string `json:"sdp"`
+	ThreadID string `json:"threadId"`
+}
+
+func (n *ThreadRealtimeSdpNotification) UnmarshalJSON(data []byte) error {
+	type wire ThreadRealtimeSdpNotification
+	var decoded wire
+	required := []string{"sdp", "threadId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = ThreadRealtimeSdpNotification(decoded)
+	return nil
+}
+
+// ThreadRealtimeTranscriptDeltaNotification is sent when realtime transcript text streams.
+// Method: thread/realtime/transcript/delta
+type ThreadRealtimeTranscriptDeltaNotification struct {
+	Delta    string `json:"delta"`
+	Role     string `json:"role"`
+	ThreadID string `json:"threadId"`
+}
+
+func (n *ThreadRealtimeTranscriptDeltaNotification) UnmarshalJSON(data []byte) error {
+	type wire ThreadRealtimeTranscriptDeltaNotification
+	var decoded wire
+	required := []string{"delta", "role", "threadId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = ThreadRealtimeTranscriptDeltaNotification(decoded)
+	return nil
+}
+
+// ThreadRealtimeTranscriptDoneNotification is sent when realtime transcript text completes.
+// Method: thread/realtime/transcript/done
+type ThreadRealtimeTranscriptDoneNotification struct {
+	Role     string `json:"role"`
+	Text     string `json:"text"`
+	ThreadID string `json:"threadId"`
+}
+
+func (n *ThreadRealtimeTranscriptDoneNotification) UnmarshalJSON(data []byte) error {
+	type wire ThreadRealtimeTranscriptDoneNotification
+	var decoded wire
+	required := []string{"role", "text", "threadId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = ThreadRealtimeTranscriptDoneNotification(decoded)
+	return nil
+}
+
 // OnThreadRealtimeStarted registers a listener for thread/realtime/started notifications.
 func (c *Client) OnThreadRealtimeStarted(handler func(ThreadRealtimeStartedNotification)) {
 	if handler == nil {
@@ -211,6 +267,54 @@ func (c *Client) OnThreadRealtimeOutputAudioDelta(handler func(ThreadRealtimeOut
 		var params ThreadRealtimeOutputAudioDeltaNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyRealtimeOutputAudioDelta, fmt.Errorf("unmarshal %s: %w", notifyRealtimeOutputAudioDelta, err))
+			return
+		}
+		handler(params)
+	})
+}
+
+// OnThreadRealtimeSdp registers a listener for thread/realtime/sdp notifications.
+func (c *Client) OnThreadRealtimeSdp(handler func(ThreadRealtimeSdpNotification)) {
+	if handler == nil {
+		c.OnNotification(notifyRealtimeSdp, nil)
+		return
+	}
+	c.OnNotification(notifyRealtimeSdp, func(ctx context.Context, notif Notification) {
+		var params ThreadRealtimeSdpNotification
+		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifyRealtimeSdp, fmt.Errorf("unmarshal %s: %w", notifyRealtimeSdp, err))
+			return
+		}
+		handler(params)
+	})
+}
+
+// OnThreadRealtimeTranscriptDelta registers a listener for thread/realtime/transcript/delta notifications.
+func (c *Client) OnThreadRealtimeTranscriptDelta(handler func(ThreadRealtimeTranscriptDeltaNotification)) {
+	if handler == nil {
+		c.OnNotification(notifyRealtimeTranscriptDelta, nil)
+		return
+	}
+	c.OnNotification(notifyRealtimeTranscriptDelta, func(ctx context.Context, notif Notification) {
+		var params ThreadRealtimeTranscriptDeltaNotification
+		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifyRealtimeTranscriptDelta, fmt.Errorf("unmarshal %s: %w", notifyRealtimeTranscriptDelta, err))
+			return
+		}
+		handler(params)
+	})
+}
+
+// OnThreadRealtimeTranscriptDone registers a listener for thread/realtime/transcript/done notifications.
+func (c *Client) OnThreadRealtimeTranscriptDone(handler func(ThreadRealtimeTranscriptDoneNotification)) {
+	if handler == nil {
+		c.OnNotification(notifyRealtimeTranscriptDone, nil)
+		return
+	}
+	c.OnNotification(notifyRealtimeTranscriptDone, func(ctx context.Context, notif Notification) {
+		var params ThreadRealtimeTranscriptDoneNotification
+		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifyRealtimeTranscriptDone, fmt.Errorf("unmarshal %s: %w", notifyRealtimeTranscriptDone, err))
 			return
 		}
 		handler(params)

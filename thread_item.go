@@ -44,9 +44,10 @@ func (u *UserMessageThreadItem) MarshalJSON() ([]byte, error) {
 
 // AgentMessageThreadItem represents an agent message in a thread.
 type AgentMessageThreadItem struct {
-	ID    string        `json:"id"`
-	Text  string        `json:"text"`
-	Phase *MessagePhase `json:"phase,omitempty"`
+	ID             string          `json:"id"`
+	MemoryCitation *MemoryCitation `json:"memoryCitation,omitempty"`
+	Text           string          `json:"text"`
+	Phase          *MessagePhase   `json:"phase,omitempty"`
 }
 
 func (AgentMessageThreadItem) threadItem() {}
@@ -103,15 +104,16 @@ func (r *ReasoningThreadItem) MarshalJSON() ([]byte, error) {
 
 // CommandExecutionThreadItem represents a command execution in a thread.
 type CommandExecutionThreadItem struct {
-	ID               string                 `json:"id"`
-	Command          string                 `json:"command"`
-	CommandActions   []CommandActionWrapper `json:"commandActions"`
-	Cwd              string                 `json:"cwd"`
-	Status           CommandExecutionStatus `json:"status"`
-	AggregatedOutput *string                `json:"aggregatedOutput,omitempty"`
-	DurationMs       *int64                 `json:"durationMs,omitempty"`
-	ExitCode         *int32                 `json:"exitCode,omitempty"`
-	ProcessId        *string                `json:"processId,omitempty"`
+	ID               string                  `json:"id"`
+	Command          string                  `json:"command"`
+	CommandActions   []CommandActionWrapper  `json:"commandActions"`
+	Cwd              string                  `json:"cwd"`
+	Source           *CommandExecutionSource `json:"source,omitempty"`
+	Status           CommandExecutionStatus  `json:"status"`
+	AggregatedOutput *string                 `json:"aggregatedOutput,omitempty"`
+	DurationMs       *int64                  `json:"durationMs,omitempty"`
+	ExitCode         *int32                  `json:"exitCode,omitempty"`
+	ProcessId        *string                 `json:"processId,omitempty"`
 }
 
 func (CommandExecutionThreadItem) threadItem() {}
@@ -149,14 +151,15 @@ func (f *FileChangeThreadItem) MarshalJSON() ([]byte, error) {
 
 // McpToolCallThreadItem represents an MCP tool call in a thread.
 type McpToolCallThreadItem struct {
-	ID         string             `json:"id"`
-	Server     string             `json:"server"`
-	Tool       string             `json:"tool"`
-	Status     McpToolCallStatus  `json:"status"`
-	Arguments  interface{}        `json:"arguments"`
-	Result     *McpToolCallResult `json:"result,omitempty"`
-	Error      *McpToolCallError  `json:"error,omitempty"`
-	DurationMs *int64             `json:"durationMs,omitempty"`
+	ID                string             `json:"id"`
+	Server            string             `json:"server"`
+	Tool              string             `json:"tool"`
+	Status            McpToolCallStatus  `json:"status"`
+	Arguments         interface{}        `json:"arguments"`
+	McpAppResourceURI *string            `json:"mcpAppResourceUri,omitempty"`
+	Result            *McpToolCallResult `json:"result,omitempty"`
+	Error             *McpToolCallError  `json:"error,omitempty"`
+	DurationMs        *int64             `json:"durationMs,omitempty"`
 }
 
 func (McpToolCallThreadItem) threadItem() {}
@@ -176,6 +179,7 @@ func (m *McpToolCallThreadItem) MarshalJSON() ([]byte, error) {
 type DynamicToolCallThreadItem struct {
 	ID           string                                    `json:"id"`
 	Tool         string                                    `json:"tool"`
+	Namespace    *string                                   `json:"namespace,omitempty"`
 	Status       DynamicToolCallStatus                     `json:"status"`
 	Arguments    interface{}                               `json:"arguments"`
 	ContentItems []DynamicToolCallOutputContentItemWrapper `json:"contentItems,omitempty"`

@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 )
 
 // FsReadFileParams reads a file from the host filesystem.
@@ -56,11 +57,12 @@ type FsGetMetadataResponse struct {
 	CreatedAtMs  int64 `json:"createdAtMs"`
 	IsDirectory  bool  `json:"isDirectory"`
 	IsFile       bool  `json:"isFile"`
+	IsSymlink    bool  `json:"isSymlink"`
 	ModifiedAtMs int64 `json:"modifiedAtMs"`
 }
 
 func (r *FsGetMetadataResponse) UnmarshalJSON(data []byte) error {
-	if err := validateRequiredObjectFields(data, "createdAtMs", "isDirectory", "isFile", "modifiedAtMs"); err != nil {
+	if err := validateRequiredObjectFields(data, "createdAtMs", "isDirectory", "isFile", "isSymlink", "modifiedAtMs"); err != nil {
 		return err
 	}
 	type wire FsGetMetadataResponse
@@ -135,6 +137,55 @@ type FsCopyParams struct {
 // FsCopyResponse is the empty response from fs/copy.
 type FsCopyResponse struct{}
 
+// FsWatchParams starts watching a filesystem path.
+type FsWatchParams struct {
+	Path    string `json:"path"`
+	WatchID string `json:"watchId"`
+}
+
+// FsWatchResponse contains the canonicalized watched path.
+type FsWatchResponse struct {
+	Path string `json:"path"`
+}
+
+func (r *FsWatchResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "path"); err != nil {
+		return err
+	}
+	type wire FsWatchResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = FsWatchResponse(decoded)
+	return nil
+}
+
+// FsUnwatchParams stops watching a filesystem path.
+type FsUnwatchParams struct {
+	WatchID string `json:"watchId"`
+}
+
+// FsUnwatchResponse is the empty response from fs/unwatch.
+type FsUnwatchResponse struct{}
+
+// FsChangedNotification reports changed paths for a filesystem watch.
+type FsChangedNotification struct {
+	ChangedPaths []string `json:"changedPaths"`
+	WatchID      string   `json:"watchId"`
+}
+
+func (n *FsChangedNotification) UnmarshalJSON(data []byte) error {
+	type wire FsChangedNotification
+	var decoded wire
+	required := []string{"changedPaths", "watchId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = FsChangedNotification(decoded)
+	return nil
+}
+
 // FsService provides host filesystem operations.
 type FsService struct {
 	client *Client
@@ -201,4 +252,37 @@ func (s *FsService) Copy(ctx context.Context, params FsCopyParams) (FsCopyRespon
 		return FsCopyResponse{}, err
 	}
 	return FsCopyResponse{}, nil
+}
+
+// Watch starts watching a filesystem path.
+func (s *FsService) Watch(ctx context.Context, params FsWatchParams) (FsWatchResponse, error) {
+	var resp FsWatchResponse
+	if err := s.client.sendRequest(ctx, methodFsWatch, params, &resp); err != nil {
+		return FsWatchResponse{}, err
+	}
+	return resp, nil
+}
+
+// Unwatch stops watching a filesystem path.
+func (s *FsService) Unwatch(ctx context.Context, params FsUnwatchParams) (FsUnwatchResponse, error) {
+	if err := s.client.sendEmptyObjectRequest(ctx, methodFsUnwatch, params); err != nil {
+		return FsUnwatchResponse{}, err
+	}
+	return FsUnwatchResponse{}, nil
+}
+
+// OnFsChanged registers a listener for fs/changed notifications.
+func (c *Client) OnFsChanged(handler func(FsChangedNotification)) {
+	if handler == nil {
+		c.OnNotification(notifyFsChanged, nil)
+		return
+	}
+	c.OnNotification(notifyFsChanged, func(ctx context.Context, notif Notification) {
+		var n FsChangedNotification
+		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			c.reportHandlerError(notifyFsChanged, fmt.Errorf("unmarshal %s: %w", notifyFsChanged, err))
+			return
+		}
+		handler(n)
+	})
 }

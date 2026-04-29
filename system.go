@@ -152,6 +152,67 @@ type TerminalInteractionNotification struct {
 	TurnID    string `json:"turnId"`
 }
 
+// WarningNotification reports a non-fatal warning.
+type WarningNotification struct {
+	Message  string  `json:"message"`
+	ThreadID *string `json:"threadId,omitempty"`
+}
+
+func (n *WarningNotification) UnmarshalJSON(data []byte) error {
+	type wire WarningNotification
+	var decoded wire
+	required := []string{"message"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = WarningNotification(decoded)
+	return nil
+}
+
+// GuardianWarningNotification reports a guardian warning for a thread.
+type GuardianWarningNotification struct {
+	Message  string `json:"message"`
+	ThreadID string `json:"threadId"`
+}
+
+func (n *GuardianWarningNotification) UnmarshalJSON(data []byte) error {
+	type wire GuardianWarningNotification
+	var decoded wire
+	required := []string{"message", "threadId"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = GuardianWarningNotification(decoded)
+	return nil
+}
+
+// RemoteControlConnectionStatus is the remote-control connection state.
+type RemoteControlConnectionStatus string
+
+const (
+	RemoteControlConnectionStatusDisabled   RemoteControlConnectionStatus = "disabled"
+	RemoteControlConnectionStatusConnecting RemoteControlConnectionStatus = "connecting"
+	RemoteControlConnectionStatusConnected  RemoteControlConnectionStatus = "connected"
+	RemoteControlConnectionStatusErrored    RemoteControlConnectionStatus = "errored"
+)
+
+// RemoteControlStatusChangedNotification reports remote-control connection status.
+type RemoteControlStatusChangedNotification struct {
+	EnvironmentID *string                       `json:"environmentId,omitempty"`
+	Status        RemoteControlConnectionStatus `json:"status"`
+}
+
+func (n *RemoteControlStatusChangedNotification) UnmarshalJSON(data []byte) error {
+	type wire RemoteControlStatusChangedNotification
+	var decoded wire
+	required := []string{"status"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = RemoteControlStatusChangedNotification(decoded)
+	return nil
+}
+
 func (n *TerminalInteractionNotification) UnmarshalJSON(data []byte) error {
 	type wire TerminalInteractionNotification
 	var decoded wire
@@ -260,6 +321,54 @@ func (c *Client) OnError(handler func(ErrorNotification)) {
 		var params ErrorNotification
 		if err := json.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyError, fmt.Errorf("unmarshal %s: %w", notifyError, err))
+			return
+		}
+		handler(params)
+	})
+}
+
+// OnWarning registers a listener for warning notifications.
+func (c *Client) OnWarning(handler func(WarningNotification)) {
+	if handler == nil {
+		c.OnNotification(notifyWarning, nil)
+		return
+	}
+	c.OnNotification(notifyWarning, func(ctx context.Context, notif Notification) {
+		var params WarningNotification
+		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifyWarning, fmt.Errorf("unmarshal %s: %w", notifyWarning, err))
+			return
+		}
+		handler(params)
+	})
+}
+
+// OnGuardianWarning registers a listener for guardianWarning notifications.
+func (c *Client) OnGuardianWarning(handler func(GuardianWarningNotification)) {
+	if handler == nil {
+		c.OnNotification(notifyGuardianWarning, nil)
+		return
+	}
+	c.OnNotification(notifyGuardianWarning, func(ctx context.Context, notif Notification) {
+		var params GuardianWarningNotification
+		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifyGuardianWarning, fmt.Errorf("unmarshal %s: %w", notifyGuardianWarning, err))
+			return
+		}
+		handler(params)
+	})
+}
+
+// OnRemoteControlStatusChanged registers a listener for remote-control status changes.
+func (c *Client) OnRemoteControlStatusChanged(handler func(RemoteControlStatusChangedNotification)) {
+	if handler == nil {
+		c.OnNotification(notifyRemoteControlStatusChanged, nil)
+		return
+	}
+	c.OnNotification(notifyRemoteControlStatusChanged, func(ctx context.Context, notif Notification) {
+		var params RemoteControlStatusChangedNotification
+		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifyRemoteControlStatusChanged, fmt.Errorf("unmarshal %s: %w", notifyRemoteControlStatusChanged, err))
 			return
 		}
 		handler(params)

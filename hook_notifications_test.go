@@ -186,8 +186,8 @@ func TestGuardianApprovalReviewRejectsInvalidEnums(t *testing.T) {
 		},
 		{
 			name:    "invalid risk level",
-			payload: `{"status":"approved","riskLevel":"critical"}`,
-			wantErr: `invalid guardian.review.riskLevel "critical"`,
+			payload: `{"status":"approved","riskLevel":"severe"}`,
+			wantErr: `invalid guardian.review.riskLevel "severe"`,
 		},
 	}
 
@@ -420,7 +420,9 @@ func TestGuardianNotificationsReportHandlerErrorsForInvalidReviewEnums(t *testin
 			name:   "invalid review status",
 			method: "item/autoApprovalReview/started",
 			params: `{
+				"action": {},
 				"review": {"status":"queued"},
+				"reviewId": "review-1",
 				"targetItemId": "item-1",
 				"threadId": "thread-1",
 				"turnId": "turn-1"
@@ -430,7 +432,10 @@ func TestGuardianNotificationsReportHandlerErrorsForInvalidReviewEnums(t *testin
 			name:   "invalid review risk level",
 			method: "item/autoApprovalReview/completed",
 			params: `{
-				"review": {"status":"approved","riskLevel":"critical"},
+				"action": {},
+				"decisionSource": "agent",
+				"review": {"status":"approved","riskLevel":"severe"},
+				"reviewId": "review-1",
 				"targetItemId": "item-1",
 				"threadId": "thread-1",
 				"turnId": "turn-1"

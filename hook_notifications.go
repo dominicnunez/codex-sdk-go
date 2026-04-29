@@ -10,15 +10,21 @@ import (
 type HookEventName string
 
 const (
-	HookEventNameSessionStart     HookEventName = "sessionStart"
-	HookEventNameUserPromptSubmit HookEventName = "userPromptSubmit"
-	HookEventNameStop             HookEventName = "stop"
+	HookEventNameSessionStart      HookEventName = "sessionStart"
+	HookEventNameUserPromptSubmit  HookEventName = "userPromptSubmit"
+	HookEventNamePreToolUse        HookEventName = "preToolUse"
+	HookEventNamePermissionRequest HookEventName = "permissionRequest"
+	HookEventNamePostToolUse       HookEventName = "postToolUse"
+	HookEventNameStop              HookEventName = "stop"
 )
 
 var validHookEventNames = map[HookEventName]struct{}{
-	HookEventNameSessionStart:     {},
-	HookEventNameUserPromptSubmit: {},
-	HookEventNameStop:             {},
+	HookEventNameSessionStart:      {},
+	HookEventNameUserPromptSubmit:  {},
+	HookEventNamePreToolUse:        {},
+	HookEventNamePermissionRequest: {},
+	HookEventNamePostToolUse:       {},
+	HookEventNameStop:              {},
 }
 
 func (n HookEventName) MarshalJSON() ([]byte, error) {
@@ -176,11 +182,27 @@ type HookRunSummary struct {
 	HandlerType   HookHandlerType   `json:"handlerType"`
 	ID            string            `json:"id"`
 	Scope         HookScope         `json:"scope"`
+	Source        *HookSource       `json:"source,omitempty"`
 	SourcePath    string            `json:"sourcePath"`
 	StartedAt     int64             `json:"startedAt"`
 	Status        HookRunStatus     `json:"status"`
 	StatusMessage *string           `json:"statusMessage,omitempty"`
 }
+
+// HookSource identifies where hook configuration came from.
+type HookSource string
+
+const (
+	HookSourceSystem                  HookSource = "system"
+	HookSourceUser                    HookSource = "user"
+	HookSourceProject                 HookSource = "project"
+	HookSourceMDM                     HookSource = "mdm"
+	HookSourceSessionFlags            HookSource = "sessionFlags"
+	HookSourcePlugin                  HookSource = "plugin"
+	HookSourceLegacyManagedConfigFile HookSource = "legacyManagedConfigFile"
+	HookSourceLegacyManagedConfigMDM  HookSource = "legacyManagedConfigMdm"
+	HookSourceUnknown                 HookSource = "unknown"
+)
 
 func (s *HookRunSummary) UnmarshalJSON(data []byte) error {
 	type wire HookRunSummary
@@ -248,6 +270,7 @@ const (
 	GuardianApprovalReviewStatusApproved   GuardianApprovalReviewStatus = "approved"
 	GuardianApprovalReviewStatusDenied     GuardianApprovalReviewStatus = "denied"
 	GuardianApprovalReviewStatusAborted    GuardianApprovalReviewStatus = "aborted"
+	GuardianApprovalReviewStatusTimedOut   GuardianApprovalReviewStatus = "timedOut"
 )
 
 var validGuardianApprovalReviewStatuses = map[GuardianApprovalReviewStatus]struct{}{
@@ -255,6 +278,7 @@ var validGuardianApprovalReviewStatuses = map[GuardianApprovalReviewStatus]struc
 	GuardianApprovalReviewStatusApproved:   {},
 	GuardianApprovalReviewStatusDenied:     {},
 	GuardianApprovalReviewStatusAborted:    {},
+	GuardianApprovalReviewStatusTimedOut:   {},
 }
 
 func (s *GuardianApprovalReviewStatus) UnmarshalJSON(data []byte) error {
@@ -265,15 +289,17 @@ func (s *GuardianApprovalReviewStatus) UnmarshalJSON(data []byte) error {
 type GuardianRiskLevel string
 
 const (
-	GuardianRiskLevelLow    GuardianRiskLevel = "low"
-	GuardianRiskLevelMedium GuardianRiskLevel = "medium"
-	GuardianRiskLevelHigh   GuardianRiskLevel = "high"
+	GuardianRiskLevelLow      GuardianRiskLevel = "low"
+	GuardianRiskLevelMedium   GuardianRiskLevel = "medium"
+	GuardianRiskLevelHigh     GuardianRiskLevel = "high"
+	GuardianRiskLevelCritical GuardianRiskLevel = "critical"
 )
 
 var validGuardianRiskLevels = map[GuardianRiskLevel]struct{}{
-	GuardianRiskLevelLow:    {},
-	GuardianRiskLevelMedium: {},
-	GuardianRiskLevelHigh:   {},
+	GuardianRiskLevelLow:      {},
+	GuardianRiskLevelMedium:   {},
+	GuardianRiskLevelHigh:     {},
+	GuardianRiskLevelCritical: {},
 }
 
 func (l *GuardianRiskLevel) UnmarshalJSON(data []byte) error {
@@ -282,11 +308,29 @@ func (l *GuardianRiskLevel) UnmarshalJSON(data []byte) error {
 
 // GuardianApprovalReview contains the guardian review payload.
 type GuardianApprovalReview struct {
-	Rationale *string                      `json:"rationale,omitempty"`
-	RiskLevel *GuardianRiskLevel           `json:"riskLevel,omitempty"`
-	RiskScore *uint8                       `json:"riskScore,omitempty"`
-	Status    GuardianApprovalReviewStatus `json:"status"`
+	Rationale         *string                      `json:"rationale,omitempty"`
+	RiskLevel         *GuardianRiskLevel           `json:"riskLevel,omitempty"`
+	RiskScore         *uint8                       `json:"riskScore,omitempty"`
+	Status            GuardianApprovalReviewStatus `json:"status"`
+	UserAuthorization *GuardianUserAuthorization   `json:"userAuthorization,omitempty"`
 }
+
+// GuardianUserAuthorization describes the user's authorization level for guardian review.
+type GuardianUserAuthorization string
+
+const (
+	GuardianUserAuthorizationUnknown GuardianUserAuthorization = "unknown"
+	GuardianUserAuthorizationLow     GuardianUserAuthorization = "low"
+	GuardianUserAuthorizationMedium  GuardianUserAuthorization = "medium"
+	GuardianUserAuthorizationHigh    GuardianUserAuthorization = "high"
+)
+
+// AutoReviewDecisionSource identifies who made an auto-review decision.
+type AutoReviewDecisionSource string
+
+const (
+	AutoReviewDecisionSourceAgent AutoReviewDecisionSource = "agent"
+)
 
 func (r *GuardianApprovalReview) UnmarshalJSON(data []byte) error {
 	type wire GuardianApprovalReview
@@ -301,8 +345,9 @@ func (r *GuardianApprovalReview) UnmarshalJSON(data []byte) error {
 
 // ItemGuardianApprovalReviewStartedNotification is sent when guardian review begins.
 type ItemGuardianApprovalReviewStartedNotification struct {
-	Action       interface{}            `json:"action,omitempty"`
+	Action       interface{}            `json:"action"`
 	Review       GuardianApprovalReview `json:"review"`
+	ReviewID     string                 `json:"reviewId"`
 	TargetItemID string                 `json:"targetItemId"`
 	ThreadID     string                 `json:"threadId"`
 	TurnID       string                 `json:"turnId"`
@@ -311,7 +356,7 @@ type ItemGuardianApprovalReviewStartedNotification struct {
 func (n *ItemGuardianApprovalReviewStartedNotification) UnmarshalJSON(data []byte) error {
 	type wire ItemGuardianApprovalReviewStartedNotification
 	var decoded wire
-	required := []string{"review", "targetItemId", "threadId", "turnId"}
+	required := []string{"action", "review", "reviewId", "threadId", "turnId"}
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
@@ -321,17 +366,19 @@ func (n *ItemGuardianApprovalReviewStartedNotification) UnmarshalJSON(data []byt
 
 // ItemGuardianApprovalReviewCompletedNotification is sent when guardian review finishes.
 type ItemGuardianApprovalReviewCompletedNotification struct {
-	Action       interface{}            `json:"action,omitempty"`
-	Review       GuardianApprovalReview `json:"review"`
-	TargetItemID string                 `json:"targetItemId"`
-	ThreadID     string                 `json:"threadId"`
-	TurnID       string                 `json:"turnId"`
+	Action         interface{}              `json:"action"`
+	DecisionSource AutoReviewDecisionSource `json:"decisionSource"`
+	Review         GuardianApprovalReview   `json:"review"`
+	ReviewID       string                   `json:"reviewId"`
+	TargetItemID   string                   `json:"targetItemId"`
+	ThreadID       string                   `json:"threadId"`
+	TurnID         string                   `json:"turnId"`
 }
 
 func (n *ItemGuardianApprovalReviewCompletedNotification) UnmarshalJSON(data []byte) error {
 	type wire ItemGuardianApprovalReviewCompletedNotification
 	var decoded wire
-	required := []string{"review", "targetItemId", "threadId", "turnId"}
+	required := []string{"action", "decisionSource", "review", "reviewId", "threadId", "turnId"}
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}

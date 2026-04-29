@@ -265,8 +265,16 @@ type PluginListParams struct {
 
 // PluginListResponse contains marketplace plugin listings.
 type PluginListResponse struct {
-	Marketplaces    []PluginMarketplaceEntry `json:"marketplaces"`
-	RemoteSyncError *string                  `json:"remoteSyncError,omitempty"`
+	FeaturedPluginIDs     []string                   `json:"featuredPluginIds,omitempty"`
+	MarketplaceLoadErrors []MarketplaceLoadErrorInfo `json:"marketplaceLoadErrors,omitempty"`
+	Marketplaces          []PluginMarketplaceEntry   `json:"marketplaces"`
+	RemoteSyncError       *string                    `json:"remoteSyncError,omitempty"`
+}
+
+// MarketplaceLoadErrorInfo describes a marketplace loading failure.
+type MarketplaceLoadErrorInfo struct {
+	MarketplacePath string `json:"marketplacePath"`
+	Message         string `json:"message"`
 }
 
 func (r *PluginListResponse) UnmarshalJSON(data []byte) error {
@@ -284,8 +292,9 @@ func (r *PluginListResponse) UnmarshalJSON(data []byte) error {
 
 // PluginReadParams reads a single plugin from a marketplace.
 type PluginReadParams struct {
-	MarketplacePath string `json:"marketplacePath"`
-	PluginName      string `json:"pluginName"`
+	MarketplacePath       string  `json:"marketplacePath,omitempty"`
+	PluginName            string  `json:"pluginName"`
+	RemoteMarketplaceName *string `json:"remoteMarketplaceName,omitempty"`
 }
 
 // AppSummary is experimental app metadata included with plugin responses.
@@ -448,9 +457,10 @@ func (r PluginReadResponse) validate() error {
 
 // PluginInstallParams installs a plugin from a marketplace.
 type PluginInstallParams struct {
-	ForceRemoteSync *bool  `json:"forceRemoteSync,omitempty"`
-	MarketplacePath string `json:"marketplacePath"`
-	PluginName      string `json:"pluginName"`
+	ForceRemoteSync       *bool   `json:"forceRemoteSync,omitempty"`
+	MarketplacePath       string  `json:"marketplacePath,omitempty"`
+	PluginName            string  `json:"pluginName"`
+	RemoteMarketplaceName *string `json:"remoteMarketplaceName,omitempty"`
 }
 
 // PluginInstallResponse contains plugin auth follow-up requirements.
