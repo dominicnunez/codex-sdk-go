@@ -989,12 +989,7 @@ func (t *StdioTransport) failPendingWithError(
 // transport.
 func readLimitedLine(r *bufio.Reader, limit int) ([]byte, *oversizedFrameInfo, error) {
 	var line []byte
-	preciseThreshold := limit - readBufferSizeBytes
-	if preciseThreshold < 0 {
-		preciseThreshold = 0
-	}
-
-	for len(line) < preciseThreshold {
+	for {
 		frag, err := r.ReadSlice('\n')
 		line = append(line, frag...)
 		if lineExceedsLimit(line, limit) {
@@ -1005,41 +1000,6 @@ func readLimitedLine(r *bufio.Reader, limit int) ([]byte, *oversizedFrameInfo, e
 			return bytes.TrimSuffix(line, []byte{'\n'}), nil, nil
 		case errors.Is(err, bufio.ErrBufferFull):
 			continue
-		case errors.Is(err, io.EOF):
-			if len(line) == 0 {
-				return nil, nil, io.EOF
-			}
-			return line, nil, nil
-		default:
-			return nil, nil, err
-		}
-	}
-
-	var chunkBuf [readBufferSizeBytes]byte
-	for {
-		remaining := limit - len(line) + 1
-		if remaining <= 0 {
-			return handleOversizedLine(r, bufio.ErrBufferFull, line)
-		}
-		if remaining > len(chunkBuf) {
-			remaining = len(chunkBuf)
-		}
-
-		n, err := r.Read(chunkBuf[:remaining])
-		switch {
-		case n > 0:
-			chunk := chunkBuf[:n]
-			if newline := bytes.IndexByte(chunk, '\n'); newline >= 0 {
-				line = append(line, chunk[:newline+1]...)
-				if lineExceedsLimit(line, limit) {
-					return handleOversizedLine(r, nil, line)
-				}
-				return bytes.TrimSuffix(line, []byte{'\n'}), nil, nil
-			}
-			line = append(line, chunk...)
-			if lineExceedsLimit(line, limit) {
-				return handleOversizedLine(r, bufio.ErrBufferFull, line)
-			}
 		case errors.Is(err, io.EOF):
 			if len(line) == 0 {
 				return nil, nil, io.EOF

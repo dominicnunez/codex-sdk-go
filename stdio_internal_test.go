@@ -16,6 +16,41 @@ import (
 	"time"
 )
 
+func TestReadLimitedLinePreservesBufferedBytesAfterNewline(t *testing.T) {
+	const (
+		frameLimitBytes = 5
+		firstFrame      = "abc"
+		secondFrame     = "next"
+	)
+
+	reader := bufio.NewReaderSize(
+		strings.NewReader(firstFrame+"\n"+secondFrame+"\n"),
+		readBufferSizeBytes,
+	)
+
+	line, oversize, err := readLimitedLine(reader, frameLimitBytes)
+	if err != nil {
+		t.Fatalf("readLimitedLine() error = %v; want nil", err)
+	}
+	if oversize != nil {
+		t.Fatalf("readLimitedLine() oversize = %+v; want nil", oversize)
+	}
+	if got := string(line); got != firstFrame {
+		t.Fatalf("readLimitedLine() = %q; want %q", got, firstFrame)
+	}
+
+	line, oversize, err = readLimitedLine(reader, frameLimitBytes)
+	if err != nil {
+		t.Fatalf("second readLimitedLine() error = %v; want nil", err)
+	}
+	if oversize != nil {
+		t.Fatalf("second readLimitedLine() oversize = %+v; want nil", oversize)
+	}
+	if got := string(line); got != secondFrame {
+		t.Fatalf("second readLimitedLine() = %q; want %q", got, secondFrame)
+	}
+}
+
 func TestHandleInvalidRequestObjectInvalidIDUsesNullID(t *testing.T) {
 	var buf safeBuffer
 	ctx, cancel := context.WithCancel(context.Background())
