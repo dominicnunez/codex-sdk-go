@@ -131,6 +131,48 @@ func TestBuildArgsEmitFlagsAcceptedByCodexCLI(t *testing.T) {
 	}
 }
 
+func TestBuildArgsRejectsSensitiveConfigKeys(t *testing.T) {
+	tests := []struct {
+		name string
+		key  string
+	}{
+		{name: "api key", key: "model_providers.openai.api_key"},
+		{name: "access token", key: "auth.access_token"},
+		{name: "client secret", key: "oauth.clientSecret"},
+		{name: "password", key: "database.password"},
+		{name: "private endpoint", key: "private_endpoint"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := &ProcessOptions{Config: map[string]string{tt.key: "sensitive"}}
+			_, err := opts.buildArgs()
+			if !errors.Is(err, errSensitiveProcessConfigKey) {
+				t.Fatalf("buildArgs() error = %v; want %v", err, errSensitiveProcessConfigKey)
+			}
+		})
+	}
+}
+
+func TestBuildArgsAllowsNonSensitiveConfigKeys(t *testing.T) {
+	opts := &ProcessOptions{Config: map[string]string{
+		processConfigApprovalPolicyKey: "on-request",
+		"model":                        "o3",
+		"model_provider":               "openai",
+		"max_tokens":                   "1024",
+		"key1":                         "val1",
+	}}
+
+	args, err := opts.buildArgs()
+	if err != nil {
+		t.Fatalf("buildArgs() error = %v", err)
+	}
+
+	if !slices.Contains(args, "--config") {
+		t.Fatalf("args = %v; want --config flag", args)
+	}
+}
+
 func TestDefaultChildEnvKeysForGOOS(t *testing.T) {
 	tests := []struct {
 		name       string

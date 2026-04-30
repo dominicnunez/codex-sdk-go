@@ -62,7 +62,9 @@ type ProcessOptions struct {
 	ExecArgs []string
 
 	// Environment variables for the child process. Nil uses a minimal allowlist
-	// from the parent environment unless InheritParentEnv is true.
+	// from the parent environment unless InheritParentEnv is true. Use Env for
+	// sensitive values supported by the child process; command-line arguments can
+	// be visible in process listings.
 	Env []string
 
 	// InheritParentEnv forwards the full parent environment to the child when
@@ -94,7 +96,9 @@ type ProcessOptions struct {
 	// For other policies, set Config["approval_policy"] directly.
 	ApprovalMode string
 
-	// Config passes repeatable --config key=value flags.
+	// Config passes non-sensitive repeatable --config key=value flags. Sensitive
+	// keys are rejected because command-line arguments can be visible in process
+	// listings; pass secrets through Env when the child process supports it.
 	Config map[string]string
 }
 
@@ -120,9 +124,28 @@ var errEndOfOptionsInExecArgs = errors.New(`ExecArgs must not contain "--" (end-
 
 var errTypedFlagInExecArgs = errors.New("ExecArgs must not contain typed safety flags")
 var errNilProcessClient = errors.New("process client must not be nil")
+var errSensitiveProcessConfigKey = errors.New("ProcessOptions.Config must not include secret-bearing keys; pass secrets through Env")
 
 const approvalModeFullAuto = "full-auto"
 const processConfigApprovalPolicyKey = "approval_policy"
+
+var sensitiveProcessConfigKeySubstrings = []string{
+	"accesstoken",
+	"apikey",
+	"apitoken",
+	"authtoken",
+	"bearertoken",
+	"clientsecret",
+	"credential",
+	"credentials",
+	"password",
+	"passwd",
+	"privateendpoint",
+	"privatekey",
+	"refreshtoken",
+	"secret",
+	"sessiontoken",
+}
 
 var commonChildEnvKeys = []string{
 	"HOME",
@@ -204,12 +227,48 @@ func canonicalRejectedExecArgFlag(arg string) (string, bool) {
 	return "", false
 }
 
+func validateProcessConfig(config map[string]string) error {
+	for key := range config {
+		if processConfigKeyLooksSensitive(key) {
+			return fmt.Errorf("%w: %q", errSensitiveProcessConfigKey, key)
+		}
+	}
+	return nil
+}
+
+func processConfigKeyLooksSensitive(key string) bool {
+	normalized := normalizeProcessConfigKeyForSecretCheck(key)
+	for _, substr := range sensitiveProcessConfigKeySubstrings {
+		if strings.Contains(normalized, substr) {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeProcessConfigKeyForSecretCheck(key string) string {
+	var b strings.Builder
+	for _, r := range key {
+		if r >= 'A' && r <= 'Z' {
+			r += 'a' - 'A'
+		}
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
 // buildArgs constructs the CLI argument list from typed fields and ExecArgs.
 // Typed safety flags and the "--" end-of-options marker are rejected from
 // ExecArgs up front. The remaining ExecArgs are inserted before the typed
 // fields to keep the emitted argv stable without relying on CLI duplicate-flag
 // semantics for safety.
 func (opts *ProcessOptions) buildArgs() ([]string, error) {
+	if err := validateProcessConfig(opts.Config); err != nil {
+		return nil, err
+	}
+
 	for _, arg := range opts.ExecArgs {
 		if arg == "--" {
 			return nil, errEndOfOptionsInExecArgs
