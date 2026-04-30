@@ -1031,6 +1031,28 @@ func TestStdioApprovalInvalidParamsReturnsErrorCode(t *testing.T) {
 	}
 }
 
+func TestStdioNullIDRequestReturnsInvalidRequest(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	defer func() { _ = clientReader.Close() }()
+	defer func() { _ = serverWriter.Close() }()
+	defer func() { _ = serverReader.Close() }()
+	defer func() { _ = clientWriter.Close() }()
+
+	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	defer func() { _ = transport.Close() }()
+
+	_, _ = serverWriter.Write([]byte(`{"jsonrpc":"2.0","id":null,"method":"approval/request"}` + "\n"))
+
+	resp := readOutboundErrorResponse(t, serverReader)
+	if resp.Error.Code != codex.ErrCodeInvalidRequest {
+		t.Fatalf("error code = %d; want %d", resp.Error.Code, codex.ErrCodeInvalidRequest)
+	}
+	if resp.ID.Value != nil {
+		t.Fatalf("response ID = %v; want nil", resp.ID.Value)
+	}
+}
+
 func TestStdioApprovalMissingRequiredFieldReturnsInvalidParams(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()

@@ -433,7 +433,7 @@ func (t *StdioTransport) processInboundLine(line []byte) {
 		return
 	}
 
-	hasID := frame.ID.hasValue()
+	hasID := frame.ID.isPresent()
 	if frame.hasInvalidProtocolVersion() {
 		t.handleInvalidJSONRPCVersion(frame, hasID)
 		return

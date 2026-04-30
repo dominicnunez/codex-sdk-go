@@ -114,6 +114,10 @@ func (i inboundID) hasValue() bool {
 	return i.present && !i.isNull
 }
 
+func (i inboundID) isPresent() bool {
+	return i.present
+}
+
 func (i inboundID) requestID() (RequestID, bool) {
 	if !i.hasValue() || i.invalid {
 		return RequestID{}, false
