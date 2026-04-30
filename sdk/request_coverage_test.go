@@ -329,7 +329,9 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 
 	// Verify System service
 	verified["windowsSandbox/setupStart"] = verifyMethod(t, transport, "windowsSandbox/setupStart", func() {
-		_, _ = client.System.WindowsSandboxSetupStart(context.Background(), codex.WindowsSandboxSetupStartParams{})
+		_, _ = client.System.WindowsSandboxSetupStart(context.Background(), codex.WindowsSandboxSetupStartParams{
+			Mode: codex.WindowsSandboxSetupModeElevated,
+		})
 	})
 
 	// Check that all methods were verified

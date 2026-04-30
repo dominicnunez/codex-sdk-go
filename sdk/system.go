@@ -23,6 +23,10 @@ func (m *WindowsSandboxSetupMode) UnmarshalJSON(data []byte) error {
 	return unmarshalEnumString(data, "windowsSandbox.mode", validWindowsSandboxSetupModes, m)
 }
 
+func (m WindowsSandboxSetupMode) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("windowsSandbox.mode", m, validWindowsSandboxSetupModes)
+}
+
 // --- Client→Server Request Types ---
 
 // WindowsSandboxSetupStartParams are the parameters for windowsSandbox/setupStart request

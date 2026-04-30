@@ -43,6 +43,19 @@ const (
 	ThreadStartSourceClear   ThreadStartSource = "clear"
 )
 
+var validThreadStartSources = map[ThreadStartSource]struct{}{
+	ThreadStartSourceStartup: {},
+	ThreadStartSourceClear:   {},
+}
+
+func (s ThreadStartSource) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("sessionStartSource", s, validThreadStartSources)
+}
+
+func (s *ThreadStartSource) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "sessionStartSource", validThreadStartSources, s)
+}
+
 // ThreadStartResponse is the response from starting a thread
 type ThreadStartResponse struct {
 	ApprovalPolicy     AskForApprovalWrapper `json:"approvalPolicy"`
@@ -263,6 +276,19 @@ const (
 	SortDirectionAsc  SortDirection = "asc"
 	SortDirectionDesc SortDirection = "desc"
 )
+
+var validSortDirections = map[SortDirection]struct{}{
+	SortDirectionAsc:  {},
+	SortDirectionDesc: {},
+}
+
+func (d SortDirection) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("sortDirection", d, validSortDirections)
+}
+
+func (d *SortDirection) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "sortDirection", validSortDirections, d)
+}
 
 // ThreadTurnsListParams are parameters for listing turns in a thread.
 type ThreadTurnsListParams struct {

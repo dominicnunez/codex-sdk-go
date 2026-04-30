@@ -104,6 +104,28 @@ func TestProtocolEnumsRejectInvalidMarshalAndUnmarshal(t *testing.T) {
 			wantErr: `invalid webSearchMode "totally-invalid"`,
 		},
 		{
+			name: "thread start source",
+			marshal: func() ([]byte, error) {
+				return json.Marshal(codex.ThreadStartSource("totally-invalid"))
+			},
+			unmarshal: func(data []byte) error {
+				var value codex.ThreadStartSource
+				return json.Unmarshal(data, &value)
+			},
+			wantErr: `invalid sessionStartSource "totally-invalid"`,
+		},
+		{
+			name: "sort direction",
+			marshal: func() ([]byte, error) {
+				return json.Marshal(codex.SortDirection("totally-invalid"))
+			},
+			unmarshal: func(data []byte) error {
+				var value codex.SortDirection
+				return json.Unmarshal(data, &value)
+			},
+			wantErr: `invalid sortDirection "totally-invalid"`,
+		},
+		{
 			name: "thread sort key",
 			marshal: func() ([]byte, error) {
 				return json.Marshal(codex.ThreadSortKey("totally-invalid"))
@@ -124,6 +146,17 @@ func TestProtocolEnumsRejectInvalidMarshalAndUnmarshal(t *testing.T) {
 				return json.Unmarshal(data, &value)
 			},
 			wantErr: `invalid sourceKinds "totally-invalid"`,
+		},
+		{
+			name: "windows sandbox setup mode",
+			marshal: func() ([]byte, error) {
+				return json.Marshal(codex.WindowsSandboxSetupMode("totally-invalid"))
+			},
+			unmarshal: func(data []byte) error {
+				var value codex.WindowsSandboxSetupMode
+				return json.Unmarshal(data, &value)
+			},
+			wantErr: `invalid windowsSandbox.mode "totally-invalid"`,
 		},
 		{
 			name: "forced login method",

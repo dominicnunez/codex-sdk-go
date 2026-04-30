@@ -167,6 +167,28 @@ func TestClientRejectsInvalidOutboundEnumsBeforeSending(t *testing.T) {
 			},
 		},
 		{
+			name:    "thread start session start source",
+			wantErr: `invalid sessionStartSource "resume"`,
+			call: func(client *codex.Client) error {
+				source := codex.ThreadStartSource("resume")
+				_, err := client.Thread.Start(context.Background(), codex.ThreadStartParams{
+					SessionStartSource: &source,
+				})
+				return err
+			},
+		},
+		{
+			name:    "thread list sort direction",
+			wantErr: `invalid sortDirection "forward"`,
+			call: func(client *codex.Client) error {
+				sortDirection := codex.SortDirection("forward")
+				_, err := client.Thread.List(context.Background(), codex.ThreadListParams{
+					SortDirection: &sortDirection,
+				})
+				return err
+			},
+		},
+		{
 			name:    "thread list sort key",
 			wantErr: `invalid sortKey "rank"`,
 			call: func(client *codex.Client) error {
@@ -183,6 +205,28 @@ func TestClientRejectsInvalidOutboundEnumsBeforeSending(t *testing.T) {
 			call: func(client *codex.Client) error {
 				_, err := client.Thread.List(context.Background(), codex.ThreadListParams{
 					SourceKinds: []codex.ThreadSourceKind{codex.ThreadSourceKind("daemon")},
+				})
+				return err
+			},
+		},
+		{
+			name:    "thread turns list sort direction",
+			wantErr: `invalid sortDirection "forward"`,
+			call: func(client *codex.Client) error {
+				sortDirection := codex.SortDirection("forward")
+				_, err := client.Thread.TurnsList(context.Background(), codex.ThreadTurnsListParams{
+					ThreadID:      "thread-1",
+					SortDirection: &sortDirection,
+				})
+				return err
+			},
+		},
+		{
+			name:    "windows sandbox setup mode",
+			wantErr: `invalid windowsSandbox.mode "automatic"`,
+			call: func(client *codex.Client) error {
+				_, err := client.System.WindowsSandboxSetupStart(context.Background(), codex.WindowsSandboxSetupStartParams{
+					Mode: codex.WindowsSandboxSetupMode("automatic"),
 				})
 				return err
 			},

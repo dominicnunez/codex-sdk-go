@@ -785,6 +785,9 @@ func (p ThreadStartParams) prepareRequest() (interface{}, error) {
 	if err := validateOptionalRawJSONObjectField("config", p.Config); err != nil {
 		return nil, err
 	}
+	if err := validateOptionalEnumValue("sessionStartSource", p.SessionStartSource, validThreadStartSources); err != nil {
+		return nil, err
+	}
 	var err error
 	p.Cwd, err = normalizeOptionalAbsolutePathField("cwd", p.Cwd)
 	if err != nil {
@@ -794,6 +797,9 @@ func (p ThreadStartParams) prepareRequest() (interface{}, error) {
 }
 
 func (p ThreadListParams) prepareRequest() (interface{}, error) {
+	if err := validateOptionalEnumValue("sortDirection", p.SortDirection, validSortDirections); err != nil {
+		return nil, err
+	}
 	var err error
 	p.Cwd, err = normalizeOptionalAbsolutePathField("cwd", p.Cwd)
 	if err != nil {
@@ -811,6 +817,9 @@ func (p ThreadReadParams) prepareRequest() (interface{}, error) {
 
 func (p ThreadTurnsListParams) prepareRequest() (interface{}, error) {
 	if err := validateThreadScopedRequest(p.ThreadID); err != nil {
+		return nil, err
+	}
+	if err := validateOptionalEnumValue("sortDirection", p.SortDirection, validSortDirections); err != nil {
 		return nil, err
 	}
 	return p, nil
@@ -926,6 +935,9 @@ func (p ThreadCompactStartParams) prepareRequest() (interface{}, error) {
 }
 
 func (p WindowsSandboxSetupStartParams) prepareRequest() (interface{}, error) {
+	if err := validateEnumValue("windowsSandbox.mode", p.Mode, validWindowsSandboxSetupModes); err != nil {
+		return nil, err
+	}
 	var err error
 	p.Cwd, err = normalizeOptionalAbsolutePathField("cwd", p.Cwd)
 	if err != nil {
