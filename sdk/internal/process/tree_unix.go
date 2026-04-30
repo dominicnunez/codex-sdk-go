@@ -1,6 +1,6 @@
 //go:build !windows
 
-package codex
+package process
 
 import (
 	"os"
@@ -9,9 +9,11 @@ import (
 	"time"
 )
 
-type processTreeState struct{}
+// Tree tracks process-tree state for a managed child process.
+type Tree struct{}
 
-func configureProcessTree(cmd *exec.Cmd) {
+// ConfigureCommand prepares cmd so child processes share a process group.
+func ConfigureCommand(cmd *exec.Cmd) {
 	if cmd == nil {
 		return
 	}
@@ -21,22 +23,26 @@ func configureProcessTree(cmd *exec.Cmd) {
 	cmd.SysProcAttr.Setpgid = true
 }
 
-func attachProcessTree(_ *exec.Cmd) (processTreeState, error) {
-	return processTreeState{}, nil
+// AttachTree attaches process-tree state to a started command.
+func AttachTree(_ *exec.Cmd) (Tree, error) {
+	return Tree{}, nil
 }
 
-func (processTreeState) requestShutdown(process *os.Process) error {
-	return requestProcessShutdown(process)
+// RequestShutdown asks the process group to terminate gracefully.
+func (Tree) RequestShutdown(process *os.Process) error {
+	return requestShutdown(process)
 }
 
-func (processTreeState) forceKill(process *os.Process) error {
+// ForceKill kills the process group.
+func (Tree) ForceKill(process *os.Process) error {
 	if process == nil {
 		return nil
 	}
 	return syscall.Kill(-process.Pid, syscall.SIGKILL)
 }
 
-func (processTreeState) waitForExit(waitDone <-chan struct{}, process *os.Process, gracePeriod time.Duration) bool {
+// WaitForExit waits until the parent exits and its process group disappears.
+func (Tree) WaitForExit(waitDone <-chan struct{}, process *os.Process, gracePeriod time.Duration) bool {
 	if process == nil {
 		select {
 		case <-waitDone:
@@ -75,7 +81,8 @@ func (processTreeState) waitForExit(waitDone <-chan struct{}, process *os.Proces
 	}
 }
 
-func (processTreeState) close() error {
+// Close releases process-tree state.
+func (Tree) Close() error {
 	return nil
 }
 

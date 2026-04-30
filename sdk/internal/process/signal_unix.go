@@ -1,6 +1,6 @@
 //go:build !windows
 
-package codex
+package process
 
 import (
 	"errors"
@@ -9,11 +9,12 @@ import (
 	"syscall"
 )
 
-func defaultProcessShutdownMode() processShutdownMode {
-	return processShutdownModeGraceful
+// DefaultShutdownMode returns the platform default child-process stop mode.
+func DefaultShutdownMode() ShutdownMode {
+	return ShutdownModeGraceful
 }
 
-func requestProcessShutdown(process *os.Process) error {
+func requestShutdown(process *os.Process) error {
 	if process == nil {
 		return nil
 	}
@@ -24,8 +25,9 @@ func requestProcessShutdown(process *os.Process) error {
 	return syscall.Kill(-process.Pid, interruptSignal)
 }
 
-func isExpectedShutdownWaitError(err error, attempt processShutdownAttempt) bool {
-	if err == nil || attempt == processShutdownAttemptNone {
+// IsExpectedShutdownWaitError reports whether Wait returned because of our shutdown signal.
+func IsExpectedShutdownWaitError(err error, attempt ShutdownAttempt) bool {
+	if err == nil || attempt == ShutdownAttemptNone {
 		return false
 	}
 
@@ -40,7 +42,7 @@ func isExpectedShutdownWaitError(err error, attempt processShutdownAttempt) bool
 	}
 
 	switch attempt {
-	case processShutdownAttemptInterrupt:
+	case ShutdownAttemptInterrupt:
 		interruptSignal, ok := os.Interrupt.(syscall.Signal)
 		if !ok {
 			return false
@@ -51,7 +53,7 @@ func isExpectedShutdownWaitError(err error, attempt processShutdownAttempt) bool
 		if waitStatus.Exited() {
 			return waitStatus.ExitStatus() == 128+int(interruptSignal)
 		}
-	case processShutdownAttemptKill:
+	case ShutdownAttemptKill:
 		return waitStatus.Signaled() && waitStatus.Signal() == syscall.SIGKILL
 	}
 

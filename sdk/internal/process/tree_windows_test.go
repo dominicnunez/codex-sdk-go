@@ -1,6 +1,6 @@
 //go:build windows
 
-package codex
+package process
 
 import (
 	"errors"
@@ -20,8 +20,8 @@ const (
 	testWindowsProcessHandle = syscall.Handle(99)
 )
 
-func testWindowsProcessTreeAPI() windowsProcessTreeAPI {
-	return windowsProcessTreeAPI{
+func testWindowsTreeAPI() windowsTreeAPI {
+	return windowsTreeAPI{
 		openProcess: func(uint32, bool, uint32) (syscall.Handle, error) {
 			return 0, nil
 		},
@@ -42,7 +42,7 @@ func testWindowsProcessTreeAPI() windowsProcessTreeAPI {
 }
 
 func TestCreateKillOnCloseJobObjectConfiguresKillOnCloseLimit(t *testing.T) {
-	api := testWindowsProcessTreeAPI()
+	api := testWindowsTreeAPI()
 
 	var gotInfoClass uint32
 	var gotInfoLen uint32
@@ -80,7 +80,7 @@ func TestCreateKillOnCloseJobObjectConfiguresKillOnCloseLimit(t *testing.T) {
 }
 
 func TestCreateKillOnCloseJobObjectClosesHandleOnConfigureError(t *testing.T) {
-	api := testWindowsProcessTreeAPI()
+	api := testWindowsTreeAPI()
 	wantErr := errors.New("configure failed")
 	var closed []syscall.Handle
 
@@ -110,18 +110,18 @@ func TestCreateKillOnCloseJobObjectClosesHandleOnConfigureError(t *testing.T) {
 	}
 }
 
-func TestAttachProcessTreeReturnsZeroStateWithoutProcess(t *testing.T) {
-	state, err := attachProcessTreeWithAPI(&exec.Cmd{}, testWindowsProcessTreeAPI())
+func TestAttachTreeReturnsZeroStateWithoutProcess(t *testing.T) {
+	state, err := attachTreeWithAPI(&exec.Cmd{}, testWindowsTreeAPI())
 	if err != nil {
-		t.Fatalf("attachProcessTreeWithAPI() error = %v, want nil", err)
+		t.Fatalf("attachTreeWithAPI() error = %v, want nil", err)
 	}
 	if state.job != 0 {
 		t.Fatalf("job = %v, want 0", state.job)
 	}
 }
 
-func TestAttachProcessTreeAttachesProcessAndClosesProcessHandle(t *testing.T) {
-	api := testWindowsProcessTreeAPI()
+func TestAttachTreeAttachesProcessAndClosesProcessHandle(t *testing.T) {
+	api := testWindowsTreeAPI()
 	cmd := &exec.Cmd{Process: &os.Process{Pid: testWindowsPID}}
 	var (
 		gotAccess  uint32
@@ -156,9 +156,9 @@ func TestAttachProcessTreeAttachesProcessAndClosesProcessHandle(t *testing.T) {
 		return nil
 	}
 
-	state, err := attachProcessTreeWithAPI(cmd, api)
+	state, err := attachTreeWithAPI(cmd, api)
 	if err != nil {
-		t.Fatalf("attachProcessTreeWithAPI() error = %v, want nil", err)
+		t.Fatalf("attachTreeWithAPI() error = %v, want nil", err)
 	}
 	if state.job != testWindowsJobHandle {
 		t.Fatalf("job = %v, want %v", state.job, testWindowsJobHandle)
@@ -177,8 +177,8 @@ func TestAttachProcessTreeAttachesProcessAndClosesProcessHandle(t *testing.T) {
 	}
 }
 
-func TestAttachProcessTreeClosesJobHandleWhenOpenProcessFails(t *testing.T) {
-	api := testWindowsProcessTreeAPI()
+func TestAttachTreeClosesJobHandleWhenOpenProcessFails(t *testing.T) {
+	api := testWindowsTreeAPI()
 	wantErr := errors.New("open failed")
 	var closed []syscall.Handle
 
@@ -196,7 +196,7 @@ func TestAttachProcessTreeClosesJobHandleWhenOpenProcessFails(t *testing.T) {
 		return nil
 	}
 
-	state, err := attachProcessTreeWithAPI(&exec.Cmd{Process: &os.Process{Pid: testWindowsPID}}, api)
+	state, err := attachTreeWithAPI(&exec.Cmd{Process: &os.Process{Pid: testWindowsPID}}, api)
 	if state.job != 0 {
 		t.Fatalf("job = %v, want 0", state.job)
 	}
@@ -211,8 +211,8 @@ func TestAttachProcessTreeClosesJobHandleWhenOpenProcessFails(t *testing.T) {
 	}
 }
 
-func TestAttachProcessTreeClosesHandlesWhenAssignFails(t *testing.T) {
-	api := testWindowsProcessTreeAPI()
+func TestAttachTreeClosesHandlesWhenAssignFails(t *testing.T) {
+	api := testWindowsTreeAPI()
 	wantErr := errors.New("assign failed")
 	var closed []syscall.Handle
 
@@ -233,7 +233,7 @@ func TestAttachProcessTreeClosesHandlesWhenAssignFails(t *testing.T) {
 		return nil
 	}
 
-	state, err := attachProcessTreeWithAPI(&exec.Cmd{Process: &os.Process{Pid: testWindowsPID}}, api)
+	state, err := attachTreeWithAPI(&exec.Cmd{Process: &os.Process{Pid: testWindowsPID}}, api)
 	if state.job != 0 {
 		t.Fatalf("job = %v, want 0", state.job)
 	}
@@ -249,8 +249,8 @@ func TestAttachProcessTreeClosesHandlesWhenAssignFails(t *testing.T) {
 	}
 }
 
-func TestProcessTreeForceKillUsesJobObjectWhenPresent(t *testing.T) {
-	api := testWindowsProcessTreeAPI()
+func TestTreeForceKillUsesJobObjectWhenPresent(t *testing.T) {
+	api := testWindowsTreeAPI()
 	var (
 		gotJob      syscall.Handle
 		gotExitCode uint32
@@ -266,17 +266,17 @@ func TestProcessTreeForceKillUsesJobObjectWhenPresent(t *testing.T) {
 		return nil
 	}
 
-	state := processTreeState{job: testWindowsJobHandle, api: api}
-	if err := state.forceKill(&os.Process{Pid: testWindowsPID}); err != nil {
-		t.Fatalf("forceKill() error = %v, want nil", err)
+	state := Tree{job: testWindowsJobHandle, api: api}
+	if err := state.ForceKill(&os.Process{Pid: testWindowsPID}); err != nil {
+		t.Fatalf("ForceKill() error = %v, want nil", err)
 	}
 	if gotJob != testWindowsJobHandle || gotExitCode != 1 {
 		t.Fatalf("terminateJobObject(%v, %d), want (%v, 1)", gotJob, gotExitCode, testWindowsJobHandle)
 	}
 }
 
-func TestProcessTreeForceKillFallsBackToProcessKill(t *testing.T) {
-	api := testWindowsProcessTreeAPI()
+func TestTreeForceKillFallsBackToProcessKill(t *testing.T) {
+	api := testWindowsTreeAPI()
 	var gotPID int
 
 	api.killProcess = func(process *os.Process) error {
@@ -287,17 +287,17 @@ func TestProcessTreeForceKillFallsBackToProcessKill(t *testing.T) {
 		return nil
 	}
 
-	state := processTreeState{api: api}
-	if err := state.forceKill(&os.Process{Pid: testWindowsPID}); err != nil {
-		t.Fatalf("forceKill() error = %v, want nil", err)
+	state := Tree{api: api}
+	if err := state.ForceKill(&os.Process{Pid: testWindowsPID}); err != nil {
+		t.Fatalf("ForceKill() error = %v, want nil", err)
 	}
 	if gotPID != testWindowsPID {
 		t.Fatalf("killProcess pid = %d, want %d", gotPID, testWindowsPID)
 	}
 }
 
-func TestProcessTreeWaitForExitUsesConfiguredTimer(t *testing.T) {
-	api := testWindowsProcessTreeAPI()
+func TestTreeWaitForExitUsesConfiguredTimer(t *testing.T) {
+	api := testWindowsTreeAPI()
 	timerFired := make(chan time.Time)
 	close(timerFired)
 	var gotDuration time.Duration
@@ -307,17 +307,17 @@ func TestProcessTreeWaitForExitUsesConfiguredTimer(t *testing.T) {
 		return timerFired
 	}
 
-	state := processTreeState{api: api}
-	if state.waitForExit(make(chan struct{}), nil, 2*time.Second) {
-		t.Fatal("waitForExit() = true, want false when grace period expires")
+	state := Tree{api: api}
+	if state.WaitForExit(make(chan struct{}), nil, 2*time.Second) {
+		t.Fatal("WaitForExit() = true, want false when grace period expires")
 	}
 	if gotDuration != 2*time.Second {
 		t.Fatalf("gracePeriod = %v, want %v", gotDuration, 2*time.Second)
 	}
 }
 
-func TestProcessTreeCloseClosesHandleOnce(t *testing.T) {
-	api := testWindowsProcessTreeAPI()
+func TestTreeCloseClosesHandleOnce(t *testing.T) {
+	api := testWindowsTreeAPI()
 	var closed []syscall.Handle
 
 	api.closeHandle = func(handle syscall.Handle) error {
@@ -325,15 +325,15 @@ func TestProcessTreeCloseClosesHandleOnce(t *testing.T) {
 		return nil
 	}
 
-	state := &processTreeState{job: testWindowsJobHandle, api: api}
-	if err := state.close(); err != nil {
-		t.Fatalf("close() error = %v, want nil", err)
+	state := &Tree{job: testWindowsJobHandle, api: api}
+	if err := state.Close(); err != nil {
+		t.Fatalf("Close() error = %v, want nil", err)
 	}
 	if state.job != 0 {
 		t.Fatalf("job = %v, want 0", state.job)
 	}
-	if err := state.close(); err != nil {
-		t.Fatalf("second close() error = %v, want nil", err)
+	if err := state.Close(); err != nil {
+		t.Fatalf("second Close() error = %v, want nil", err)
 	}
 	if !slices.Equal(closed, []syscall.Handle{testWindowsJobHandle}) {
 		t.Fatalf("closed handles = %v, want [%v]", closed, testWindowsJobHandle)

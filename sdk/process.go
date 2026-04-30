@@ -15,6 +15,8 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
+
+	processctl "github.com/dominicnunez/codex-sdk-go/sdk/internal/process"
 )
 
 const (
@@ -32,20 +34,20 @@ const (
 	sdkVersion = "0.3.0"
 )
 
-type processShutdownMode uint8
+type processShutdownMode = processctl.ShutdownMode
 
 const (
-	processShutdownModeUnset processShutdownMode = iota
-	processShutdownModeGraceful
-	processShutdownModeNoSignal
+	processShutdownModeUnset    = processctl.ShutdownModeUnset
+	processShutdownModeGraceful = processctl.ShutdownModeGraceful
+	processShutdownModeNoSignal = processctl.ShutdownModeNoSignal
 )
 
-type processShutdownAttempt uint8
+type processShutdownAttempt = processctl.ShutdownAttempt
 
 const (
-	processShutdownAttemptNone processShutdownAttempt = iota
-	processShutdownAttemptInterrupt
-	processShutdownAttemptKill
+	processShutdownAttemptNone      = processctl.ShutdownAttemptNone
+	processShutdownAttemptInterrupt = processctl.ShutdownAttemptInterrupt
+	processShutdownAttemptKill      = processctl.ShutdownAttemptKill
 )
 
 // ProcessOptions configures how the Codex CLI process is spawned.
@@ -103,7 +105,7 @@ type Process struct {
 	transport        *StdioTransport
 	stdin            io.Closer
 	initializeParams InitializeParams
-	processTree      processTreeState
+	processTree      processctl.Tree
 	closeOnce        sync.Once
 	waitOnce         sync.Once
 	waitErr          error
@@ -292,7 +294,7 @@ func StartProcess(ctx context.Context, opts *ProcessOptions) (*Process, error) {
 	}
 
 	cmd := exec.CommandContext(context.WithoutCancel(ctx), binary, args...)
-	configureProcessTree(cmd)
+	processctl.ConfigureCommand(cmd)
 	cmd.Env = resolveProcessEnv(opts)
 	cmd.Dir = opts.Dir
 
@@ -315,7 +317,7 @@ func StartProcess(ctx context.Context, opts *ProcessOptions) (*Process, error) {
 		return nil, fmt.Errorf("start codex: %w", err)
 	}
 
-	processTree, err := attachProcessTree(cmd)
+	processTree, err := processctl.AttachTree(cmd)
 	if err != nil {
 		_ = stdout.Close()
 		_ = stdin.Close()
@@ -326,7 +328,7 @@ func StartProcess(ctx context.Context, opts *ProcessOptions) (*Process, error) {
 		_ = stdout.Close()
 		_ = stdin.Close()
 		stopStartedCommand(cmd)
-		_ = processTree.close()
+		_ = processTree.Close()
 		return nil, err
 	}
 
@@ -344,6 +346,10 @@ func StartProcess(ctx context.Context, opts *ProcessOptions) (*Process, error) {
 		waitDone:         make(chan struct{}),
 		shutdownMode:     defaultProcessShutdownMode(),
 	}, nil
+}
+
+func defaultProcessShutdownMode() processShutdownMode {
+	return processctl.DefaultShutdownMode()
 }
 
 func defaultInitializeParams() InitializeParams {
@@ -449,13 +455,13 @@ func (p *Process) closeTransport() error {
 
 func (p *Process) closeChildProcess() (closeErr error) {
 	if p.cmd == nil || p.cmd.Process == nil {
-		return p.processTree.close()
+		return p.processTree.Close()
 	}
 
 	process := p.cmd.Process
 	shutdownMode := p.effectiveShutdownMode()
 	defer func() {
-		closeErr = errors.Join(closeErr, p.processTree.close())
+		closeErr = errors.Join(closeErr, p.processTree.Close())
 	}()
 
 	go p.doWait()
@@ -478,7 +484,7 @@ func (p *Process) effectiveShutdownMode() processShutdownMode {
 }
 
 func (p *Process) signalProcessShutdown(process *os.Process) error {
-	if err := p.processTree.requestShutdown(process); err != nil && !isExpectedProcessStopError(err) {
+	if err := p.processTree.RequestShutdown(process); err != nil && !isExpectedProcessStopError(err) {
 		return fmt.Errorf("signal process: %w", err)
 	}
 	p.recordShutdownAttempt(processShutdownAttemptInterrupt)
@@ -491,11 +497,11 @@ func (p *Process) waitForProcessExit(process *os.Process, shutdownMode processSh
 		gracePeriod = processGracePeriod
 	}
 
-	if p.processTree.waitForExit(p.waitDone, process, gracePeriod) {
+	if p.processTree.WaitForExit(p.waitDone, process, gracePeriod) {
 		return nil
 	}
 
-	if err := p.processTree.forceKill(process); err != nil && !isExpectedProcessStopError(err) {
+	if err := p.processTree.ForceKill(process); err != nil && !isExpectedProcessStopError(err) {
 		return fmt.Errorf("kill process: %w", err)
 	}
 	p.recordShutdownAttempt(processShutdownAttemptKill)
@@ -507,7 +513,7 @@ func (p *Process) processExitError() error {
 	if p.waitErr == nil {
 		return nil
 	}
-	if isExpectedShutdownWaitError(p.waitErr, p.recordedShutdownAttempt()) {
+	if processctl.IsExpectedShutdownWaitError(p.waitErr, p.recordedShutdownAttempt()) {
 		return nil
 	}
 	return p.waitErr
@@ -571,7 +577,7 @@ func (p *Process) doWait() {
 }
 
 func isExpectedProcessStopError(err error) bool {
-	return errors.Is(err, os.ErrProcessDone) || errors.Is(err, syscall.ESRCH)
+	return processctl.IsExpectedStopError(err)
 }
 
 func isExpectedPipeCloseError(err error) bool {

@@ -1,6 +1,6 @@
 //go:build windows
 
-package codex
+package process
 
 import (
 	"fmt"
@@ -25,7 +25,7 @@ var (
 	procTerminateJobObject = modkernel32.NewProc("TerminateJobObject")
 )
 
-type windowsProcessTreeAPI struct {
+type windowsTreeAPI struct {
 	openProcess              func(desiredAccess uint32, inheritHandle bool, processID uint32) (syscall.Handle, error)
 	closeHandle              func(handle syscall.Handle) error
 	createJobObject          func() (syscall.Handle, error)
@@ -36,7 +36,7 @@ type windowsProcessTreeAPI struct {
 	after                    func(d time.Duration) <-chan time.Time
 }
 
-var defaultWindowsProcessTreeAPI = windowsProcessTreeAPI{
+var defaultWindowsTreeAPI = windowsTreeAPI{
 	openProcess:              syscall.OpenProcess,
 	closeHandle:              syscall.CloseHandle,
 	createJobObject:          createJobObject,
@@ -52,9 +52,10 @@ var defaultWindowsProcessTreeAPI = windowsProcessTreeAPI{
 	after: time.After,
 }
 
-type processTreeState struct {
+// Tree tracks process-tree state for a managed child process.
+type Tree struct {
 	job syscall.Handle
-	api windowsProcessTreeAPI
+	api windowsTreeAPI
 }
 
 type ioCounters struct {
@@ -87,70 +88,76 @@ type jobObjectExtendedLimitInfo struct {
 	PeakJobMemoryUsed     uintptr
 }
 
-func configureProcessTree(_ *exec.Cmd) {}
+// ConfigureCommand prepares cmd for process-tree management.
+func ConfigureCommand(_ *exec.Cmd) {}
 
-func attachProcessTree(cmd *exec.Cmd) (processTreeState, error) {
-	return attachProcessTreeWithAPI(cmd, defaultWindowsProcessTreeAPI)
+// AttachTree attaches process-tree state to a started command.
+func AttachTree(cmd *exec.Cmd) (Tree, error) {
+	return attachTreeWithAPI(cmd, defaultWindowsTreeAPI)
 }
 
-func attachProcessTreeWithAPI(cmd *exec.Cmd, api windowsProcessTreeAPI) (processTreeState, error) {
-	api = (&processTreeState{api: api}).apiOrDefault()
+func attachTreeWithAPI(cmd *exec.Cmd, api windowsTreeAPI) (Tree, error) {
+	api = (&Tree{api: api}).apiOrDefault()
 
 	if cmd == nil || cmd.Process == nil {
-		return processTreeState{}, nil
+		return Tree{}, nil
 	}
 
 	job, err := createKillOnCloseJobObject(api)
 	if err != nil {
-		return processTreeState{}, err
+		return Tree{}, err
 	}
 
 	processHandle, err := api.openProcess(processSetQuota|syscall.PROCESS_TERMINATE, false, uint32(cmd.Process.Pid))
 	if err != nil {
 		_ = api.closeHandle(job)
-		return processTreeState{}, fmt.Errorf("open process handle: %w", err)
+		return Tree{}, fmt.Errorf("open process handle: %w", err)
 	}
 	defer api.closeHandle(processHandle)
 
 	if err := api.assignProcessToJobObject(job, processHandle); err != nil {
 		_ = api.closeHandle(job)
-		return processTreeState{}, fmt.Errorf("assign process to job: %w", err)
+		return Tree{}, fmt.Errorf("assign process to job: %w", err)
 	}
 
-	return processTreeState{job: job, api: api}, nil
+	return Tree{job: job, api: api}, nil
 }
 
-func (processTreeState) requestShutdown(_ *os.Process) error {
+// RequestShutdown asks the process tree to terminate gracefully.
+func (Tree) RequestShutdown(_ *os.Process) error {
 	return nil
 }
 
-func (s processTreeState) forceKill(process *os.Process) error {
-	if s.job != 0 {
-		return s.apiOrDefault().terminateJobObject(s.job, 1)
+// ForceKill kills the process tree.
+func (t Tree) ForceKill(process *os.Process) error {
+	if t.job != 0 {
+		return t.apiOrDefault().terminateJobObject(t.job, 1)
 	}
-	return s.apiOrDefault().killProcess(process)
+	return t.apiOrDefault().killProcess(process)
 }
 
-func (s processTreeState) waitForExit(waitDone <-chan struct{}, _ *os.Process, gracePeriod time.Duration) bool {
+// WaitForExit waits for the parent process to exit or for gracePeriod to expire.
+func (t Tree) WaitForExit(waitDone <-chan struct{}, _ *os.Process, gracePeriod time.Duration) bool {
 	select {
 	case <-waitDone:
 		return true
-	case <-s.apiOrDefault().after(gracePeriod):
+	case <-t.apiOrDefault().after(gracePeriod):
 		return false
 	}
 }
 
-func (s *processTreeState) close() error {
-	if s == nil || s.job == 0 {
+// Close releases process-tree state.
+func (t *Tree) Close() error {
+	if t == nil || t.job == 0 {
 		return nil
 	}
-	job := s.job
-	s.job = 0
-	return s.apiOrDefault().closeHandle(job)
+	job := t.job
+	t.job = 0
+	return t.apiOrDefault().closeHandle(job)
 }
 
-func createKillOnCloseJobObject(api windowsProcessTreeAPI) (syscall.Handle, error) {
-	api = (&processTreeState{api: api}).apiOrDefault()
+func createKillOnCloseJobObject(api windowsTreeAPI) (syscall.Handle, error) {
+	api = (&Tree{api: api}).apiOrDefault()
 
 	job, err := api.createJobObject()
 	if err != nil {
@@ -167,34 +174,34 @@ func createKillOnCloseJobObject(api windowsProcessTreeAPI) (syscall.Handle, erro
 	return job, nil
 }
 
-func (s *processTreeState) apiOrDefault() windowsProcessTreeAPI {
-	if s == nil {
-		return defaultWindowsProcessTreeAPI
+func (t *Tree) apiOrDefault() windowsTreeAPI {
+	if t == nil {
+		return defaultWindowsTreeAPI
 	}
-	api := s.api
+	api := t.api
 	if api.openProcess == nil {
-		api.openProcess = defaultWindowsProcessTreeAPI.openProcess
+		api.openProcess = defaultWindowsTreeAPI.openProcess
 	}
 	if api.closeHandle == nil {
-		api.closeHandle = defaultWindowsProcessTreeAPI.closeHandle
+		api.closeHandle = defaultWindowsTreeAPI.closeHandle
 	}
 	if api.createJobObject == nil {
-		api.createJobObject = defaultWindowsProcessTreeAPI.createJobObject
+		api.createJobObject = defaultWindowsTreeAPI.createJobObject
 	}
 	if api.assignProcessToJobObject == nil {
-		api.assignProcessToJobObject = defaultWindowsProcessTreeAPI.assignProcessToJobObject
+		api.assignProcessToJobObject = defaultWindowsTreeAPI.assignProcessToJobObject
 	}
 	if api.setInformationJobObject == nil {
-		api.setInformationJobObject = defaultWindowsProcessTreeAPI.setInformationJobObject
+		api.setInformationJobObject = defaultWindowsTreeAPI.setInformationJobObject
 	}
 	if api.terminateJobObject == nil {
-		api.terminateJobObject = defaultWindowsProcessTreeAPI.terminateJobObject
+		api.terminateJobObject = defaultWindowsTreeAPI.terminateJobObject
 	}
 	if api.killProcess == nil {
-		api.killProcess = defaultWindowsProcessTreeAPI.killProcess
+		api.killProcess = defaultWindowsTreeAPI.killProcess
 	}
 	if api.after == nil {
-		api.after = defaultWindowsProcessTreeAPI.after
+		api.after = defaultWindowsTreeAPI.after
 	}
 	return api
 }
