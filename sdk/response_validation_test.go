@@ -658,6 +658,81 @@ func TestClientMethodsRejectMalformedAbsolutePathResponses(t *testing.T) {
 			},
 			wantContains: `config.write.filePath: must be normalized`,
 		},
+		{
+			name:   "fs watch rejects relative response path",
+			method: "fs/watch",
+			payload: map[string]interface{}{
+				"path": "project",
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Fs.Watch(context.Background(), codex.FsWatchParams{
+					Path:    "/tmp/project",
+					WatchID: "watch-1",
+				})
+				return err
+			},
+			wantContains: `fs.watch.path: must be an absolute path`,
+		},
+		{
+			name:   "fs watch rejects non-normalized response path",
+			method: "fs/watch",
+			payload: map[string]interface{}{
+				"path": "/tmp/../project",
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Fs.Watch(context.Background(), codex.FsWatchParams{
+					Path:    "/tmp/project",
+					WatchID: "watch-1",
+				})
+				return err
+			},
+			wantContains: `fs.watch.path: must be normalized`,
+		},
+		{
+			name:   "marketplace add rejects relative installed root",
+			method: "marketplace/add",
+			payload: map[string]interface{}{
+				"alreadyAdded":    false,
+				"installedRoot":   "marketplaces/official",
+				"marketplaceName": "official",
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Marketplace.Add(context.Background(), codex.MarketplaceAddParams{
+					Source: "https://example.com/official.git",
+				})
+				return err
+			},
+			wantContains: `marketplace.add.installedRoot: must be an absolute path`,
+		},
+		{
+			name:   "marketplace remove rejects non-normalized installed root",
+			method: "marketplace/remove",
+			payload: map[string]interface{}{
+				"installedRoot":   "/tmp/../marketplaces/official",
+				"marketplaceName": "official",
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Marketplace.Remove(context.Background(), codex.MarketplaceRemoveParams{
+					MarketplaceName: "official",
+				})
+				return err
+			},
+			wantContains: `marketplace.remove.installedRoot: must be normalized`,
+		},
+		{
+			name:   "marketplace upgrade rejects relative upgraded root",
+			method: "marketplace/upgrade",
+			payload: map[string]interface{}{
+				"errors":               []interface{}{},
+				"selectedMarketplaces": []interface{}{"official"},
+				"upgradedRoots":        []interface{}{"marketplaces/official"},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Marketplace.Upgrade(context.Background(), codex.MarketplaceUpgradeParams{})
+				return err
+			},
+			wantContains: `marketplace.upgrade.upgradedRoots[0]: must be an absolute path`,
+		},
 	}
 
 	for _, tt := range tests {

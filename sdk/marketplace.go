@@ -28,6 +28,11 @@ func (r *MarketplaceAddResponse) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	validatedInstalledRoot, err := validateInboundAbsolutePathField("marketplace.add.installedRoot", decoded.InstalledRoot)
+	if err != nil {
+		return err
+	}
+	decoded.InstalledRoot = validatedInstalledRoot
 	*r = MarketplaceAddResponse(decoded)
 	return nil
 }
@@ -52,6 +57,11 @@ func (r *MarketplaceRemoveResponse) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	validatedInstalledRoot, err := validateInboundAbsolutePathPointerField("marketplace.remove.installedRoot", decoded.InstalledRoot)
+	if err != nil {
+		return err
+	}
+	decoded.InstalledRoot = validatedInstalledRoot
 	*r = MarketplaceRemoveResponse(decoded)
 	return nil
 }
@@ -83,6 +93,11 @@ func (r *MarketplaceUpgradeResponse) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	validatedUpgradedRoots, err := validateInboundAbsolutePathSliceField("marketplace.upgrade.upgradedRoots", decoded.UpgradedRoots)
+	if err != nil {
+		return err
+	}
+	decoded.UpgradedRoots = validatedUpgradedRoots
 	*r = MarketplaceUpgradeResponse(decoded)
 	return nil
 }

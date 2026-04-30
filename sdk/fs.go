@@ -160,6 +160,11 @@ func (r *FsWatchResponse) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	validatedPath, err := validateInboundAbsolutePathField("fs.watch.path", decoded.Path)
+	if err != nil {
+		return err
+	}
+	decoded.Path = validatedPath
 	*r = FsWatchResponse(decoded)
 	return nil
 }
