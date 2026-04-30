@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
+	"unicode"
 
 	processctl "github.com/dominicnunez/codex-sdk-go/sdk/internal/process"
 )
@@ -129,21 +130,46 @@ var errSensitiveProcessConfigKey = errors.New("ProcessOptions.Config must not in
 const approvalModeFullAuto = "full-auto"
 const processConfigApprovalPolicyKey = "approval_policy"
 
-var sensitiveProcessConfigKeySubstrings = []string{
+type processConfigKeySegmentPair struct {
+	first  string
+	second string
+}
+
+var sensitiveProcessConfigKeySegments = map[string]struct{}{
+	"credential":  {},
+	"credentials": {},
+	"password":    {},
+	"passwd":      {},
+	"secret":      {},
+}
+
+var sensitiveProcessConfigKeySegmentPairs = map[processConfigKeySegmentPair]struct{}{
+	{"access", "token"}:     {},
+	{"api", "key"}:          {},
+	{"api", "token"}:        {},
+	{"auth", "token"}:       {},
+	{"bearer", "token"}:     {},
+	{"client", "secret"}:    {},
+	{"github", "token"}:     {},
+	{"oauth", "token"}:      {},
+	{"private", "endpoint"}: {},
+	{"private", "key"}:      {},
+	{"refresh", "token"}:    {},
+	{"session", "token"}:    {},
+}
+
+var sensitiveProcessConfigKeyCompactTerms = []string{
 	"accesstoken",
 	"apikey",
 	"apitoken",
 	"authtoken",
 	"bearertoken",
 	"clientsecret",
-	"credential",
-	"credentials",
-	"password",
-	"passwd",
+	"githubtoken",
+	"oauthtoken",
 	"privateendpoint",
 	"privatekey",
 	"refreshtoken",
-	"secret",
 	"sessiontoken",
 }
 
@@ -237,23 +263,72 @@ func validateProcessConfig(config map[string]string) error {
 }
 
 func processConfigKeyLooksSensitive(key string) bool {
-	normalized := normalizeProcessConfigKeyForSecretCheck(key)
-	for _, substr := range sensitiveProcessConfigKeySubstrings {
-		if strings.Contains(normalized, substr) {
+	segments := splitProcessConfigKeySegments(key)
+	if len(segments) == 1 && segments[0] == "token" {
+		return true
+	}
+	for _, segment := range segments {
+		if _, ok := sensitiveProcessConfigKeySegments[segment]; ok {
+			return true
+		}
+	}
+	for i := 0; i+1 < len(segments); i++ {
+		pair := processConfigKeySegmentPair{first: segments[i], second: segments[i+1]}
+		if _, ok := sensitiveProcessConfigKeySegmentPairs[pair]; ok {
+			return true
+		}
+	}
+	compact := compactProcessConfigKey(key)
+	for _, term := range sensitiveProcessConfigKeyCompactTerms {
+		if strings.Contains(compact, term) {
 			return true
 		}
 	}
 	return false
 }
 
-func normalizeProcessConfigKeyForSecretCheck(key string) string {
+func splitProcessConfigKeySegments(key string) []string {
+	var segments []string
+	var b strings.Builder
+	runes := []rune(key)
+	for i, r := range runes {
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+			segments = appendProcessConfigKeySegment(segments, &b)
+			continue
+		}
+		if b.Len() > 0 && startsProcessConfigKeySegment(runes, i) {
+			segments = appendProcessConfigKeySegment(segments, &b)
+		}
+		b.WriteRune(unicode.ToLower(r))
+	}
+	return appendProcessConfigKeySegment(segments, &b)
+}
+
+func appendProcessConfigKeySegment(segments []string, b *strings.Builder) []string {
+	if b.Len() == 0 {
+		return segments
+	}
+	segments = append(segments, b.String())
+	b.Reset()
+	return segments
+}
+
+func startsProcessConfigKeySegment(runes []rune, i int) bool {
+	if i <= 0 || i >= len(runes) || !unicode.IsUpper(runes[i]) {
+		return false
+	}
+	prev := runes[i-1]
+	if unicode.IsLower(prev) || unicode.IsDigit(prev) {
+		return true
+	}
+	return unicode.IsUpper(prev) && i+1 < len(runes) && unicode.IsLower(runes[i+1])
+}
+
+func compactProcessConfigKey(key string) string {
 	var b strings.Builder
 	for _, r := range key {
-		if r >= 'A' && r <= 'Z' {
-			r += 'a' - 'A'
-		}
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
-			b.WriteRune(r)
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			b.WriteRune(unicode.ToLower(r))
 		}
 	}
 	return b.String()

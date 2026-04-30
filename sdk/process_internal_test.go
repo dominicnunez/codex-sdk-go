@@ -139,6 +139,9 @@ func TestBuildArgsRejectsSensitiveConfigKeys(t *testing.T) {
 		{name: "api key", key: "model_providers.openai.api_key"},
 		{name: "access token", key: "auth.access_token"},
 		{name: "client secret", key: "oauth.clientSecret"},
+		{name: "github token", key: "github_token"},
+		{name: "oauth token", key: "oauth_token"},
+		{name: "oauth camel token", key: "oauthToken"},
 		{name: "password", key: "database.password"},
 		{name: "private endpoint", key: "private_endpoint"},
 	}
@@ -156,11 +159,12 @@ func TestBuildArgsRejectsSensitiveConfigKeys(t *testing.T) {
 
 func TestBuildArgsAllowsNonSensitiveConfigKeys(t *testing.T) {
 	opts := &ProcessOptions{Config: map[string]string{
-		processConfigApprovalPolicyKey: "on-request",
-		"model":                        "o3",
-		"model_provider":               "openai",
-		"max_tokens":                   "1024",
-		"key1":                         "val1",
+		processConfigApprovalPolicyKey:   "on-request",
+		"model":                          "o3",
+		"model_provider":                 "openai",
+		"max_tokens":                     "1024",
+		"model_auto_compact_token_limit": "200000",
+		"key1":                           "val1",
 	}}
 
 	args, err := opts.buildArgs()
