@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"syscall"
 )
 
 // DefaultShutdownMode returns the platform default child-process stop mode.
@@ -23,5 +24,13 @@ func IsExpectedShutdownWaitError(err error, attempt ShutdownAttempt) bool {
 		return false
 	}
 	var exitErr *exec.ExitError
-	return errors.As(err, &exitErr)
+	if !errors.As(err, &exitErr) || exitErr.ProcessState == nil {
+		return false
+	}
+	waitStatus, ok := exitErr.Sys().(syscall.WaitStatus)
+	return ok && isExpectedJobTerminationExitCode(waitStatus.ExitStatus())
+}
+
+func isExpectedJobTerminationExitCode(exitCode int) bool {
+	return exitCode == terminateJobObjectExitCode
 }

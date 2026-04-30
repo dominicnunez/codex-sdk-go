@@ -281,6 +281,33 @@ func TestTreeForceKillUsesJobObjectWhenPresent(t *testing.T) {
 	}
 }
 
+func TestExpectedJobTerminationExitCodeOnlyMatchesJobTermination(t *testing.T) {
+	tests := []struct {
+		name     string
+		exitCode int
+		want     bool
+	}{
+		{
+			name:     "job termination",
+			exitCode: terminateJobObjectExitCode,
+			want:     true,
+		},
+		{
+			name:     "unrelated child failure",
+			exitCode: 2,
+			want:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isExpectedJobTerminationExitCode(tt.exitCode); got != tt.want {
+				t.Fatalf("isExpectedJobTerminationExitCode(%d) = %t, want %t", tt.exitCode, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestTreeForceKillFallsBackToProcessKill(t *testing.T) {
 	api := testWindowsTreeAPI()
 	var gotPID int
