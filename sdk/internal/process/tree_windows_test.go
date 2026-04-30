@@ -270,8 +270,14 @@ func TestTreeForceKillUsesJobObjectWhenPresent(t *testing.T) {
 	if err := state.ForceKill(&os.Process{Pid: testWindowsPID}); err != nil {
 		t.Fatalf("ForceKill() error = %v, want nil", err)
 	}
-	if gotJob != testWindowsJobHandle || gotExitCode != 1 {
-		t.Fatalf("terminateJobObject(%v, %d), want (%v, 1)", gotJob, gotExitCode, testWindowsJobHandle)
+	if gotJob != testWindowsJobHandle || gotExitCode != terminateJobObjectExitCode {
+		t.Fatalf(
+			"terminateJobObject(%v, %d), want (%v, %d)",
+			gotJob,
+			gotExitCode,
+			testWindowsJobHandle,
+			terminateJobObjectExitCode,
+		)
 	}
 }
 

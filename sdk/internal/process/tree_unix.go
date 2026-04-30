@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+const processGroupPollInterval = 10 * time.Millisecond
+
 // Tree tracks process-tree state for a managed child process.
 type Tree struct{}
 
@@ -53,7 +55,7 @@ func (Tree) WaitForExit(waitDone <-chan struct{}, process *os.Process, gracePeri
 	}
 
 	deadline := time.Now().Add(gracePeriod)
-	ticker := time.NewTicker(10 * time.Millisecond)
+	ticker := time.NewTicker(processGroupPollInterval)
 	defer ticker.Stop()
 
 	parentExited := false

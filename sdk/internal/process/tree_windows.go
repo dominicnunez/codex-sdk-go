@@ -15,6 +15,7 @@ const (
 	jobObjectExtendedLimitInformation = 9
 	jobObjectLimitKillOnJobClose      = 0x00002000
 	processSetQuota                   = 0x0100
+	terminateJobObjectExitCode        = 1
 )
 
 var (
@@ -131,7 +132,7 @@ func (Tree) RequestShutdown(_ *os.Process) error {
 // ForceKill kills the process tree.
 func (t Tree) ForceKill(process *os.Process) error {
 	if t.job != 0 {
-		return t.apiOrDefault().terminateJobObject(t.job, 1)
+		return t.apiOrDefault().terminateJobObject(t.job, terminateJobObjectExitCode)
 	}
 	return t.apiOrDefault().killProcess(process)
 }
