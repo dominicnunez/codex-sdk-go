@@ -1,0 +1,898 @@
+package codex_test
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
+	"testing"
+	"time"
+
+	codex "github.com/dominicnunez/codex-sdk-go/sdk"
+)
+
+func validProcessThreadPayload(threadID string) map[string]interface{} {
+	return map[string]interface{}{
+		"id":            threadID,
+		"cliVersion":    "1.0.0",
+		"createdAt":     1700000000,
+		"cwd":           "/tmp",
+		"modelProvider": "openai",
+		"preview":       "",
+		"source":        "exec",
+		"status":        map[string]interface{}{"type": "idle"},
+		"turns":         []interface{}{},
+		"updatedAt":     1700000000,
+		"ephemeral":     true,
+	}
+}
+
+func validProcessThreadStartResponse(thread map[string]interface{}) map[string]interface{} {
+	response := validThreadLifecycleResponse(thread)
+	response["approvalPolicy"] = "never"
+	response["cwd"] = "/tmp"
+	response["model"] = "o3"
+	response["modelProvider"] = "openai"
+	response["sandbox"] = map[string]interface{}{"type": "readOnly"}
+	return response
+}
+
+// mockProcess creates a Process with a mock transport for testing Run().
+// The mock is pre-configured to respond to initialize, thread/start, and turn/start.
+// It returns the mock so callers can inject notifications.
+func mockProcess(t *testing.T) (*codex.Process, *MockTransport) {
+	t.Helper()
+	mock := NewMockTransport()
+
+	_ = mock.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
+	_ = mock.SetResponseData("thread/start", validProcessThreadStartResponse(validProcessThreadPayload("thread-1")))
+
+	_ = mock.SetResponseData("turn/start", map[string]interface{}{
+		"turn": map[string]interface{}{
+			"id":     "turn-1",
+			"status": "inProgress",
+			"items":  []interface{}{},
+		},
+	})
+
+	client := codex.NewClient(mock, codex.WithRequestTimeout(5*time.Second))
+	proc := codex.NewProcessFromClient(client)
+
+	return proc, mock
+}
+
+func TestRunSuccess(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Run in a goroutine since it blocks waiting for notifications.
+	type runResult struct {
+		result *codex.RunResult
+		err    error
+	}
+	ch := make(chan runResult, 1)
+
+	go func() {
+		r, err := proc.Run(ctx, codex.RunOptions{
+			Prompt: "Say hello",
+		})
+		ch <- runResult{r, err}
+	}()
+
+	waitForMethodCallCount(t, mock, "turn/start", 1)
+
+	// Inject item/completed notification with an agentMessage.
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-1","text":"Hello there!"}}`),
+	})
+
+	// Inject turn/completed notification.
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	result := <-ch
+	if result.err != nil {
+		t.Fatalf("Run() error: %v", result.err)
+	}
+
+	if result.result.Response != "Hello there!" {
+		t.Errorf("Response = %q, want %q", result.result.Response, "Hello there!")
+	}
+
+	if len(result.result.Items) != 1 {
+		t.Errorf("len(Items) = %d, want 1", len(result.result.Items))
+	}
+	if len(result.result.Turn.Items) != 1 {
+		t.Errorf("len(Turn.Items) = %d, want 1", len(result.result.Turn.Items))
+	}
+	if len(result.result.Thread.Turns) != 1 {
+		t.Fatalf("len(Thread.Turns) = %d, want 1", len(result.result.Thread.Turns))
+	}
+	if len(result.result.Thread.Turns[0].Items) != 1 {
+		t.Errorf("len(Thread.Turns[0].Items) = %d, want 1", len(result.result.Thread.Turns[0].Items))
+	}
+
+	if result.result.Turn.ID != "turn-1" {
+		t.Errorf("Turn.ID = %q, want %q", result.result.Turn.ID, "turn-1")
+	}
+
+	if result.result.Thread.ID != "thread-1" {
+		t.Errorf("Thread.ID = %q, want %q", result.result.Thread.ID, "thread-1")
+	}
+	if len(result.result.Thread.Turns) != 1 {
+		t.Errorf("len(Thread.Turns) = %d, want 1", len(result.result.Thread.Turns))
+	}
+	if len(result.result.Thread.Turns) == 1 && len(result.result.Thread.Turns[0].Items) != 1 {
+		t.Errorf("len(Thread.Turns[0].Items) = %d, want 1", len(result.result.Thread.Turns[0].Items))
+	}
+}
+
+func TestRunResultSnapshotsAreIndependent(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	type runResult struct {
+		result *codex.RunResult
+		err    error
+	}
+	ch := make(chan runResult, 1)
+
+	go func() {
+		r, err := proc.Run(ctx, codex.RunOptions{
+			Prompt: "Say hello",
+		})
+		ch <- runResult{r, err}
+	}()
+
+	waitForMethodCallCount(t, mock, "turn/start", 1)
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-1","text":"Hello there!"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	result := <-ch
+	if result.err != nil {
+		t.Fatalf("Run() error: %v", result.err)
+	}
+
+	itemsMsg, ok := result.result.Items[0].Value.(*codex.AgentMessageThreadItem)
+	if !ok {
+		t.Fatalf("result.Items[0] type = %T, want *AgentMessageThreadItem", result.result.Items[0].Value)
+	}
+	itemsMsg.Text = "mutated"
+
+	turnMsg, ok := result.result.Turn.Items[0].Value.(*codex.AgentMessageThreadItem)
+	if !ok {
+		t.Fatalf("result.Turn.Items[0] type = %T, want *AgentMessageThreadItem", result.result.Turn.Items[0].Value)
+	}
+	if turnMsg.Text != "Hello there!" {
+		t.Fatalf("result.Turn.Items[0].Text = %q, want %q", turnMsg.Text, "Hello there!")
+	}
+
+	threadMsg, ok := result.result.Thread.Turns[0].Items[0].Value.(*codex.AgentMessageThreadItem)
+	if !ok {
+		t.Fatalf("result.Thread.Turns[0].Items[0] type = %T, want *AgentMessageThreadItem", result.result.Thread.Turns[0].Items[0].Value)
+	}
+	if threadMsg.Text != "Hello there!" {
+		t.Fatalf("result.Thread.Turns[0].Items[0].Text = %q, want %q", threadMsg.Text, "Hello there!")
+	}
+
+	result.result.Turn.Items = append(result.result.Turn.Items, codex.ThreadItemWrapper{})
+	if got := len(result.result.Thread.Turns[0].Items); got != 1 {
+		t.Fatalf("len(result.Thread.Turns[0].Items) = %d, want 1", got)
+	}
+}
+
+func TestRunContextCancellation(t *testing.T) {
+	proc, _ := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	_, err := proc.Run(ctx, codex.RunOptions{
+		Prompt: "This will time out",
+	})
+	if err == nil {
+		t.Fatal("expected error from context cancellation")
+	}
+}
+
+func TestRunNilContext(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	var nilCtx context.Context
+	_, err := proc.Run(nilCtx, codex.RunOptions{Prompt: "hello"})
+	if !errors.Is(err, codex.ErrNilContext) {
+		t.Fatalf("Run(nil, ...) error = %v; want ErrNilContext", err)
+	}
+	if got := mock.CallCount(); got != 0 {
+		t.Fatalf("mock CallCount = %d, want 0", got)
+	}
+}
+
+func TestRunEmptyPrompt(t *testing.T) {
+	proc, _ := mockProcess(t)
+	ctx := context.Background()
+
+	_, err := proc.Run(ctx, codex.RunOptions{})
+	if err == nil {
+		t.Fatal("expected error for empty prompt")
+	}
+}
+
+func TestRunTurnError(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	type runResult struct {
+		result *codex.RunResult
+		err    error
+	}
+	ch := make(chan runResult, 1)
+
+	go func() {
+		r, err := proc.Run(ctx, codex.RunOptions{
+			Prompt: "This will fail",
+		})
+		ch <- runResult{r, err}
+	}()
+
+	waitForMethodCallCount(t, mock, "turn/start", 1)
+
+	// Inject turn/completed with an error.
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"failed","items":[],"error":{"message":"model rate limited"}}}`),
+	})
+
+	result := <-ch
+	if result.err == nil {
+		t.Fatal("expected error from turn error")
+	}
+	if result.result != nil {
+		t.Errorf("expected nil result on error, got %+v", result.result)
+	}
+}
+
+func TestRunTurnErrorUnwrap(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	type runResult struct {
+		result *codex.RunResult
+		err    error
+	}
+	ch := make(chan runResult, 1)
+
+	go func() {
+		r, err := proc.Run(ctx, codex.RunOptions{
+			Prompt: "This will fail with details",
+		})
+		ch <- runResult{r, err}
+	}()
+
+	waitForMethodCallCount(t, mock, "turn/start", 1)
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"failed","items":[],"error":{"message":"model rate limited","codexErrorInfo":{"code":"rate_limit"},"additionalDetails":"retry after 30s"}}}`),
+	})
+
+	result := <-ch
+	if result.err == nil {
+		t.Fatal("expected error from turn error")
+	}
+
+	var turnErr *codex.TurnError
+	if !errors.As(result.err, &turnErr) {
+		t.Fatalf("errors.As failed: could not extract *TurnError from %v", result.err)
+	}
+	if turnErr.Message != "model rate limited" {
+		t.Errorf("TurnError.Message = %q, want %q", turnErr.Message, "model rate limited")
+	}
+	if turnErr.CodexErrorInfo == nil {
+		t.Error("TurnError.CodexErrorInfo is nil, want non-nil")
+	}
+	if turnErr.AdditionalDetails == nil || *turnErr.AdditionalDetails != "retry after 30s" {
+		t.Errorf("TurnError.AdditionalDetails = %v, want %q", turnErr.AdditionalDetails, "retry after 30s")
+	}
+}
+
+func TestRunInitializeFailure(t *testing.T) {
+	mock := NewMockTransport()
+	mock.SetSendError(fmt.Errorf("connection refused"))
+
+	client := codex.NewClient(mock, codex.WithRequestTimeout(2*time.Second))
+	proc := codex.NewProcessFromClient(client)
+
+	ctx := context.Background()
+	_, err := proc.Run(ctx, codex.RunOptions{Prompt: "hello"})
+	if err == nil {
+		t.Fatal("expected error from initialize failure")
+	}
+	if !strings.Contains(err.Error(), "initialize") {
+		t.Errorf("error = %q, want it to mention 'initialize'", err)
+	}
+
+	// Second call retries (init is not latched on failure).
+	_, err2 := proc.Run(ctx, codex.RunOptions{Prompt: "hello again"})
+	if err2 == nil {
+		t.Fatal("expected initialize error on second call (still failing)")
+	}
+}
+
+func TestRunThreadStartFailure(t *testing.T) {
+	mock := NewMockTransport()
+
+	_ = mock.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
+
+	// thread/start returns an RPC error.
+	mock.SetResponse("thread/start", codex.Response{
+		JSONRPC: "2.0",
+		Error: &codex.Error{
+			Code:    -32600,
+			Message: "invalid model",
+		},
+	})
+
+	client := codex.NewClient(mock, codex.WithRequestTimeout(2*time.Second))
+	proc := codex.NewProcessFromClient(client)
+
+	ctx := context.Background()
+	_, err := proc.Run(ctx, codex.RunOptions{Prompt: "hello"})
+	if err == nil {
+		t.Fatal("expected error from thread/start failure")
+	}
+	if !strings.Contains(err.Error(), "thread/start") {
+		t.Errorf("error = %q, want it to mention 'thread/start'", err)
+	}
+}
+
+func TestRunThreadStartMissingThreadID(t *testing.T) {
+	mock := NewMockTransport()
+	_ = mock.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
+	_ = mock.SetResponseData("thread/start", validProcessThreadStartResponse(map[string]interface{}{
+		"cliVersion":    "1.0.0",
+		"createdAt":     1700000000,
+		"cwd":           "/tmp",
+		"modelProvider": "openai",
+		"preview":       "",
+		"source":        "exec",
+		"status":        map[string]interface{}{"type": "idle"},
+		"turns":         []interface{}{},
+		"updatedAt":     1700000000,
+		"ephemeral":     true,
+	}))
+
+	client := codex.NewClient(mock, codex.WithRequestTimeout(2*time.Second))
+	proc := codex.NewProcessFromClient(client)
+
+	_, err := proc.Run(context.Background(), codex.RunOptions{Prompt: "hello"})
+	if err == nil {
+		t.Fatal("expected error from missing thread.id")
+	}
+	if !strings.Contains(err.Error(), "thread/start: missing thread.id") {
+		t.Fatalf("error = %q, want thread/start: missing thread.id", err.Error())
+	}
+}
+
+func TestRunTurnStartFailure(t *testing.T) {
+	mock := NewMockTransport()
+
+	_ = mock.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
+	_ = mock.SetResponseData("thread/start", validProcessThreadStartResponse(validProcessThreadPayload("thread-1")))
+
+	// turn/start returns an RPC error.
+	mock.SetResponse("turn/start", codex.Response{
+		JSONRPC: "2.0",
+		Error: &codex.Error{
+			Code:    -32600,
+			Message: "rate limited",
+		},
+	})
+
+	client := codex.NewClient(mock, codex.WithRequestTimeout(2*time.Second))
+	proc := codex.NewProcessFromClient(client)
+
+	ctx := context.Background()
+	_, err := proc.Run(ctx, codex.RunOptions{Prompt: "hello"})
+	if err == nil {
+		t.Fatal("expected error from turn/start failure")
+	}
+	if !strings.Contains(err.Error(), "turn/start") {
+		t.Errorf("error = %q, want it to mention 'turn/start'", err)
+	}
+}
+
+func TestRunWithAllOptions(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	type runResult struct {
+		result *codex.RunResult
+		err    error
+	}
+	ch := make(chan runResult, 1)
+
+	effort := codex.ReasoningEffortHigh
+	personality := codex.PersonalityFriendly
+	var approvalPolicy codex.AskForApproval = codex.ApprovalPolicyNever
+
+	go func() {
+		r, err := proc.Run(ctx, codex.RunOptions{
+			Prompt:         "Explain generics",
+			Instructions:   codex.Ptr("Be concise"),
+			Model:          codex.Ptr("o3"),
+			Effort:         &effort,
+			Personality:    &personality,
+			ApprovalPolicy: &approvalPolicy,
+		})
+		ch <- runResult{r, err}
+	}()
+
+	waitForMethodCallCount(t, mock, "turn/start", 1)
+
+	// Verify the thread/start params contain our options.
+	var threadReq *codex.Request
+	for i := 0; i < mock.CallCount(); i++ {
+		req := mock.GetSentRequest(i)
+		if req != nil && req.Method == "thread/start" {
+			threadReq = req
+			break
+		}
+	}
+	if threadReq == nil {
+		t.Fatal("thread/start request not found")
+		return
+	}
+
+	var threadParams map[string]interface{}
+	if err := json.Unmarshal(threadReq.Params, &threadParams); err != nil {
+		t.Fatalf("unmarshal thread/start params: %v", err)
+	}
+
+	if threadParams["developerInstructions"] != "Be concise" {
+		t.Errorf("developerInstructions = %v, want 'Be concise'", threadParams["developerInstructions"])
+	}
+	if threadParams["model"] != "o3" {
+		t.Errorf("model = %v, want 'o3'", threadParams["model"])
+	}
+	if threadParams["personality"] != "friendly" {
+		t.Errorf("personality = %v, want 'friendly'", threadParams["personality"])
+	}
+	if threadParams["approvalPolicy"] != "never" {
+		t.Errorf("approvalPolicy = %v, want 'never'", threadParams["approvalPolicy"])
+	}
+
+	// Verify turn/start params contain effort.
+	var turnReq *codex.Request
+	for i := 0; i < mock.CallCount(); i++ {
+		req := mock.GetSentRequest(i)
+		if req != nil && req.Method == "turn/start" {
+			turnReq = req
+			break
+		}
+	}
+	if turnReq == nil {
+		t.Fatal("turn/start request not found")
+		return
+	}
+
+	var turnParams map[string]interface{}
+	if err := json.Unmarshal(turnReq.Params, &turnParams); err != nil {
+		t.Fatalf("unmarshal turn/start params: %v", err)
+	}
+
+	if turnParams["effort"] != "high" {
+		t.Errorf("effort = %v, want 'high'", turnParams["effort"])
+	}
+
+	// Complete the turn so Run() returns.
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-1","text":"Done"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	result := <-ch
+	if result.err != nil {
+		t.Fatalf("Run() error: %v", result.err)
+	}
+	if result.result.Response != "Done" {
+		t.Errorf("Response = %q, want %q", result.result.Response, "Done")
+	}
+}
+
+func TestRunMultipleItems(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	type runResult struct {
+		result *codex.RunResult
+		err    error
+	}
+	ch := make(chan runResult, 1)
+
+	go func() {
+		r, err := proc.Run(ctx, codex.RunOptions{
+			Prompt: "Do something complex",
+		})
+		ch <- runResult{r, err}
+	}()
+
+	waitForMethodCallCount(t, mock, "turn/start", 1)
+
+	// Inject multiple item/completed notifications.
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"reasoning","id":"item-1"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-2","text":"First message"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-3","text":"Final answer"}}`),
+	})
+
+	// Inject turn/completed.
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	result := <-ch
+	if result.err != nil {
+		t.Fatalf("Run() error: %v", result.err)
+	}
+
+	if len(result.result.Items) != 3 {
+		t.Errorf("len(Items) = %d, want 3", len(result.result.Items))
+	}
+
+	// Response should be the last agentMessage text.
+	if result.result.Response != "Final answer" {
+		t.Errorf("Response = %q, want %q", result.result.Response, "Final answer")
+	}
+}
+
+func TestRunInitRetry(t *testing.T) {
+	mock := NewMockTransport()
+
+	// First call: init fails.
+	mock.SetSendError(fmt.Errorf("connection refused"))
+
+	client := codex.NewClient(mock, codex.WithRequestTimeout(2*time.Second))
+	proc := codex.NewProcessFromClient(client)
+
+	ctx := context.Background()
+	_, err := proc.Run(ctx, codex.RunOptions{Prompt: "hello"})
+	if err == nil {
+		t.Fatal("expected error from first init failure")
+	}
+
+	// Fix the transport — second call should retry and succeed.
+	mock.SetSendError(nil)
+	_ = mock.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
+	_ = mock.SetResponseData("thread/start", validProcessThreadStartResponse(validProcessThreadPayload("thread-1")))
+	_ = mock.SetResponseData("turn/start", map[string]interface{}{
+		"turn": map[string]interface{}{
+			"id":     "turn-1",
+			"status": "inProgress",
+			"items":  []interface{}{},
+		},
+	})
+
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel2()
+
+	type runResult struct {
+		result *codex.RunResult
+		err    error
+	}
+	ch := make(chan runResult, 1)
+
+	go func() {
+		r, err := proc.Run(ctx2, codex.RunOptions{Prompt: "retry"})
+		ch <- runResult{r, err}
+	}()
+
+	waitForMethodCallCount(t, mock, "turn/start", 1)
+
+	mock.InjectServerNotification(ctx2, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	result := <-ch
+	if result.err != nil {
+		t.Fatalf("Run() error on retry: %v", result.err)
+	}
+	if result.result == nil {
+		t.Fatal("expected non-nil result on successful retry")
+	}
+}
+
+func TestRunTurnCompletedUnmarshalFailure(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	type runResult struct {
+		result *codex.RunResult
+		err    error
+	}
+	ch := make(chan runResult, 1)
+
+	go func() {
+		r, err := proc.Run(ctx, codex.RunOptions{Prompt: "malformed completion"})
+		ch <- runResult{r, err}
+	}()
+
+	waitForMethodCallCount(t, mock, "turn/start", 1)
+
+	// Inject a turn/completed with valid threadId but malformed turn body.
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":12345,"status":false,"items":"not-an-array"}}`),
+	})
+
+	result := <-ch
+	if result.err == nil {
+		t.Fatal("expected error from malformed turn/completed")
+	}
+	if !strings.Contains(result.err.Error(), "unmarshal turn/completed") {
+		t.Errorf("error = %q, want it to mention 'unmarshal turn/completed'", result.err)
+	}
+	if result.result != nil {
+		t.Error("expected nil result on unmarshal failure")
+	}
+}
+
+func TestRunItemCompletedUnmarshalFailureStillCollectsFallbackItem(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	type runResult struct {
+		result *codex.RunResult
+		err    error
+	}
+	ch := make(chan runResult, 1)
+
+	go func() {
+		r, err := proc.Run(ctx, codex.RunOptions{Prompt: "malformed item fallback"})
+		ch <- runResult{r, err}
+	}()
+
+	waitForMethodCallCount(t, mock, "turn/start", 1)
+
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","item":"bad-item","turnId":"turn-1"}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	result := <-ch
+	if result.err != nil {
+		t.Fatalf("Run() error: %v", result.err)
+	}
+	if result.result == nil {
+		t.Fatal("expected non-nil run result")
+	}
+	if len(result.result.Items) != 1 {
+		t.Fatalf("len(Items) = %d, want 1", len(result.result.Items))
+	}
+
+	item, ok := result.result.Items[0].Value.(*codex.UnknownThreadItem)
+	if !ok {
+		t.Fatalf("item type = %T, want *UnknownThreadItem", result.result.Items[0].Value)
+	}
+	if item.Type != codex.UnmarshalErrorItemType {
+		t.Fatalf("UnknownThreadItem.Type = %q, want %q", item.Type, codex.UnmarshalErrorItemType)
+	}
+	assertUnknownThreadItemFallback(t, item, `"bad-item"`)
+	if result.result.Turn.ID != "turn-1" {
+		t.Fatalf("Turn.ID = %q, want turn-1", result.result.Turn.ID)
+	}
+}
+
+func TestRunApprovalFlowDuringTurn(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Register an approval handler that approves command execution.
+	var approvalCalled bool
+	proc.Client.SetApprovalHandlers(codex.ApprovalHandlers{
+		OnCommandExecutionRequestApproval: func(_ context.Context, p codex.CommandExecutionRequestApprovalParams) (codex.CommandExecutionRequestApprovalResponse, error) {
+			approvalCalled = true
+			if p.ItemID != "item-cmd-1" {
+				t.Errorf("approval ItemID = %q, want 'item-cmd-1'", p.ItemID)
+			}
+			return codex.CommandExecutionRequestApprovalResponse{
+				Decision: codex.CommandExecutionApprovalDecisionWrapper{
+					Value: "accept",
+				},
+			}, nil
+		},
+	})
+
+	type runResult struct {
+		result *codex.RunResult
+		err    error
+	}
+	ch := make(chan runResult, 1)
+
+	go func() {
+		r, err := proc.Run(ctx, codex.RunOptions{Prompt: "run a command"})
+		ch <- runResult{r, err}
+	}()
+
+	waitForMethodCallCount(t, mock, "turn/start", 1)
+
+	// Inject a server→client approval request mid-turn.
+	approvalParams, _ := json.Marshal(codex.CommandExecutionRequestApprovalParams{
+		ItemID:   "item-cmd-1",
+		ThreadID: "thread-1",
+		TurnID:   "turn-1",
+		Command:  codex.Ptr("ls -la"),
+	})
+	resp, err := mock.InjectServerRequest(ctx, codex.Request{
+		JSONRPC: "2.0",
+		ID:      codex.RequestID{Value: "approval-1"},
+		Method:  "item/commandExecution/requestApproval",
+		Params:  approvalParams,
+	})
+	if err != nil {
+		t.Fatalf("InjectServerRequest error: %v", err)
+	}
+	if resp.Error != nil {
+		t.Fatalf("approval response has error: %v", resp.Error.Message)
+	}
+
+	if !approvalCalled {
+		t.Error("approval handler was not called during turn")
+	}
+
+	// Complete the turn normally.
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-1","text":"Done"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	result := <-ch
+	if result.err != nil {
+		t.Fatalf("Run() error: %v", result.err)
+	}
+	if result.result.Response != "Done" {
+		t.Errorf("Response = %q, want 'Done'", result.result.Response)
+	}
+}
+
+func TestRunIgnoresCrossThreadNotifications(t *testing.T) {
+	proc, mock := mockProcess(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	type runResult struct {
+		result *codex.RunResult
+		err    error
+	}
+	ch := make(chan runResult, 1)
+
+	go func() {
+		r, err := proc.Run(ctx, codex.RunOptions{
+			Prompt: "Say hello",
+		})
+		ch <- runResult{r, err}
+	}()
+
+	waitForMethodCallCount(t, mock, "turn/start", 1)
+
+	// Inject notifications for a different thread — these should be ignored.
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-OTHER","turnId":"turn-1","item":{"type":"agentMessage","id":"item-wrong","text":"Wrong thread"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-OTHER","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	// Now inject the correct item and turn/completed for thread-1.
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "item/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-1","text":"Correct thread"}}`),
+	})
+	mock.InjectServerNotification(ctx, codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "turn/completed",
+		Params:  json.RawMessage(`{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}`),
+	})
+
+	result := <-ch
+	if result.err != nil {
+		t.Fatalf("Run() error: %v", result.err)
+	}
+
+	// Only the correct-thread item should be collected.
+	if len(result.result.Items) != 1 {
+		t.Fatalf("len(Items) = %d, want 1", len(result.result.Items))
+	}
+
+	if result.result.Response != "Correct thread" {
+		t.Errorf("Response = %q, want %q", result.result.Response, "Correct thread")
+	}
+}
+
+func TestProcessCloseFromClient(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+	proc := codex.NewProcessFromClient(client)
+
+	// Close() and Wait() should not panic on a process with no cmd/transport.
+	if err := proc.Close(); err != nil {
+		t.Errorf("Close() error: %v", err)
+	}
+	if err := proc.Wait(); err != nil {
+		t.Errorf("Wait() error: %v", err)
+	}
+}

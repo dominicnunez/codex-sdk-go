@@ -9,7 +9,7 @@ Do NOT:
 - Rename public types, fields, or constants that map to spec schemas
 - Change JSON-RPC method names, parameter shapes, or notification types
 - Alter approval request/response type names or structures
-- Remove or restructure `enums.go` constants
+- Remove or restructure `sdk/enums.go` constants
 
 Do:
 - Fix internal implementation (error handling, transport, retries, etc.)
@@ -19,7 +19,7 @@ Do:
 
 **When in doubt:** check the type against the corresponding `specs/*.json` schema before changing it.
 
-Run `go test -run TestSpecCoverage` to verify all specs have corresponding Go types.
+Run `go test ./sdk -run TestSpecCoverage` to verify all specs have corresponding Go types.
 
 ## Architecture
 

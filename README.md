@@ -7,7 +7,7 @@ Built against the [protocol schemas](specs/) extracted from the Codex TypeScript
 ## Installation
 
 ```go
-import codex "github.com/dominicnunez/codex-sdk-go"
+import codex "github.com/dominicnunez/codex-sdk-go/sdk"
 ```
 
 ## Requirements
