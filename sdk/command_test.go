@@ -162,6 +162,13 @@ func TestCommandExecRejectsInvalidOutboundParams(t *testing.T) {
 			want:   "command array must not be empty",
 		},
 		{
+			name: "empty command element",
+			params: codex.CommandExecParams{
+				Command: []string{"echo", ""},
+			},
+			want: "command[1] must not be empty",
+		},
+		{
 			name: "disable output cap conflict",
 			params: codex.CommandExecParams{
 				Command:          []string{"echo", "hello"},
@@ -180,12 +187,48 @@ func TestCommandExecRejectsInvalidOutboundParams(t *testing.T) {
 			want: "disableTimeout",
 		},
 		{
+			name: "zero timeout",
+			params: codex.CommandExecParams{
+				Command:   []string{"echo", "hello"},
+				TimeoutMs: ptr(int64(0)),
+			},
+			want: "timeoutMs must be greater than zero",
+		},
+		{
+			name: "negative timeout",
+			params: codex.CommandExecParams{
+				Command:   []string{"echo", "hello"},
+				TimeoutMs: ptr(int64(-1)),
+			},
+			want: "timeoutMs must be greater than zero",
+		},
+		{
 			name: "size without tty",
 			params: codex.CommandExecParams{
 				Command: []string{"echo", "hello"},
 				Size:    size,
 			},
 			want: "size requires tty",
+		},
+		{
+			name: "zero size cols",
+			params: codex.CommandExecParams{
+				Command:   []string{"echo", "hello"},
+				ProcessID: ptr("proc-123"),
+				TTY:       ptr(true),
+				Size:      &codex.CommandExecTerminalSize{Cols: 0, Rows: 24},
+			},
+			want: "size.cols must be greater than zero",
+		},
+		{
+			name: "zero size rows",
+			params: codex.CommandExecParams{
+				Command:   []string{"echo", "hello"},
+				ProcessID: ptr("proc-123"),
+				TTY:       ptr(true),
+				Size:      &codex.CommandExecTerminalSize{Cols: 80, Rows: 0},
+			},
+			want: "size.rows must be greater than zero",
 		},
 		{
 			name: "tty without process id",
@@ -292,6 +335,66 @@ func TestCommandFollowUpRequestsRejectEmptyProcessID(t *testing.T) {
 			}
 			if !strings.Contains(err.Error(), "processId must not be empty") {
 				t.Fatalf("error = %v; want processId validation", err)
+			}
+			if transport.CallCount() != 0 {
+				t.Fatalf("CallCount() = %d; want 0", transport.CallCount())
+			}
+		})
+	}
+}
+
+func TestCommandWriteRejectsInvalidDeltaBase64(t *testing.T) {
+	transport := NewMockTransport()
+	client := codex.NewClient(transport)
+	deltaBase64 := "not-base64!"
+
+	_, err := client.Command.Write(context.Background(), codex.CommandExecWriteParams{
+		ProcessID:   "proc-123",
+		DeltaBase64: &deltaBase64,
+	})
+	if err == nil {
+		t.Fatal("expected invalid params error")
+	}
+	if !strings.Contains(err.Error(), "deltaBase64 must be valid base64") {
+		t.Fatalf("error = %v; want deltaBase64 validation", err)
+	}
+	if transport.CallCount() != 0 {
+		t.Fatalf("CallCount() = %d; want 0", transport.CallCount())
+	}
+}
+
+func TestCommandResizeRejectsZeroSize(t *testing.T) {
+	tests := []struct {
+		name string
+		size codex.CommandExecTerminalSize
+		want string
+	}{
+		{
+			name: "zero cols",
+			size: codex.CommandExecTerminalSize{Cols: 0, Rows: 24},
+			want: "size.cols must be greater than zero",
+		},
+		{
+			name: "zero rows",
+			size: codex.CommandExecTerminalSize{Cols: 80, Rows: 0},
+			want: "size.rows must be greater than zero",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := NewMockTransport()
+			client := codex.NewClient(transport)
+
+			_, err := client.Command.Resize(context.Background(), codex.CommandExecResizeParams{
+				ProcessID: "proc-123",
+				Size:      tt.size,
+			})
+			if err == nil {
+				t.Fatal("expected invalid params error")
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v; want %q", err, tt.want)
 			}
 			if transport.CallCount() != 0 {
 				t.Fatalf("CallCount() = %d; want 0", transport.CallCount())
@@ -520,6 +623,40 @@ func TestCommandExecOutputDeltaInvalidStreamReportsHandlerError(t *testing.T) {
 	}
 	if gotErr == nil || !strings.Contains(gotErr.Error(), `invalid stream "bogus"`) {
 		t.Fatalf("handler error = %v; want invalid stream failure", gotErr)
+	}
+}
+
+func TestCommandExecOutputDeltaInvalidBase64ReportsHandlerError(t *testing.T) {
+	mock := NewMockTransport()
+
+	var (
+		gotMethod string
+		gotErr    error
+	)
+	client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+		gotMethod = method
+		gotErr = err
+	}))
+
+	var called bool
+	client.OnCommandExecOutputDelta(func(codex.CommandExecOutputDeltaNotification) {
+		called = true
+	})
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "command/exec/outputDelta",
+		Params:  json.RawMessage(`{"capReached":true,"deltaBase64":"not-base64!","processId":"proc-123","stream":"stdout"}`),
+	})
+
+	if called {
+		t.Fatal("handler should not be called for invalid base64")
+	}
+	if gotMethod != "command/exec/outputDelta" {
+		t.Fatalf("handler error method = %q; want %q", gotMethod, "command/exec/outputDelta")
+	}
+	if gotErr == nil || !strings.Contains(gotErr.Error(), "deltaBase64 must be valid base64") {
+		t.Fatalf("handler error = %v; want deltaBase64 validation", gotErr)
 	}
 }
 

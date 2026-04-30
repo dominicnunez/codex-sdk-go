@@ -79,6 +79,23 @@ func TestFsReadFile(t *testing.T) {
 		}
 	})
 
+	t.Run("invalid base64 result", func(t *testing.T) {
+		transport := NewMockTransport()
+		client := codex.NewClient(transport)
+		transport.SetResponse("fs/readFile", codex.Response{
+			JSONRPC: "2.0",
+			Result:  json.RawMessage(`{"dataBase64":"not-base64!"}`),
+		})
+
+		_, err := client.Fs.ReadFile(context.Background(), codex.FsReadFileParams{Path: "/tmp/file.txt"})
+		if err == nil {
+			t.Fatal("expected invalid base64 result error")
+		}
+		if !strings.Contains(err.Error(), "dataBase64 must be valid base64") {
+			t.Fatalf("error = %v; want dataBase64 validation", err)
+		}
+	})
+
 	t.Run("rpc error", func(t *testing.T) {
 		transport := NewMockTransport()
 		client := codex.NewClient(transport)
@@ -137,6 +154,25 @@ func TestFsWriteFile(t *testing.T) {
 			DataBase64: "ZGF0YQ==",
 		})
 		assertRPCErrorCode(t, err, codex.ErrCodeInvalidRequest)
+	})
+
+	t.Run("invalid base64 request", func(t *testing.T) {
+		transport := NewMockTransport()
+		client := codex.NewClient(transport)
+
+		_, err := client.Fs.WriteFile(context.Background(), codex.FsWriteFileParams{
+			Path:       "/tmp/file.txt",
+			DataBase64: "not-base64!",
+		})
+		if err == nil {
+			t.Fatal("expected invalid params error")
+		}
+		if !strings.Contains(err.Error(), "dataBase64 must be valid base64") {
+			t.Fatalf("error = %v; want dataBase64 validation", err)
+		}
+		if transport.CallCount() != 0 {
+			t.Fatalf("CallCount() = %d; want 0", transport.CallCount())
+		}
 	})
 }
 

@@ -25,6 +25,9 @@ func (r *FsReadFileResponse) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	if err := validateInboundBase64Field("dataBase64", decoded.DataBase64); err != nil {
+		return err
+	}
 	*r = FsReadFileResponse(decoded)
 	return nil
 }

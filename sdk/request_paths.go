@@ -570,6 +570,10 @@ func (p FsReadFileParams) prepareRequest() (interface{}, error) {
 }
 
 func (p FsWriteFileParams) prepareRequest() (interface{}, error) {
+	if err := validateOutboundBase64Field("dataBase64", p.DataBase64); err != nil {
+		return nil, err
+	}
+
 	var err error
 	p.Path, err = normalizeAbsolutePathField("path", p.Path)
 	if err != nil {
@@ -688,6 +692,11 @@ func (p CommandExecWriteParams) prepareRequest() (interface{}, error) {
 	if err := validateRequiredNonEmptyStringField("processId", p.ProcessID); err != nil {
 		return nil, err
 	}
+	if p.DeltaBase64 != nil {
+		if err := validateOutboundBase64Field("deltaBase64", *p.DeltaBase64); err != nil {
+			return nil, err
+		}
+	}
 	return p, nil
 }
 
@@ -700,6 +709,9 @@ func (p CommandExecTerminateParams) prepareRequest() (interface{}, error) {
 
 func (p CommandExecResizeParams) prepareRequest() (interface{}, error) {
 	if err := validateRequiredNonEmptyStringField("processId", p.ProcessID); err != nil {
+		return nil, err
+	}
+	if err := validateCommandExecTerminalSize(p.Size); err != nil {
 		return nil, err
 	}
 	return p, nil
@@ -905,6 +917,11 @@ func validateCommandExecParams(params CommandExecParams) error {
 	if len(params.Command) == 0 {
 		return invalidParamsError("command array must not be empty")
 	}
+	for i, command := range params.Command {
+		if err := validateRequiredNonEmptyStringField(fmt.Sprintf("command[%d]", i), command); err != nil {
+			return err
+		}
+	}
 	if err := validateOptionalNonEmptyStringField("processId", params.ProcessID); err != nil {
 		return err
 	}
@@ -914,10 +931,18 @@ func validateCommandExecParams(params CommandExecParams) error {
 	if boolPointerValue(params.DisableTimeout) && params.TimeoutMs != nil {
 		return invalidParamsError("disableTimeout cannot be combined with timeoutMs")
 	}
+	if params.TimeoutMs != nil && *params.TimeoutMs <= 0 {
+		return invalidParamsError("timeoutMs must be greater than zero")
+	}
 
 	ttyEnabled := boolPointerValue(params.TTY)
 	if params.Size != nil && !ttyEnabled {
 		return invalidParamsError("size requires tty")
+	}
+	if params.Size != nil {
+		if err := validateCommandExecTerminalSize(*params.Size); err != nil {
+			return err
+		}
 	}
 	if ttyEnabled || boolPointerValue(params.StreamStdin) || boolPointerValue(params.StreamStdoutStderr) {
 		if params.ProcessID == nil {
@@ -925,6 +950,16 @@ func validateCommandExecParams(params CommandExecParams) error {
 		}
 	}
 
+	return nil
+}
+
+func validateCommandExecTerminalSize(size CommandExecTerminalSize) error {
+	if size.Cols == 0 {
+		return invalidParamsError("size.cols must be greater than zero")
+	}
+	if size.Rows == 0 {
+		return invalidParamsError("size.rows must be greater than zero")
+	}
 	return nil
 }
 
