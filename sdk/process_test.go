@@ -251,12 +251,12 @@ exit 0
 		}
 	}
 
-	// Verify typed fields are emitted after validated ExecArgs for stable argv
-	// construction. Safety comes from rejecting typed safety flags in ExecArgs.
+	// Verify typed fields are emitted before ExecArgs so positional arguments
+	// cannot move SDK-owned safety flags into prompt text.
 	modelIdx := strings.Index(args, "--model")
 	extraIdx := strings.Index(args, "--extra")
-	if modelIdx < extraIdx {
-		t.Errorf("typed flags should come after ExecArgs: model at %d, extra at %d", modelIdx, extraIdx)
+	if modelIdx > extraIdx {
+		t.Errorf("typed flags should come before ExecArgs: model at %d, extra at %d", modelIdx, extraIdx)
 	}
 }
 

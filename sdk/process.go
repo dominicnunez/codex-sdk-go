@@ -339,9 +339,9 @@ func compactProcessConfigKey(key string) string {
 
 // buildArgs constructs the CLI argument list from typed fields and ExecArgs.
 // Typed safety flags and the "--" end-of-options marker are rejected from
-// ExecArgs up front. The remaining ExecArgs are inserted before the typed
-// fields to keep the emitted argv stable without relying on CLI duplicate-flag
-// semantics for safety.
+// ExecArgs up front. The remaining ExecArgs are appended after typed fields so
+// positional arguments cannot cause SDK-owned safety flags to be parsed as
+// prompt text.
 func (opts *ProcessOptions) buildArgs() ([]string, error) {
 	if err := validateProcessConfig(opts.Config); err != nil {
 		return nil, err
@@ -357,8 +357,6 @@ func (opts *ProcessOptions) buildArgs() ([]string, error) {
 	}
 
 	args := []string{"exec", "--experimental-json"}
-
-	args = append(args, opts.ExecArgs...)
 
 	if opts.Model != "" {
 		args = append(args, "--model", opts.Model)
@@ -385,6 +383,7 @@ func (opts *ProcessOptions) buildArgs() ([]string, error) {
 	for _, k := range keys {
 		args = append(args, "--config", k+"="+opts.Config[k])
 	}
+	args = append(args, opts.ExecArgs...)
 
 	return args, nil
 }

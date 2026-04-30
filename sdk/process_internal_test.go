@@ -54,17 +54,16 @@ func TestProcessExitErrorSurfacesUnexpectedSignalExit(t *testing.T) {
 	}
 }
 
-func TestBuildArgsEmitFlagsAcceptedByCodexCLI(t *testing.T) {
-	if _, err := exec.LookPath("codex"); err != nil {
-		t.Skip("codex binary not available in PATH")
-	}
-
+func TestBuildArgsEmitsTypedFlagsBeforeExecArgs(t *testing.T) {
 	opts := &ProcessOptions{
 		Model:        "o3",
 		Sandbox:      SandboxModeReadOnly,
-		ApprovalMode: "full-auto",
-		Config:       map[string]string{"foo": `"bar"`},
-		ExecArgs:     []string{"--help"},
+		ApprovalMode: approvalModeFullAuto,
+		Config: map[string]string{
+			"beta":  "second",
+			"alpha": "first",
+		},
+		ExecArgs: []string{"summarize this repository", "--verbose"},
 	}
 
 	args, err := opts.buildArgs()
@@ -72,10 +71,23 @@ func TestBuildArgsEmitFlagsAcceptedByCodexCLI(t *testing.T) {
 		t.Fatalf("buildArgs: %v", err)
 	}
 
-	cmd := exec.CommandContext(context.Background(), "codex", args...)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("codex %s failed: %v\noutput:\n%s", strings.Join(args, " "), err, string(out))
+	want := []string{
+		"exec",
+		"--experimental-json",
+		"--model",
+		"o3",
+		"--sandbox",
+		string(SandboxModeReadOnly),
+		"--full-auto",
+		"--config",
+		"alpha=first",
+		"--config",
+		"beta=second",
+		"summarize this repository",
+		"--verbose",
+	}
+	if !slices.Equal(args, want) {
+		t.Fatalf("buildArgs() = %v; want %v", args, want)
 	}
 }
 
