@@ -23,7 +23,7 @@ Each per-file audit document consists only of finding entries. Entries use this 
 ```md
 ### Plain language description
 
-**Location:** `file/path:line` — optional context
+**Location:** `line` — optional context
 
 **Reason:** Explanation (can be multiple lines)
 ```
