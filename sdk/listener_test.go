@@ -2,6 +2,7 @@ package codex
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -83,6 +84,61 @@ func TestHandleNotificationRunsInternalListenersBeforePublicHandler(t *testing.T
 	second := <-order
 	if first != "internal" || second != "public" {
 		t.Fatalf("listener order = %q, %q; want internal before public", first, second)
+	}
+}
+
+func TestHandleNotificationInternalListenerPanicReportsErrorAndContinues(t *testing.T) {
+	const (
+		method       = "test/internal-panic"
+		panicMessage = "internal listener panics"
+		wantErrors   = 1
+	)
+
+	var (
+		gotMethod string
+		gotErr    error
+		errCount  int
+	)
+
+	transport := &mockInternalTransport{}
+	c := NewClient(transport, WithHandlerErrorCallback(func(method string, err error) {
+		gotMethod = method
+		gotErr = err
+		errCount++
+	}))
+
+	secondInternalRan := false
+	publicRan := false
+
+	c.addNotificationListener(method, func(_ context.Context, _ Notification) {
+		panic(panicMessage)
+	})
+	c.addNotificationListener(method, func(_ context.Context, _ Notification) {
+		secondInternalRan = true
+	})
+	c.OnNotification(method, func(_ context.Context, _ Notification) {
+		publicRan = true
+	})
+
+	c.handleNotification(context.Background(), Notification{
+		JSONRPC: "2.0",
+		Method:  method,
+	})
+
+	if errCount != wantErrors {
+		t.Fatalf("handler error count = %d; want %d", errCount, wantErrors)
+	}
+	if gotMethod != method {
+		t.Fatalf("handler error method = %q; want %q", gotMethod, method)
+	}
+	if gotErr == nil || !strings.Contains(gotErr.Error(), panicMessage) {
+		t.Fatalf("handler error = %v; want panic message %q", gotErr, panicMessage)
+	}
+	if !secondInternalRan {
+		t.Fatal("second internal listener did not execute after first panicked")
+	}
+	if !publicRan {
+		t.Fatal("public handler did not execute after internal listener panicked")
 	}
 }
 

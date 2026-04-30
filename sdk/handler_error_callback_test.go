@@ -190,10 +190,10 @@ func TestHandlerErrorCallback_CallbackPanics(t *testing.T) {
 	}
 }
 
-func TestHandlerErrorCallback_InternalListenerPanic(t *testing.T) {
+func TestHandlerErrorCallback_PublicNotificationPanicDoesNotBlockLaterDispatch(t *testing.T) {
 	var (
 		callbackCount atomic.Int32
-		listener2Ran  atomic.Bool
+		laterHandler  atomic.Bool
 	)
 
 	mock := NewMockTransport()
@@ -201,22 +201,12 @@ func TestHandlerErrorCallback_InternalListenerPanic(t *testing.T) {
 		callbackCount.Add(1)
 	}))
 
-	// Register two internal listeners via the public OnNotification + a second
-	// one. We can only add internal listeners indirectly, so we use the public
-	// handler for the panicking one and verify the second public handler would
-	// also work. Actually, let's register one public handler that panics and
-	// verify the test doesn't crash, plus use a second method to test isolation
-	// isn't needed across methods.
-
-	// Public handler panics
 	client.OnNotification("test.multi", func(_ context.Context, _ codex.Notification) {
-		panic("listener 1 panics")
+		panic("public handler panics")
 	})
 
-	// Register a second public handler for a different method to verify
-	// the first panic doesn't affect other dispatch calls.
 	client.OnNotification("test.ok", func(_ context.Context, _ codex.Notification) {
-		listener2Ran.Store(true)
+		laterHandler.Store(true)
 	})
 
 	mock.InjectServerNotification(context.Background(), codex.Notification{
@@ -234,8 +224,8 @@ func TestHandlerErrorCallback_InternalListenerPanic(t *testing.T) {
 	if callbackCount.Load() != 1 {
 		t.Errorf("expected callback called once, got %d", callbackCount.Load())
 	}
-	if !listener2Ran.Load() {
-		t.Error("second listener did not execute after first panicked")
+	if !laterHandler.Load() {
+		t.Error("later public handler did not execute after first panicked")
 	}
 }
 
