@@ -139,8 +139,10 @@ var sensitiveProcessConfigKeySegments = map[string]struct{}{
 	"credential":  {},
 	"credentials": {},
 	"password":    {},
+	"passwords":   {},
 	"passwd":      {},
 	"secret":      {},
+	"secrets":     {},
 }
 
 var sensitiveProcessConfigKeySegmentPairs = map[processConfigKeySegmentPair]struct{}{
@@ -165,6 +167,7 @@ var sensitiveProcessConfigKeyCompactTerms = []string{
 	"authtoken",
 	"bearertoken",
 	"clientsecret",
+	"clientsecrets",
 	"githubtoken",
 	"oauthtoken",
 	"privateendpoint",

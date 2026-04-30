@@ -143,7 +143,10 @@ func TestBuildArgsRejectsSensitiveConfigKeys(t *testing.T) {
 		{name: "oauth token", key: "oauth_token"},
 		{name: "oauth camel token", key: "oauthToken"},
 		{name: "password", key: "database.password"},
+		{name: "plural password", key: "database.passwords"},
 		{name: "private endpoint", key: "private_endpoint"},
+		{name: "plural secret", key: "app.secrets"},
+		{name: "camel plural secret", key: "clientSecrets"},
 	}
 
 	for _, tt := range tests {
