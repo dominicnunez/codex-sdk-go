@@ -124,7 +124,7 @@ func TestClientMethodsRejectMalformedSuccessResponses(t *testing.T) {
 				"status": nil,
 			},
 			call: func(client *codex.Client) error {
-				_, err := client.Account.CancelLogin(context.Background(), codex.CancelLoginAccountParams{})
+				_, err := client.Account.CancelLogin(context.Background(), codex.CancelLoginAccountParams{LoginId: "login-1"})
 				return err
 			},
 		},

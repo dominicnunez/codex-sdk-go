@@ -644,6 +644,13 @@ func (p FsWatchParams) prepareRequest() (interface{}, error) {
 	return p, nil
 }
 
+func (p FsUnwatchParams) prepareRequest() (interface{}, error) {
+	if err := validateRequiredNonEmptyStringField("watchId", p.WatchID); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
 func (p PluginListParams) prepareRequest() (interface{}, error) {
 	var err error
 	p.Cwds, err = normalizeAbsolutePathSliceField("cwds", p.Cwds)
@@ -666,6 +673,20 @@ func (p PluginInstallParams) prepareRequest() (interface{}, error) {
 	var err error
 	p.MarketplacePath, err = normalizeAbsolutePathField("marketplacePath", p.MarketplacePath)
 	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (p PluginUninstallParams) prepareRequest() (interface{}, error) {
+	if err := validateRequiredNonEmptyStringField("pluginId", p.PluginID); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (p CancelLoginAccountParams) prepareRequest() (interface{}, error) {
+	if err := validateRequiredNonEmptyStringField("loginId", p.LoginId); err != nil {
 		return nil, err
 	}
 	return p, nil

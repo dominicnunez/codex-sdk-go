@@ -43,7 +43,7 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 		_, _ = client.Account.Login(context.Background(), &codex.ChatgptLoginAccountParams{Type: "chatgpt"})
 	})
 	verified["account/login/cancel"] = verifyMethod(t, transport, "account/login/cancel", func() {
-		_, _ = client.Account.CancelLogin(context.Background(), codex.CancelLoginAccountParams{})
+		_, _ = client.Account.CancelLogin(context.Background(), codex.CancelLoginAccountParams{LoginId: "login-1"})
 	})
 	verified["account/logout"] = verifyMethod(t, transport, "account/logout", func() {
 		_, _ = client.Account.Logout(context.Background())
