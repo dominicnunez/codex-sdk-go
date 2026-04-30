@@ -40,6 +40,10 @@ func (p *PermissionsRequestApprovalParams) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	var err error
+	decoded.Cwd, err = validateInboundAbsolutePathField("cwd", decoded.Cwd)
+	if err != nil {
+		return err
+	}
 	decoded.Permissions, err = normalizeRequestPermissionProfileField("permissions", decoded.Permissions)
 	if err != nil {
 		return err

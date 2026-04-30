@@ -3,6 +3,7 @@ package codex_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -186,6 +187,36 @@ func TestPermissionsRequestApprovalParamsRejectRelativeFileSystemRoots(t *testin
 	}
 	if !strings.Contains(err.Error(), `permissions.fileSystem.read[0]`) {
 		t.Fatalf("error = %v; want permissions.fileSystem.read[0] context", err)
+	}
+}
+
+func TestPermissionsRequestApprovalParamsRejectInvalidCwd(t *testing.T) {
+	tests := []struct {
+		name string
+		cwd  string
+	}{
+		{name: "relative", cwd: "../repo"},
+		{name: "non-normalized", cwd: "/tmp/../repo"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var params codex.PermissionsRequestApprovalParams
+			data := fmt.Sprintf(`{
+				"cwd":%q,
+				"itemId":"item-1",
+				"threadId":"thread-1",
+				"turnId":"turn-1",
+				"permissions":{"fileSystem":{"read":["/tmp"]}}
+			}`, tt.cwd)
+			err := json.Unmarshal([]byte(data), &params)
+			if err == nil {
+				t.Fatal("expected invalid cwd error")
+			}
+			if !strings.Contains(err.Error(), `cwd`) {
+				t.Fatalf("error = %v; want cwd context", err)
+			}
+		})
 	}
 }
 
