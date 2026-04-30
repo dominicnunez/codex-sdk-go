@@ -554,7 +554,7 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, g *guardedC
 	}
 
 	registerStreamDeltaListeners(p, g, on, onEvent, dispatchTurnScoped)
-	registerItemListeners(ctx, p, on, emit, &items, &itemsMu, dispatchTurnScoped)
+	registerItemListeners(p, on, emit, &items, &itemsMu, dispatchTurnScoped)
 	registerTurnCompletedListener(p, on, allowMissingTurnID, queueTurnCompletionCandidate)
 	registerCollectorListeners(p, on, dispatchTurnScoped)
 
@@ -679,7 +679,7 @@ func streamListenTurnScoped[N any](on func(string, NotificationHandler), method 
 	})
 }
 
-func registerItemListeners(ctx context.Context, p turnLifecycleParams, on func(string, NotificationHandler), emit func(Event), items *[]ThreadItemWrapper, itemsMu *sync.Mutex, dispatchTurnScoped func(string, func())) {
+func registerItemListeners(p turnLifecycleParams, on func(string, NotificationHandler), emit func(Event), items *[]ThreadItemWrapper, itemsMu *sync.Mutex, dispatchTurnScoped func(string, func())) {
 	on(notifyItemStarted, func(_ context.Context, notif Notification) {
 		var n ItemStartedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {
@@ -719,8 +719,6 @@ func registerItemListeners(ctx context.Context, p turnLifecycleParams, on func(s
 			emit(&ItemCompleted{Item: n.Item, ThreadID: n.ThreadID, TurnID: n.TurnID})
 		})
 	})
-
-	_ = ctx // keeps signature consistent for future listener additions.
 }
 
 func registerTurnCompletedListener(p turnLifecycleParams, on func(string, NotificationHandler), allowMissingTurnID bool, queueTurnCompletion func(turnCompletionCandidate)) {
