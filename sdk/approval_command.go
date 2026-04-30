@@ -28,6 +28,13 @@ func (p *CommandExecutionRequestApprovalParams) UnmarshalJSON(data []byte) error
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
+	if err := validateNonEmptyStringFields(map[string]string{
+		"itemId":   decoded.ItemID,
+		"threadId": decoded.ThreadID,
+		"turnId":   decoded.TurnID,
+	}); err != nil {
+		return err
+	}
 	var err error
 	decoded.Cwd, err = validateInboundAbsolutePathPointerField("cwd", decoded.Cwd)
 	if err != nil {
@@ -243,6 +250,9 @@ func (c *NetworkApprovalContext) UnmarshalJSON(data []byte) error {
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
+	if err := validateNonEmptyStringField("host", decoded.Host); err != nil {
+		return err
+	}
 	if err := validateNetworkApprovalProtocolField("protocol", decoded.Protocol); err != nil {
 		return err
 	}
@@ -448,6 +458,12 @@ func (p *ExecCommandApprovalParams) UnmarshalJSON(data []byte) error {
 	var decoded wire
 	required := []string{"callId", "command", "conversationId", "cwd", "parsedCmd"}
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	if err := validateNonEmptyStringFields(map[string]string{
+		"callId":         decoded.CallID,
+		"conversationId": decoded.ConversationID,
+	}); err != nil {
 		return err
 	}
 	validatedCwd, err := validateInboundAbsolutePathField("cwd", decoded.Cwd)

@@ -136,6 +136,102 @@ func TestNetworkApprovalContextRejectsInvalidProtocol(t *testing.T) {
 	}
 }
 
+func TestNetworkApprovalContextRejectsEmptyHost(t *testing.T) {
+	var ctx codex.NetworkApprovalContext
+	err := json.Unmarshal([]byte(`{"host":"","protocol":"http"}`), &ctx)
+	if err == nil {
+		t.Fatal("expected empty host error")
+	}
+	if !strings.Contains(err.Error(), "host must not be empty") {
+		t.Fatalf("error = %v; want empty host context", err)
+	}
+}
+
+func TestApprovalRequestParamsRejectEmptyBindingFields(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		decode  func([]byte) error
+		wantErr string
+	}{
+		{
+			name:  "command execution item id",
+			input: `{"itemId":"","threadId":"thread-1","turnId":"turn-1"}`,
+			decode: func(data []byte) error {
+				var params codex.CommandExecutionRequestApprovalParams
+				return json.Unmarshal(data, &params)
+			},
+			wantErr: "itemId must not be empty",
+		},
+		{
+			name:  "file change thread id",
+			input: `{"itemId":"item-1","threadId":"","turnId":"turn-1"}`,
+			decode: func(data []byte) error {
+				var params codex.FileChangeRequestApprovalParams
+				return json.Unmarshal(data, &params)
+			},
+			wantErr: "threadId must not be empty",
+		},
+		{
+			name:  "permissions turn id",
+			input: `{"cwd":"/tmp","itemId":"item-1","permissions":{},"threadId":"thread-1","turnId":""}`,
+			decode: func(data []byte) error {
+				var params codex.PermissionsRequestApprovalParams
+				return json.Unmarshal(data, &params)
+			},
+			wantErr: "turnId must not be empty",
+		},
+		{
+			name:  "dynamic tool call id",
+			input: `{"arguments":{},"callId":"","threadId":"thread-1","tool":"tool-1","turnId":"turn-1"}`,
+			decode: func(data []byte) error {
+				var params codex.DynamicToolCallParams
+				return json.Unmarshal(data, &params)
+			},
+			wantErr: "callId must not be empty",
+		},
+		{
+			name:  "tool user input question id",
+			input: `{"itemId":"item-1","threadId":"thread-1","turnId":"turn-1","questions":[{"id":"","header":"Header","question":"Prompt"}]}`,
+			decode: func(data []byte) error {
+				var params codex.ToolRequestUserInputParams
+				return json.Unmarshal(data, &params)
+			},
+			wantErr: "id must not be empty",
+		},
+		{
+			name:  "legacy apply patch call id",
+			input: `{"callId":"","conversationId":"thread-1","fileChanges":{}}`,
+			decode: func(data []byte) error {
+				var params codex.ApplyPatchApprovalParams
+				return json.Unmarshal(data, &params)
+			},
+			wantErr: "callId must not be empty",
+		},
+		{
+			name:  "legacy exec conversation id",
+			input: `{"callId":"call-1","command":[],"conversationId":"","cwd":"/tmp","parsedCmd":[]}`,
+			decode: func(data []byte) error {
+				var params codex.ExecCommandApprovalParams
+				return json.Unmarshal(data, &params)
+			},
+			wantErr: "conversationId must not be empty",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.decode([]byte(tt.input))
+			if err == nil {
+				t.Fatal("expected empty binding field error")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %v; want %q", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestChatgptAuthTokensRefreshParamsRejectInvalidReason(t *testing.T) {
 	var params codex.ChatgptAuthTokensRefreshParams
 	err := json.Unmarshal([]byte(`{"reason":"expired"}`), &params)

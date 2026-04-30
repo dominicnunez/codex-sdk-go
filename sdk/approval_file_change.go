@@ -24,6 +24,12 @@ func (p *ApplyPatchApprovalParams) UnmarshalJSON(data []byte) error {
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
+	if err := validateNonEmptyStringFields(map[string]string{
+		"callId":         decoded.CallID,
+		"conversationId": decoded.ConversationID,
+	}); err != nil {
+		return err
+	}
 	var err error
 	decoded.GrantRoot, err = validateInboundAbsolutePathPointerField("grantRoot", decoded.GrantRoot)
 	if err != nil {
@@ -372,6 +378,13 @@ func (p *FileChangeRequestApprovalParams) UnmarshalJSON(data []byte) error {
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
+	if err := validateNonEmptyStringFields(map[string]string{
+		"itemId":   decoded.ItemID,
+		"threadId": decoded.ThreadID,
+		"turnId":   decoded.TurnID,
+	}); err != nil {
+		return err
+	}
 	var err error
 	decoded.GrantRoot, err = validateInboundAbsolutePathPointerField("grantRoot", decoded.GrantRoot)
 	if err != nil {
@@ -411,8 +424,8 @@ func validateNetworkPolicyAmendment(amendment NetworkPolicyAmendment) error {
 	if err := validateNetworkPolicyRuleAction(amendment.Action); err != nil {
 		return err
 	}
-	if amendment.Host == "" {
-		return errors.New("network policy amendment missing host")
+	if err := validateNonEmptyStringField("host", amendment.Host); err != nil {
+		return fmt.Errorf("network policy amendment: %w", err)
 	}
 	return nil
 }

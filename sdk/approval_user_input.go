@@ -20,6 +20,13 @@ func (p *ToolRequestUserInputParams) UnmarshalJSON(data []byte) error {
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
+	if err := validateNonEmptyStringFields(map[string]string{
+		"itemId":   decoded.ItemID,
+		"threadId": decoded.ThreadID,
+		"turnId":   decoded.TurnID,
+	}); err != nil {
+		return err
+	}
 	*p = ToolRequestUserInputParams(decoded)
 	return nil
 }
@@ -39,6 +46,9 @@ func (q *ToolRequestUserInputQuestion) UnmarshalJSON(data []byte) error {
 	var decoded wire
 	required := []string{"header", "id", "question"}
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	if err := validateNonEmptyStringField("id", decoded.ID); err != nil {
 		return err
 	}
 	*q = ToolRequestUserInputQuestion(decoded)

@@ -39,6 +39,13 @@ func (p *PermissionsRequestApprovalParams) UnmarshalJSON(data []byte) error {
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
+	if err := validateNonEmptyStringFields(map[string]string{
+		"itemId":   decoded.ItemID,
+		"threadId": decoded.ThreadID,
+		"turnId":   decoded.TurnID,
+	}); err != nil {
+		return err
+	}
 	var err error
 	decoded.Cwd, err = validateInboundAbsolutePathField("cwd", decoded.Cwd)
 	if err != nil {
@@ -145,6 +152,15 @@ func (p *McpServerElicitationRequestParams) UnmarshalJSON(data []byte) error {
 	var decoded wire
 	required := []string{"serverName", "threadId"}
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	if err := validateNonEmptyStringField("serverName", decoded.ServerName); err != nil {
+		return err
+	}
+	if err := validateNonEmptyStringField("threadId", decoded.ThreadID); err != nil {
+		return err
+	}
+	if err := validateNonEmptyStringPointerField("turnId", decoded.TurnID); err != nil {
 		return err
 	}
 	if err := validateMcpServerElicitationVariant(data, decoded.Mode); err != nil {

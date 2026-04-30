@@ -24,6 +24,14 @@ func (p *DynamicToolCallParams) UnmarshalJSON(data []byte) error {
 	if err := unmarshalInboundObject(data, &decoded, required, nonNull); err != nil {
 		return err
 	}
+	if err := validateNonEmptyStringFields(map[string]string{
+		"callId":   decoded.CallID,
+		"threadId": decoded.ThreadID,
+		"tool":     decoded.Tool,
+		"turnId":   decoded.TurnID,
+	}); err != nil {
+		return err
+	}
 	*p = DynamicToolCallParams(decoded)
 	return nil
 }
