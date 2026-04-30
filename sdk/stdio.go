@@ -52,6 +52,7 @@ const (
 	errNilTransportWriter     = "stdio transport writer must not be nil"
 	errInvalidJSONRPCVersion  = `invalid request: jsonrpc must be "2.0"`
 	errInvalidResponseJSONRPC = `invalid response: jsonrpc must be "2.0"`
+	errInvalidServerRequest   = "invalid server request"
 )
 
 // StdioTransport implements the Transport interface using stdin/stdout with newline-delimited JSON.
@@ -475,6 +476,11 @@ func (t *StdioTransport) processInboundLine(line []byte) {
 		return
 	}
 
+	if hasID {
+		t.rejectInvalidRequestID(frame.ID)
+		return
+	}
+
 	t.handleMalformedInboundObject()
 }
 
@@ -493,6 +499,14 @@ func (t *StdioTransport) handleInvalidJSONRPCVersion(frame inboundFrame, hasID b
 }
 
 func (t *StdioTransport) rejectInvalidProtocolVersion(idField inboundID) {
+	t.rejectInvalidRequestIDWithMessage(idField, errInvalidJSONRPCVersion)
+}
+
+func (t *StdioTransport) rejectInvalidRequestID(idField inboundID) {
+	t.rejectInvalidRequestIDWithMessage(idField, errInvalidServerRequest)
+}
+
+func (t *StdioTransport) rejectInvalidRequestIDWithMessage(idField inboundID, message string) {
 	id := RequestID{Value: nil}
 	if parsed, ok := idField.requestID(); ok {
 		id = parsed
@@ -502,7 +516,7 @@ func (t *StdioTransport) rejectInvalidProtocolVersion(idField inboundID) {
 		ID:      id,
 		Error: &Error{
 			Code:    ErrCodeInvalidRequest,
-			Message: errInvalidJSONRPCVersion,
+			Message: message,
 		},
 	}); err != nil {
 		t.handleWriteFailure(err)
@@ -910,7 +924,7 @@ func (t *StdioTransport) handleInvalidRequestObject(data []byte) bool {
 		ID:      id,
 		Error: &Error{
 			Code:    ErrCodeInvalidRequest,
-			Message: "invalid server request",
+			Message: errInvalidServerRequest,
 		},
 	}
 	if err := t.writeMessage(errorResp); err != nil {

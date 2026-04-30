@@ -1207,6 +1207,28 @@ func waitForOutboundRequest(t *testing.T, serverReader io.Reader) {
 	}
 }
 
+func readOutboundErrorResponse(t *testing.T, serverReader io.Reader) codex.Response {
+	t.Helper()
+	responseChan := make(chan codex.Response, 1)
+	go func() {
+		scanner := bufio.NewScanner(serverReader)
+		if scanner.Scan() {
+			var resp codex.Response
+			if json.Unmarshal(scanner.Bytes(), &resp) == nil && resp.Error != nil {
+				responseChan <- resp
+			}
+		}
+	}()
+
+	select {
+	case resp := <-responseChan:
+		return resp
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout waiting for outbound error response")
+	}
+	return codex.Response{}
+}
+
 type sendResult struct {
 	resp codex.Response
 	err  error
@@ -2110,6 +2132,54 @@ func TestStdioRejectsRequestWithInvalidMethodType(t *testing.T) {
 	}
 }
 
+func TestStdioRejectsRequestWithMissingEmptyOrNullMethod(t *testing.T) {
+	tests := []struct {
+		name  string
+		frame string
+		id    string
+	}{
+		{
+			name:  "missing method",
+			frame: `{"jsonrpc":"2.0","id":"missing-method","params":{}}`,
+			id:    "missing-method",
+		},
+		{
+			name:  "empty method",
+			frame: `{"jsonrpc":"2.0","id":"empty-method","method":"","params":{}}`,
+			id:    "empty-method",
+		},
+		{
+			name:  "null method",
+			frame: `{"jsonrpc":"2.0","id":"null-method","method":null,"params":{}}`,
+			id:    "null-method",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clientReader, serverWriter := io.Pipe()
+			serverReader, clientWriter := io.Pipe()
+			defer func() { _ = clientReader.Close() }()
+			defer func() { _ = serverWriter.Close() }()
+			defer func() { _ = serverReader.Close() }()
+			defer func() { _ = clientWriter.Close() }()
+
+			transport := codex.NewStdioTransport(clientReader, clientWriter)
+			defer func() { _ = transport.Close() }()
+
+			_, _ = serverWriter.Write([]byte(tt.frame + "\n"))
+
+			resp := readOutboundErrorResponse(t, serverReader)
+			if resp.Error.Code != codex.ErrCodeInvalidRequest {
+				t.Fatalf("error code = %d; want %d", resp.Error.Code, codex.ErrCodeInvalidRequest)
+			}
+			if resp.ID.Value != tt.id {
+				t.Fatalf("response ID = %v; want %s", resp.ID.Value, tt.id)
+			}
+		})
+	}
+}
+
 func TestStdioInvalidJSONRPCResponseVersionFailsPending(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()
@@ -2418,14 +2488,21 @@ func TestStdioIgnoresNonResponseFramesWithID(t *testing.T) {
 	waitForOutboundRequest(t, serverReader)
 
 	_, _ = serverWriter.Write([]byte(`{"jsonrpc":"2.0","id":"non-response-frame","params":{"ignored":true}}` + "\n"))
+	invalidReqResp := readOutboundErrorResponse(t, serverReader)
+	if invalidReqResp.Error.Code != codex.ErrCodeInvalidRequest {
+		t.Fatalf("error code = %d; want %d", invalidReqResp.Error.Code, codex.ErrCodeInvalidRequest)
+	}
+	if invalidReqResp.ID.Value != "non-response-frame" {
+		t.Fatalf("response ID = %v; want non-response-frame", invalidReqResp.ID.Value)
+	}
 	_, _ = serverWriter.Write([]byte(`{"jsonrpc":"2.0","params":{"ignored":true}}` + "\n"))
 
 	deadline := time.Now().Add(500 * time.Millisecond)
-	for transport.MalformedMessageCount() < 2 && time.Now().Before(deadline) {
+	for transport.MalformedMessageCount() < 1 && time.Now().Before(deadline) {
 		time.Sleep(10 * time.Millisecond)
 	}
-	if got := transport.MalformedMessageCount(); got != 2 {
-		t.Fatalf("MalformedMessageCount() = %d; want 2 after malformed inbound objects", got)
+	if got := transport.MalformedMessageCount(); got != 1 {
+		t.Fatalf("MalformedMessageCount() = %d; want 1 after malformed inbound object", got)
 	}
 
 	select {
