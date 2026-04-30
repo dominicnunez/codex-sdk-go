@@ -183,6 +183,67 @@ func TestHandleInvalidRequestObjectValidIDPreservesID(t *testing.T) {
 	}
 }
 
+func TestHandleRequestRejectsPreHandlerQueueOverflow(t *testing.T) {
+	const expectedOverloadMessage = "too many pending inbound requests"
+
+	var buf safeBuffer
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	transport := &StdioTransport{
+		writer:        &buf,
+		pendingReqs:   make(map[string]pendingReq),
+		writeQueue:    make(chan writeEnvelope, outboundWriteQueueSize),
+		readerStopped: make(chan struct{}),
+		ctx:           ctx,
+		cancelCtx:     cancel,
+	}
+	go transport.writeLoop()
+
+	for i := range inboundRequestQueueSize {
+		transport.handleRequest(Request{
+			JSONRPC: jsonrpcVersion,
+			ID:      RequestID{Value: i},
+			Method:  "approval/startup",
+		})
+	}
+
+	if got := len(transport.pendingReqHandler); got != inboundRequestQueueSize {
+		t.Fatalf("pending request queue length = %d; want %d", got, inboundRequestQueueSize)
+	}
+	if got := strings.TrimSpace(buf.String()); got != "" {
+		t.Fatalf("queued pre-handler requests wrote %q; want no responses", got)
+	}
+
+	overflowID := RequestID{Value: "overflow"}
+	transport.handleRequest(Request{
+		JSONRPC: jsonrpcVersion,
+		ID:      overflowID,
+		Method:  "approval/startup",
+	})
+
+	output := strings.TrimSpace(buf.String())
+	if output == "" {
+		t.Fatal("expected overload response to be written")
+	}
+
+	var resp Response
+	if err := json.Unmarshal([]byte(output), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if resp.ID.Value != overflowID.Value {
+		t.Fatalf("response ID = %v; want %v", resp.ID.Value, overflowID.Value)
+	}
+	if resp.Error == nil {
+		t.Fatal("response error = nil; want overload error")
+	}
+	if resp.Error.Code != ErrCodeInternalError {
+		t.Fatalf("error code = %d; want %d", resp.Error.Code, ErrCodeInternalError)
+	}
+	if resp.Error.Message != expectedOverloadMessage {
+		t.Fatalf("error message = %q; want %q", resp.Error.Message, expectedOverloadMessage)
+	}
+}
+
 func TestStdioInboundRequestDispatchIsBounded(t *testing.T) {
 	clientReader, serverWriter := io.Pipe()
 	serverReader, clientWriter := io.Pipe()

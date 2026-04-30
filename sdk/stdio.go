@@ -23,6 +23,14 @@ type pendingReqResult struct {
 	err  error
 }
 
+type requestHandlerResolution int
+
+const (
+	requestHandlerResolved requestHandlerResolution = iota
+	requestHandlerQueued
+	requestHandlerQueueFull
+)
+
 // inbound/outbound queue sizing. These are intentionally conservative defaults:
 // large enough for normal bursts, bounded to prevent untrusted-peer DoS via
 // unbounded goroutine or memory growth.
@@ -821,11 +829,16 @@ func (t *StdioTransport) stopAfterReaderTermination(scanErr error) {
 
 // handleRequest dispatches an incoming server→client request to the handler
 func (t *StdioTransport) handleRequest(req Request) {
-	handler, panicFn, queued := t.resolveRequestHandler(req)
+	handler, panicFn, resolution := t.resolveRequestHandler(req)
 	if handler == nil {
-		if queued {
+		switch resolution {
+		case requestHandlerQueued:
+			return
+		case requestHandlerQueueFull:
+			t.rejectRequestForOverload(req)
 			return
 		}
+
 		errorResp := Response{
 			JSONRPC: jsonrpcVersion,
 			ID:      req.ID,
@@ -891,18 +904,18 @@ func (t *StdioTransport) handleRequest(req Request) {
 	}
 }
 
-func (t *StdioTransport) resolveRequestHandler(req Request) (RequestHandler, func(any), bool) {
+func (t *StdioTransport) resolveRequestHandler(req Request) (RequestHandler, func(any), requestHandlerResolution) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
 	if t.reqHandler != nil {
-		return t.reqHandler, t.panicHandler, false
+		return t.reqHandler, t.panicHandler, requestHandlerResolved
 	}
 	if len(t.pendingReqHandler) >= inboundRequestQueueSize {
-		return nil, nil, false
+		return nil, nil, requestHandlerQueueFull
 	}
 	t.pendingReqHandler = append(t.pendingReqHandler, req)
-	return nil, nil, true
+	return nil, nil, requestHandlerQueued
 }
 
 // handleInvalidRequestObject sends an invalid-request response for a structurally
