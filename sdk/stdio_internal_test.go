@@ -376,6 +376,36 @@ func TestNotifyCanceledContextDoesNotAttemptWrite(t *testing.T) {
 	}
 }
 
+func TestNotifyAppliesDefaultSendTimeout(t *testing.T) {
+	const notifyDefaultSendTimeout = 25 * time.Millisecond
+
+	reader := newBlockingReadCloser()
+	writer := newBlockingWriter()
+	transport := NewStdioTransport(reader, writer)
+	transport.sendTimeout = notifyDefaultSendTimeout
+	t.Cleanup(func() {
+		writer.Release()
+		_ = transport.Close()
+	})
+
+	resultCh := make(chan error, 1)
+	go func() {
+		resultCh <- transport.Notify(context.Background(), Notification{
+			JSONRPC: jsonrpcVersion,
+			Method:  "test/default-timeout",
+		})
+	}()
+
+	select {
+	case err := <-resultCh:
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("Notify() error = %v; want context deadline exceeded", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for Notify to observe the default send timeout")
+	}
+}
+
 func TestRecvWhileRunningReturnsQueuedValue(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -1510,6 +1540,26 @@ type writeCountWriter struct {
 func (w *writeCountWriter) Write(p []byte) (int, error) {
 	w.calls.Add(1)
 	return len(p), nil
+}
+
+type blockingWriter struct {
+	releaseOnce sync.Once
+	release     chan struct{}
+}
+
+func newBlockingWriter() *blockingWriter {
+	return &blockingWriter{release: make(chan struct{})}
+}
+
+func (w *blockingWriter) Write(p []byte) (int, error) {
+	<-w.release
+	return len(p), nil
+}
+
+func (w *blockingWriter) Release() {
+	w.releaseOnce.Do(func() {
+		close(w.release)
+	})
 }
 
 type blockingReadCloser struct {

@@ -101,6 +101,7 @@ type StdioTransport struct {
 	panicHandler        func(v any)
 	ctx                 context.Context
 	cancelCtx           context.CancelFunc
+	sendTimeout         time.Duration
 }
 
 var errTransportClosed = errors.New("transport closed")
@@ -141,6 +142,7 @@ func NewStdioTransport(reader io.ReadCloser, writer io.Writer) *StdioTransport {
 		readerStopped:       make(chan struct{}),
 		ctx:                 ctx,
 		cancelCtx:           cancel,
+		sendTimeout:         defaultSendTimeout,
 	}
 	t.initTurnScopedScheduler()
 	for range inboundRequestWorkers {
@@ -172,7 +174,7 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 	if ctx == nil {
 		return Response{}, NewTransportError("send failed", ErrNilContext)
 	}
-	ctx, cancel := applyDefaultSendTimeout(ctx)
+	ctx, cancel := t.applyDefaultSendTimeout(ctx)
 	defer cancel()
 
 	t.ensureReadLoopStarted()
@@ -236,6 +238,9 @@ func (t *StdioTransport) Notify(ctx context.Context, notif Notification) error {
 	if ctx == nil {
 		return NewTransportError("notify failed", ErrNilContext)
 	}
+	ctx, cancel := t.applyDefaultSendTimeout(ctx)
+	defer cancel()
+
 	t.ensureReadLoopStarted()
 
 	t.mu.Lock()
@@ -303,11 +308,19 @@ func (t *StdioTransport) MalformedMessageCount() uint64 {
 	return t.malformedCount.Load()
 }
 
-func applyDefaultSendTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
+func (t *StdioTransport) applyDefaultSendTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
+	timeout := t.sendTimeout
+	if timeout <= 0 {
+		timeout = defaultSendTimeout
+	}
+	return applyDefaultSendTimeout(ctx, timeout)
+}
+
+func applyDefaultSendTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
 	if _, hasDeadline := ctx.Deadline(); hasDeadline {
 		return ctx, func() {}
 	}
-	return context.WithTimeout(ctx, defaultSendTimeout)
+	return context.WithTimeout(ctx, timeout)
 }
 
 func (t *StdioTransport) ensureReadLoopStarted() {
