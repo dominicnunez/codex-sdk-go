@@ -183,6 +183,24 @@ func TestAccountEnumValidation(t *testing.T) {
 			t.Fatalf("error = %q; want invalid planType failure", err.Error())
 		}
 	})
+
+	t.Run("send add credits nudge rejects invalid status", func(t *testing.T) {
+		transport := NewMockTransport()
+		client := codex.NewClient(transport)
+		_ = transport.SetResponseData("account/sendAddCreditsNudgeEmail", map[string]interface{}{
+			"status": "queued",
+		})
+
+		_, err := client.Account.SendAddCreditsNudgeEmail(context.Background(), codex.SendAddCreditsNudgeEmailParams{
+			CreditType: codex.AddCreditsNudgeCreditTypeCredits,
+		})
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), `invalid addCreditsNudge.status "queued"`) {
+			t.Fatalf("error = %q; want invalid add credits nudge status failure", err.Error())
+		}
+	})
 }
 
 func TestLoginParamsMarshalJSONHardcodesType(t *testing.T) {

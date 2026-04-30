@@ -187,6 +187,40 @@ func TestClientRejectsInvalidOutboundEnumsBeforeSending(t *testing.T) {
 				return err
 			},
 		},
+		{
+			name:    "account add credits nudge credit type",
+			wantErr: `invalid creditType "tokens"`,
+			call: func(client *codex.Client) error {
+				_, err := client.Account.SendAddCreditsNudgeEmail(context.Background(), codex.SendAddCreditsNudgeEmailParams{
+					CreditType: codex.AddCreditsNudgeCreditType("tokens"),
+				})
+				return err
+			},
+		},
+		{
+			name:    "device key protection policy",
+			wantErr: `invalid protectionPolicy "software"`,
+			call: func(client *codex.Client) error {
+				policy := codex.DeviceKeyProtectionPolicy("software")
+				_, err := client.DeviceKey.Create(context.Background(), codex.DeviceKeyCreateParams{
+					AccountUserID:    "user-1",
+					ClientID:         "client-1",
+					ProtectionPolicy: &policy,
+				})
+				return err
+			},
+		},
+		{
+			name:    "mcp list detail",
+			wantErr: `invalid detail "namesOnly"`,
+			call: func(client *codex.Client) error {
+				detail := codex.McpServerStatusDetail("namesOnly")
+				_, err := client.Mcp.ListServerStatus(context.Background(), codex.ListMcpServerStatusParams{
+					Detail: &detail,
+				})
+				return err
+			},
+		},
 	}
 
 	for _, tt := range tests {

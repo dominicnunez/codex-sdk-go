@@ -308,6 +308,40 @@ func TestMcpOauthLoginCompletedMissingRequiredFieldReportsHandlerError(t *testin
 	}
 }
 
+func TestMcpServerStatusUpdatedRejectsInvalidStatus(t *testing.T) {
+	mock := NewMockTransport()
+
+	var (
+		gotMethod string
+		gotErr    error
+	)
+	client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
+		gotMethod = method
+		gotErr = err
+	}))
+
+	var called bool
+	client.OnMcpServerStatusUpdated(func(codex.McpServerStatusUpdatedNotification) {
+		called = true
+	})
+
+	mock.InjectServerNotification(context.Background(), codex.Notification{
+		JSONRPC: "2.0",
+		Method:  "mcpServer/startupStatus/updated",
+		Params:  json.RawMessage(`{"name":"github","status":"paused"}`),
+	})
+
+	if called {
+		t.Fatal("handler should not be called for malformed payload")
+	}
+	if gotMethod != "mcpServer/startupStatus/updated" {
+		t.Fatalf("handler error method = %q; want %q", gotMethod, "mcpServer/startupStatus/updated")
+	}
+	if gotErr == nil || !strings.Contains(gotErr.Error(), `invalid mcpServerStatus.status "paused"`) {
+		t.Fatalf("handler error = %v; want invalid status failure", gotErr)
+	}
+}
+
 func TestMcpToolCallProgressNotification(t *testing.T) {
 	mock := NewMockTransport()
 	client := codex.NewClient(mock)

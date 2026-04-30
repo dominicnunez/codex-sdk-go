@@ -285,9 +285,25 @@ const (
 	AddCreditsNudgeCreditTypeUsageLimit AddCreditsNudgeCreditType = "usage_limit"
 )
 
+var validAddCreditsNudgeCreditTypes = map[AddCreditsNudgeCreditType]struct{}{
+	AddCreditsNudgeCreditTypeCredits:    {},
+	AddCreditsNudgeCreditTypeUsageLimit: {},
+}
+
+func validateAddCreditsNudgeCreditTypeField(field string, value AddCreditsNudgeCreditType) error {
+	return validateEnumValue(field, value, validAddCreditsNudgeCreditTypes)
+}
+
 // SendAddCreditsNudgeEmailParams sends an add-credits nudge email.
 type SendAddCreditsNudgeEmailParams struct {
 	CreditType AddCreditsNudgeCreditType `json:"creditType"`
+}
+
+func (p SendAddCreditsNudgeEmailParams) prepareRequest() (interface{}, error) {
+	if err := validateAddCreditsNudgeCreditTypeField("creditType", p.CreditType); err != nil {
+		return nil, invalidParamsError("%v", err)
+	}
+	return p, nil
 }
 
 // AddCreditsNudgeEmailStatus is the result of sending an add-credits nudge email.
@@ -297,6 +313,15 @@ const (
 	AddCreditsNudgeEmailStatusSent           AddCreditsNudgeEmailStatus = "sent"
 	AddCreditsNudgeEmailStatusCooldownActive AddCreditsNudgeEmailStatus = "cooldown_active"
 )
+
+var validAddCreditsNudgeEmailStatuses = map[AddCreditsNudgeEmailStatus]struct{}{
+	AddCreditsNudgeEmailStatusSent:           {},
+	AddCreditsNudgeEmailStatusCooldownActive: {},
+}
+
+func validateAddCreditsNudgeEmailStatusField(field string, value AddCreditsNudgeEmailStatus) error {
+	return validateEnumValue(field, value, validAddCreditsNudgeEmailStatuses)
+}
 
 // SendAddCreditsNudgeEmailResponse is the response from account/sendAddCreditsNudgeEmail.
 type SendAddCreditsNudgeEmailResponse struct {
@@ -310,6 +335,9 @@ func (r *SendAddCreditsNudgeEmailResponse) UnmarshalJSON(data []byte) error {
 	type wire SendAddCreditsNudgeEmailResponse
 	var decoded wire
 	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	if err := validateAddCreditsNudgeEmailStatusField("addCreditsNudge.status", decoded.Status); err != nil {
 		return err
 	}
 	*r = SendAddCreditsNudgeEmailResponse(decoded)

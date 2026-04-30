@@ -35,6 +35,15 @@ const (
 	McpServerStatusDetailToolsAndAuthOnly McpServerStatusDetail = "toolsAndAuthOnly"
 )
 
+var validMcpServerStatusDetails = map[McpServerStatusDetail]struct{}{
+	McpServerStatusDetailFull:             {},
+	McpServerStatusDetailToolsAndAuthOnly: {},
+}
+
+func validateOptionalMcpServerStatusDetailField(field string, value *McpServerStatusDetail) error {
+	return validateOptionalEnumValue(field, value, validMcpServerStatusDetails)
+}
+
 // Resource represents a resource exposed by an MCP server.
 type Resource struct {
 	Name        string      `json:"name"`
@@ -136,6 +145,13 @@ type ListMcpServerStatusParams struct {
 	Cursor *string                `json:"cursor,omitempty"`
 	Detail *McpServerStatusDetail `json:"detail,omitempty"`
 	Limit  *uint32                `json:"limit,omitempty"`
+}
+
+func (p ListMcpServerStatusParams) prepareRequest() (interface{}, error) {
+	if err := validateOptionalMcpServerStatusDetailField("detail", p.Detail); err != nil {
+		return nil, invalidParamsError("%v", err)
+	}
+	return p, nil
 }
 
 // ListMcpServerStatusResponse is the response from mcpServerStatus/list.
@@ -258,6 +274,17 @@ const (
 	McpServerStartupStateFailed    McpServerStartupState = "failed"
 	McpServerStartupStateCancelled McpServerStartupState = "cancelled"
 )
+
+var validMcpServerStartupStates = map[McpServerStartupState]struct{}{
+	McpServerStartupStateStarting:  {},
+	McpServerStartupStateReady:     {},
+	McpServerStartupStateFailed:    {},
+	McpServerStartupStateCancelled: {},
+}
+
+func (s *McpServerStartupState) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "mcpServerStatus.status", validMcpServerStartupStates, s)
+}
 
 // McpServerStatusUpdatedNotification reports MCP server startup status updates.
 type McpServerStatusUpdatedNotification struct {

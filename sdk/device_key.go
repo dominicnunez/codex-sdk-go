@@ -47,11 +47,27 @@ const (
 	DeviceKeyProtectionPolicyAllowOSProtectedNonextractable DeviceKeyProtectionPolicy = "allow_os_protected_nonextractable"
 )
 
+var validDeviceKeyProtectionPolicies = map[DeviceKeyProtectionPolicy]struct{}{
+	DeviceKeyProtectionPolicyHardwareOnly:                   {},
+	DeviceKeyProtectionPolicyAllowOSProtectedNonextractable: {},
+}
+
+func validateOptionalDeviceKeyProtectionPolicyField(field string, value *DeviceKeyProtectionPolicy) error {
+	return validateOptionalEnumValue(field, value, validDeviceKeyProtectionPolicies)
+}
+
 // DeviceKeyCreateParams creates a controller-local device key.
 type DeviceKeyCreateParams struct {
 	AccountUserID    string                     `json:"accountUserId"`
 	ClientID         string                     `json:"clientId"`
 	ProtectionPolicy *DeviceKeyProtectionPolicy `json:"protectionPolicy,omitempty"`
+}
+
+func (p DeviceKeyCreateParams) prepareRequest() (interface{}, error) {
+	if err := validateOptionalDeviceKeyProtectionPolicyField("protectionPolicy", p.ProtectionPolicy); err != nil {
+		return nil, invalidParamsError("%v", err)
+	}
+	return p, nil
 }
 
 // DeviceKeyCreateResponse contains device-key metadata and public key material.
@@ -108,11 +124,26 @@ const (
 	RemoteControlClientConnectionAudienceWebsocket RemoteControlClientConnectionAudience = "remote_control_client_websocket"
 )
 
+var validRemoteControlClientConnectionAudiences = map[RemoteControlClientConnectionAudience]struct{}{
+	RemoteControlClientConnectionAudienceWebsocket: {},
+}
+
 // RemoteControlClientEnrollmentAudience is the device-key proof audience for enrollment.
 type RemoteControlClientEnrollmentAudience string
 
 const (
 	RemoteControlClientEnrollmentAudienceEnrollment RemoteControlClientEnrollmentAudience = "remote_control_client_enrollment"
+)
+
+var validRemoteControlClientEnrollmentAudiences = map[RemoteControlClientEnrollmentAudience]struct{}{
+	RemoteControlClientEnrollmentAudienceEnrollment: {},
+}
+
+const (
+	remoteControlClientConnectionDeviceKeySignPayloadType = "remoteControlClientConnection"
+	remoteControlClientEnrollmentDeviceKeySignPayloadType = "remoteControlClientEnrollment"
+	remoteControlClientConnectionScope                    = "remote_control_controller_websocket"
+	remoteControlClientConnectionScopeCount               = 1
 )
 
 // DeviceKeySignPayload is a structured payload accepted by device/key/sign.
@@ -157,6 +188,88 @@ func (*RemoteControlClientEnrollmentDeviceKeySignPayload) isDeviceKeySignPayload
 type DeviceKeySignParams struct {
 	KeyID   string               `json:"keyId"`
 	Payload DeviceKeySignPayload `json:"payload"`
+}
+
+func (p DeviceKeySignParams) prepareRequest() (interface{}, error) {
+	if err := validateRequiredNonEmptyStringField("keyId", p.KeyID); err != nil {
+		return nil, err
+	}
+	if err := validateDeviceKeySignPayload(p.Payload); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func validateDeviceKeySignPayload(payload DeviceKeySignPayload) error {
+	if isNilInterfaceValue(payload) {
+		return invalidParamsError("payload must not be null")
+	}
+
+	switch p := payload.(type) {
+	case *RemoteControlClientConnectionDeviceKeySignPayload:
+		return validateRemoteControlClientConnectionDeviceKeySignPayload(p)
+	case *RemoteControlClientEnrollmentDeviceKeySignPayload:
+		return validateRemoteControlClientEnrollmentDeviceKeySignPayload(p)
+	default:
+		return invalidParamsError("payload has unsupported device-key sign payload type %T", payload)
+	}
+}
+
+func validateRemoteControlClientConnectionDeviceKeySignPayload(p *RemoteControlClientConnectionDeviceKeySignPayload) error {
+	if p == nil {
+		return invalidParamsError("payload must not be null")
+	}
+	if p.Type != remoteControlClientConnectionDeviceKeySignPayloadType {
+		return invalidParamsError("invalid payload.type %q", p.Type)
+	}
+	if err := validateEnumValue("payload.audience", p.Audience, validRemoteControlClientConnectionAudiences); err != nil {
+		return invalidParamsError("%v", err)
+	}
+	if err := validateNonEmptyDeviceKeyPayloadStrings(map[string]string{
+		"payload.accountUserId":        p.AccountUserID,
+		"payload.clientId":             p.ClientID,
+		"payload.nonce":                p.Nonce,
+		"payload.sessionId":            p.SessionID,
+		"payload.targetOrigin":         p.TargetOrigin,
+		"payload.targetPath":           p.TargetPath,
+		"payload.tokenSha256Base64url": p.TokenSha256Base64url,
+	}); err != nil {
+		return err
+	}
+	if len(p.Scopes) != remoteControlClientConnectionScopeCount || p.Scopes[0] != remoteControlClientConnectionScope {
+		return invalidParamsError("payload.scopes must contain exactly %q", remoteControlClientConnectionScope)
+	}
+	return nil
+}
+
+func validateRemoteControlClientEnrollmentDeviceKeySignPayload(p *RemoteControlClientEnrollmentDeviceKeySignPayload) error {
+	if p == nil {
+		return invalidParamsError("payload must not be null")
+	}
+	if p.Type != remoteControlClientEnrollmentDeviceKeySignPayloadType {
+		return invalidParamsError("invalid payload.type %q", p.Type)
+	}
+	if err := validateEnumValue("payload.audience", p.Audience, validRemoteControlClientEnrollmentAudiences); err != nil {
+		return invalidParamsError("%v", err)
+	}
+	return validateNonEmptyDeviceKeyPayloadStrings(map[string]string{
+		"payload.accountUserId":                 p.AccountUserID,
+		"payload.challengeId":                   p.ChallengeID,
+		"payload.clientId":                      p.ClientID,
+		"payload.deviceIdentitySha256Base64url": p.DeviceIdentitySha256Base64url,
+		"payload.nonce":                         p.Nonce,
+		"payload.targetOrigin":                  p.TargetOrigin,
+		"payload.targetPath":                    p.TargetPath,
+	})
+}
+
+func validateNonEmptyDeviceKeyPayloadStrings(fields map[string]string) error {
+	for field, value := range fields {
+		if err := validateRequiredNonEmptyStringField(field, value); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // DeviceKeySignResponse contains a signature over the canonicalized payload.
