@@ -456,6 +456,9 @@ type ConfigValueWriteParams struct {
 }
 
 func (p ConfigValueWriteParams) prepareRequest() (interface{}, error) {
+	if err := validateRequiredNonEmptyStringField("keyPath", p.KeyPath); err != nil {
+		return nil, err
+	}
 	var err error
 	p.FilePath, err = normalizeOptionalAbsolutePathField("filePath", p.FilePath)
 	if err != nil {
@@ -482,6 +485,11 @@ type ConfigEdit struct {
 func (p ConfigBatchWriteParams) prepareRequest() (interface{}, error) {
 	if p.Edits == nil {
 		return nil, invalidParamsError("edits must not be null")
+	}
+	for i, edit := range p.Edits {
+		if err := validateRequiredNonEmptyStringField(fmt.Sprintf("edits[%d].keyPath", i), edit.KeyPath); err != nil {
+			return nil, err
+		}
 	}
 	var err error
 	p.FilePath, err = normalizeOptionalAbsolutePathField("filePath", p.FilePath)

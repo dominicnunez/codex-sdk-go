@@ -64,6 +64,12 @@ type DeviceKeyCreateParams struct {
 }
 
 func (p DeviceKeyCreateParams) prepareRequest() (interface{}, error) {
+	if err := validateRequiredNonEmptyStringField("accountUserId", p.AccountUserID); err != nil {
+		return nil, err
+	}
+	if err := validateRequiredNonEmptyStringField("clientId", p.ClientID); err != nil {
+		return nil, err
+	}
 	if err := validateOptionalDeviceKeyProtectionPolicyField("protectionPolicy", p.ProtectionPolicy); err != nil {
 		return nil, invalidParamsError("%v", err)
 	}
@@ -94,6 +100,13 @@ func (r *DeviceKeyCreateResponse) UnmarshalJSON(data []byte) error {
 // DeviceKeyPublicParams requests public metadata for an existing device key.
 type DeviceKeyPublicParams struct {
 	KeyID string `json:"keyId"`
+}
+
+func (p DeviceKeyPublicParams) prepareRequest() (interface{}, error) {
+	if err := validateRequiredNonEmptyStringField("keyId", p.KeyID); err != nil {
+		return nil, err
+	}
+	return p, nil
 }
 
 // DeviceKeyPublicResponse contains device-key metadata and public key material.

@@ -15,6 +15,63 @@ const (
 	deviceKeyExpiresAt                 = int64(1)
 )
 
+func TestDeviceKeyCreateRejectsEmptyIdentityFieldsBeforeSending(t *testing.T) {
+	tests := []struct {
+		name    string
+		params  codex.DeviceKeyCreateParams
+		wantErr string
+	}{
+		{
+			name: "empty account user id",
+			params: codex.DeviceKeyCreateParams{
+				ClientID: "client-1",
+			},
+			wantErr: "accountUserId must not be empty",
+		},
+		{
+			name: "empty client id",
+			params: codex.DeviceKeyCreateParams{
+				AccountUserID: "user-1",
+			},
+			wantErr: "clientId must not be empty",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := NewMockTransport()
+			client := codex.NewClient(mock)
+
+			_, err := client.DeviceKey.Create(context.Background(), tt.params)
+			if err == nil {
+				t.Fatal("expected invalid params error")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %q, want substring %q", err.Error(), tt.wantErr)
+			}
+			if got := mock.CallCount(); got != 0 {
+				t.Fatalf("transport recorded %d requests, want 0", got)
+			}
+		})
+	}
+}
+
+func TestDeviceKeyPublicRejectsEmptyKeyIDBeforeSending(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+
+	_, err := client.DeviceKey.Public(context.Background(), codex.DeviceKeyPublicParams{})
+	if err == nil {
+		t.Fatal("expected invalid params error")
+	}
+	if !strings.Contains(err.Error(), "keyId must not be empty") {
+		t.Fatalf("error = %q, want keyId validation error", err.Error())
+	}
+	if got := mock.CallCount(); got != 0 {
+		t.Fatalf("transport recorded %d requests, want 0", got)
+	}
+}
+
 func TestDeviceKeySignRejectsMalformedPayloadBeforeSending(t *testing.T) {
 	tests := []struct {
 		name    string

@@ -291,6 +291,36 @@ func TestReviewStartRejectsInvalidParamsBeforeSending(t *testing.T) {
 			}(),
 			wantErr: "target must not be null",
 		},
+		{
+			name: "empty base branch",
+			params: codex.ReviewStartParams{
+				ThreadID: "thread-123",
+				Target: codex.ReviewTargetWrapper{
+					Value: &codex.BaseBranchReviewTarget{},
+				},
+			},
+			wantErr: "target.branch must not be empty",
+		},
+		{
+			name: "empty commit sha",
+			params: codex.ReviewStartParams{
+				ThreadID: "thread-123",
+				Target: codex.ReviewTargetWrapper{
+					Value: &codex.CommitReviewTarget{},
+				},
+			},
+			wantErr: "target.sha must not be empty",
+		},
+		{
+			name: "empty custom instructions",
+			params: codex.ReviewStartParams{
+				ThreadID: "thread-123",
+				Target: codex.ReviewTargetWrapper{
+					Value: &codex.CustomReviewTarget{},
+				},
+			},
+			wantErr: "target.instructions must not be empty",
+		},
 	}
 
 	for _, tt := range tests {

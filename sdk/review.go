@@ -211,6 +211,25 @@ func (w *ReviewTargetWrapper) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func validateReviewTarget(target ReviewTarget) error {
+	if isNilInterfaceValue(target) {
+		return invalidParamsError("target must not be null")
+	}
+
+	switch t := target.(type) {
+	case *UncommittedChangesReviewTarget:
+		return nil
+	case *BaseBranchReviewTarget:
+		return validateRequiredNonEmptyStringField("target.branch", t.Branch)
+	case *CommitReviewTarget:
+		return validateRequiredNonEmptyStringField("target.sha", t.SHA)
+	case *CustomReviewTarget:
+		return validateRequiredNonEmptyStringField("target.instructions", t.Instructions)
+	default:
+		return validateRequiredJSONObjectField("target", target)
+	}
+}
+
 func validateReviewTargetVariantFields(data []byte, wantType string, requiredFields ...string) error {
 	if err := validateRequiredTaggedObjectFields(data, requiredFields...); err != nil {
 		return err
@@ -263,6 +282,9 @@ func (p ReviewStartParams) prepareRequest() (interface{}, error) {
 		return nil, err
 	}
 	if err := validateRequiredJSONObjectField("target", p.Target); err != nil {
+		return nil, err
+	}
+	if err := validateReviewTarget(p.Target.Value); err != nil {
 		return nil, err
 	}
 	return p, nil

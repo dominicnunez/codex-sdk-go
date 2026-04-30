@@ -603,6 +603,57 @@ func TestConfigBatchWriteRejectsNilEditsBeforeSending(t *testing.T) {
 	}
 }
 
+func TestConfigWriteRejectsEmptyKeyPathBeforeSending(t *testing.T) {
+	tests := []struct {
+		name    string
+		call    func(*codex.Client) error
+		wantErr string
+	}{
+		{
+			name: "value write",
+			call: func(client *codex.Client) error {
+				_, err := client.Config.Write(context.Background(), codex.ConfigValueWriteParams{
+					MergeStrategy: "replace",
+					Value:         json.RawMessage(`"gpt-5"`),
+				})
+				return err
+			},
+			wantErr: "keyPath must not be empty",
+		},
+		{
+			name: "batch write",
+			call: func(client *codex.Client) error {
+				_, err := client.Config.BatchWrite(context.Background(), codex.ConfigBatchWriteParams{
+					Edits: []codex.ConfigEdit{{
+						MergeStrategy: "replace",
+						Value:         json.RawMessage(`"gpt-5"`),
+					}},
+				})
+				return err
+			},
+			wantErr: "edits[0].keyPath must not be empty",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := NewMockTransport()
+			client := codex.NewClient(mock)
+
+			err := tt.call(client)
+			if err == nil {
+				t.Fatal("expected invalid params error")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %v, want substring %q", err, tt.wantErr)
+			}
+			if got := mock.CallCount(); got != 0 {
+				t.Fatalf("transport recorded %d requests, want 0", got)
+			}
+		})
+	}
+}
+
 func TestConfigWarningNotification(t *testing.T) {
 	mock := NewMockTransport()
 	client := codex.NewClient(mock)
