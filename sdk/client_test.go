@@ -1,6 +1,7 @@
 package codex_test
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -12,6 +13,13 @@ import (
 	"time"
 
 	codex "github.com/dominicnunez/codex-sdk-go/sdk"
+)
+
+const (
+	stdioNoParamRequestTimeout = 2 * time.Second
+	rateLimitUsedPercent       = 50
+	rateLimitResetsAt          = 1234567890
+	rateLimitWindowMins        = 60
 )
 
 // TestClientSendRequest verifies that the Client can send a request and receive a response.
@@ -56,6 +64,134 @@ func TestClientSendRequest(t *testing.T) {
 	}
 	if sentReq.Method != "test.method" {
 		t.Errorf("expected method=test.method, got %s", sentReq.Method)
+	}
+}
+
+func TestNoParamServiceRequestsOmitParamsOverStdio(t *testing.T) {
+	tests := []struct {
+		name   string
+		method string
+		result interface{}
+		call   func(context.Context, *codex.Client) error
+	}{
+		{
+			name:   "logout",
+			method: "account/logout",
+			result: map[string]interface{}{},
+			call: func(ctx context.Context, client *codex.Client) error {
+				_, err := client.Account.Logout(ctx)
+				return err
+			},
+		},
+		{
+			name:   "rate limits",
+			method: "account/rateLimits/read",
+			result: map[string]interface{}{
+				"rateLimits": map[string]interface{}{
+					"limitId":   "codex",
+					"limitName": "Codex Rate Limit",
+					"planType":  "plus",
+					"credits": map[string]interface{}{
+						"hasCredits": true,
+						"unlimited":  false,
+						"balance":    "100",
+					},
+					"primary": map[string]interface{}{
+						"usedPercent":        rateLimitUsedPercent,
+						"resetsAt":           rateLimitResetsAt,
+						"windowDurationMins": rateLimitWindowMins,
+					},
+				},
+			},
+			call: func(ctx context.Context, client *codex.Client) error {
+				_, err := client.Account.GetRateLimits(ctx)
+				return err
+			},
+		},
+		{
+			name:   "config requirements",
+			method: "configRequirements/read",
+			result: map[string]interface{}{"requirements": nil},
+			call: func(ctx context.Context, client *codex.Client) error {
+				_, err := client.Config.ReadRequirements(ctx)
+				return err
+			},
+		},
+		{
+			name:   "mcp reload",
+			method: "config/mcpServer/reload",
+			result: map[string]interface{}{},
+			call: func(ctx context.Context, client *codex.Client) error {
+				_, err := client.Mcp.Refresh(ctx)
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clientReader, serverWriter := io.Pipe()
+			serverReader, clientWriter := io.Pipe()
+			defer func() { _ = clientReader.Close() }()
+			defer func() { _ = serverWriter.Close() }()
+			defer func() { _ = serverReader.Close() }()
+			defer func() { _ = clientWriter.Close() }()
+
+			serverErrCh := make(chan error, 1)
+			go func() {
+				scanner := bufio.NewScanner(serverReader)
+				if !scanner.Scan() {
+					if err := scanner.Err(); err != nil {
+						serverErrCh <- fmt.Errorf("scan request: %w", err)
+					} else {
+						serverErrCh <- io.ErrUnexpectedEOF
+					}
+					return
+				}
+
+				var raw map[string]json.RawMessage
+				if err := json.Unmarshal(scanner.Bytes(), &raw); err != nil {
+					serverErrCh <- fmt.Errorf("unmarshal raw request: %w", err)
+					return
+				}
+				if _, ok := raw["params"]; ok {
+					serverErrCh <- fmt.Errorf("%s request included params: %s", tt.method, raw["params"])
+					return
+				}
+
+				var req codex.Request
+				if err := json.Unmarshal(scanner.Bytes(), &req); err != nil {
+					serverErrCh <- fmt.Errorf("unmarshal request: %w", err)
+					return
+				}
+				if req.Method != tt.method {
+					serverErrCh <- fmt.Errorf("method = %q; want %q", req.Method, tt.method)
+					return
+				}
+
+				serverErrCh <- writeStdioResult(json.NewEncoder(serverWriter), req.ID, tt.result)
+			}()
+
+			transport := codex.NewStdioTransport(clientReader, clientWriter)
+			defer func() { _ = transport.Close() }()
+			client := codex.NewClient(transport)
+
+			ctx, cancel := context.WithTimeout(context.Background(), stdioNoParamRequestTimeout)
+			defer cancel()
+
+			if err := tt.call(ctx, client); err != nil {
+				t.Fatalf("%s call error = %v", tt.method, err)
+			}
+
+			select {
+			case err := <-serverErrCh:
+				if err != nil {
+					t.Fatal(err)
+				}
+			case <-ctx.Done():
+				t.Fatalf("timeout waiting for %s request assertion", tt.method)
+			}
+		})
 	}
 }
 
