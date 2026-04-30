@@ -69,9 +69,8 @@ func TestStdioNewlineDelimitedJSON(t *testing.T) {
 		if err := json.Unmarshal([]byte(line), &decoded); err != nil {
 			t.Fatalf("received line is not valid JSON: %v", err)
 		}
-		// Verify it has required JSON-RPC fields
-		if decoded["jsonrpc"] != "2.0" {
-			t.Errorf("jsonrpc field = %v; want 2.0", decoded["jsonrpc"])
+		if _, ok := decoded["jsonrpc"]; ok {
+			t.Errorf("jsonrpc field present in stdio frame: %v", decoded["jsonrpc"])
 		}
 		if decoded["method"] != "test/method" {
 			t.Errorf("method field = %v; want test/method", decoded["method"])
@@ -1229,6 +1228,28 @@ func readOutboundErrorResponse(t *testing.T, serverReader io.Reader) codex.Respo
 	return codex.Response{}
 }
 
+func readOutboundResponse(t *testing.T, serverReader io.Reader) map[string]interface{} {
+	t.Helper()
+	responseChan := make(chan map[string]interface{}, 1)
+	go func() {
+		scanner := bufio.NewScanner(serverReader)
+		if scanner.Scan() {
+			var resp map[string]interface{}
+			if json.Unmarshal(scanner.Bytes(), &resp) == nil {
+				responseChan <- resp
+			}
+		}
+	}()
+
+	select {
+	case resp := <-responseChan:
+		return resp
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout waiting for outbound response")
+	}
+	return nil
+}
+
 type sendResult struct {
 	resp codex.Response
 	err  error
@@ -2054,6 +2075,117 @@ func TestStdioRejectsInvalidJSONRPCRequestVersion(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("timeout waiting for invalid-version request rejection")
 	}
+}
+
+func TestStdioAcceptsFramesWithoutJSONRPC(t *testing.T) {
+	t.Run("response", func(t *testing.T) {
+		clientReader, serverWriter := io.Pipe()
+		serverReader, clientWriter := io.Pipe()
+		defer func() { _ = clientReader.Close() }()
+		defer func() { _ = serverWriter.Close() }()
+		defer func() { _ = serverReader.Close() }()
+		defer func() { _ = clientWriter.Close() }()
+
+		transport := codex.NewStdioTransport(clientReader, clientWriter)
+		defer func() { _ = transport.Close() }()
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		result := make(chan sendResult, 1)
+		go func() {
+			resp, err := transport.Send(ctx, codex.Request{
+				JSONRPC: "2.0",
+				ID:      codex.RequestID{Value: "no-version-response"},
+				Method:  "test/method",
+			})
+			result <- sendResult{resp: resp, err: err}
+		}()
+
+		waitForOutboundRequest(t, serverReader)
+		_, _ = serverWriter.Write([]byte(`{"id":"no-version-response","result":{"ok":true}}` + "\n"))
+
+		select {
+		case got := <-result:
+			if got.err != nil {
+				t.Fatalf("Send returned error: %v", got.err)
+			}
+			if string(got.resp.Result) != `{"ok":true}` {
+				t.Fatalf("response result = %s; want {\"ok\":true}", got.resp.Result)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("timeout waiting for response without jsonrpc")
+		}
+	})
+
+	t.Run("request", func(t *testing.T) {
+		clientReader, serverWriter := io.Pipe()
+		serverReader, clientWriter := io.Pipe()
+		defer func() { _ = clientReader.Close() }()
+		defer func() { _ = serverWriter.Close() }()
+		defer func() { _ = serverReader.Close() }()
+		defer func() { _ = clientWriter.Close() }()
+
+		transport := codex.NewStdioTransport(clientReader, clientWriter)
+		defer func() { _ = transport.Close() }()
+
+		received := make(chan codex.Request, 1)
+		transport.OnRequest(func(_ context.Context, req codex.Request) (codex.Response, error) {
+			received <- req
+			return codex.Response{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Result:  json.RawMessage(`{"ok":true}`),
+			}, nil
+		})
+
+		_, _ = serverWriter.Write([]byte(`{"id":"no-version-request","method":"approval/test","params":{"ok":true}}` + "\n"))
+
+		select {
+		case req := <-received:
+			if req.Method != "approval/test" {
+				t.Fatalf("request method = %s; want approval/test", req.Method)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("timeout waiting for request without jsonrpc")
+		}
+
+		response := readOutboundResponse(t, serverReader)
+		if _, ok := response["jsonrpc"]; ok {
+			t.Fatalf("jsonrpc field present in outbound response: %v", response["jsonrpc"])
+		}
+		if response["id"] != "no-version-request" {
+			t.Fatalf("response id = %v; want no-version-request", response["id"])
+		}
+	})
+
+	t.Run("notification", func(t *testing.T) {
+		clientReader, serverWriter := io.Pipe()
+		serverReader, clientWriter := io.Pipe()
+		defer func() { _ = clientReader.Close() }()
+		defer func() { _ = serverWriter.Close() }()
+		defer func() { _ = serverReader.Close() }()
+		defer func() { _ = clientWriter.Close() }()
+
+		transport := codex.NewStdioTransport(clientReader, clientWriter)
+		defer func() { _ = transport.Close() }()
+
+		received := make(chan codex.Notification, 1)
+		transport.OnNotify(func(_ context.Context, notif codex.Notification) {
+			received <- notif
+		})
+
+		_, _ = serverWriter.Write([]byte(`{"method":"thread/started","params":{"threadId":"thread-1"}}` + "\n"))
+
+		select {
+		case notif := <-received:
+			if notif.Method != "thread/started" {
+				t.Fatalf("notification method = %s; want thread/started", notif.Method)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("timeout waiting for notification without jsonrpc")
+		}
+	})
 }
 
 func TestStdioRejectsRequestWithInvalidIDType(t *testing.T) {

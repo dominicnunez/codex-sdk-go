@@ -426,7 +426,7 @@ func (t *StdioTransport) processInboundLine(line []byte) {
 	}
 
 	hasID := frame.ID.hasValue()
-	if frame.JSONRPC != jsonrpcVersion {
+	if frame.hasInvalidProtocolVersion() {
 		t.handleInvalidJSONRPCVersion(frame, hasID)
 		return
 	}
@@ -444,7 +444,7 @@ func (t *StdioTransport) processInboundLine(line []byte) {
 			return
 		}
 		resp := Response{
-			JSONRPC: frame.JSONRPC,
+			JSONRPC: frame.protocolVersion(),
 			ID:      id,
 			Result:  frame.Result,
 			Error:   frame.Error.value,
@@ -461,7 +461,7 @@ func (t *StdioTransport) processInboundLine(line []byte) {
 			return
 		}
 		req := Request{
-			JSONRPC: frame.JSONRPC,
+			JSONRPC: frame.protocolVersion(),
 			ID:      id,
 			Method:  frame.Method,
 			Params:  frame.Params,

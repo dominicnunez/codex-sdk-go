@@ -47,7 +47,7 @@ func (t *StdioTransport) enqueueWrite(ctx context.Context, msg interface{}, op s
 		return err
 	}
 
-	data, err := json.Marshal(msg)
+	data, err := marshalStdioFrame(msg)
 	if err != nil {
 		return NewTransportError("marshal message", err)
 	}
@@ -97,6 +97,71 @@ func (t *StdioTransport) enqueueWrite(ctx context.Context, msg interface{}, op s
 	case <-t.ctx.Done():
 		return NewTransportError(op, errTransportClosed)
 	}
+}
+
+func marshalStdioFrame(msg interface{}) ([]byte, error) {
+	switch v := msg.(type) {
+	case Request:
+		return marshalStdioRequest(v)
+	case *Request:
+		if v == nil {
+			return json.Marshal(v)
+		}
+		return marshalStdioRequest(*v)
+	case Response:
+		return marshalStdioResponse(v)
+	case *Response:
+		if v == nil {
+			return json.Marshal(v)
+		}
+		return marshalStdioResponse(*v)
+	case Notification:
+		return marshalStdioNotification(v)
+	case *Notification:
+		if v == nil {
+			return json.Marshal(v)
+		}
+		return marshalStdioNotification(*v)
+	default:
+		return json.Marshal(msg)
+	}
+}
+
+func marshalStdioRequest(req Request) ([]byte, error) {
+	type wireRequest struct {
+		ID     RequestID       `json:"id"`
+		Method string          `json:"method"`
+		Params json.RawMessage `json:"params,omitempty"`
+	}
+	return json.Marshal(wireRequest{
+		ID:     req.ID,
+		Method: req.Method,
+		Params: req.Params,
+	})
+}
+
+func marshalStdioResponse(resp Response) ([]byte, error) {
+	type wireResponse struct {
+		ID     RequestID       `json:"id"`
+		Result json.RawMessage `json:"result,omitempty"`
+		Error  *Error          `json:"error,omitempty"`
+	}
+	return json.Marshal(wireResponse{
+		ID:     resp.ID,
+		Result: resp.Result,
+		Error:  resp.Error,
+	})
+}
+
+func marshalStdioNotification(notif Notification) ([]byte, error) {
+	type wireNotification struct {
+		Method string          `json:"method"`
+		Params json.RawMessage `json:"params,omitempty"`
+	}
+	return json.Marshal(wireNotification{
+		Method: notif.Method,
+		Params: notif.Params,
+	})
 }
 
 func (t *StdioTransport) normalizeWriteCompletionError(op string, err error) error {

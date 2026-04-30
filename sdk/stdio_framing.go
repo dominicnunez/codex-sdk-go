@@ -24,12 +24,12 @@ var errUnexpectedIDType = errors.New("unexpected ID type")
 var errNullID = errors.New("null request ID")
 
 type inboundFrame struct {
-	JSONRPC string          `json:"jsonrpc"`
-	ID      inboundID       `json:"id"`
-	Method  string          `json:"method"`
-	Params  json.RawMessage `json:"params,omitempty"`
-	Result  json.RawMessage `json:"result,omitempty"`
-	Error   inboundError    `json:"error,omitempty"`
+	JSONRPC inboundProtocolVersion `json:"jsonrpc"`
+	ID      inboundID              `json:"id"`
+	Method  string                 `json:"method"`
+	Params  json.RawMessage        `json:"params,omitempty"`
+	Result  json.RawMessage        `json:"result,omitempty"`
+	Error   inboundError           `json:"error,omitempty"`
 }
 
 func (f inboundFrame) hasResultField() bool {
@@ -53,6 +53,35 @@ func (f inboundFrame) hasMalformedResponseShape() bool {
 		return f.Error.invalid || f.Error.isNull || f.Error.value == nil
 	}
 	return false
+}
+
+func (f inboundFrame) protocolVersion() string {
+	if !f.JSONRPC.present {
+		return ""
+	}
+	return f.JSONRPC.value
+}
+
+func (f inboundFrame) hasInvalidProtocolVersion() bool {
+	return f.JSONRPC.present && (f.JSONRPC.invalid || f.JSONRPC.value != jsonrpcVersion)
+}
+
+type inboundProtocolVersion struct {
+	present bool
+	value   string
+	invalid bool
+}
+
+func (v *inboundProtocolVersion) UnmarshalJSON(data []byte) error {
+	v.present = true
+	var parsed string
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		v.invalid = true
+		return nil //nolint:nilerr // Preserve frame routing; invalid version is handled after classification.
+	}
+	v.value = parsed
+	v.invalid = false
+	return nil
 }
 
 type inboundID struct {
@@ -233,7 +262,7 @@ func parseRequestID(data json.RawMessage) (RequestID, error) {
 
 func (f inboundFrame) toNotification() Notification {
 	return Notification{
-		JSONRPC: f.JSONRPC,
+		JSONRPC: f.protocolVersion(),
 		Method:  f.Method,
 		Params:  f.Params,
 	}
