@@ -75,6 +75,32 @@ func validateOptionalRawJSONObjectField(field string, value json.RawMessage) err
 	return nil
 }
 
+func validateRequiredRawJSONValueField(field string, value json.RawMessage) error {
+	trimmed := bytes.TrimSpace(value)
+	if len(trimmed) == 0 {
+		return invalidParamsError("%s must not be empty", field)
+	}
+	if bytes.Equal(trimmed, []byte("null")) {
+		return invalidParamsError("%s must not be null", field)
+	}
+	if !json.Valid(trimmed) {
+		return invalidParamsError("%s must be valid JSON", field)
+	}
+	return nil
+}
+
+func validateRequiredRawJSONValueSliceField(field string, values []json.RawMessage) error {
+	if values == nil {
+		return invalidParamsError("%s must not be null", field)
+	}
+	for i, value := range values {
+		if err := validateRequiredRawJSONValueField(fmt.Sprintf("%s[%d]", field, i), value); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func normalizeAbsolutePathField(field, value string) (string, error) {
 	normalized, err := normalizeAbsolutePath(value)
 	if err != nil {
@@ -601,6 +627,19 @@ func (p FsCopyParams) prepareRequest() (interface{}, error) {
 	return p, nil
 }
 
+func (p FsWatchParams) prepareRequest() (interface{}, error) {
+	if err := validateRequiredNonEmptyStringField("watchId", p.WatchID); err != nil {
+		return nil, err
+	}
+
+	var err error
+	p.Path, err = normalizeAbsolutePathField("path", p.Path)
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
 func (p PluginListParams) prepareRequest() (interface{}, error) {
 	var err error
 	p.Cwds, err = normalizeAbsolutePathSliceField("cwds", p.Cwds)
@@ -732,6 +771,43 @@ func (p ThreadListParams) prepareRequest() (interface{}, error) {
 
 func (p ThreadReadParams) prepareRequest() (interface{}, error) {
 	if err := validateThreadScopedRequest(p.ThreadID); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (p ThreadTurnsListParams) prepareRequest() (interface{}, error) {
+	if err := validateThreadScopedRequest(p.ThreadID); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (p ThreadShellCommandParams) prepareRequest() (interface{}, error) {
+	if err := validateThreadScopedRequest(p.ThreadID); err != nil {
+		return nil, err
+	}
+	if err := validateRequiredNonEmptyStringField("command", p.Command); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (p ThreadApproveGuardianDeniedActionParams) prepareRequest() (interface{}, error) {
+	if err := validateThreadScopedRequest(p.ThreadID); err != nil {
+		return nil, err
+	}
+	if err := validateRequiredRawJSONValueField("event", p.Event); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (p ThreadInjectItemsParams) prepareRequest() (interface{}, error) {
+	if err := validateThreadScopedRequest(p.ThreadID); err != nil {
+		return nil, err
+	}
+	if err := validateRequiredRawJSONValueSliceField("items", p.Items); err != nil {
 		return nil, err
 	}
 	return p, nil

@@ -17,12 +17,23 @@ func TestOutboundAbsolutePathRequestsNormalizeBeforeSend(t *testing.T) {
 			JSONRPC: "2.0",
 			Result:  json.RawMessage(`{"dataBase64":"ZGF0YQ=="}`),
 		})
+		transport.SetResponse("fs/watch", codex.Response{
+			JSONRPC: "2.0",
+			Result:  json.RawMessage(`{"path":"/var/log"}`),
+		})
 
 		_, err := client.Fs.ReadFile(context.Background(), codex.FsReadFileParams{
 			Path: "/tmp/../var//log.txt",
 		})
 		if err != nil {
 			t.Fatalf("ReadFile() error = %v", err)
+		}
+		_, err = client.Fs.Watch(context.Background(), codex.FsWatchParams{
+			Path:    "/tmp/../var//log",
+			WatchID: "watch-1",
+		})
+		if err != nil {
+			t.Fatalf("Watch() error = %v", err)
 		}
 
 		var params codex.FsReadFileParams
@@ -31,6 +42,14 @@ func TestOutboundAbsolutePathRequestsNormalizeBeforeSend(t *testing.T) {
 		}
 		if params.Path != "/var/log.txt" {
 			t.Fatalf("Path = %q, want /var/log.txt", params.Path)
+		}
+
+		var watchParams codex.FsWatchParams
+		if err := json.Unmarshal(transport.GetSentRequest(1).Params, &watchParams); err != nil {
+			t.Fatalf("unmarshal watch params: %v", err)
+		}
+		if watchParams.Path != "/var/log" {
+			t.Fatalf("Watch Path = %q, want /var/log", watchParams.Path)
 		}
 	})
 
@@ -430,6 +449,16 @@ func TestOutboundAbsolutePathRequestsRejectRelativePaths(t *testing.T) {
 			name: "filesystem request",
 			call: func(client *codex.Client) error {
 				_, err := client.Fs.ReadFile(context.Background(), codex.FsReadFileParams{Path: "relative/file.txt"})
+				return err
+			},
+		},
+		{
+			name: "filesystem watch request",
+			call: func(client *codex.Client) error {
+				_, err := client.Fs.Watch(context.Background(), codex.FsWatchParams{
+					Path:    "relative/file.txt",
+					WatchID: "watch-1",
+				})
 				return err
 			},
 		},

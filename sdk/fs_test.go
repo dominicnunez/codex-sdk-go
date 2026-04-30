@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go/sdk"
@@ -466,5 +467,60 @@ func TestFsCopy(t *testing.T) {
 			DestinationPath: "/tmp/dst",
 		})
 		assertRPCErrorCode(t, err, codex.ErrCodeInternalError)
+	})
+}
+
+func TestFsWatch(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		transport := NewMockTransport()
+		client := codex.NewClient(transport)
+		transport.SetResponse("fs/watch", codex.Response{
+			JSONRPC: "2.0",
+			Result:  json.RawMessage(`{"path":"/tmp/project"}`),
+		})
+
+		resp, err := client.Fs.Watch(context.Background(), codex.FsWatchParams{
+			Path:    "/tmp/project",
+			WatchID: "watch-1",
+		})
+		if err != nil {
+			t.Fatalf("Watch() error = %v", err)
+		}
+		if resp.Path != "/tmp/project" {
+			t.Fatalf("Path = %q; want /tmp/project", resp.Path)
+		}
+
+		req := transport.GetSentRequest(0)
+		if req.Method != "fs/watch" {
+			t.Fatalf("method = %q; want fs/watch", req.Method)
+		}
+		var params codex.FsWatchParams
+		if err := json.Unmarshal(req.Params, &params); err != nil {
+			t.Fatalf("unmarshal params: %v", err)
+		}
+		if params.Path != "/tmp/project" || params.WatchID != "watch-1" {
+			t.Fatalf("params = %+v; want watch payload preserved", params)
+		}
+	})
+
+	t.Run("empty watch id", func(t *testing.T) {
+		transport := NewMockTransport()
+		client := codex.NewClient(transport)
+
+		_, err := client.Fs.Watch(context.Background(), codex.FsWatchParams{
+			Path: "/tmp/project",
+		})
+		if err == nil {
+			t.Fatal("expected invalid params error")
+		}
+		if !strings.Contains(err.Error(), "invalid params") {
+			t.Fatalf("error = %v; want invalid params context", err)
+		}
+		if !strings.Contains(err.Error(), "watchId must not be empty") {
+			t.Fatalf("error = %v; want watchId required context", err)
+		}
+		if transport.CallCount() != 0 {
+			t.Fatalf("CallCount() = %d, want 0", transport.CallCount())
+		}
 	})
 }

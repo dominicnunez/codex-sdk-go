@@ -284,6 +284,135 @@ func TestThreadRequestsRejectEmptyRequiredIDs(t *testing.T) {
 			},
 			wantErr: "threadId must not be empty",
 		},
+		{
+			name: "turns list rejects empty thread id",
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.TurnsList(context.Background(), codex.ThreadTurnsListParams{})
+				return err
+			},
+			wantErr: "threadId must not be empty",
+		},
+		{
+			name: "shell command rejects empty thread id",
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.ShellCommand(context.Background(), codex.ThreadShellCommandParams{
+					Command: "pwd",
+				})
+				return err
+			},
+			wantErr: "threadId must not be empty",
+		},
+		{
+			name: "guardian approval rejects empty thread id",
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.ApproveGuardianDeniedAction(
+					context.Background(),
+					codex.ThreadApproveGuardianDeniedActionParams{
+						Event: json.RawMessage(`{}`),
+					},
+				)
+				return err
+			},
+			wantErr: "threadId must not be empty",
+		},
+		{
+			name: "inject items rejects empty thread id",
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.InjectItems(context.Background(), codex.ThreadInjectItemsParams{
+					Items: []json.RawMessage{json.RawMessage(`{}`)},
+				})
+				return err
+			},
+			wantErr: "threadId must not be empty",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := NewMockTransport()
+			client := codex.NewClient(transport)
+
+			err := tt.call(client)
+			if err == nil {
+				t.Fatal("expected invalid params error")
+			}
+			if !strings.Contains(err.Error(), "invalid params") {
+				t.Fatalf("error = %v, want invalid params context", err)
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %v, want substring %q", err, tt.wantErr)
+			}
+			if transport.CallCount() != 0 {
+				t.Fatalf("CallCount() = %d, want 0", transport.CallCount())
+			}
+		})
+	}
+}
+
+func TestThreadRequestsRejectInvalidRequiredParams(t *testing.T) {
+	tests := []struct {
+		name    string
+		call    func(*codex.Client) error
+		wantErr string
+	}{
+		{
+			name: "shell command rejects empty command",
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.ShellCommand(context.Background(), codex.ThreadShellCommandParams{
+					ThreadID: "thread-1",
+				})
+				return err
+			},
+			wantErr: "command must not be empty",
+		},
+		{
+			name: "guardian approval rejects missing event",
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.ApproveGuardianDeniedAction(
+					context.Background(),
+					codex.ThreadApproveGuardianDeniedActionParams{
+						ThreadID: "thread-1",
+					},
+				)
+				return err
+			},
+			wantErr: "event must not be empty",
+		},
+		{
+			name: "guardian approval rejects malformed event",
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.ApproveGuardianDeniedAction(
+					context.Background(),
+					codex.ThreadApproveGuardianDeniedActionParams{
+						ThreadID: "thread-1",
+						Event:    json.RawMessage(`{`),
+					},
+				)
+				return err
+			},
+			wantErr: "event must be valid JSON",
+		},
+		{
+			name: "inject items rejects missing items",
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.InjectItems(context.Background(), codex.ThreadInjectItemsParams{
+					ThreadID: "thread-1",
+				})
+				return err
+			},
+			wantErr: "items must not be null",
+		},
+		{
+			name: "inject items rejects malformed item",
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.InjectItems(context.Background(), codex.ThreadInjectItemsParams{
+					ThreadID: "thread-1",
+					Items:    []json.RawMessage{json.RawMessage(`{`)},
+				})
+				return err
+			},
+			wantErr: "items[0] must be valid JSON",
+		},
 	}
 
 	for _, tt := range tests {
