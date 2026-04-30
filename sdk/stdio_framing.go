@@ -313,8 +313,19 @@ func extractOversizedFrameInfo(prefix []byte, reader *bufio.Reader) oversizedFra
 		return info
 	}
 
-	scanner := newOversizedFrameScanner(prefix, reader)
-	return scanner.scan()
+	buffered := reader.Buffered()
+	if buffered == 0 {
+		return info
+	}
+	bufferedBytes, err := reader.Peek(buffered)
+	if err != nil {
+		return info
+	}
+
+	inspectionBytes := make([]byte, 0, len(prefix)+len(bufferedBytes))
+	inspectionBytes = append(inspectionBytes, prefix...)
+	inspectionBytes = append(inspectionBytes, bufferedBytes...)
+	return inspectOversizedFramePrefix(inspectionBytes)
 }
 
 func inspectOversizedFramePrefix(data []byte) oversizedFrameInfo {
@@ -356,353 +367,42 @@ func inspectOversizedFramePrefix(data []byte) oversizedFrameInfo {
 			return info
 		}
 
-		switch key {
-		case "id":
-			id, valueEnd, ok := consumeRequestIDValue(data, i)
-			if !ok {
-				return info
-			}
-			info.id = id
-			info.hasID = id.Value != nil
-			i = valueEnd
-		case "method":
-			_, _, ok := consumeJSONString(data, i)
-			if !ok {
-				return info
-			}
-			info.hasMethod = true
+		valueEnd, ok := inspectOversizedFrameField(data, key, i, &info)
+		if !ok || info.hasMethod || (info.hasResponseFields && info.hasID) {
 			return info
-		case "result", "error":
-			info.hasResponseFields = true
-			return info
-		default:
-			valueEnd, ok := consumeJSONValue(data, i)
-			if !ok {
-				return info
-			}
-			i = valueEnd
 		}
+		i = valueEnd
 	}
 
 	return info
 }
 
-type oversizedFrameScanner struct {
-	reader *bufio.Reader
-}
-
-func newOversizedFrameScanner(prefix []byte, reader *bufio.Reader) oversizedFrameScanner {
-	source := io.Reader(bytes.NewReader(prefix))
-	if reader != nil && !bytes.HasSuffix(prefix, []byte{'\n'}) {
-		source = io.MultiReader(bytes.NewReader(prefix), &newlineTerminatedReader{reader: reader})
-	}
-	return oversizedFrameScanner{reader: bufio.NewReader(source)}
-}
-
-func (s *oversizedFrameScanner) scan() oversizedFrameInfo {
-	var info oversizedFrameInfo
-
-	start, ok := s.nextNonWhitespaceByte()
-	if !ok || start != '{' {
-		return info
-	}
-
-	for {
-		next, ok := s.nextNonWhitespaceByte()
+func inspectOversizedFrameField(data []byte, key string, valueStart int, info *oversizedFrameInfo) (int, bool) {
+	switch key {
+	case "id":
+		id, valueEnd, ok := consumeRequestIDValue(data, valueStart)
 		if !ok {
-			return info
+			return valueStart, false
 		}
-		switch next {
-		case ',':
-			continue
-		case '}':
-			return info
-		default:
-			if next != '"' {
-				return info
-			}
-		}
-
-		key, ok := s.readJSONString()
-		if !ok || !s.consumeColon() {
-			return info
-		}
-
-		switch key {
-		case "id":
-			id, hasID, ok := s.readRequestID()
-			if !ok {
-				return info
-			}
-			info.id = id
-			info.hasID = hasID
-		case "method":
-			if !s.skipJSONValue() {
-				return info
-			}
-			info.hasMethod = true
-		case "result", "error":
-			info.hasResponseFields = true
-			if !s.skipJSONValue() {
-				return info
-			}
-		default:
-			if !s.skipJSONValue() {
-				return info
-			}
-		}
-	}
-}
-
-type newlineTerminatedReader struct {
-	reader *bufio.Reader
-	done   bool
-}
-
-func (r *newlineTerminatedReader) Read(p []byte) (int, error) {
-	if r.done {
-		return 0, io.EOF
-	}
-	if len(p) == 0 {
-		return 0, nil
-	}
-
-	n := 0
-	for n < len(p) {
-		b, err := r.reader.ReadByte()
-		if err != nil {
-			r.done = true
-			if n > 0 {
-				return n, nil
-			}
-			return 0, err
-		}
-		p[n] = b
-		n++
-		if b == '\n' {
-			r.done = true
-			return n, nil
-		}
-	}
-	return n, nil
-}
-
-func (s *oversizedFrameScanner) nextNonWhitespaceByte() (byte, bool) {
-	for {
-		b, err := s.reader.ReadByte()
-		if err != nil {
-			return 0, false
-		}
-		switch b {
-		case ' ', '\n', '\r', '\t':
-			continue
-		default:
-			return b, true
-		}
-	}
-}
-
-func (s *oversizedFrameScanner) consumeColon() bool {
-	b, ok := s.nextNonWhitespaceByte()
-	return ok && b == ':'
-}
-
-func (s *oversizedFrameScanner) readJSONString() (string, bool) {
-	raw, ok := s.readRawJSONString('"')
-	if !ok {
-		return "", false
-	}
-	var value string
-	if err := json.Unmarshal(raw, &value); err != nil {
-		return "", false
-	}
-	return value, true
-}
-
-func (s *oversizedFrameScanner) readRawJSONString(opening byte) ([]byte, bool) {
-	if opening != '"' {
-		return nil, false
-	}
-
-	var raw bytes.Buffer
-	raw.WriteByte('"')
-	escaped := false
-	for {
-		b, err := s.reader.ReadByte()
-		if err != nil {
-			return nil, false
-		}
-		raw.WriteByte(b)
-		if escaped {
-			escaped = false
-			continue
-		}
-		switch b {
-		case '\\':
-			escaped = true
-		case '"':
-			return raw.Bytes(), true
-		}
-	}
-}
-
-func (s *oversizedFrameScanner) skipJSONValue() bool {
-	first, ok := s.nextNonWhitespaceByte()
-	if !ok {
-		return false
-	}
-
-	switch first {
-	case '"':
-		return s.skipJSONStringBody()
-	case '{':
-		return s.skipJSONObjectBody()
-	case '[':
-		return s.skipJSONArrayBody()
-	default:
-		return s.skipJSONScalar(first)
-	}
-}
-
-func (s *oversizedFrameScanner) skipJSONStringBody() bool {
-	for {
-		segment, err := s.reader.ReadSlice('"')
-		switch {
-		case err == nil:
-			if stringTerminatorUnescaped(segment) {
-				return true
-			}
-		case errors.Is(err, bufio.ErrBufferFull):
-			continue
-		default:
-			return false
-		}
-	}
-}
-
-func stringTerminatorUnescaped(segment []byte) bool {
-	backslashes := 0
-	for i := len(segment) - 2; i >= 0 && segment[i] == '\\'; i-- {
-		backslashes++
-	}
-	return backslashes%2 == 0
-}
-
-func (s *oversizedFrameScanner) skipJSONObjectBody() bool {
-	return s.skipCompositeJSONValue('}')
-}
-
-func (s *oversizedFrameScanner) skipJSONArrayBody() bool {
-	return s.skipCompositeJSONValue(']')
-}
-
-func (s *oversizedFrameScanner) skipCompositeJSONValue(closing byte) bool {
-	stack := []byte{closing}
-	for len(stack) > 0 {
-		b, err := s.reader.ReadByte()
-		if err != nil {
-			return false
-		}
-		switch b {
-		case '"':
-			if !s.skipJSONStringBody() {
-				return false
-			}
-		case '{':
-			stack = append(stack, '}')
-		case '[':
-			stack = append(stack, ']')
-		case '}', ']':
-			if b != stack[len(stack)-1] {
-				return false
-			}
-			stack = stack[:len(stack)-1]
-		}
-	}
-	return true
-}
-
-func (s *oversizedFrameScanner) skipJSONScalar(first byte) bool {
-	if isJSONScalarTerminator(first) {
-		return false
-	}
-	for {
-		b, err := s.reader.ReadByte()
-		if err != nil {
-			return errors.Is(err, io.EOF)
-		}
-		if isJSONScalarTerminator(b) {
-			if err := s.reader.UnreadByte(); err != nil {
-				return false
-			}
-			return true
-		}
-	}
-}
-
-func (s *oversizedFrameScanner) readRequestID() (RequestID, bool, bool) {
-	first, ok := s.nextNonWhitespaceByte()
-	if !ok {
-		return RequestID{}, false, false
-	}
-
-	var raw []byte
-	switch first {
-	case '"':
-		var ok bool
-		raw, ok = s.readRawJSONString(first)
+		info.id = id
+		info.hasID = id.Value != nil
+		return valueEnd, true
+	case "method":
+		valueEnd, ok := consumeJSONValue(data, valueStart)
 		if !ok {
-			return RequestID{}, false, false
+			return valueStart, false
 		}
-	case '{', '[':
-		return RequestID{}, false, false
-	default:
-		var ok bool
-		raw, ok = s.readJSONScalar(first)
+		info.hasMethod = true
+		return valueEnd, true
+	case "result", "error":
+		info.hasResponseFields = true
+		valueEnd, ok := consumeJSONValue(data, valueStart)
 		if !ok {
-			return RequestID{}, false, false
+			return valueStart, false
 		}
+		return valueEnd, true
 	}
-
-	var id RequestID
-	if err := json.Unmarshal(raw, &id); err != nil {
-		return RequestID{}, false, false
-	}
-	return id, id.Value != nil, true
-}
-
-func (s *oversizedFrameScanner) readJSONScalar(first byte) ([]byte, bool) {
-	if isJSONScalarTerminator(first) {
-		return nil, false
-	}
-
-	var raw bytes.Buffer
-	raw.WriteByte(first)
-	for {
-		b, err := s.reader.ReadByte()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				return raw.Bytes(), true
-			}
-			return nil, false
-		}
-		if isJSONScalarTerminator(b) {
-			if err := s.reader.UnreadByte(); err != nil {
-				return nil, false
-			}
-			return raw.Bytes(), true
-		}
-		raw.WriteByte(b)
-	}
-}
-
-func isJSONScalarTerminator(b byte) bool {
-	switch b {
-	case ',', '}', ']', ' ', '\n', '\r', '\t':
-		return true
-	default:
-		return false
-	}
+	return consumeJSONValue(data, valueStart)
 }
 
 func skipJSONWhitespace(data []byte, start int) int {

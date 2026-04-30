@@ -51,6 +51,63 @@ func TestReadLimitedLinePreservesBufferedBytesAfterNewline(t *testing.T) {
 	}
 }
 
+func TestReadLimitedLineOversizedClassificationDoesNotWaitForLiveReader(t *testing.T) {
+	const (
+		frameLimitBytes                = 32
+		readBufferBytes                = 16
+		oversizedClassificationTimeout = 200 * time.Millisecond
+		unterminatedKeyPrefix          = `{"jsonrpc":"2.0","`
+	)
+
+	reader, writer := io.Pipe()
+	defer func() { _ = reader.Close() }()
+	defer func() { _ = writer.Close() }()
+
+	type readResult struct {
+		oversize *oversizedFrameInfo
+		err      error
+	}
+	resultCh := make(chan readResult, 1)
+	go func() {
+		bufferedReader := bufio.NewReaderSize(reader, readBufferBytes)
+		_, oversize, err := readLimitedLine(bufferedReader, frameLimitBytes)
+		resultCh <- readResult{oversize: oversize, err: err}
+	}()
+
+	payloadBytes := frameLimitBytes + readBufferBytes - len(unterminatedKeyPrefix)
+	if payloadBytes <= 0 {
+		t.Fatal("invalid oversized test payload")
+	}
+	oversizedPrefix := unterminatedKeyPrefix + strings.Repeat("x", payloadBytes)
+
+	writeCh := make(chan error, 1)
+	go func() {
+		_, err := writer.Write([]byte(oversizedPrefix))
+		writeCh <- err
+	}()
+
+	select {
+	case result := <-resultCh:
+		if result.err != nil {
+			t.Fatalf("readLimitedLine() error = %v; want nil", result.err)
+		}
+		if result.oversize == nil {
+			t.Fatal("readLimitedLine() oversize = nil; want oversized frame info")
+		}
+	case <-time.After(oversizedClassificationTimeout):
+		t.Fatal("readLimitedLine() waited for more bytes after the frame exceeded the limit")
+	}
+
+	select {
+	case err := <-writeCh:
+		if err != nil {
+			t.Fatalf("writer.Write() error = %v; want nil", err)
+		}
+	case <-time.After(oversizedClassificationTimeout):
+		t.Fatal("writer.Write() did not complete")
+	}
+}
+
 func TestHandleInvalidRequestObjectInvalidIDUsesNullID(t *testing.T) {
 	var buf safeBuffer
 	ctx, cancel := context.WithCancel(context.Background())
