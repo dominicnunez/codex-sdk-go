@@ -6,11 +6,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	codex "github.com/dominicnunez/codex-sdk-go/sdk"
+)
+
+const (
+	preStartOverflowFloodCount = 1100
+	preStartOverflowTimeout    = 5 * time.Second
+	preStartOverflowMessage    = "pending turn/start notification queue overflow"
 )
 
 func writeStdioResult(enc *json.Encoder, id codex.RequestID, result interface{}) error {
@@ -206,12 +213,24 @@ type staleMalformedTurnCompletedTransport struct {
 	turnStarts   int
 }
 
+type floodDuringTurnStartTransport struct {
+	*MockTransport
+	notifHandler codex.NotificationHandler
+	threadID     string
+	floodCount   int
+}
+
 func (t *notifyDuringSendTransport) OnNotify(handler codex.NotificationHandler) {
 	t.notifHandler = handler
 	t.MockTransport.OnNotify(handler)
 }
 
 func (t *staleMalformedTurnCompletedTransport) OnNotify(handler codex.NotificationHandler) {
+	t.notifHandler = handler
+	t.MockTransport.OnNotify(handler)
+}
+
+func (t *floodDuringTurnStartTransport) OnNotify(handler codex.NotificationHandler) {
 	t.notifHandler = handler
 	t.MockTransport.OnNotify(handler)
 }
@@ -288,6 +307,57 @@ func (t *staleMalformedTurnCompletedTransport) Send(ctx context.Context, req cod
 	return resp, nil
 }
 
+func (t *floodDuringTurnStartTransport) Send(ctx context.Context, req codex.Request) (codex.Response, error) {
+	resp, err := t.MockTransport.Send(ctx, req)
+	if err != nil {
+		return resp, err
+	}
+
+	if req.Method == "turn/start" && t.notifHandler != nil {
+		for i := 0; i < t.floodCount; i++ {
+			t.notifHandler(ctx, codex.Notification{
+				JSONRPC: "2.0",
+				Method:  "item/completed",
+				Params: json.RawMessage(fmt.Sprintf(
+					`{"threadId":"%s","turnId":"turn-1","item":{"type":"agentMessage","id":"item-%d","text":"message %d"}}`,
+					t.threadID,
+					i,
+					i,
+				)),
+			})
+		}
+	}
+
+	return resp, nil
+}
+
+func newFloodDuringTurnStartProcess(t *testing.T, handler func(string, error)) (*codex.Process, *floodDuringTurnStartTransport) {
+	t.Helper()
+
+	base := NewMockTransport()
+	_ = base.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
+	_ = base.SetResponseData("thread/start", validProcessThreadStartResponse(validProcessThreadPayload("thread-1")))
+	_ = base.SetResponseData("turn/start", map[string]interface{}{
+		"turn": map[string]interface{}{
+			"id":     "turn-1",
+			"status": "inProgress",
+			"items":  []interface{}{},
+		},
+	})
+
+	transport := &floodDuringTurnStartTransport{
+		MockTransport: base,
+		threadID:      "thread-1",
+		floodCount:    preStartOverflowFloodCount,
+	}
+	client := codex.NewClient(
+		transport,
+		codex.WithRequestTimeout(preStartOverflowTimeout),
+		codex.WithHandlerErrorCallback(handler),
+	)
+	return codex.NewProcessFromClient(client), transport
+}
+
 func TestRunNotificationBeforeTurnStartResponse(t *testing.T) {
 	base := NewMockTransport()
 
@@ -334,6 +404,36 @@ func TestRunNotificationBeforeTurnStartResponse(t *testing.T) {
 	}
 	if result.Turn.ID != "turn-1" {
 		t.Errorf("Turn.ID = %q, want %q", result.Turn.ID, "turn-1")
+	}
+}
+
+func TestRunFailsWhenPreStartNotificationQueueOverflows(t *testing.T) {
+	reportedErrs := make(chan error, preStartOverflowFloodCount)
+	proc, _ := newFloodDuringTurnStartProcess(t, func(_ string, err error) {
+		reportedErrs <- err
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), preStartOverflowTimeout)
+	defer cancel()
+
+	result, err := proc.Run(ctx, codex.RunOptions{Prompt: "overflow"})
+	if err == nil {
+		t.Fatal("Run() error = nil; want pre-start queue overflow")
+	}
+	if result != nil {
+		t.Fatalf("Run() result = %#v; want nil", result)
+	}
+	if !strings.Contains(err.Error(), preStartOverflowMessage) {
+		t.Fatalf("Run() error = %v; want %q", err, preStartOverflowMessage)
+	}
+
+	select {
+	case reported := <-reportedErrs:
+		if !strings.Contains(reported.Error(), preStartOverflowMessage) {
+			t.Fatalf("reported error = %v; want %q", reported, preStartOverflowMessage)
+		}
+	default:
+		t.Fatal("expected handler error callback for pre-start queue overflow")
 	}
 }
 
@@ -399,6 +499,32 @@ func TestRunStreamedNotificationBeforeTurnStartResponse(t *testing.T) {
 	}
 	if len(result.Items) != 1 {
 		t.Errorf("len(Items) = %d, want 1", len(result.Items))
+	}
+}
+
+func TestRunStreamedFailsWhenPreStartNotificationQueueOverflows(t *testing.T) {
+	proc, _ := newFloodDuringTurnStartProcess(t, nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), preStartOverflowTimeout)
+	defer cancel()
+
+	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "overflow"})
+	var gotErr error
+	for _, err := range stream.Events() {
+		if err != nil {
+			gotErr = err
+			break
+		}
+	}
+
+	if gotErr == nil {
+		t.Fatal("RunStreamed() error = nil; want pre-start queue overflow")
+	}
+	if !strings.Contains(gotErr.Error(), preStartOverflowMessage) {
+		t.Fatalf("RunStreamed() error = %v; want %q", gotErr, preStartOverflowMessage)
+	}
+	if result := stream.Result(); result != nil {
+		t.Fatalf("RunStreamed() result = %#v; want nil", result)
 	}
 }
 

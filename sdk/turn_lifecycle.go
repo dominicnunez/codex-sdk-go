@@ -3,9 +3,14 @@ package codex
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 )
+
+const maxPendingTurnStartNotifications = 1024
+
+var errPendingTurnStartQueueOverflow = errors.New("pending turn/start notification queue overflow")
 
 // threadIDCarrier extracts thread-scoping fields from raw notification JSON for filtering.
 type threadIDCarrier struct {
@@ -193,37 +198,64 @@ type blockingTurnState struct {
 	turnID             string
 	pendingItems       []ItemCompletedNotification
 	pendingCompletions []turnCompletionCandidate
+	pendingCount       int
+	overflowErr        error
 }
 
-func (s *blockingTurnState) queueItem(n ItemCompletedNotification) (ThreadItemWrapper, bool) {
+func newPendingTurnStartOverflowError() error {
+	return fmt.Errorf("%w: queued notification limit %d reached", errPendingTurnStartQueueOverflow, maxPendingTurnStartNotifications)
+}
+
+func (s *blockingTurnState) queuePendingLocked() error {
+	if s.pendingCount >= maxPendingTurnStartNotifications {
+		s.overflowErr = newPendingTurnStartOverflowError()
+		return s.overflowErr
+	}
+	s.pendingCount++
+	return nil
+}
+
+func (s *blockingTurnState) queueItem(n ItemCompletedNotification) (ThreadItemWrapper, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if !s.ready {
+		if s.overflowErr != nil {
+			return ThreadItemWrapper{}, false, nil
+		}
+		if err := s.queuePendingLocked(); err != nil {
+			return ThreadItemWrapper{}, false, err
+		}
 		s.pendingItems = append(s.pendingItems, n)
-		return ThreadItemWrapper{}, false
+		return ThreadItemWrapper{}, false, nil
 	}
 	if n.TurnID != s.turnID {
-		return ThreadItemWrapper{}, false
+		return ThreadItemWrapper{}, false, nil
 	}
-	return n.Item, true
+	return n.Item, true, nil
 }
 
-func (s *blockingTurnState) queueCompletion(n turnCompletionCandidate) (TurnCompletedNotification, bool) {
+func (s *blockingTurnState) queueCompletion(n turnCompletionCandidate) (TurnCompletedNotification, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if !s.ready {
+		if s.overflowErr != nil {
+			return TurnCompletedNotification{}, false, nil
+		}
+		if err := s.queuePendingLocked(); err != nil {
+			return TurnCompletedNotification{}, false, err
+		}
 		s.pendingCompletions = append(s.pendingCompletions, n)
-		return TurnCompletedNotification{}, false
+		return TurnCompletedNotification{}, false, nil
 	}
 	if !matchesActiveTurn(s.turnID, n) {
-		return TurnCompletedNotification{}, false
+		return TurnCompletedNotification{}, false, nil
 	}
-	return n.notification, true
+	return n.notification, true, nil
 }
 
-func (s *blockingTurnState) start(turnID string) ([]ItemCompletedNotification, []turnCompletionCandidate) {
+func (s *blockingTurnState) start(turnID string) ([]ItemCompletedNotification, []turnCompletionCandidate, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -231,9 +263,86 @@ func (s *blockingTurnState) start(turnID string) ([]ItemCompletedNotification, [
 	s.turnID = turnID
 	items := s.pendingItems
 	completions := s.pendingCompletions
+	err := s.overflowErr
 	s.pendingItems = nil
 	s.pendingCompletions = nil
-	return items, completions
+	s.pendingCount = 0
+	return items, completions, err
+}
+
+type streamedTurnState struct {
+	mu                 sync.Mutex
+	ready              bool
+	turnID             string
+	pendingEvents      []func(string)
+	pendingCompletions []turnCompletionCandidate
+	pendingCount       int
+	overflowErr        error
+}
+
+func (s *streamedTurnState) queuePendingLocked() error {
+	if s.pendingCount >= maxPendingTurnStartNotifications {
+		s.overflowErr = newPendingTurnStartOverflowError()
+		return s.overflowErr
+	}
+	s.pendingCount++
+	return nil
+}
+
+func (s *streamedTurnState) queueEvent(turnID string, fn func()) (string, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.ready {
+		if s.overflowErr != nil {
+			return "", false, nil
+		}
+		if err := s.queuePendingLocked(); err != nil {
+			return "", false, err
+		}
+		capturedTurnID := turnID
+		s.pendingEvents = append(s.pendingEvents, func(activeTurnID string) {
+			if capturedTurnID == activeTurnID {
+				fn()
+			}
+		})
+		return "", false, nil
+	}
+
+	return s.turnID, true, nil
+}
+
+func (s *streamedTurnState) queueCompletion(n turnCompletionCandidate) (string, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.ready {
+		if s.overflowErr != nil {
+			return "", false, nil
+		}
+		if err := s.queuePendingLocked(); err != nil {
+			return "", false, err
+		}
+		s.pendingCompletions = append(s.pendingCompletions, n)
+		return "", false, nil
+	}
+
+	return s.turnID, true, nil
+}
+
+func (s *streamedTurnState) start(turnID string) ([]func(string), []turnCompletionCandidate, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.ready = true
+	s.turnID = turnID
+	events := s.pendingEvents
+	completions := s.pendingCompletions
+	err := s.overflowErr
+	s.pendingEvents = nil
+	s.pendingCompletions = nil
+	s.pendingCount = 0
+	return events, completions, err
 }
 
 func waitForTurnCompletion(ctx context.Context, done <-chan TurnCompletedNotification) (TurnCompletedNotification, error) {
@@ -294,7 +403,11 @@ func executeTurn(ctx context.Context, p turnLifecycleParams) (*RunResult, error)
 		if err != nil {
 			p.client.reportHandlerError(notifyItemCompleted, fmt.Errorf("unmarshal %s: %w", notifyItemCompleted, err))
 		}
-		item, ok := state.queueItem(n)
+		item, ok, err := state.queueItem(n)
+		if err != nil {
+			p.client.reportHandlerError(notifyItemCompleted, err)
+			return
+		}
 		if !ok {
 			return
 		}
@@ -313,7 +426,11 @@ func executeTurn(ctx context.Context, p turnLifecycleParams) (*RunResult, error)
 				p.client.reportHandlerError(notifyTurnCompleted, fmt.Errorf("validate %s: %w", notifyTurnCompleted, err))
 			}
 		}
-		completed, ok := state.queueCompletion(candidate)
+		completed, ok, err := state.queueCompletion(candidate)
+		if err != nil {
+			p.client.reportHandlerError(notifyTurnCompleted, err)
+			return
+		}
 		if !ok {
 			return
 		}
@@ -334,7 +451,10 @@ func executeTurn(ctx context.Context, p turnLifecycleParams) (*RunResult, error)
 		p.onStart()
 	}
 
-	bufferedItems, bufferedCompletions := state.start(startResp.Turn.ID)
+	bufferedItems, bufferedCompletions, err := state.start(startResp.Turn.ID)
+	if err != nil {
+		return nil, err
+	}
 
 	for _, n := range bufferedItems {
 		if n.TurnID == startResp.Turn.ID {
@@ -369,15 +489,12 @@ func executeTurn(ctx context.Context, p turnLifecycleParams) (*RunResult, error)
 // starts the turn, and sends events on ch until completion or context cancellation.
 func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, g *guardedChan, s *Stream) {
 	var (
-		items                 []ThreadItemWrapper
-		itemsMu               sync.Mutex
-		turnStateMu           sync.Mutex
-		turnReady             bool
-		allowMissingTurnID    = p.allowMissingInitialTurnID
-		startedTurnID         string
-		pendingTurnScoped     []func(string)
-		pendingTurnCompletion []turnCompletionCandidate
-		unsubFuncs            []func()
+		items              []ThreadItemWrapper
+		itemsMu            sync.Mutex
+		turnState          streamedTurnState
+		allowMissingTurnID = p.allowMissingInitialTurnID
+		startedTurnID      string
+		unsubFuncs         []func()
 	)
 	defer func() {
 		for _, unsub := range unsubFuncs {
@@ -410,37 +527,24 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, g *guardedC
 	turnDone := make(chan TurnCompletedNotification, 1)
 
 	dispatchTurnScoped := func(turnID string, fn func()) {
-		turnStateMu.Lock()
-		if !turnReady {
-			capturedTurnID := turnID
-			pendingTurnScoped = append(pendingTurnScoped, func(activeTurnID string) {
-				if capturedTurnID == activeTurnID {
-					fn()
-				}
-			})
-			turnStateMu.Unlock()
+		activeTurnID, ready, err := turnState.queueEvent(turnID, fn)
+		if err != nil {
+			emitErr(err)
 			return
 		}
-		activeTurnID := startedTurnID
-		turnStateMu.Unlock()
-
-		if turnID != activeTurnID {
+		if !ready || turnID != activeTurnID {
 			return
 		}
 		fn()
 	}
 
 	queueTurnCompletionCandidate := func(n turnCompletionCandidate) {
-		turnStateMu.Lock()
-		if !turnReady {
-			pendingTurnCompletion = append(pendingTurnCompletion, n)
-			turnStateMu.Unlock()
+		activeTurnID, ready, err := turnState.queueCompletion(n)
+		if err != nil {
+			emitErr(err)
 			return
 		}
-		activeTurnID := startedTurnID
-		turnStateMu.Unlock()
-
-		if !matchesActiveTurn(activeTurnID, n) {
+		if !ready || !matchesActiveTurn(activeTurnID, n) {
 			return
 		}
 		select {
@@ -467,14 +571,12 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, g *guardedC
 		p.onStart()
 	}
 
-	turnStateMu.Lock()
-	turnReady = true
 	startedTurnID = startResp.Turn.ID
-	pendingEvents := pendingTurnScoped
-	pendingCompletions := pendingTurnCompletion
-	pendingTurnScoped = nil
-	pendingTurnCompletion = nil
-	turnStateMu.Unlock()
+	pendingEvents, pendingCompletions, err := turnState.start(startedTurnID)
+	if err != nil {
+		emitErr(err)
+		return
+	}
 
 	for _, pending := range pendingEvents {
 		pending(startedTurnID)
