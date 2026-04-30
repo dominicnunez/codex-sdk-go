@@ -364,6 +364,12 @@ const (
 	loginTypeChatgptAuthTokens = "chatgptAuthTokens"
 )
 
+const (
+	loginFieldApiKey           = "apiKey"
+	loginFieldAccessToken      = "accessToken"
+	loginFieldChatgptAccountID = "chatgptAccountId"
+)
+
 var errNilLoginAccountParams = errors.New("login params cannot be nil")
 var errEmptyLoginAccountResponse = errors.New("login response must be a non-null object")
 var errMissingLoginAccountResponseType = errors.New("login response missing type")
@@ -397,6 +403,9 @@ func (p *ApiKeyLoginAccountParams) MarshalJSON() ([]byte, error) {
 func (p *ApiKeyLoginAccountParams) marshalWire() ([]byte, error) {
 	if p == nil {
 		return nil, errNilLoginAccountParams
+	}
+	if err := validateRequiredNonEmptyStringField(loginFieldApiKey, p.ApiKey); err != nil {
+		return nil, err
 	}
 	w := ApiKeyLoginAccountParams{
 		Type:   loginTypeApiKey,
@@ -465,6 +474,12 @@ func (p *ChatgptAuthTokensLoginAccountParams) MarshalJSON() ([]byte, error) {
 func (p *ChatgptAuthTokensLoginAccountParams) marshalWire() ([]byte, error) {
 	if p == nil {
 		return nil, errNilLoginAccountParams
+	}
+	if err := validateRequiredNonEmptyStringField(loginFieldAccessToken, p.AccessToken); err != nil {
+		return nil, err
+	}
+	if err := validateRequiredNonEmptyStringField(loginFieldChatgptAccountID, p.ChatgptAccountId); err != nil {
+		return nil, err
 	}
 	w := ChatgptAuthTokensLoginAccountParams{
 		Type:             loginTypeChatgptAuthTokens,

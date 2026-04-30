@@ -377,6 +377,52 @@ func TestAccountLoginUntypedNilParamsReturnsError(t *testing.T) {
 	}
 }
 
+func TestAccountLoginRejectsEmptyCredentialFields(t *testing.T) {
+	tests := []struct {
+		name    string
+		params  codex.LoginAccountParams
+		wantErr string
+	}{
+		{
+			name:    "api key login requires api key",
+			params:  &codex.ApiKeyLoginAccountParams{},
+			wantErr: "apiKey must not be empty",
+		},
+		{
+			name: "chatgpt auth token login requires access token",
+			params: &codex.ChatgptAuthTokensLoginAccountParams{
+				ChatgptAccountId: "acct-1",
+			},
+			wantErr: "accessToken must not be empty",
+		},
+		{
+			name: "chatgpt auth token login requires account id",
+			params: &codex.ChatgptAuthTokensLoginAccountParams{
+				AccessToken: "token-1",
+			},
+			wantErr: "chatgptAccountId must not be empty",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := NewMockTransport()
+			client := codex.NewClient(transport)
+
+			_, err := client.Account.Login(context.Background(), tt.params)
+			if err == nil {
+				t.Fatal("expected error for empty credential field")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %q, want %q", err, tt.wantErr)
+			}
+			if got := transport.CallCount(); got != 0 {
+				t.Fatalf("transport call count = %d, want 0", got)
+			}
+		})
+	}
+}
+
 func TestAccountLogin(t *testing.T) {
 	tests := []struct {
 		name     string
