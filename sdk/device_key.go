@@ -93,6 +93,9 @@ func (r *DeviceKeyCreateResponse) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	if err := validateNonEmptyInboundBase64Field("publicKeySpkiDerBase64", decoded.PublicKeySpkiDerBase64); err != nil {
+		return err
+	}
 	*r = DeviceKeyCreateResponse(decoded)
 	return nil
 }
@@ -124,6 +127,9 @@ func (r *DeviceKeyPublicResponse) UnmarshalJSON(data []byte) error {
 	type wire DeviceKeyPublicResponse
 	var decoded wire
 	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	if err := validateNonEmptyInboundBase64Field("publicKeySpkiDerBase64", decoded.PublicKeySpkiDerBase64); err != nil {
 		return err
 	}
 	*r = DeviceKeyPublicResponse(decoded)
@@ -239,14 +245,16 @@ func validateRemoteControlClientConnectionDeviceKeySignPayload(p *RemoteControlC
 		return invalidParamsError("%v", err)
 	}
 	if err := validateNonEmptyDeviceKeyPayloadStrings(map[string]string{
-		"payload.accountUserId":        p.AccountUserID,
-		"payload.clientId":             p.ClientID,
-		"payload.nonce":                p.Nonce,
-		"payload.sessionId":            p.SessionID,
-		"payload.targetOrigin":         p.TargetOrigin,
-		"payload.targetPath":           p.TargetPath,
-		"payload.tokenSha256Base64url": p.TokenSha256Base64url,
+		"payload.accountUserId": p.AccountUserID,
+		"payload.clientId":      p.ClientID,
+		"payload.nonce":         p.Nonce,
+		"payload.sessionId":     p.SessionID,
+		"payload.targetOrigin":  p.TargetOrigin,
+		"payload.targetPath":    p.TargetPath,
 	}); err != nil {
+		return err
+	}
+	if err := validateOutboundSHA256Base64URLField("payload.tokenSha256Base64url", p.TokenSha256Base64url); err != nil {
 		return err
 	}
 	if len(p.Scopes) != remoteControlClientConnectionScopeCount || p.Scopes[0] != remoteControlClientConnectionScope {
@@ -265,15 +273,17 @@ func validateRemoteControlClientEnrollmentDeviceKeySignPayload(p *RemoteControlC
 	if err := validateEnumValue("payload.audience", p.Audience, validRemoteControlClientEnrollmentAudiences); err != nil {
 		return invalidParamsError("%v", err)
 	}
-	return validateNonEmptyDeviceKeyPayloadStrings(map[string]string{
-		"payload.accountUserId":                 p.AccountUserID,
-		"payload.challengeId":                   p.ChallengeID,
-		"payload.clientId":                      p.ClientID,
-		"payload.deviceIdentitySha256Base64url": p.DeviceIdentitySha256Base64url,
-		"payload.nonce":                         p.Nonce,
-		"payload.targetOrigin":                  p.TargetOrigin,
-		"payload.targetPath":                    p.TargetPath,
-	})
+	if err := validateNonEmptyDeviceKeyPayloadStrings(map[string]string{
+		"payload.accountUserId": p.AccountUserID,
+		"payload.challengeId":   p.ChallengeID,
+		"payload.clientId":      p.ClientID,
+		"payload.nonce":         p.Nonce,
+		"payload.targetOrigin":  p.TargetOrigin,
+		"payload.targetPath":    p.TargetPath,
+	}); err != nil {
+		return err
+	}
+	return validateOutboundSHA256Base64URLField("payload.deviceIdentitySha256Base64url", p.DeviceIdentitySha256Base64url)
 }
 
 func validateNonEmptyDeviceKeyPayloadStrings(fields map[string]string) error {
@@ -299,6 +309,12 @@ func (r *DeviceKeySignResponse) UnmarshalJSON(data []byte) error {
 	type wire DeviceKeySignResponse
 	var decoded wire
 	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	if err := validateNonEmptyInboundBase64Field("signatureDerBase64", decoded.SignatureDerBase64); err != nil {
+		return err
+	}
+	if err := validateNonEmptyInboundBase64Field("signedPayloadBase64", decoded.SignedPayloadBase64); err != nil {
 		return err
 	}
 	*r = DeviceKeySignResponse(decoded)

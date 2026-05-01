@@ -71,7 +71,7 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 				ChallengeExpiresAt:            1,
 				ChallengeID:                   "challenge-1",
 				ClientID:                      "client-1",
-				DeviceIdentitySha256Base64url: "digest",
+				DeviceIdentitySha256Base64url: validDeviceKeyHashBase64URL(),
 				Nonce:                         "nonce",
 				TargetOrigin:                  "https://example.com",
 				TargetPath:                    "/client/enroll",
