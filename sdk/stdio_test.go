@@ -16,6 +16,21 @@ import (
 	"github.com/dominicnunez/codex-sdk-go/sdk"
 )
 
+const (
+	stdioMicroPollInterval       = time.Millisecond
+	stdioPollInterval            = 10 * time.Millisecond
+	stdioShortDelay              = 50 * time.Millisecond
+	stdioShortTimeout            = 100 * time.Millisecond
+	stdioMediumTimeout           = 150 * time.Millisecond
+	stdioResponseTimeout         = 200 * time.Millisecond
+	stdioAssertionTimeout        = 500 * time.Millisecond
+	stdioRequestTimeout          = time.Second
+	stdioExtendedRequestTimeout  = 1500 * time.Millisecond
+	stdioLongRequestTimeout      = 2 * time.Second
+	stdioProcessAssertionTimeout = 3 * time.Second
+	stdioSlowAssertionTimeout    = 5 * time.Second
+)
+
 // TestStdioNewlineDelimitedJSON verifies that messages are encoded/decoded as newline-delimited JSON
 func TestStdioNewlineDelimitedJSON(t *testing.T) {
 	// Create pipes to simulate stdin/stdout
@@ -39,7 +54,7 @@ func TestStdioNewlineDelimitedJSON(t *testing.T) {
 	}()
 
 	// Send a request
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), stdioRequestTimeout)
 	defer cancel()
 
 	req := codex.Request{
@@ -75,7 +90,7 @@ func TestStdioNewlineDelimitedJSON(t *testing.T) {
 		if decoded["method"] != "test/method" {
 			t.Errorf("method field = %v; want test/method", decoded["method"])
 		}
-	case <-time.After(100 * time.Millisecond):
+	case <-time.After(stdioShortTimeout):
 		t.Fatal("timeout waiting for message to be sent")
 	}
 
@@ -96,7 +111,7 @@ func TestStdioNewlineDelimitedJSON(t *testing.T) {
 		}
 	case err := <-errorChan:
 		t.Fatalf("Send returned error: %v", err)
-	case <-time.After(100 * time.Millisecond):
+	case <-time.After(stdioShortTimeout):
 		t.Fatal("timeout waiting for response")
 	}
 }
@@ -142,7 +157,7 @@ func TestStdioConcurrentRequestDispatch(t *testing.T) {
 	}
 
 	// Wait for all requests to be processed
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(stdioShortTimeout)
 
 	// Verify all requests were received
 	for _, method := range requests {
@@ -242,14 +257,14 @@ func TestStdioResponseRequestIDMatching(t *testing.T) {
 	}()
 
 	// Wait for all requests to be sent and collect them
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(stdioShortDelay)
 
 	requests := make([]codex.Request, 0, 5)
 	for i := 0; i < 5; i++ {
 		select {
 		case req := <-sentRequests:
 			requests = append(requests, req)
-		case <-time.After(100 * time.Millisecond):
+		case <-time.After(stdioShortTimeout):
 			t.Fatal("timeout waiting for requests to be sent")
 		}
 	}
@@ -292,7 +307,7 @@ func TestStdioResponseRequestIDMatching(t *testing.T) {
 			if string(res.result) != want {
 				t.Errorf("request id %v: got result %s; want %s", res.id, res.result, want)
 			}
-		case <-time.After(200 * time.Millisecond):
+		case <-time.After(stdioResponseTimeout):
 			t.Fatal("timeout waiting for responses")
 		}
 	}
@@ -315,7 +330,7 @@ func TestStdioRequestIDTypeFamiliesDoNotCollide(t *testing.T) {
 		err    error
 	}
 	results := make(chan sendResult, 2)
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), stdioLongRequestTimeout)
 	defer cancel()
 
 	go func() {
@@ -363,7 +378,7 @@ func TestStdioRequestIDTypeFamiliesDoNotCollide(t *testing.T) {
 			sentRequests = append(sentRequests, req)
 		case err := <-scanErr:
 			t.Fatalf("scan outbound requests: %v", err)
-		case <-time.After(500 * time.Millisecond):
+		case <-time.After(stdioAssertionTimeout):
 			t.Fatalf("expected two outbound requests, got %d", len(sentRequests))
 		}
 	}
@@ -391,7 +406,7 @@ func TestStdioRequestIDTypeFamiliesDoNotCollide(t *testing.T) {
 				t.Fatalf("%s-id send returned error: %v", res.label, res.err)
 			}
 			got[res.label] = res.result
-		case <-time.After(500 * time.Millisecond):
+		case <-time.After(stdioAssertionTimeout):
 			t.Fatal("timeout waiting for responses")
 		}
 	}
@@ -427,7 +442,7 @@ func TestStdioAllowsReusingRequestIDAfterResponse(t *testing.T) {
 		}
 	}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), stdioLongRequestTimeout)
 	defer cancel()
 
 	roundTrip := func(method, payload string) codex.Response {
@@ -450,7 +465,7 @@ func TestStdioAllowsReusingRequestIDAfterResponse(t *testing.T) {
 		var req codex.Request
 		select {
 		case req = <-requests:
-		case <-time.After(500 * time.Millisecond):
+		case <-time.After(stdioAssertionTimeout):
 			t.Fatalf("timeout waiting for request %q", method)
 		}
 
@@ -467,7 +482,7 @@ func TestStdioAllowsReusingRequestIDAfterResponse(t *testing.T) {
 			t.Fatalf("send %q returned error: %v", method, err)
 		case out := <-respCh:
 			return out
-		case <-time.After(500 * time.Millisecond):
+		case <-time.After(stdioAssertionTimeout):
 			t.Fatalf("timeout waiting for response %q", method)
 		}
 		return codex.Response{}
@@ -524,7 +539,7 @@ func TestStdioNotificationDispatch(t *testing.T) {
 		select {
 		case method := <-received:
 			receivedMethods[method] = true
-		case <-time.After(100 * time.Millisecond):
+		case <-time.After(stdioShortTimeout):
 			t.Fatal("timeout waiting for notifications")
 		}
 	}
@@ -629,7 +644,7 @@ func TestStdioMixedMessageTypes(t *testing.T) {
 	_, _ = serverWriter.Write(append(notifJSON, '\n'))
 
 	// Wait for all messages to be processed
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(stdioResponseTimeout)
 
 	mu.Lock()
 	defer mu.Unlock()
@@ -730,7 +745,7 @@ func TestStdioInvalidJSON(t *testing.T) {
 		if method != "test/valid" {
 			t.Errorf("received method = %s; want test/valid", method)
 		}
-	case <-time.After(200 * time.Millisecond):
+	case <-time.After(stdioResponseTimeout):
 		t.Error("timeout waiting for valid notification after invalid JSON")
 	}
 
@@ -780,7 +795,7 @@ func TestStdioUnknownMessageTypeSkipped(t *testing.T) {
 		if method != "test/after-unknown" {
 			t.Errorf("received method = %s; want test/after-unknown", method)
 		}
-	case <-time.After(200 * time.Millisecond):
+	case <-time.After(stdioResponseTimeout):
 		t.Fatal("timeout: transport stopped working after unknown message type")
 	}
 }
@@ -813,7 +828,7 @@ func TestStdioContextCancellation(t *testing.T) {
 	}()
 
 	// Wait for request to be sent
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(stdioShortDelay)
 
 	// Cancel the context before response arrives
 	cancel()
@@ -828,7 +843,7 @@ func TestStdioContextCancellation(t *testing.T) {
 		if err != context.Canceled && !strings.Contains(err.Error(), "context canceled") {
 			t.Errorf("unexpected error: %v; want context.Canceled or similar", err)
 		}
-	case <-time.After(100 * time.Millisecond):
+	case <-time.After(stdioShortTimeout):
 		t.Fatal("timeout waiting for Send to return after context cancellation")
 	}
 }
@@ -877,7 +892,7 @@ func TestStdioRequestHandlerPanicRecovery(t *testing.T) {
 		if resp.Error.Code != codex.ErrCodeInternalError {
 			t.Errorf("error code = %d; want %d", resp.Error.Code, codex.ErrCodeInternalError)
 		}
-	case <-time.After(500 * time.Millisecond):
+	case <-time.After(stdioAssertionTimeout):
 		t.Fatal("timeout waiting for error response from panicking handler")
 	}
 }
@@ -912,7 +927,7 @@ func TestStdioNotificationHandlerPanicWithoutOnPanic(t *testing.T) {
 	_, _ = serverWriter.Write(append(n1JSON, '\n'))
 
 	// Brief wait for the panic to be recovered
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(stdioShortDelay)
 
 	// Send second notification (transport should still work)
 	notif2 := codex.Notification{JSONRPC: "2.0", Method: "second/ok"}
@@ -924,7 +939,7 @@ func TestStdioNotificationHandlerPanicWithoutOnPanic(t *testing.T) {
 		if method != "second/ok" {
 			t.Errorf("received method = %s; want second/ok", method)
 		}
-	case <-time.After(500 * time.Millisecond):
+	case <-time.After(stdioAssertionTimeout):
 		t.Fatal("timeout: transport stopped working after unhandled notification panic")
 	}
 }
@@ -963,7 +978,7 @@ func TestStdioNotificationHandlerPanicRecovery(t *testing.T) {
 	// Wait for panic to be caught by OnPanic handler
 	select {
 	case <-panicCaught:
-	case <-time.After(500 * time.Millisecond):
+	case <-time.After(stdioAssertionTimeout):
 		t.Fatal("timeout: OnPanic handler was not called")
 	}
 
@@ -977,7 +992,7 @@ func TestStdioNotificationHandlerPanicRecovery(t *testing.T) {
 		if method != "second/ok" {
 			t.Errorf("received method = %s; want second/ok", method)
 		}
-	case <-time.After(500 * time.Millisecond):
+	case <-time.After(stdioAssertionTimeout):
 		t.Fatal("timeout: transport stopped working after notification handler panic")
 	}
 }
@@ -1026,7 +1041,7 @@ func TestStdioApprovalInvalidParamsReturnsErrorCode(t *testing.T) {
 		if resp.Error.Code != codex.ErrCodeInvalidParams {
 			t.Errorf("error code = %d; want %d (ErrCodeInvalidParams)", resp.Error.Code, codex.ErrCodeInvalidParams)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(stdioLongRequestTimeout):
 		t.Fatal("timeout waiting for error response")
 	}
 }
@@ -1091,7 +1106,7 @@ func TestStdioApprovalMissingRequiredFieldReturnsInvalidParams(t *testing.T) {
 		if resp.Error.Code != codex.ErrCodeInvalidParams {
 			t.Errorf("error code = %d; want %d (ErrCodeInvalidParams)", resp.Error.Code, codex.ErrCodeInvalidParams)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(stdioLongRequestTimeout):
 		t.Fatal("timeout waiting for error response")
 	}
 }
@@ -1138,7 +1153,7 @@ func TestStdioApprovalHandlerErrorReturnsErrorCode(t *testing.T) {
 		if resp.Error.Code != codex.ErrCodeInternalError {
 			t.Errorf("error code = %d; want %d (ErrCodeInternalError)", resp.Error.Code, codex.ErrCodeInternalError)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(stdioLongRequestTimeout):
 		t.Fatal("timeout waiting for error response")
 	}
 }
@@ -1182,10 +1197,10 @@ func TestStdioOversizeInboundLineStopsTransport(t *testing.T) {
 	select {
 	case method := <-received:
 		t.Fatalf("received notification %q after oversized frame shutdown", method)
-	case <-time.After(200 * time.Millisecond):
+	case <-time.After(stdioResponseTimeout):
 	}
 
-	deadline := time.After(2 * time.Second)
+	deadline := time.After(stdioLongRequestTimeout)
 	for {
 		err := transport.ScanErr()
 		if err != nil {
@@ -1198,7 +1213,7 @@ func TestStdioOversizeInboundLineStopsTransport(t *testing.T) {
 		case <-deadline:
 			t.Fatal("timeout waiting for oversized frame shutdown")
 		default:
-			time.Sleep(10 * time.Millisecond)
+			time.Sleep(stdioPollInterval)
 		}
 	}
 
@@ -1223,7 +1238,7 @@ func waitForOutboundRequest(t *testing.T, serverReader io.Reader) {
 	}()
 	select {
 	case <-reqSeen:
-	case <-time.After(500 * time.Millisecond):
+	case <-time.After(stdioAssertionTimeout):
 		t.Fatal("timeout waiting for outbound request")
 	}
 }
@@ -1244,7 +1259,7 @@ func readOutboundErrorResponse(t *testing.T, serverReader io.Reader) codex.Respo
 	select {
 	case resp := <-responseChan:
 		return resp
-	case <-time.After(500 * time.Millisecond):
+	case <-time.After(stdioAssertionTimeout):
 		t.Fatal("timeout waiting for outbound error response")
 	}
 	return codex.Response{}
@@ -1266,7 +1281,7 @@ func readOutboundResponse(t *testing.T, serverReader io.Reader) map[string]inter
 	select {
 	case resp := <-responseChan:
 		return resp
-	case <-time.After(500 * time.Millisecond):
+	case <-time.After(stdioAssertionTimeout):
 		t.Fatal("timeout waiting for outbound response")
 	}
 	return nil
@@ -1351,7 +1366,7 @@ func TestStdioOversizeResponseUnblocksPendingSend(t *testing.T) {
 			transport := codex.NewStdioTransport(clientReader, clientWriter)
 			defer func() { _ = transport.Close() }()
 
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), stdioLongRequestTimeout)
 			defer cancel()
 
 			errCh := make(chan error, 1)
@@ -1394,7 +1409,7 @@ func TestStdioOversizeResponseUnblocksPendingSend(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-			case <-time.After(3 * time.Second):
+			case <-time.After(stdioProcessAssertionTimeout):
 				t.Fatal("timeout waiting for oversized response handling")
 			}
 		})
@@ -1412,7 +1427,7 @@ func TestStdioOversizeResponseWithIDBeyondLimitClosesTransport(t *testing.T) {
 	transport := codex.NewStdioTransport(clientReader, clientWriter)
 	defer func() { _ = transport.Close() }()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), stdioLongRequestTimeout)
 	defer cancel()
 
 	type sendResult struct {
@@ -1452,7 +1467,7 @@ func TestStdioOversizeResponseWithIDBeyondLimitClosesTransport(t *testing.T) {
 		if !strings.Contains(result.resp.Error.Message, "oversized") {
 			t.Fatalf("response error message = %q; want oversized transport error", result.resp.Error.Message)
 		}
-	case <-time.After(3 * time.Second):
+	case <-time.After(stdioProcessAssertionTimeout):
 		t.Fatal("timeout waiting for oversized response handling")
 	}
 
@@ -1479,7 +1494,7 @@ func TestStdioPartialOversizeResponseClosesTransportImmediately(t *testing.T) {
 	transport := codex.NewStdioTransport(clientReader, clientWriter)
 	defer func() { _ = transport.Close() }()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), stdioLongRequestTimeout)
 	defer cancel()
 
 	errCh := make(chan error, 1)
@@ -1519,7 +1534,7 @@ func TestStdioPartialOversizeResponseClosesTransportImmediately(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-	case <-time.After(3 * time.Second):
+	case <-time.After(stdioProcessAssertionTimeout):
 		t.Fatal("timeout waiting for partial oversized response handling")
 	}
 
@@ -1573,7 +1588,7 @@ func TestStdioExactInboundMessageLimitIsAccepted(t *testing.T) {
 				t.Fatalf("received unexpected notification %q", gotMethod)
 			}
 			delete(wantMethods, gotMethod)
-		case <-time.After(3 * time.Second):
+		case <-time.After(stdioProcessAssertionTimeout):
 			t.Fatalf("timeout waiting for notifications %v", wantMethods)
 		}
 	}
@@ -1596,7 +1611,7 @@ func TestStdioOversizeAmbiguousFrameStopsTransport(t *testing.T) {
 	transport := codex.NewStdioTransport(clientReader, clientWriter)
 	defer func() { _ = transport.Close() }()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), stdioLongRequestTimeout)
 	defer cancel()
 
 	type sendResult struct {
@@ -1636,7 +1651,7 @@ func TestStdioOversizeAmbiguousFrameStopsTransport(t *testing.T) {
 		if !strings.Contains(result.resp.Error.Message, "oversized") {
 			t.Fatalf("response error message = %q; want oversized transport error", result.resp.Error.Message)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(stdioLongRequestTimeout):
 		t.Fatal("timeout waiting for oversized response handling")
 	}
 }
@@ -1652,7 +1667,7 @@ func TestStdioOversizeNotificationWithLateMethodStopsTransport(t *testing.T) {
 	transport := codex.NewStdioTransport(clientReader, clientWriter)
 	defer func() { _ = transport.Close() }()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), stdioLongRequestTimeout)
 	defer cancel()
 
 	resultCh := make(chan sendResult, 1)
@@ -1688,7 +1703,7 @@ func TestStdioOversizeNotificationWithLateMethodStopsTransport(t *testing.T) {
 		if !strings.Contains(result.resp.Error.Message, "oversized") {
 			t.Fatalf("response error message = %q; want oversized transport error", result.resp.Error.Message)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(stdioLongRequestTimeout):
 		t.Fatal("timeout waiting for oversized notification shutdown")
 	}
 }
@@ -1705,7 +1720,7 @@ func TestStdioOversizeResponseAtEOFFailsPendingSend(t *testing.T) {
 	transport := codex.NewStdioTransport(clientReader, clientWriter)
 	defer func() { _ = transport.Close() }()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), stdioLongRequestTimeout)
 	defer cancel()
 
 	errCh := make(chan error, 1)
@@ -1748,7 +1763,7 @@ func TestStdioOversizeResponseAtEOFFailsPendingSend(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(stdioLongRequestTimeout):
 		t.Fatal("timeout waiting for oversized EOF response handling")
 	}
 }
@@ -1786,7 +1801,7 @@ func TestStdioTurnScopedNotificationsDoNotBlockReadLoop(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), stdioExtendedRequestTimeout)
 		defer cancel()
 		req := codex.Request{
 			JSONRPC: "2.0",
@@ -1807,7 +1822,7 @@ func TestStdioTurnScopedNotificationsDoNotBlockReadLoop(t *testing.T) {
 
 	select {
 	case <-outbound:
-	case <-time.After(500 * time.Millisecond):
+	case <-time.After(stdioAssertionTimeout):
 		t.Fatal("timeout waiting for outbound request")
 	}
 
@@ -1825,7 +1840,7 @@ func TestStdioTurnScopedNotificationsDoNotBlockReadLoop(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(stdioLongRequestTimeout):
 		t.Fatal("timeout waiting for response while turn-scoped queue is saturated")
 	}
 }
@@ -1861,7 +1876,7 @@ func TestStdioDistinctTurnScopedNotificationsDoNotBlockReadLoop(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), stdioExtendedRequestTimeout)
 		defer cancel()
 		req := codex.Request{
 			JSONRPC: "2.0",
@@ -1882,7 +1897,7 @@ func TestStdioDistinctTurnScopedNotificationsDoNotBlockReadLoop(t *testing.T) {
 
 	select {
 	case <-outbound:
-	case <-time.After(500 * time.Millisecond):
+	case <-time.After(stdioAssertionTimeout):
 		t.Fatal("timeout waiting for outbound request")
 	}
 
@@ -1905,7 +1920,7 @@ func TestStdioDistinctTurnScopedNotificationsDoNotBlockReadLoop(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(stdioLongRequestTimeout):
 		t.Fatal("timeout waiting for response while distinct turn-scoped queues are saturated")
 	}
 }
@@ -1936,7 +1951,7 @@ func TestStdioErrorNotificationsUseCriticalQueue(t *testing.T) {
 	})
 	errCh := make(chan error, 1)
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), stdioExtendedRequestTimeout)
 		defer cancel()
 		req := codex.Request{
 			JSONRPC: "2.0",
@@ -1969,14 +1984,14 @@ func TestStdioErrorNotificationsUseCriticalQueue(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(stdioLongRequestTimeout):
 		t.Fatal("timeout waiting for response while critical queue is saturated")
 	}
 	close(block)
 
-	deadline := time.Now().Add(2 * time.Second)
+	deadline := time.Now().Add(stdioLongRequestTimeout)
 	for !sawError.Load() && time.Now().Before(deadline) {
-		time.Sleep(time.Millisecond)
+		time.Sleep(stdioMicroPollInterval)
 	}
 	if !sawError.Load() {
 		t.Fatal("expected error notification to be delivered under queue pressure")
@@ -2010,7 +2025,7 @@ func TestStdioTurnCompletedWaitsForEarlierSameTurnItems(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), stdioExtendedRequestTimeout)
 		defer cancel()
 		req := codex.Request{
 			JSONRPC: "2.0",
@@ -2043,20 +2058,20 @@ func TestStdioTurnCompletedWaitsForEarlierSameTurnItems(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(stdioLongRequestTimeout):
 		t.Fatal("timeout waiting for response while critical queue is saturated")
 	}
 
 	select {
 	case <-turnCompletedSeen:
 		t.Fatal("turn/completed should wait for earlier same-turn item/completed handling")
-	case <-time.After(150 * time.Millisecond):
+	case <-time.After(stdioMediumTimeout):
 	}
 	close(blockCritical)
 
 	select {
 	case <-turnCompletedSeen:
-	case <-time.After(2 * time.Second):
+	case <-time.After(stdioLongRequestTimeout):
 		t.Fatal("expected turn/completed after earlier same-turn items drained")
 	}
 }
@@ -2094,7 +2109,7 @@ func TestStdioRejectsInvalidJSONRPCRequestVersion(t *testing.T) {
 		if resp.ID.Value != "bad-version" {
 			t.Fatalf("response ID = %v; want bad-version", resp.ID.Value)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(stdioLongRequestTimeout):
 		t.Fatal("timeout waiting for invalid-version request rejection")
 	}
 }
@@ -2111,7 +2126,7 @@ func TestStdioAcceptsFramesWithoutJSONRPC(t *testing.T) {
 		transport := codex.NewStdioTransport(clientReader, clientWriter)
 		defer func() { _ = transport.Close() }()
 
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), stdioLongRequestTimeout)
 		defer cancel()
 
 		result := make(chan sendResult, 1)
@@ -2135,7 +2150,7 @@ func TestStdioAcceptsFramesWithoutJSONRPC(t *testing.T) {
 			if string(got.resp.Result) != `{"ok":true}` {
 				t.Fatalf("response result = %s; want {\"ok\":true}", got.resp.Result)
 			}
-		case <-time.After(2 * time.Second):
+		case <-time.After(stdioLongRequestTimeout):
 			t.Fatal("timeout waiting for response without jsonrpc")
 		}
 	})
@@ -2168,7 +2183,7 @@ func TestStdioAcceptsFramesWithoutJSONRPC(t *testing.T) {
 			if req.Method != "approval/test" {
 				t.Fatalf("request method = %s; want approval/test", req.Method)
 			}
-		case <-time.After(2 * time.Second):
+		case <-time.After(stdioLongRequestTimeout):
 			t.Fatal("timeout waiting for request without jsonrpc")
 		}
 
@@ -2204,7 +2219,7 @@ func TestStdioAcceptsFramesWithoutJSONRPC(t *testing.T) {
 			if notif.Method != "thread/started" {
 				t.Fatalf("notification method = %s; want thread/started", notif.Method)
 			}
-		case <-time.After(2 * time.Second):
+		case <-time.After(stdioLongRequestTimeout):
 			t.Fatal("timeout waiting for notification without jsonrpc")
 		}
 	})
@@ -2243,7 +2258,7 @@ func TestStdioRejectsRequestWithInvalidIDType(t *testing.T) {
 		if resp.ID.Value != nil {
 			t.Fatalf("response ID = %v; want nil", resp.ID.Value)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(stdioLongRequestTimeout):
 		t.Fatal("timeout waiting for invalid-id request rejection")
 	}
 }
@@ -2281,7 +2296,7 @@ func TestStdioRejectsRequestWithInvalidMethodType(t *testing.T) {
 		if resp.ID.Value != "bad-method" {
 			t.Fatalf("response ID = %v; want bad-method", resp.ID.Value)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(stdioLongRequestTimeout):
 		t.Fatal("timeout waiting for invalid-method request rejection")
 	}
 }
@@ -2345,7 +2360,7 @@ func TestStdioInvalidJSONRPCResponseVersionFailsPending(t *testing.T) {
 	transport := codex.NewStdioTransport(clientReader, clientWriter)
 	defer func() { _ = transport.Close() }()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), stdioLongRequestTimeout)
 	defer cancel()
 
 	errCh := make(chan error, 1)
@@ -2379,7 +2394,7 @@ func TestStdioInvalidJSONRPCResponseVersionFailsPending(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(stdioLongRequestTimeout):
 		t.Fatal("timeout waiting for invalid-version response handling")
 	}
 }
@@ -2408,7 +2423,7 @@ func TestStdioInvalidJSONRPCNotificationVersionIgnored(t *testing.T) {
 		if method != "error" {
 			t.Fatalf("received method = %s; want error", method)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(stdioLongRequestTimeout):
 		t.Fatal("timeout waiting for valid-version notification")
 	}
 
@@ -2504,7 +2519,7 @@ func TestStdioHandleResponseUnmarshalError(t *testing.T) {
 		}
 	}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), stdioLongRequestTimeout)
 	defer cancel()
 
 	// Send a request in a goroutine
@@ -2531,7 +2546,7 @@ func TestStdioHandleResponseUnmarshalError(t *testing.T) {
 	}()
 
 	// Wait for the request to be sent
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(stdioShortDelay)
 
 	// Send a malformed response that has a valid ID but invalid structure
 	// for the full Response type. We include a valid "id" but make "error"
@@ -2544,13 +2559,13 @@ func TestStdioHandleResponseUnmarshalError(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(stdioLongRequestTimeout):
 		t.Fatal("timeout: caller should have received a parse error, not hung")
 	}
 
-	deadline := time.Now().Add(500 * time.Millisecond)
+	deadline := time.Now().Add(stdioAssertionTimeout)
 	for transport.MalformedMessageCount() < 1 && time.Now().Before(deadline) {
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(stdioPollInterval)
 	}
 	if got := transport.MalformedMessageCount(); got != 1 {
 		t.Fatalf("MalformedMessageCount() = %d; want 1 after malformed response shape", got)
@@ -2568,7 +2583,7 @@ func TestStdioMalformedResponseShapeIncrementsCounterWhenAttributed(t *testing.T
 	transport := codex.NewStdioTransport(clientReader, clientWriter)
 	defer func() { _ = transport.Close() }()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), stdioLongRequestTimeout)
 	defer cancel()
 
 	errCh := make(chan error, 1)
@@ -2601,13 +2616,13 @@ func TestStdioMalformedResponseShapeIncrementsCounterWhenAttributed(t *testing.T
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(stdioLongRequestTimeout):
 		t.Fatal("timeout waiting for malformed response handling")
 	}
 
-	deadline := time.Now().Add(500 * time.Millisecond)
+	deadline := time.Now().Add(stdioAssertionTimeout)
 	for transport.MalformedMessageCount() < 1 && time.Now().Before(deadline) {
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(stdioPollInterval)
 	}
 	if got := transport.MalformedMessageCount(); got != 1 {
 		t.Fatalf("MalformedMessageCount() = %d; want 1 after attributed malformed response", got)
@@ -2625,7 +2640,7 @@ func TestStdioIgnoresNonResponseFramesWithID(t *testing.T) {
 	transport := codex.NewStdioTransport(clientReader, clientWriter)
 	defer func() { _ = transport.Close() }()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), stdioLongRequestTimeout)
 	defer cancel()
 
 	sendResultCh := make(chan sendResult, 1)
@@ -2651,9 +2666,9 @@ func TestStdioIgnoresNonResponseFramesWithID(t *testing.T) {
 	}
 	_, _ = serverWriter.Write([]byte(`{"jsonrpc":"2.0","params":{"ignored":true}}` + "\n"))
 
-	deadline := time.Now().Add(500 * time.Millisecond)
+	deadline := time.Now().Add(stdioAssertionTimeout)
 	for transport.MalformedMessageCount() < 1 && time.Now().Before(deadline) {
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(stdioPollInterval)
 	}
 	if got := transport.MalformedMessageCount(); got != 1 {
 		t.Fatalf("MalformedMessageCount() = %d; want 1 after malformed inbound object", got)
@@ -2662,7 +2677,7 @@ func TestStdioIgnoresNonResponseFramesWithID(t *testing.T) {
 	select {
 	case result := <-sendResultCh:
 		t.Fatalf("Send returned early after malformed inbound object: resp=%+v err=%v", result.resp, result.err)
-	case <-time.After(150 * time.Millisecond):
+	case <-time.After(stdioMediumTimeout):
 	}
 
 	_, _ = serverWriter.Write([]byte(`{"jsonrpc":"2.0","id":"non-response-frame","result":{"ok":true}}` + "\n"))
@@ -2675,7 +2690,7 @@ func TestStdioIgnoresNonResponseFramesWithID(t *testing.T) {
 		if string(result.resp.Result) != `{"ok":true}` {
 			t.Fatalf("response result = %s; want {\"ok\":true}", string(result.resp.Result))
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(stdioLongRequestTimeout):
 		t.Fatal("timeout waiting for response after malformed inbound objects")
 	}
 }
@@ -2691,7 +2706,7 @@ func TestStdioMalformedResponseInvalidIDDoesNotFailUnrelatedPending(t *testing.T
 	transport := codex.NewStdioTransport(clientReader, clientWriter)
 	defer func() { _ = transport.Close() }()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), stdioLongRequestTimeout)
 	defer cancel()
 
 	outboundReqIDs := make(chan string, 2)
@@ -2760,7 +2775,7 @@ func TestStdioMalformedResponseInvalidIDDoesNotFailUnrelatedPending(t *testing.T
 		select {
 		case id := <-outboundReqIDs:
 			seen[id] = true
-		case <-time.After(500 * time.Millisecond):
+		case <-time.After(stdioAssertionTimeout):
 			t.Fatal("timeout waiting for outbound requests")
 		}
 	}
@@ -2777,7 +2792,7 @@ func TestStdioMalformedResponseInvalidIDDoesNotFailUnrelatedPending(t *testing.T
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-		case <-time.After(2 * time.Second):
+		case <-time.After(stdioLongRequestTimeout):
 			t.Fatal("timeout waiting for pending sends after malformed response id")
 		}
 	}
@@ -2836,7 +2851,7 @@ func TestStdioSpuriousResponseUnknownID(t *testing.T) {
 	_, _ = serverWriter.Write([]byte(spurious))
 
 	// Verify the transport still works by doing a real request-response cycle.
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), stdioLongRequestTimeout)
 	defer cancel()
 
 	respCh := make(chan codex.Response, 1)
@@ -2853,7 +2868,7 @@ func TestStdioSpuriousResponseUnknownID(t *testing.T) {
 		respCh <- resp
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(stdioShortDelay)
 
 	// Send the real response.
 	realResp := `{"jsonrpc":"2.0","id":"real-request","result":{"status":"ok"}}` + "\n"
@@ -2864,7 +2879,7 @@ func TestStdioSpuriousResponseUnknownID(t *testing.T) {
 		if string(resp.Result) != `{"status":"ok"}` {
 			t.Errorf("response result = %s; want {\"status\":\"ok\"}", resp.Result)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(stdioLongRequestTimeout):
 		t.Fatal("timeout: transport broken after spurious response")
 	}
 }
@@ -2900,7 +2915,7 @@ func TestStdioInboundRequestBeforeHandlerRegistrationWaitsForHandler(t *testing.
 		if err != nil {
 			t.Fatalf("write early request: %v", err)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(stdioLongRequestTimeout):
 		t.Fatal("timeout waiting for early request write completion")
 	}
 
@@ -2924,7 +2939,7 @@ func TestStdioInboundRequestBeforeHandlerRegistrationWaitsForHandler(t *testing.
 		if string(resp.Result) != `{"handled":true}` {
 			t.Fatalf("response result = %s; want {\"handled\":true}", resp.Result)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(stdioLongRequestTimeout):
 		t.Fatal("timeout waiting for response to early request")
 	}
 }
@@ -2954,7 +2969,7 @@ func TestStdioNotificationBeforeHandlerRegistrationIsDelivered(t *testing.T) {
 		if err != nil {
 			t.Fatalf("write early notification: %v", err)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(stdioLongRequestTimeout):
 		t.Fatal("timeout waiting for early notification write completion")
 	}
 
@@ -2963,7 +2978,7 @@ func TestStdioNotificationBeforeHandlerRegistrationIsDelivered(t *testing.T) {
 		if n.Method != "thread/started" {
 			t.Fatalf("notification method = %q; want thread/started", n.Method)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(stdioLongRequestTimeout):
 		t.Fatal("timeout waiting for early notification delivery")
 	}
 }
@@ -2989,7 +3004,7 @@ func TestStdioWriteMessageRejectsAfterClose(t *testing.T) {
 		// Wait for Close() to run, then try to write a response.
 		// The transport's writeMessage should reject the write because
 		// the transport context has been cancelled.
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(stdioShortDelay)
 
 		handlerDone <- struct{}{}
 		return codex.Response{
@@ -3014,7 +3029,7 @@ func TestStdioWriteMessageRejectsAfterClose(t *testing.T) {
 	// Wait for handler goroutine to start, then close transport.
 	select {
 	case <-handlerStarted:
-	case <-time.After(5 * time.Second):
+	case <-time.After(stdioSlowAssertionTimeout):
 		t.Fatal("handler did not start")
 	}
 
@@ -3025,7 +3040,7 @@ func TestStdioWriteMessageRejectsAfterClose(t *testing.T) {
 	select {
 	case <-handlerDone:
 		// Handler completed — writeMessage rejected the write after Close.
-	case <-time.After(2 * time.Second):
+	case <-time.After(stdioLongRequestTimeout):
 		t.Fatal("handler goroutine did not complete after Close")
 	}
 }
@@ -3054,7 +3069,7 @@ func TestStdioRequestHandlerWriteFailureSetsScanErr(t *testing.T) {
 		t.Fatalf("write server request: %v", err)
 	}
 
-	deadline := time.Now().Add(2 * time.Second)
+	deadline := time.Now().Add(stdioLongRequestTimeout)
 	for time.Now().Before(deadline) {
 		if err := transport.ScanErr(); err != nil {
 			if !strings.Contains(err.Error(), "write failed") {
@@ -3062,7 +3077,7 @@ func TestStdioRequestHandlerWriteFailureSetsScanErr(t *testing.T) {
 			}
 			return
 		}
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(stdioPollInterval)
 	}
 	t.Fatal("expected scan error after handler response write failure")
 }
@@ -3087,7 +3102,7 @@ func TestStdioRequestHandlerErrorResponseWriteFailureSetsScanErr(t *testing.T) {
 		t.Fatalf("write server request: %v", err)
 	}
 
-	deadline := time.Now().Add(2 * time.Second)
+	deadline := time.Now().Add(stdioLongRequestTimeout)
 	for time.Now().Before(deadline) {
 		if err := transport.ScanErr(); err != nil {
 			if !strings.Contains(err.Error(), "error response write failed") {
@@ -3095,7 +3110,7 @@ func TestStdioRequestHandlerErrorResponseWriteFailureSetsScanErr(t *testing.T) {
 			}
 			return
 		}
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(stdioPollInterval)
 	}
 	t.Fatal("expected scan error after handler error-response write failure")
 }
@@ -3111,7 +3126,7 @@ func TestStdioMalformedResponseFrameWithRecoverableIDFailsPending(t *testing.T) 
 	transport := codex.NewStdioTransport(clientReader, clientWriter)
 	defer func() { _ = transport.Close() }()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), stdioLongRequestTimeout)
 	defer cancel()
 	errCh := make(chan error, 1)
 	go func() {
@@ -3144,7 +3159,7 @@ func TestStdioMalformedResponseFrameWithRecoverableIDFailsPending(t *testing.T) 
 		if err != nil {
 			t.Fatal(err)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(stdioLongRequestTimeout):
 		t.Fatal("timeout waiting for malformed response handling")
 	}
 }
@@ -3177,7 +3192,7 @@ func TestStdioConcurrentSendAndClose(t *testing.T) {
 	for i := 0; i < senders; i++ {
 		go func(id int) {
 			defer wg.Done()
-			ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+			ctx, cancel := context.WithTimeout(context.Background(), stdioAssertionTimeout)
 			defer cancel()
 
 			req := codex.Request{
@@ -3208,7 +3223,7 @@ func TestStdioConcurrentSendAndClose(t *testing.T) {
 	}
 
 	// Give senders a moment to start blocking in Send.
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(stdioPollInterval)
 
 	// Close concurrently while sends are in-flight.
 	go func() {
@@ -3240,7 +3255,7 @@ func TestStdioSpontaneousReaderEOF(t *testing.T) {
 		}
 	}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), stdioSlowAssertionTimeout)
 	defer cancel()
 
 	// Send a request that will block waiting for a response.
@@ -3256,7 +3271,7 @@ func TestStdioSpontaneousReaderEOF(t *testing.T) {
 	}()
 
 	// Wait for the request to be sent.
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(stdioShortDelay)
 
 	// Simulate a child process crash by closing the remote writer.
 	// This causes the readLoop scanner to hit EOF and close readerStopped.
@@ -3270,7 +3285,7 @@ func TestStdioSpontaneousReaderEOF(t *testing.T) {
 		if !strings.Contains(err.Error(), "transport reader stopped") {
 			t.Errorf("expected 'transport reader stopped' error, got: %v", err)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(stdioLongRequestTimeout):
 		t.Fatal("timeout: Send was not unblocked after reader EOF")
 	}
 }
@@ -3292,14 +3307,14 @@ func TestStdioNotifyAfterReaderEOFReturnsReaderStopped(t *testing.T) {
 
 	_ = serverWriter.Close()
 
-	deadline := time.Now().Add(2 * time.Second)
+	deadline := time.Now().Add(stdioLongRequestTimeout)
 	for time.Now().Before(deadline) {
 		err := transport.Notify(context.Background(), codex.Notification{
 			JSONRPC: "2.0",
 			Method:  "test/notification",
 		})
 		if err == nil {
-			time.Sleep(10 * time.Millisecond)
+			time.Sleep(stdioPollInterval)
 			continue
 		}
 		if !strings.Contains(err.Error(), "transport reader stopped") {
