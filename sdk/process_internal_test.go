@@ -116,6 +116,11 @@ func TestBuildArgsRejectsSensitiveConfigKeys(t *testing.T) {
 		{name: "private endpoint", key: "private_endpoint"},
 		{name: "plural secret", key: "app.secrets"},
 		{name: "camel plural secret", key: "clientSecrets"},
+		{name: "openai key", key: "openaiKey"},
+		{name: "openai token", key: "openaiToken"},
+		{name: "model provider token", key: "modelProviderToken"},
+		{name: "model provider key", key: "model_provider_key"},
+		{name: "azure openai key", key: "azureOpenAIKey"},
 	}
 
 	for _, tt := range tests {

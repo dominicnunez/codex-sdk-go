@@ -194,6 +194,24 @@ var sensitiveProcessConfigKeyCompactTerms = []string{
 	"sessiontoken",
 }
 
+var sensitiveProcessConfigProviderTerms = []string{
+	"anthropic",
+	"azureopenai",
+	"gemini",
+	"github",
+	"gitlab",
+	"google",
+	"modelprovider",
+	"openai",
+	"openrouter",
+	"provider",
+}
+
+var sensitiveProcessConfigCredentialSuffixes = []string{
+	"key",
+	"token",
+}
+
 var commonChildEnvKeys = []string{
 	"HOME",
 	"LANG",
@@ -303,6 +321,20 @@ func processConfigKeyLooksSensitive(key string) bool {
 	for _, term := range sensitiveProcessConfigKeyCompactTerms {
 		if strings.Contains(compact, term) {
 			return true
+		}
+	}
+	return processConfigCompactKeyHasProviderCredential(compact)
+}
+
+func processConfigCompactKeyHasProviderCredential(compact string) bool {
+	for _, provider := range sensitiveProcessConfigProviderTerms {
+		if !strings.Contains(compact, provider) {
+			continue
+		}
+		for _, suffix := range sensitiveProcessConfigCredentialSuffixes {
+			if strings.HasSuffix(compact, suffix) {
+				return true
+			}
 		}
 	}
 	return false
