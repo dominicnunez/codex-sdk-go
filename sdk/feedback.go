@@ -21,6 +21,13 @@ type FeedbackUploadParams struct {
 	ExtraLogFiles *[]string `json:"extraLogFiles,omitempty"`
 }
 
+func (p FeedbackUploadParams) prepareRequest() (interface{}, error) {
+	if err := validateRequiredNonEmptyStringField("classification", p.Classification); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
 // FeedbackUploadResponse represents the response from uploading feedback.
 type FeedbackUploadResponse struct {
 	// ThreadID is the ID of the thread created for this feedback.

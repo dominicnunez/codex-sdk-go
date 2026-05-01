@@ -148,7 +148,7 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 
 	// Verify Feedback service
 	verified["feedback/upload"] = verifyMethod(t, transport, "feedback/upload", func() {
-		_, _ = client.Feedback.Upload(context.Background(), codex.FeedbackUploadParams{})
+		_, _ = client.Feedback.Upload(context.Background(), codex.FeedbackUploadParams{Classification: "bug"})
 	})
 
 	// Verify Fs service

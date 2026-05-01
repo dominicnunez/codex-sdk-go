@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go/sdk"
@@ -100,7 +101,7 @@ func TestFeedbackUpload_RPCError_ReturnsRPCError(t *testing.T) {
 	})
 
 	_, err := client.Feedback.Upload(context.Background(), codex.FeedbackUploadParams{
-		Classification: "",
+		Classification: "bug",
 		IncludeLogs:    false,
 	})
 	if err == nil {
@@ -113,5 +114,21 @@ func TestFeedbackUpload_RPCError_ReturnsRPCError(t *testing.T) {
 	}
 	if rpcErr.RPCError().Code != codex.ErrCodeInvalidParams {
 		t.Errorf("expected error code %d, got %d", codex.ErrCodeInvalidParams, rpcErr.RPCError().Code)
+	}
+}
+
+func TestFeedbackUploadRejectsEmptyClassificationBeforeSend(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+
+	_, err := client.Feedback.Upload(context.Background(), codex.FeedbackUploadParams{})
+	if err == nil {
+		t.Fatal("expected invalid params error")
+	}
+	if !strings.Contains(err.Error(), "classification must not be empty") {
+		t.Fatalf("error = %v; want classification validation", err)
+	}
+	if got := mock.CallCount(); got != 0 {
+		t.Fatalf("CallCount() = %d; want 0", got)
 	}
 }
