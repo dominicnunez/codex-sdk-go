@@ -10,6 +10,49 @@ import (
 	codex "github.com/dominicnunez/codex-sdk-go/sdk"
 )
 
+func TestFsChangedNotificationRejectsInvalidChangedPaths(t *testing.T) {
+	tests := []struct {
+		name    string
+		payload string
+		want    string
+	}{
+		{
+			name:    "relative path",
+			payload: `{"changedPaths":["relative/file.txt"],"watchId":"watch-1"}`,
+			want:    `changedPaths[0]: must be an absolute path`,
+		},
+		{
+			name:    "unnormalized path",
+			payload: `{"changedPaths":["/tmp/../etc/passwd"],"watchId":"watch-1"}`,
+			want:    `changedPaths[0]: must be normalized`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var notif codex.FsChangedNotification
+			err := json.Unmarshal([]byte(tt.payload), &notif)
+			if err == nil {
+				t.Fatal("expected changed path validation error")
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v; want %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestFsChangedNotificationAcceptsAbsoluteChangedPaths(t *testing.T) {
+	var notif codex.FsChangedNotification
+	err := json.Unmarshal([]byte(`{"changedPaths":["/tmp/file.txt"],"watchId":"watch-1"}`), &notif)
+	if err != nil {
+		t.Fatalf("UnmarshalJSON() error = %v", err)
+	}
+	if len(notif.ChangedPaths) != 1 || notif.ChangedPaths[0] != "/tmp/file.txt" {
+		t.Fatalf("ChangedPaths = %v; want [/tmp/file.txt]", notif.ChangedPaths)
+	}
+}
+
 func TestFsReadFile(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		transport := NewMockTransport()

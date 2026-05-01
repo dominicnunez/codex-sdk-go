@@ -190,6 +190,11 @@ func (n *FsChangedNotification) UnmarshalJSON(data []byte) error {
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
+	validatedPaths, err := validateInboundAbsolutePathSliceField("changedPaths", decoded.ChangedPaths)
+	if err != nil {
+		return err
+	}
+	decoded.ChangedPaths = validatedPaths
 	*n = FsChangedNotification(decoded)
 	return nil
 }
