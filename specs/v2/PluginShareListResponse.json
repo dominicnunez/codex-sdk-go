@@ -5,32 +5,6 @@
       "description": "A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).\n\nIMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.",
       "type": "string"
     },
-    "MarketplaceInterface": {
-      "properties": {
-        "displayName": {
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      },
-      "type": "object"
-    },
-    "MarketplaceLoadErrorInfo": {
-      "properties": {
-        "marketplacePath": {
-          "$ref": "#/definitions/AbsolutePathBuf"
-        },
-        "message": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "marketplacePath",
-        "message"
-      ],
-      "type": "object"
-    },
     "PluginAuthPolicy": {
       "enum": [
         "ON_INSTALL",
@@ -193,22 +167,9 @@
       ],
       "type": "object"
     },
-    "PluginMarketplaceEntry": {
+    "PluginShareListItem": {
       "properties": {
-        "interface": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/MarketplaceInterface"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "name": {
-          "type": "string"
-        },
-        "path": {
+        "localPluginPath": {
           "anyOf": [
             {
               "$ref": "#/definitions/AbsolutePathBuf"
@@ -216,19 +177,18 @@
             {
               "type": "null"
             }
-          ],
-          "description": "Local marketplace file path when the marketplace is backed by a local file. Remote-only catalog marketplaces do not have a local path."
+          ]
         },
-        "plugins": {
-          "items": {
-            "$ref": "#/definitions/PluginSummary"
-          },
-          "type": "array"
+        "plugin": {
+          "$ref": "#/definitions/PluginSummary"
+        },
+        "shareUrl": {
+          "type": "string"
         }
       },
       "required": [
-        "name",
-        "plugins"
+        "plugin",
+        "shareUrl"
       ],
       "type": "object"
     },
@@ -374,30 +334,16 @@
     }
   },
   "properties": {
-    "featuredPluginIds": {
-      "default": [],
+    "data": {
       "items": {
-        "type": "string"
-      },
-      "type": "array"
-    },
-    "marketplaceLoadErrors": {
-      "default": [],
-      "items": {
-        "$ref": "#/definitions/MarketplaceLoadErrorInfo"
-      },
-      "type": "array"
-    },
-    "marketplaces": {
-      "items": {
-        "$ref": "#/definitions/PluginMarketplaceEntry"
+        "$ref": "#/definitions/PluginShareListItem"
       },
       "type": "array"
     }
   },
   "required": [
-    "marketplaces"
+    "data"
   ],
-  "title": "PluginListResponse",
+  "title": "PluginShareListResponse",
   "type": "object"
 }
