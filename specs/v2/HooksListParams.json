@@ -7,12 +7,8 @@
         "type": "string"
       },
       "type": "array"
-    },
-    "forceReload": {
-      "description": "When true, bypass the skills cache and re-scan skills from disk.",
-      "type": "boolean"
     }
   },
-  "title": "SkillsListParams",
+  "title": "HooksListParams",
   "type": "object"
 }

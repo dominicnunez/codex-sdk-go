@@ -5,6 +5,21 @@
       "description": "A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).\n\nIMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.",
       "type": "string"
     },
+    "HookErrorInfo": {
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "message",
+        "path"
+      ],
+      "type": "object"
+    },
     "HookEventName": {
       "enum": [
         "preToolUse",
@@ -18,13 +33,6 @@
       ],
       "type": "string"
     },
-    "HookExecutionMode": {
-      "enum": [
-        "sync",
-        "async"
-      ],
-      "type": "string"
-    },
     "HookHandlerType": {
       "enum": [
         "command",
@@ -33,127 +41,83 @@
       ],
       "type": "string"
     },
-    "HookOutputEntry": {
+    "HookMetadata": {
       "properties": {
-        "kind": {
-          "$ref": "#/definitions/HookOutputEntryKind"
-        },
-        "text": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "kind",
-        "text"
-      ],
-      "type": "object"
-    },
-    "HookOutputEntryKind": {
-      "enum": [
-        "warning",
-        "stop",
-        "feedback",
-        "context",
-        "error"
-      ],
-      "type": "string"
-    },
-    "HookRunStatus": {
-      "enum": [
-        "running",
-        "completed",
-        "failed",
-        "blocked",
-        "stopped"
-      ],
-      "type": "string"
-    },
-    "HookRunSummary": {
-      "properties": {
-        "completedAt": {
-          "format": "int64",
+        "command": {
           "type": [
-            "integer",
+            "string",
             "null"
           ]
+        },
+        "currentHash": {
+          "type": "string"
         },
         "displayOrder": {
           "format": "int64",
           "type": "integer"
         },
-        "durationMs": {
-          "format": "int64",
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "entries": {
-          "items": {
-            "$ref": "#/definitions/HookOutputEntry"
-          },
-          "type": "array"
+        "enabled": {
+          "type": "boolean"
         },
         "eventName": {
           "$ref": "#/definitions/HookEventName"
         },
-        "executionMode": {
-          "$ref": "#/definitions/HookExecutionMode"
-        },
         "handlerType": {
           "$ref": "#/definitions/HookHandlerType"
         },
-        "id": {
+        "isManaged": {
+          "type": "boolean"
+        },
+        "key": {
           "type": "string"
         },
-        "scope": {
-          "$ref": "#/definitions/HookScope"
+        "matcher": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pluginId": {
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "source": {
-          "allOf": [
-            {
-              "$ref": "#/definitions/HookSource"
-            }
-          ],
-          "default": "unknown"
+          "$ref": "#/definitions/HookSource"
         },
         "sourcePath": {
           "$ref": "#/definitions/AbsolutePathBuf"
-        },
-        "startedAt": {
-          "format": "int64",
-          "type": "integer"
-        },
-        "status": {
-          "$ref": "#/definitions/HookRunStatus"
         },
         "statusMessage": {
           "type": [
             "string",
             "null"
           ]
+        },
+        "timeoutSec": {
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "trustStatus": {
+          "$ref": "#/definitions/HookTrustStatus"
         }
       },
       "required": [
+        "currentHash",
         "displayOrder",
-        "entries",
+        "enabled",
         "eventName",
-        "executionMode",
         "handlerType",
-        "id",
-        "scope",
+        "isManaged",
+        "key",
+        "source",
         "sourcePath",
-        "startedAt",
-        "status"
+        "timeoutSec",
+        "trustStatus"
       ],
       "type": "object"
-    },
-    "HookScope": {
-      "enum": [
-        "thread",
-        "turn"
-      ],
-      "type": "string"
     },
     "HookSource": {
       "enum": [
@@ -169,26 +133,60 @@
         "unknown"
       ],
       "type": "string"
+    },
+    "HookTrustStatus": {
+      "enum": [
+        "managed",
+        "untrusted",
+        "trusted",
+        "modified"
+      ],
+      "type": "string"
+    },
+    "HooksListEntry": {
+      "properties": {
+        "cwd": {
+          "type": "string"
+        },
+        "errors": {
+          "items": {
+            "$ref": "#/definitions/HookErrorInfo"
+          },
+          "type": "array"
+        },
+        "hooks": {
+          "items": {
+            "$ref": "#/definitions/HookMetadata"
+          },
+          "type": "array"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "cwd",
+        "errors",
+        "hooks",
+        "warnings"
+      ],
+      "type": "object"
     }
   },
   "properties": {
-    "run": {
-      "$ref": "#/definitions/HookRunSummary"
-    },
-    "threadId": {
-      "type": "string"
-    },
-    "turnId": {
-      "type": [
-        "string",
-        "null"
-      ]
+    "data": {
+      "items": {
+        "$ref": "#/definitions/HooksListEntry"
+      },
+      "type": "array"
     }
   },
   "required": [
-    "run",
-    "threadId"
+    "data"
   ],
-  "title": "HookCompletedNotification",
+  "title": "HooksListResponse",
   "type": "object"
 }
