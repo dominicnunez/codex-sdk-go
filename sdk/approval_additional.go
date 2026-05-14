@@ -28,6 +28,7 @@ type PermissionsRequestApprovalParams struct {
 	ItemID      string                   `json:"itemId"`
 	Permissions RequestPermissionProfile `json:"permissions"`
 	Reason      *string                  `json:"reason,omitempty"`
+	StartedAtMs int64                    `json:"startedAtMs"`
 	ThreadID    string                   `json:"threadId"`
 	TurnID      string                   `json:"turnId"`
 }
@@ -35,7 +36,7 @@ type PermissionsRequestApprovalParams struct {
 func (p *PermissionsRequestApprovalParams) UnmarshalJSON(data []byte) error {
 	type wire PermissionsRequestApprovalParams
 	var decoded wire
-	required := []string{"cwd", "itemId", "permissions", "threadId", "turnId"}
+	required := []string{"cwd", "itemId", "permissions", "startedAtMs", "threadId", "turnId"}
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}

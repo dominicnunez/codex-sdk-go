@@ -74,7 +74,7 @@ func TestHandlerErrorCallback_ApprovalPanic(t *testing.T) {
 		JSONRPC: "2.0",
 		ID:      codex.RequestID{Value: uint64(1)},
 		Method:  "item/fileChange/requestApproval",
-		Params:  json.RawMessage(`{"itemId":"i","threadId":"t","turnId":"u"}`),
+		Params:  json.RawMessage(`{"itemId":"i","startedAtMs":1,"threadId":"t","turnId":"u"}`),
 	}
 
 	_, err := mock.InjectServerRequest(context.Background(), req)
@@ -119,7 +119,7 @@ func TestHandlerErrorCallback_ApprovalError(t *testing.T) {
 		JSONRPC: "2.0",
 		ID:      codex.RequestID{Value: uint64(1)},
 		Method:  "item/fileChange/requestApproval",
-		Params:  json.RawMessage(`{"itemId":"i","threadId":"t","turnId":"u"}`),
+		Params:  json.RawMessage(`{"itemId":"i","startedAtMs":1,"threadId":"t","turnId":"u"}`),
 	}
 
 	_, err := mock.InjectServerRequest(context.Background(), req)

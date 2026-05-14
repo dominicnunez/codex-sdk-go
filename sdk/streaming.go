@@ -156,15 +156,16 @@ func (n *ReasoningSummaryPartAddedNotification) UnmarshalJSON(data []byte) error
 // ItemStartedNotification is sent when a thread item starts.
 // Method: item/started
 type ItemStartedNotification struct {
-	Item     ThreadItemWrapper `json:"item"`
-	ThreadID string            `json:"threadId"`
-	TurnID   string            `json:"turnId"`
+	Item        ThreadItemWrapper `json:"item"`
+	StartedAtMs int64             `json:"startedAtMs"`
+	ThreadID    string            `json:"threadId"`
+	TurnID      string            `json:"turnId"`
 }
 
 func (n *ItemStartedNotification) UnmarshalJSON(data []byte) error {
 	type wire ItemStartedNotification
 	var decoded wire
-	required := []string{"item", "threadId", "turnId"}
+	required := []string{"item", "startedAtMs", "threadId", "turnId"}
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
@@ -175,15 +176,16 @@ func (n *ItemStartedNotification) UnmarshalJSON(data []byte) error {
 // ItemCompletedNotification is sent when a thread item completes.
 // Method: item/completed
 type ItemCompletedNotification struct {
-	Item     ThreadItemWrapper `json:"item"`
-	ThreadID string            `json:"threadId"`
-	TurnID   string            `json:"turnId"`
+	CompletedAtMs int64             `json:"completedAtMs"`
+	Item          ThreadItemWrapper `json:"item"`
+	ThreadID      string            `json:"threadId"`
+	TurnID        string            `json:"turnId"`
 }
 
 func (n *ItemCompletedNotification) UnmarshalJSON(data []byte) error {
 	type wire ItemCompletedNotification
 	var decoded wire
-	required := []string{"item", "threadId", "turnId"}
+	required := []string{"completedAtMs", "item", "threadId", "turnId"}
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}

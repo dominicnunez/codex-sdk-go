@@ -15,6 +15,8 @@ const (
 	HookEventNamePreToolUse        HookEventName = "preToolUse"
 	HookEventNamePermissionRequest HookEventName = "permissionRequest"
 	HookEventNamePostToolUse       HookEventName = "postToolUse"
+	HookEventNamePreCompact        HookEventName = "preCompact"
+	HookEventNamePostCompact       HookEventName = "postCompact"
 	HookEventNameStop              HookEventName = "stop"
 )
 
@@ -24,6 +26,8 @@ var validHookEventNames = map[HookEventName]struct{}{
 	HookEventNamePreToolUse:        {},
 	HookEventNamePermissionRequest: {},
 	HookEventNamePostToolUse:       {},
+	HookEventNamePreCompact:        {},
+	HookEventNamePostCompact:       {},
 	HookEventNameStop:              {},
 }
 
@@ -199,6 +203,7 @@ const (
 	HookSourceMDM                     HookSource = "mdm"
 	HookSourceSessionFlags            HookSource = "sessionFlags"
 	HookSourcePlugin                  HookSource = "plugin"
+	HookSourceCloudRequirements       HookSource = "cloudRequirements"
 	HookSourceLegacyManagedConfigFile HookSource = "legacyManagedConfigFile"
 	HookSourceLegacyManagedConfigMDM  HookSource = "legacyManagedConfigMdm"
 	HookSourceUnknown                 HookSource = "unknown"
@@ -348,6 +353,7 @@ type ItemGuardianApprovalReviewStartedNotification struct {
 	Action       interface{}            `json:"action"`
 	Review       GuardianApprovalReview `json:"review"`
 	ReviewID     string                 `json:"reviewId"`
+	StartedAtMs  int64                  `json:"startedAtMs"`
 	TargetItemID string                 `json:"targetItemId"`
 	ThreadID     string                 `json:"threadId"`
 	TurnID       string                 `json:"turnId"`
@@ -356,7 +362,7 @@ type ItemGuardianApprovalReviewStartedNotification struct {
 func (n *ItemGuardianApprovalReviewStartedNotification) UnmarshalJSON(data []byte) error {
 	type wire ItemGuardianApprovalReviewStartedNotification
 	var decoded wire
-	required := []string{"action", "review", "reviewId", "threadId", "turnId"}
+	required := []string{"action", "review", "reviewId", "startedAtMs", "threadId", "turnId"}
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
@@ -367,9 +373,11 @@ func (n *ItemGuardianApprovalReviewStartedNotification) UnmarshalJSON(data []byt
 // ItemGuardianApprovalReviewCompletedNotification is sent when guardian review finishes.
 type ItemGuardianApprovalReviewCompletedNotification struct {
 	Action         interface{}              `json:"action"`
+	CompletedAtMs  int64                    `json:"completedAtMs"`
 	DecisionSource AutoReviewDecisionSource `json:"decisionSource"`
 	Review         GuardianApprovalReview   `json:"review"`
 	ReviewID       string                   `json:"reviewId"`
+	StartedAtMs    int64                    `json:"startedAtMs"`
 	TargetItemID   string                   `json:"targetItemId"`
 	ThreadID       string                   `json:"threadId"`
 	TurnID         string                   `json:"turnId"`
@@ -378,7 +386,7 @@ type ItemGuardianApprovalReviewCompletedNotification struct {
 func (n *ItemGuardianApprovalReviewCompletedNotification) UnmarshalJSON(data []byte) error {
 	type wire ItemGuardianApprovalReviewCompletedNotification
 	var decoded wire
-	required := []string{"action", "decisionSource", "review", "reviewId", "threadId", "turnId"}
+	required := []string{"action", "completedAtMs", "decisionSource", "review", "reviewId", "startedAtMs", "threadId", "turnId"}
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}

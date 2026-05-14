@@ -9,6 +9,7 @@ import (
 // CommandExecutionRequestApprovalParams represents parameters for command execution approval.
 type CommandExecutionRequestApprovalParams struct {
 	ItemID                          string                    `json:"itemId"`
+	StartedAtMs                     int64                     `json:"startedAtMs"`
 	ThreadID                        string                    `json:"threadId"`
 	TurnID                          string                    `json:"turnId"`
 	ApprovalID                      *string                   `json:"approvalId,omitempty"`
@@ -24,7 +25,7 @@ type CommandExecutionRequestApprovalParams struct {
 func (p *CommandExecutionRequestApprovalParams) UnmarshalJSON(data []byte) error {
 	type wire CommandExecutionRequestApprovalParams
 	var decoded wire
-	required := []string{"itemId", "threadId", "turnId"}
+	required := []string{"itemId", "startedAtMs", "threadId", "turnId"}
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}

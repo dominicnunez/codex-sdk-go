@@ -330,6 +330,7 @@ func testStructFields(t *testing.T) {
 		// Root-level specs (approval types)
 		{"specs/ApplyPatchApprovalParams.json", reflect.TypeOf(ApplyPatchApprovalParams{})},
 		{"specs/ApplyPatchApprovalResponse.json", reflect.TypeOf(ApplyPatchApprovalResponse{})},
+		{"specs/AttestationGenerateResponse.json", reflect.TypeOf(AttestationGenerateResponse{})},
 		{"specs/ChatgptAuthTokensRefreshParams.json", reflect.TypeOf(ChatgptAuthTokensRefreshParams{})},
 		{"specs/ChatgptAuthTokensRefreshResponse.json", reflect.TypeOf(ChatgptAuthTokensRefreshResponse{})},
 		{"specs/CommandExecutionRequestApprovalParams.json", reflect.TypeOf(CommandExecutionRequestApprovalParams{})},
@@ -373,14 +374,6 @@ func testStructFields(t *testing.T) {
 		{"specs/v2/AppsListParams.json", reflect.TypeOf(AppsListParams{})},
 		{"specs/v2/AppsListResponse.json", reflect.TypeOf(AppsListResponse{})},
 		{"specs/v2/AppListUpdatedNotification.json", reflect.TypeOf(AppListUpdatedNotification{})},
-
-		// v2 device key
-		{"specs/v2/DeviceKeyCreateParams.json", reflect.TypeOf(DeviceKeyCreateParams{})},
-		{"specs/v2/DeviceKeyCreateResponse.json", reflect.TypeOf(DeviceKeyCreateResponse{})},
-		{"specs/v2/DeviceKeyPublicParams.json", reflect.TypeOf(DeviceKeyPublicParams{})},
-		{"specs/v2/DeviceKeyPublicResponse.json", reflect.TypeOf(DeviceKeyPublicResponse{})},
-		{"specs/v2/DeviceKeySignParams.json", reflect.TypeOf(DeviceKeySignParams{})},
-		{"specs/v2/DeviceKeySignResponse.json", reflect.TypeOf(DeviceKeySignResponse{})},
 
 		// v2 command
 		{"specs/v2/CommandExecParams.json", reflect.TypeOf(CommandExecParams{})},
@@ -485,6 +478,16 @@ func testStructFields(t *testing.T) {
 		{"specs/v2/PluginInstallResponse.json", reflect.TypeOf(PluginInstallResponse{})},
 		{"specs/v2/PluginUninstallParams.json", reflect.TypeOf(PluginUninstallParams{})},
 		{"specs/v2/PluginUninstallResponse.json", reflect.TypeOf(PluginUninstallResponse{})},
+		{"specs/v2/PluginSkillReadParams.json", reflect.TypeOf(PluginSkillReadParams{})},
+		{"specs/v2/PluginSkillReadResponse.json", reflect.TypeOf(PluginSkillReadResponse{})},
+		{"specs/v2/PluginShareCheckoutParams.json", reflect.TypeOf(PluginShareCheckoutParams{})},
+		{"specs/v2/PluginShareCheckoutResponse.json", reflect.TypeOf(PluginShareCheckoutResponse{})},
+		{"specs/v2/PluginShareDeleteParams.json", reflect.TypeOf(PluginShareDeleteParams{})},
+		{"specs/v2/PluginShareListResponse.json", reflect.TypeOf(PluginShareListResponse{})},
+		{"specs/v2/PluginShareSaveParams.json", reflect.TypeOf(PluginShareSaveParams{})},
+		{"specs/v2/PluginShareSaveResponse.json", reflect.TypeOf(PluginShareSaveResponse{})},
+		{"specs/v2/PluginShareUpdateTargetsParams.json", reflect.TypeOf(PluginShareUpdateTargetsParams{})},
+		{"specs/v2/PluginShareUpdateTargetsResponse.json", reflect.TypeOf(PluginShareUpdateTargetsResponse{})},
 
 		// v2 marketplace
 		{"specs/v2/MarketplaceAddParams.json", reflect.TypeOf(MarketplaceAddParams{})},
@@ -501,6 +504,10 @@ func testStructFields(t *testing.T) {
 		{"specs/v2/SkillsConfigWriteResponse.json", reflect.TypeOf(SkillsConfigWriteResponse{})},
 		{"specs/v2/SkillsChangedNotification.json", reflect.TypeOf(SkillsChangedNotification{})},
 
+		// v2 hooks
+		{"specs/v2/HooksListParams.json", reflect.TypeOf(HooksListParams{})},
+		{"specs/v2/HooksListResponse.json", reflect.TypeOf(HooksListResponse{})},
+
 		// v2 system
 		{"specs/v2/HookStartedNotification.json", reflect.TypeOf(HookStartedNotification{})},
 		{"specs/v2/HookCompletedNotification.json", reflect.TypeOf(HookCompletedNotification{})},
@@ -508,6 +515,7 @@ func testStructFields(t *testing.T) {
 		{"specs/v2/ItemGuardianApprovalReviewCompletedNotification.json", reflect.TypeOf(ItemGuardianApprovalReviewCompletedNotification{})},
 		{"specs/v2/WindowsSandboxSetupStartParams.json", reflect.TypeOf(WindowsSandboxSetupStartParams{})},
 		{"specs/v2/WindowsSandboxSetupStartResponse.json", reflect.TypeOf(WindowsSandboxSetupStartResponse{})},
+		{"specs/v2/WindowsSandboxReadinessResponse.json", reflect.TypeOf(WindowsSandboxReadinessResponse{})},
 		{"specs/v2/WindowsSandboxSetupCompletedNotification.json", reflect.TypeOf(WindowsSandboxSetupCompletedNotification{})},
 		{"specs/v2/WindowsWorldWritableWarningNotification.json", reflect.TypeOf(WindowsWorldWritableWarningNotification{})},
 		{"specs/v2/ContextCompactedNotification.json", reflect.TypeOf(ContextCompactedNotification{})},
@@ -527,8 +535,6 @@ func testStructFields(t *testing.T) {
 		{"specs/v2/ThreadListResponse.json", reflect.TypeOf(ThreadListResponse{})},
 		{"specs/v2/ThreadLoadedListParams.json", reflect.TypeOf(ThreadLoadedListParams{})},
 		{"specs/v2/ThreadLoadedListResponse.json", reflect.TypeOf(ThreadLoadedListResponse{})},
-		{"specs/v2/ThreadTurnsListParams.json", reflect.TypeOf(ThreadTurnsListParams{})},
-		{"specs/v2/ThreadTurnsListResponse.json", reflect.TypeOf(ThreadTurnsListResponse{})},
 		{"specs/v2/ThreadShellCommandParams.json", reflect.TypeOf(ThreadShellCommandParams{})},
 		{"specs/v2/ThreadShellCommandResponse.json", reflect.TypeOf(ThreadShellCommandResponse{})},
 		{"specs/v2/ThreadApproveGuardianDeniedActionParams.json", reflect.TypeOf(ThreadApproveGuardianDeniedActionParams{})},
@@ -572,6 +578,10 @@ func testStructFields(t *testing.T) {
 		{"specs/v2/ThreadRealtimeSdpNotification.json", reflect.TypeOf(ThreadRealtimeSdpNotification{})},
 		{"specs/v2/ThreadRealtimeTranscriptDeltaNotification.json", reflect.TypeOf(ThreadRealtimeTranscriptDeltaNotification{})},
 		{"specs/v2/ThreadRealtimeTranscriptDoneNotification.json", reflect.TypeOf(ThreadRealtimeTranscriptDoneNotification{})},
+
+		// v2 process notifications
+		{"specs/v2/ProcessOutputDeltaNotification.json", reflect.TypeOf(ProcessOutputDeltaNotification{})},
+		{"specs/v2/ProcessExitedNotification.json", reflect.TypeOf(ProcessExitedNotification{})},
 
 		// v2 turn
 		{"specs/v2/TurnStartParams.json", reflect.TypeOf(TurnStartParams{})},
@@ -838,7 +848,8 @@ func testEnumValues(t *testing.T) {
 			goValues: enumStrings(
 				HookEventNameSessionStart, HookEventNameUserPromptSubmit,
 				HookEventNamePreToolUse, HookEventNamePermissionRequest,
-				HookEventNamePostToolUse, HookEventNameStop,
+				HookEventNamePostToolUse, HookEventNamePreCompact,
+				HookEventNamePostCompact, HookEventNameStop,
 			),
 		},
 		{

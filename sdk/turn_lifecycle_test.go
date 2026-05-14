@@ -80,8 +80,9 @@ func serveLifecycleOverStdio(serverReader io.Reader, serverWriter io.Writer, thr
 				return err
 			}
 			if err := writeStdioNotification(enc, "item/completed", map[string]interface{}{
-				"threadId": threadID,
-				"turnId":   turnID,
+				"completedAtMs": int64(1),
+				"threadId":      threadID,
+				"turnId":        turnID,
 				"item": map[string]interface{}{
 					"type": "agentMessage",
 					"id":   itemID,
@@ -143,8 +144,9 @@ func serveBurstLifecycleOverStdio(serverReader io.Reader, serverWriter io.Writer
 			}
 			for i := 1; i <= itemCount; i++ {
 				if err := writeStdioNotification(enc, "item/completed", map[string]interface{}{
-					"threadId": threadID,
-					"turnId":   turnID,
+					"completedAtMs": int64(i),
+					"threadId":      threadID,
+					"turnId":        turnID,
 					"item": map[string]interface{}{
 						"type": "agentMessage",
 						"id":   fmt.Sprintf("item-%03d", i),
@@ -249,7 +251,7 @@ func (t *notifyDuringSendTransport) Send(ctx context.Context, req codex.Request)
 		t.notifHandler(ctx, codex.Notification{
 			JSONRPC: "2.0",
 			Method:  "item/completed",
-			Params:  json.RawMessage(`{"threadId":"` + t.threadID + `","turnId":"turn-1","item":{"type":"agentMessage","id":"item-early","text":"early bird"}}`),
+			Params:  json.RawMessage(`{"completedAtMs":1,"threadId":"` + t.threadID + `","turnId":"turn-1","item":{"type":"agentMessage","id":"item-early","text":"early bird"}}`),
 		})
 		t.notifHandler(ctx, codex.Notification{
 			JSONRPC: "2.0",
@@ -294,7 +296,7 @@ func (t *staleMalformedTurnCompletedTransport) Send(ctx context.Context, req cod
 			JSONRPC: "2.0",
 			Method:  "item/completed",
 			Params: json.RawMessage(
-				`{"threadId":"` + t.threadID + `","turnId":"` + turnID + `","item":{"type":"agentMessage","id":"item-` + turnID + `","text":"response for ` + turnID + `"}}`,
+				`{"completedAtMs":1,"threadId":"` + t.threadID + `","turnId":"` + turnID + `","item":{"type":"agentMessage","id":"item-` + turnID + `","text":"response for ` + turnID + `"}}`,
 			),
 		})
 		t.notifHandler(ctx, codex.Notification{
@@ -319,7 +321,8 @@ func (t *floodDuringTurnStartTransport) Send(ctx context.Context, req codex.Requ
 				JSONRPC: "2.0",
 				Method:  "item/completed",
 				Params: json.RawMessage(fmt.Sprintf(
-					`{"threadId":"%s","turnId":"turn-1","item":{"type":"agentMessage","id":"item-%d","text":"message %d"}}`,
+					`{"completedAtMs":%d,"threadId":"%s","turnId":"turn-1","item":{"type":"agentMessage","id":"item-%d","text":"message %d"}}`,
+					i,
 					t.threadID,
 					i,
 					i,

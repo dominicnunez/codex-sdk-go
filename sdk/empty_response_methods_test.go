@@ -21,7 +21,6 @@ func emptyObjectMethodCases() []emptyObjectMethodCase {
 	deltaBase64 := "aGVsbG8="
 	force := true
 	recursive := true
-	forceRemoteSync := true
 
 	return []emptyObjectMethodCase{
 		{
@@ -127,8 +126,7 @@ func emptyObjectMethodCases() []emptyObjectMethodCase {
 			method: "plugin/uninstall",
 			call: func(client *codex.Client) error {
 				_, err := client.Plugin.Uninstall(context.Background(), codex.PluginUninstallParams{
-					PluginID:        "plugin-1",
-					ForceRemoteSync: &forceRemoteSync,
+					PluginID: "plugin-1",
 				})
 				return err
 			},

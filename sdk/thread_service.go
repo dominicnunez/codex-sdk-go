@@ -33,6 +33,7 @@ type ThreadStartParams struct {
 	ServiceName           *string            `json:"serviceName,omitempty"`
 	ServiceTier           *ServiceTier       `json:"serviceTier,omitempty"`
 	SessionStartSource    *ThreadStartSource `json:"sessionStartSource,omitempty"`
+	ThreadSource          *ThreadSource      `json:"threadSource,omitempty"`
 }
 
 // ThreadStartSource identifies why a thread was started.
@@ -269,7 +270,7 @@ func (s *ThreadService) LoadedList(ctx context.Context, params ThreadLoadedListP
 	return response, nil
 }
 
-// SortDirection controls thread turn pagination direction.
+// SortDirection controls thread pagination direction.
 type SortDirection string
 
 const (
@@ -288,43 +289,6 @@ func (d SortDirection) MarshalJSON() ([]byte, error) {
 
 func (d *SortDirection) UnmarshalJSON(data []byte) error {
 	return unmarshalEnumString(data, "sortDirection", validSortDirections, d)
-}
-
-// ThreadTurnsListParams are parameters for listing turns in a thread.
-type ThreadTurnsListParams struct {
-	Cursor        *string        `json:"cursor,omitempty"`
-	Limit         *uint32        `json:"limit,omitempty"`
-	SortDirection *SortDirection `json:"sortDirection,omitempty"`
-	ThreadID      string         `json:"threadId"`
-}
-
-// ThreadTurnsListResponse is the response from thread/turns/list.
-type ThreadTurnsListResponse struct {
-	BackwardsCursor *string `json:"backwardsCursor,omitempty"`
-	Data            []Turn  `json:"data"`
-	NextCursor      *string `json:"nextCursor,omitempty"`
-}
-
-func (r *ThreadTurnsListResponse) UnmarshalJSON(data []byte) error {
-	if err := validateRequiredObjectFields(data, "data"); err != nil {
-		return err
-	}
-	type wire ThreadTurnsListResponse
-	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
-		return err
-	}
-	*r = ThreadTurnsListResponse(decoded)
-	return nil
-}
-
-// TurnsList lists turns in a thread.
-func (s *ThreadService) TurnsList(ctx context.Context, params ThreadTurnsListParams) (ThreadTurnsListResponse, error) {
-	var response ThreadTurnsListResponse
-	if err := s.client.sendRequest(ctx, methodThreadTurnsList, params, &response); err != nil {
-		return ThreadTurnsListResponse{}, err
-	}
-	return response, nil
 }
 
 // ThreadShellCommandParams runs a shell command in a thread context.
@@ -465,6 +429,7 @@ type ThreadForkParams struct {
 	ModelProvider         *string            `json:"modelProvider,omitempty"`
 	Sandbox               *SandboxMode       `json:"sandbox,omitempty"`
 	ServiceTier           *ServiceTier       `json:"serviceTier,omitempty"`
+	ThreadSource          *ThreadSource      `json:"threadSource,omitempty"`
 }
 
 // ThreadForkResponse is the response from forking a thread

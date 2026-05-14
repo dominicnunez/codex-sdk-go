@@ -1903,8 +1903,8 @@ func TestStdioDistinctTurnScopedNotificationsDoNotBlockReadLoop(t *testing.T) {
 
 	for i := 0; i < 64; i++ {
 		item := fmt.Sprintf(
-			`{"jsonrpc":"2.0","method":"item/completed","params":{"threadId":"thread-%d","turnId":"turn-%d","item":{"type":"plan","id":"item-%d","text":"queued"}}}`+"\n",
-			i, i, i,
+			`{"jsonrpc":"2.0","method":"item/completed","params":{"completedAtMs":%d,"threadId":"thread-%d","turnId":"turn-%d","item":{"type":"plan","id":"item-%d","text":"queued"}}}`+"\n",
+			i, i, i, i,
 		)
 		_, _ = serverWriter.Write([]byte(item))
 		completed := fmt.Sprintf(
@@ -2046,7 +2046,7 @@ func TestStdioTurnCompletedWaitsForEarlierSameTurnItems(t *testing.T) {
 
 	waitForOutboundRequest(t, serverReader)
 
-	criticalItemCompleted := `{"jsonrpc":"2.0","method":"item/completed","params":{"threadId":"t","turnId":"u","item":{"type":"plan","id":"p","text":"done"}}}` + "\n"
+	criticalItemCompleted := `{"jsonrpc":"2.0","method":"item/completed","params":{"completedAtMs":1,"threadId":"t","turnId":"u","item":{"type":"plan","id":"p","text":"done"}}}` + "\n"
 	for i := 0; i < 200; i++ {
 		_, _ = serverWriter.Write([]byte(criticalItemCompleted))
 	}

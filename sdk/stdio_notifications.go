@@ -344,7 +344,8 @@ func isStreamingNotificationMethod(method string) bool {
 		notifyReasoningSummaryPartAdded,
 		notifyRealtimeOutputAudioDelta,
 		notifyCommandExecutionOutputDelta,
-		notifyCommandExecOutputDelta:
+		notifyCommandExecOutputDelta,
+		notifyProcessOutputDelta:
 		return true
 	default:
 		return false
@@ -386,6 +387,7 @@ func isProtectedNotificationMethod(method string) bool {
 		notifySkillsChanged,
 		notifyHookStarted,
 		notifyHookCompleted,
+		notifyProcessExited,
 		notifyItemGuardianApprovalReviewStarted,
 		notifyItemGuardianApprovalReviewCompleted:
 		return true

@@ -996,8 +996,8 @@ func TestStdioDistinctTurnScopedNotificationsLimitConcurrentHandlers(t *testing.
 	totalThreads := turnScopedNotificationWorkers + 24
 	for i := range totalThreads {
 		item := fmt.Sprintf(
-			`{"jsonrpc":"2.0","method":"item/completed","params":{"threadId":"thread-%d","turnId":"turn-%d","item":{"type":"plan","id":"item-%d","text":"queued"}}}`+"\n",
-			i, i, i,
+			`{"jsonrpc":"2.0","method":"item/completed","params":{"completedAtMs":%d,"threadId":"thread-%d","turnId":"turn-%d","item":{"type":"plan","id":"item-%d","text":"queued"}}}`+"\n",
+			i, i, i, i,
 		)
 		if _, err := serverWriter.Write([]byte(item)); err != nil {
 			t.Fatalf("write item/completed %d: %v", i, err)
@@ -1177,7 +1177,7 @@ func TestStdioNotificationFloodStillDeliversItemCompleted(t *testing.T) {
 		JSONRPC: jsonrpcVersion,
 		Method:  notifyItemCompleted,
 		Params: json.RawMessage(
-			`{"threadId":"thread-1","turnId":"turn-1","item":{"id":"item-1","type":"agent_message","text":"done"}}`,
+			`{"completedAtMs":1,"threadId":"thread-1","turnId":"turn-1","item":{"id":"item-1","type":"agent_message","text":"done"}}`,
 		),
 	}
 	itemBytes, err := json.Marshal(itemCompleted)

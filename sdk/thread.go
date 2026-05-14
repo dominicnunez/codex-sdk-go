@@ -15,6 +15,7 @@ type Thread struct {
 	Preview       string               `json:"preview"`
 	Source        SessionSourceWrapper `json:"source"`
 	Status        ThreadStatusWrapper  `json:"status"`
+	ThreadSource  *ThreadSource        `json:"threadSource,omitempty"`
 	Turns         []Turn               `json:"turns"`
 	UpdatedAt     int64                `json:"updatedAt"`
 	Ephemeral     bool                 `json:"ephemeral"`
@@ -35,6 +36,7 @@ func (t *Thread) UnmarshalJSON(data []byte) error {
 		Preview       *string               `json:"preview"`
 		Source        *SessionSourceWrapper `json:"source"`
 		Status        *ThreadStatusWrapper  `json:"status"`
+		ThreadSource  *ThreadSource         `json:"threadSource"`
 		Turns         *[]Turn               `json:"turns"`
 		UpdatedAt     *int64                `json:"updatedAt"`
 		Ephemeral     *bool                 `json:"ephemeral"`
@@ -87,6 +89,7 @@ func (t *Thread) UnmarshalJSON(data []byte) error {
 	t.Preview = *wire.Preview
 	t.Source = *wire.Source
 	t.Status = *wire.Status
+	t.ThreadSource = wire.ThreadSource
 	t.Turns = *wire.Turns
 	t.UpdatedAt = *wire.UpdatedAt
 	t.Ephemeral = *wire.Ephemeral

@@ -210,12 +210,12 @@ func TestRunStreamedWithCollectorCapturesNotificationConveniences(t *testing.T) 
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "item/started",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"commandExecution","id":"cmd-1","command":"ls","commandActions":[],"cwd":"/tmp","status":"inProgress"}}`),
+		Params:  json.RawMessage(`{"startedAtMs":1,"threadId":"thread-1","turnId":"turn-1","item":{"type":"commandExecution","id":"cmd-1","command":"ls","commandActions":[],"cwd":"/tmp","status":"inProgress"}}`),
 	})
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "item/completed",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"commandExecution","id":"cmd-1","command":"ls","commandActions":[],"cwd":"/tmp","status":"completed","aggregatedOutput":"out"}}`),
+		Params:  json.RawMessage(`{"completedAtMs":1,"threadId":"thread-1","turnId":"turn-1","item":{"type":"commandExecution","id":"cmd-1","command":"ls","commandActions":[],"cwd":"/tmp","status":"completed","aggregatedOutput":"out"}}`),
 	})
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
@@ -653,7 +653,7 @@ func TestStreamCollectorBoundsOutputDeltaHistory(t *testing.T) {
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "item/started",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"commandExecution","id":"cmd-many","command":"echo","commandActions":[],"cwd":"/tmp","status":"inProgress"}}`),
+		Params:  json.RawMessage(`{"startedAtMs":1,"threadId":"thread-1","turnId":"turn-1","item":{"type":"commandExecution","id":"cmd-many","command":"echo","commandActions":[],"cwd":"/tmp","status":"inProgress"}}`),
 	})
 	for i := 0; i < 1200; i++ {
 		mock.InjectServerNotification(ctx, codex.Notification{
@@ -668,7 +668,7 @@ func TestStreamCollectorBoundsOutputDeltaHistory(t *testing.T) {
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "item/completed",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"commandExecution","id":"cmd-many","command":"echo","commandActions":[],"cwd":"/tmp","status":"completed","aggregatedOutput":"done"}}`),
+		Params:  json.RawMessage(`{"completedAtMs":1,"threadId":"thread-1","turnId":"turn-1","item":{"type":"commandExecution","id":"cmd-many","command":"echo","commandActions":[],"cwd":"/tmp","status":"completed","aggregatedOutput":"done"}}`),
 	})
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
@@ -708,7 +708,7 @@ func TestStreamCollectorBoundsOutputDeltaBytes(t *testing.T) {
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "item/started",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"commandExecution","id":"cmd-big","command":"echo","commandActions":[],"cwd":"/tmp","status":"inProgress"}}`),
+		Params:  json.RawMessage(`{"startedAtMs":1,"threadId":"thread-1","turnId":"turn-1","item":{"type":"commandExecution","id":"cmd-big","command":"echo","commandActions":[],"cwd":"/tmp","status":"inProgress"}}`),
 	})
 
 	const maxRetainedOutputDeltaBytes = 64 * 1024
@@ -793,7 +793,7 @@ func TestStreamCollectorBoundsRawOutputChunksAndFinalizesOnCompletion(t *testing
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "item/started",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"commandExecution","id":"cmd-raw","command":"echo","commandActions":[],"cwd":"/tmp","status":"inProgress"}}`),
+		Params:  json.RawMessage(`{"startedAtMs":1,"threadId":"thread-1","turnId":"turn-1","item":{"type":"commandExecution","id":"cmd-raw","command":"echo","commandActions":[],"cwd":"/tmp","status":"inProgress"}}`),
 	})
 
 	const totalChunks = 2000
@@ -812,7 +812,7 @@ func TestStreamCollectorBoundsRawOutputChunksAndFinalizesOnCompletion(t *testing
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "item/completed",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"commandExecution","id":"cmd-raw","command":"echo","commandActions":[],"cwd":"/tmp","status":"completed"}}`),
+		Params:  json.RawMessage(`{"completedAtMs":1,"threadId":"thread-1","turnId":"turn-1","item":{"type":"commandExecution","id":"cmd-raw","command":"echo","commandActions":[],"cwd":"/tmp","status":"completed"}}`),
 	})
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",

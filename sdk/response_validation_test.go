@@ -345,6 +345,90 @@ func TestClientMethodsRejectMalformedSuccessResponses(t *testing.T) {
 			},
 		},
 		{
+			name:          "plugin share save",
+			method:        "plugin/share/save",
+			missingObject: map[string]interface{}{},
+			nullFieldObject: map[string]interface{}{
+				"remotePluginId": nil,
+				"shareUrl":       "https://example.com/share/plugin-1",
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Plugin.ShareSave(context.Background(), codex.PluginShareSaveParams{PluginPath: "/tmp/plugin"})
+				return err
+			},
+		},
+		{
+			name:          "plugin share update targets",
+			method:        "plugin/share/updateTargets",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"discoverability": "PRIVATE",
+				"principals": []interface{}{
+					map[string]interface{}{},
+				},
+			},
+			invalidContains: "missing plugin.sharePrincipal.name",
+			call: func(client *codex.Client) error {
+				_, err := client.Plugin.ShareUpdateTargets(context.Background(), codex.PluginShareUpdateTargetsParams{
+					Discoverability: codex.PluginShareUpdateDiscoverabilityPrivate,
+					RemotePluginID:  "remote-1",
+					ShareTargets:    []codex.PluginShareTarget{},
+				})
+				return err
+			},
+		},
+		{
+			name:          "plugin share list",
+			method:        "plugin/share/list",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"data": []interface{}{
+					map[string]interface{}{},
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Plugin.ShareList(context.Background(), codex.PluginShareListParams{})
+				return err
+			},
+		},
+		{
+			name:          "plugin share checkout",
+			method:        "plugin/share/checkout",
+			missingObject: map[string]interface{}{},
+			nullFieldObject: map[string]interface{}{
+				"marketplaceName": "official",
+				"marketplacePath": "/plugins",
+				"pluginId":        "plugin-1",
+				"pluginName":      nil,
+				"pluginPath":      "/plugins/calendar",
+				"remotePluginId":  "remote-1",
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Plugin.ShareCheckout(context.Background(), codex.PluginShareCheckoutParams{RemotePluginID: "remote-1"})
+				return err
+			},
+		},
+		{
+			name:          "hooks list",
+			method:        "hooks/list",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"data": []interface{}{
+					map[string]interface{}{
+						"cwd":      "repo",
+						"errors":   []interface{}{},
+						"hooks":    []interface{}{map[string]interface{}{}},
+						"warnings": []interface{}{},
+					},
+				},
+			},
+			invalidContains: "missing required field",
+			call: func(client *codex.Client) error {
+				_, err := client.Hooks.List(context.Background(), codex.HooksListParams{})
+				return err
+			},
+		},
+		{
 			name:          "apps list",
 			method:        "app/list",
 			missingObject: map[string]interface{}{},
@@ -585,12 +669,14 @@ func TestClientMethodsRejectMalformedAbsolutePathResponses(t *testing.T) {
 			payload: map[string]interface{}{
 				"plugin": map[string]interface{}{
 					"apps":            []interface{}{},
+					"hooks":           []interface{}{},
 					"marketplaceName": "official",
 					"marketplacePath": "/plugins",
 					"mcpServers":      []interface{}{},
 					"skills": []interface{}{
 						map[string]interface{}{
 							"description": "skill desc",
+							"enabled":     true,
 							"name":        "book",
 							"path":        "/plugins/../skills/book",
 						},
@@ -639,6 +725,48 @@ func TestClientMethodsRejectMalformedAbsolutePathResponses(t *testing.T) {
 				return err
 			},
 			wantContains: `config.layer.user.file: must be an absolute path`,
+		},
+		{
+			name:   "plugin share list rejects relative local plugin path",
+			method: "plugin/share/list",
+			payload: map[string]interface{}{
+				"data": []interface{}{
+					map[string]interface{}{
+						"localPluginPath": "plugins/calendar",
+						"plugin": map[string]interface{}{
+							"authPolicy":    "ON_USE",
+							"enabled":       true,
+							"id":            "plugin-1",
+							"installPolicy": "AVAILABLE",
+							"installed":     true,
+							"name":          "calendar",
+							"source":        map[string]interface{}{"path": "/plugins/calendar", "type": "local"},
+						},
+					},
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Plugin.ShareList(context.Background(), codex.PluginShareListParams{})
+				return err
+			},
+			wantContains: `plugin.shareListItem.localPluginPath: must be an absolute path`,
+		},
+		{
+			name:   "plugin share checkout rejects relative plugin path",
+			method: "plugin/share/checkout",
+			payload: map[string]interface{}{
+				"marketplaceName": "official",
+				"marketplacePath": "/plugins",
+				"pluginId":        "plugin-1",
+				"pluginName":      "calendar",
+				"pluginPath":      "plugins/calendar",
+				"remotePluginId":  "remote-1",
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Plugin.ShareCheckout(context.Background(), codex.PluginShareCheckoutParams{RemotePluginID: "remote-1"})
+				return err
+			},
+			wantContains: `plugin.shareCheckout.pluginPath: must be an absolute path`,
 		},
 		{
 			name:   "config write rejects non-normalized file path",
@@ -751,6 +879,23 @@ func TestClientMethodsRejectMalformedAbsolutePathResponses(t *testing.T) {
 				t.Fatalf("error = %q; want substring %q", err.Error(), tt.wantContains)
 			}
 		})
+	}
+}
+
+func TestHooksListAllowsSchemaStringCwd(t *testing.T) {
+	transport := NewMockTransport()
+	client := codex.NewClient(transport)
+	transport.SetResponse("hooks/list", codex.Response{
+		JSONRPC: "2.0",
+		Result:  json.RawMessage(`{"data":[{"cwd":"repo","errors":[],"hooks":[],"warnings":[]}]}`),
+	})
+
+	resp, err := client.Hooks.List(context.Background(), codex.HooksListParams{})
+	if err != nil {
+		t.Fatalf("Hooks.List() error = %v", err)
+	}
+	if len(resp.Data) != 1 || resp.Data[0].Cwd != "repo" {
+		t.Fatalf("data = %+v; want relative cwd preserved", resp.Data)
 	}
 }
 

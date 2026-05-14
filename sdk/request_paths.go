@@ -652,6 +652,11 @@ func (p FsUnwatchParams) prepareRequest() (interface{}, error) {
 }
 
 func (p PluginListParams) prepareRequest() (interface{}, error) {
+	for i, kind := range p.MarketplaceKinds {
+		if err := validateEnumValue(fmt.Sprintf("marketplaceKinds[%d]", i), kind, validPluginListMarketplaceKinds); err != nil {
+			return nil, err
+		}
+	}
 	var err error
 	p.Cwds, err = normalizeAbsolutePathSliceField("cwds", p.Cwds)
 	if err != nil {
@@ -661,19 +666,23 @@ func (p PluginListParams) prepareRequest() (interface{}, error) {
 }
 
 func (p PluginReadParams) prepareRequest() (interface{}, error) {
-	var err error
-	p.MarketplacePath, err = normalizeAbsolutePathField("marketplacePath", p.MarketplacePath)
-	if err != nil {
-		return nil, err
+	if p.MarketplacePath != "" {
+		var err error
+		p.MarketplacePath, err = normalizeAbsolutePathField("marketplacePath", p.MarketplacePath)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return p, nil
 }
 
 func (p PluginInstallParams) prepareRequest() (interface{}, error) {
-	var err error
-	p.MarketplacePath, err = normalizeAbsolutePathField("marketplacePath", p.MarketplacePath)
-	if err != nil {
-		return nil, err
+	if p.MarketplacePath != "" {
+		var err error
+		p.MarketplacePath, err = normalizeAbsolutePathField("marketplacePath", p.MarketplacePath)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return p, nil
 }
@@ -683,6 +692,83 @@ func (p PluginUninstallParams) prepareRequest() (interface{}, error) {
 		return nil, err
 	}
 	return p, nil
+}
+
+func (p PluginShareSaveParams) prepareRequest() (interface{}, error) {
+	if err := validateRequiredNonEmptyStringField("pluginPath", p.PluginPath); err != nil {
+		return nil, err
+	}
+	if err := validateOptionalEnumValue("discoverability", p.Discoverability, validPluginShareDiscoverabilities); err != nil {
+		return nil, err
+	}
+	if err := validatePluginShareTargets("shareTargets", p.ShareTargets); err != nil {
+		return nil, err
+	}
+	var err error
+	p.PluginPath, err = normalizeAbsolutePathField("pluginPath", p.PluginPath)
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (p PluginShareUpdateTargetsParams) prepareRequest() (interface{}, error) {
+	if err := validateRequiredNonEmptyStringField("remotePluginId", p.RemotePluginID); err != nil {
+		return nil, err
+	}
+	if err := validateEnumValue("discoverability", p.Discoverability, validPluginShareUpdateDiscoverabilities); err != nil {
+		return nil, err
+	}
+	if p.ShareTargets == nil {
+		return nil, invalidParamsError("shareTargets must not be null")
+	}
+	if err := validatePluginShareTargets("shareTargets", p.ShareTargets); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (p PluginShareCheckoutParams) prepareRequest() (interface{}, error) {
+	if err := validateRequiredNonEmptyStringField("remotePluginId", p.RemotePluginID); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (p PluginShareDeleteParams) prepareRequest() (interface{}, error) {
+	if err := validateRequiredNonEmptyStringField("remotePluginId", p.RemotePluginID); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (p PluginSkillReadParams) prepareRequest() (interface{}, error) {
+	if err := validateRequiredNonEmptyStringField("remoteMarketplaceName", p.RemoteMarketplaceName); err != nil {
+		return nil, err
+	}
+	if err := validateRequiredNonEmptyStringField("remotePluginId", p.RemotePluginID); err != nil {
+		return nil, err
+	}
+	if err := validateRequiredNonEmptyStringField("skillName", p.SkillName); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func validatePluginShareTargets(field string, targets []PluginShareTarget) error {
+	for i, target := range targets {
+		prefix := fmt.Sprintf("%s[%d]", field, i)
+		if err := validateRequiredNonEmptyStringField(prefix+".principalId", target.PrincipalID); err != nil {
+			return err
+		}
+		if err := validateEnumValue(prefix+".principalType", target.PrincipalType, validPluginSharePrincipalTypes); err != nil {
+			return err
+		}
+		if err := validateEnumValue(prefix+".role", target.Role, validPluginShareTargetRoles); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (p CancelLoginAccountParams) prepareRequest() (interface{}, error) {
@@ -788,6 +874,9 @@ func (p ThreadStartParams) prepareRequest() (interface{}, error) {
 	if err := validateOptionalEnumValue("sessionStartSource", p.SessionStartSource, validThreadStartSources); err != nil {
 		return nil, err
 	}
+	if err := validateOptionalEnumValue("threadSource", p.ThreadSource, validThreadSources); err != nil {
+		return nil, err
+	}
 	var err error
 	p.Cwd, err = normalizeOptionalAbsolutePathField("cwd", p.Cwd)
 	if err != nil {
@@ -810,16 +899,6 @@ func (p ThreadListParams) prepareRequest() (interface{}, error) {
 
 func (p ThreadReadParams) prepareRequest() (interface{}, error) {
 	if err := validateThreadScopedRequest(p.ThreadID); err != nil {
-		return nil, err
-	}
-	return p, nil
-}
-
-func (p ThreadTurnsListParams) prepareRequest() (interface{}, error) {
-	if err := validateThreadScopedRequest(p.ThreadID); err != nil {
-		return nil, err
-	}
-	if err := validateOptionalEnumValue("sortDirection", p.SortDirection, validSortDirections); err != nil {
 		return nil, err
 	}
 	return p, nil
@@ -855,6 +934,15 @@ func (p ThreadInjectItemsParams) prepareRequest() (interface{}, error) {
 	return p, nil
 }
 
+func (p HooksListParams) prepareRequest() (interface{}, error) {
+	var err error
+	p.Cwds, err = normalizeAbsolutePathSliceField("cwds", p.Cwds)
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
 func (p ThreadResumeParams) prepareRequest() (interface{}, error) {
 	if err := validateThreadScopedRequest(p.ThreadID); err != nil {
 		return nil, err
@@ -875,6 +963,9 @@ func (p ThreadForkParams) prepareRequest() (interface{}, error) {
 		return nil, err
 	}
 	if err := validateOptionalRawJSONObjectField("config", p.Config); err != nil {
+		return nil, err
+	}
+	if err := validateOptionalEnumValue("threadSource", p.ThreadSource, validThreadSources); err != nil {
 		return nil, err
 	}
 	var err error

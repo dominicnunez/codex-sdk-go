@@ -42,10 +42,48 @@ func validatePluginInstallPolicyField(field string, value PluginInstallPolicy) e
 	return validateEnumValue(field, value, validPluginInstallPolicies)
 }
 
-const pluginSourceTypeLocal = "local"
+// PluginAvailability describes whether a remote plugin is available to install/use.
+type PluginAvailability string
+
+const (
+	PluginAvailabilityDisabledByAdmin PluginAvailability = "DISABLED_BY_ADMIN"
+	PluginAvailabilityAvailable       PluginAvailability = "AVAILABLE"
+)
+
+var validPluginAvailabilities = map[PluginAvailability]struct{}{
+	PluginAvailabilityDisabledByAdmin: {},
+	PluginAvailabilityAvailable:       {},
+}
+
+func validateOptionalPluginAvailabilityField(field string, value *PluginAvailability) error {
+	return validateOptionalEnumValue(field, value, validPluginAvailabilities)
+}
+
+// PluginListMarketplaceKind filters plugin/list marketplaces.
+type PluginListMarketplaceKind string
+
+const (
+	PluginListMarketplaceKindLocal              PluginListMarketplaceKind = "local"
+	PluginListMarketplaceKindWorkspaceDirectory PluginListMarketplaceKind = "workspace-directory"
+	PluginListMarketplaceKindSharedWithMe       PluginListMarketplaceKind = "shared-with-me"
+)
+
+var validPluginListMarketplaceKinds = map[PluginListMarketplaceKind]struct{}{
+	PluginListMarketplaceKindLocal:              {},
+	PluginListMarketplaceKindWorkspaceDirectory: {},
+	PluginListMarketplaceKindSharedWithMe:       {},
+}
+
+const (
+	pluginSourceTypeLocal  = "local"
+	pluginSourceTypeGit    = "git"
+	pluginSourceTypeRemote = "remote"
+)
 
 var validPluginSourceTypes = map[string]struct{}{
-	pluginSourceTypeLocal: {},
+	pluginSourceTypeLocal:  {},
+	pluginSourceTypeGit:    {},
+	pluginSourceTypeRemote: {},
 }
 
 func validatePluginSourceTypeField(field string, value string) error {
@@ -63,12 +101,15 @@ type PluginInterface struct {
 	Capabilities      []string `json:"capabilities"`
 	Category          *string  `json:"category,omitempty"`
 	ComposerIcon      *string  `json:"composerIcon,omitempty"`
+	ComposerIconURL   *string  `json:"composerIconUrl,omitempty"`
 	DefaultPrompt     []string `json:"defaultPrompt,omitempty"`
 	DeveloperName     *string  `json:"developerName,omitempty"`
 	DisplayName       *string  `json:"displayName,omitempty"`
 	Logo              *string  `json:"logo,omitempty"`
+	LogoURL           *string  `json:"logoUrl,omitempty"`
 	LongDescription   *string  `json:"longDescription,omitempty"`
 	PrivacyPolicyURL  *string  `json:"privacyPolicyUrl,omitempty"`
+	ScreenshotURLs    []string `json:"screenshotUrls"`
 	Screenshots       []string `json:"screenshots"`
 	ShortDescription  *string  `json:"shortDescription,omitempty"`
 	TermsOfServiceURL *string  `json:"termsOfServiceUrl,omitempty"`
@@ -81,12 +122,15 @@ func (p *PluginInterface) UnmarshalJSON(data []byte) error {
 		Capabilities      *[]string `json:"capabilities"`
 		Category          *string   `json:"category"`
 		ComposerIcon      *string   `json:"composerIcon"`
+		ComposerIconURL   *string   `json:"composerIconUrl"`
 		DefaultPrompt     []string  `json:"defaultPrompt"`
 		DeveloperName     *string   `json:"developerName"`
 		DisplayName       *string   `json:"displayName"`
 		Logo              *string   `json:"logo"`
+		LogoURL           *string   `json:"logoUrl"`
 		LongDescription   *string   `json:"longDescription"`
 		PrivacyPolicyURL  *string   `json:"privacyPolicyUrl"`
+		ScreenshotURLs    *[]string `json:"screenshotUrls"`
 		Screenshots       *[]string `json:"screenshots"`
 		ShortDescription  *string   `json:"shortDescription"`
 		TermsOfServiceURL *string   `json:"termsOfServiceUrl"`
@@ -100,6 +144,9 @@ func (p *PluginInterface) UnmarshalJSON(data []byte) error {
 	if wire.Capabilities == nil {
 		return errors.New("missing plugin.interface.capabilities")
 	}
+	if wire.ScreenshotURLs == nil {
+		return errors.New("missing plugin.interface.screenshotUrls")
+	}
 	if wire.Screenshots == nil {
 		return errors.New("missing plugin.interface.screenshots")
 	}
@@ -107,6 +154,7 @@ func (p *PluginInterface) UnmarshalJSON(data []byte) error {
 	p.BrandColor = wire.BrandColor
 	p.Capabilities = *wire.Capabilities
 	p.Category = wire.Category
+	p.ComposerIconURL = wire.ComposerIconURL
 	validatedComposerIcon, err := validateInboundAbsolutePathPointerField("plugin.interface.composerIcon", wire.ComposerIcon)
 	if err != nil {
 		return err
@@ -115,6 +163,7 @@ func (p *PluginInterface) UnmarshalJSON(data []byte) error {
 	p.DefaultPrompt = wire.DefaultPrompt
 	p.DeveloperName = wire.DeveloperName
 	p.DisplayName = wire.DisplayName
+	p.LogoURL = wire.LogoURL
 	validatedLogo, err := validateInboundAbsolutePathPointerField("plugin.interface.logo", wire.Logo)
 	if err != nil {
 		return err
@@ -122,6 +171,7 @@ func (p *PluginInterface) UnmarshalJSON(data []byte) error {
 	p.Logo = validatedLogo
 	p.LongDescription = wire.LongDescription
 	p.PrivacyPolicyURL = wire.PrivacyPolicyURL
+	p.ScreenshotURLs = *wire.ScreenshotURLs
 	validatedScreenshots, err := validateInboundAbsolutePathSliceField("plugin.interface.screenshots", *wire.Screenshots)
 	if err != nil {
 		return err
@@ -135,61 +185,86 @@ func (p *PluginInterface) UnmarshalJSON(data []byte) error {
 
 // PluginSource identifies where a plugin came from.
 type PluginSource struct {
-	Path string `json:"path"`
-	Type string `json:"type"`
+	Path    *string `json:"path,omitempty"`
+	RefName *string `json:"refName,omitempty"`
+	SHA     *string `json:"sha,omitempty"`
+	Type    string  `json:"type"`
+	URL     *string `json:"url,omitempty"`
 }
 
 func (p *PluginSource) UnmarshalJSON(data []byte) error {
 	type pluginSourceWire struct {
-		Path *string `json:"path"`
-		Type *string `json:"type"`
+		Path    *string `json:"path"`
+		RefName *string `json:"refName"`
+		SHA     *string `json:"sha"`
+		Type    *string `json:"type"`
+		URL     *string `json:"url"`
 	}
 
 	var wire pluginSourceWire
 	if err := json.Unmarshal(data, &wire); err != nil {
 		return err
 	}
-	switch {
-	case wire.Path == nil:
-		return errors.New("missing plugin.source.path")
-	case wire.Type == nil:
+	if wire.Type == nil {
 		return errors.New("missing plugin.source.type")
 	}
+	if err := validatePluginSourceTypeField("plugin.source.type", *wire.Type); err != nil {
+		return err
+	}
 
-	validatedPath, err := validateInboundAbsolutePathField("plugin.source.path", *wire.Path)
-	if err != nil {
-		return err
+	if *wire.Type == pluginSourceTypeLocal {
+		if wire.Path == nil {
+			return errors.New("missing plugin.source.path")
+		}
+		validatedPath, err := validateInboundAbsolutePathField("plugin.source.path", *wire.Path)
+		if err != nil {
+			return err
+		}
+		wire.Path = &validatedPath
 	}
-	p.Path = validatedPath
+	if *wire.Type == pluginSourceTypeGit && wire.URL == nil {
+		return errors.New("missing plugin.source.url")
+	}
+	p.Path = wire.Path
+	p.RefName = wire.RefName
+	p.SHA = wire.SHA
 	p.Type = *wire.Type
-	if err := validatePluginSourceTypeField("plugin.source.type", p.Type); err != nil {
-		return err
-	}
+	p.URL = wire.URL
 	return nil
 }
 
 // PluginSummary contains marketplace plugin summary metadata.
 type PluginSummary struct {
-	AuthPolicy    PluginAuthPolicy    `json:"authPolicy"`
-	Enabled       bool                `json:"enabled"`
-	ID            string              `json:"id"`
-	InstallPolicy PluginInstallPolicy `json:"installPolicy"`
-	Installed     bool                `json:"installed"`
-	Interface     *PluginInterface    `json:"interface,omitempty"`
-	Name          string              `json:"name"`
-	Source        PluginSource        `json:"source"`
+	AuthPolicy     PluginAuthPolicy    `json:"authPolicy"`
+	Availability   *PluginAvailability `json:"availability,omitempty"`
+	Enabled        bool                `json:"enabled"`
+	ID             string              `json:"id"`
+	InstallPolicy  PluginInstallPolicy `json:"installPolicy"`
+	Installed      bool                `json:"installed"`
+	Interface      *PluginInterface    `json:"interface,omitempty"`
+	Keywords       []string            `json:"keywords,omitempty"`
+	LocalVersion   *string             `json:"localVersion,omitempty"`
+	Name           string              `json:"name"`
+	RemotePluginID *string             `json:"remotePluginId,omitempty"`
+	ShareContext   *PluginShareContext `json:"shareContext,omitempty"`
+	Source         PluginSource        `json:"source"`
 }
 
 func (p *PluginSummary) UnmarshalJSON(data []byte) error {
 	type pluginSummaryWire struct {
-		AuthPolicy    *PluginAuthPolicy    `json:"authPolicy"`
-		Enabled       *bool                `json:"enabled"`
-		ID            *string              `json:"id"`
-		InstallPolicy *PluginInstallPolicy `json:"installPolicy"`
-		Installed     *bool                `json:"installed"`
-		Interface     *PluginInterface     `json:"interface"`
-		Name          *string              `json:"name"`
-		Source        *PluginSource        `json:"source"`
+		AuthPolicy     *PluginAuthPolicy    `json:"authPolicy"`
+		Availability   *PluginAvailability  `json:"availability"`
+		Enabled        *bool                `json:"enabled"`
+		ID             *string              `json:"id"`
+		InstallPolicy  *PluginInstallPolicy `json:"installPolicy"`
+		Installed      *bool                `json:"installed"`
+		Interface      *PluginInterface     `json:"interface"`
+		Keywords       []string             `json:"keywords"`
+		LocalVersion   *string              `json:"localVersion"`
+		Name           *string              `json:"name"`
+		RemotePluginID *string              `json:"remotePluginId"`
+		ShareContext   *PluginShareContext  `json:"shareContext"`
+		Source         *PluginSource        `json:"source"`
 	}
 
 	var wire pluginSummaryWire
@@ -215,17 +290,25 @@ func (p *PluginSummary) UnmarshalJSON(data []byte) error {
 	}
 
 	p.AuthPolicy = *wire.AuthPolicy
+	p.Availability = wire.Availability
 	p.Enabled = *wire.Enabled
 	p.ID = *wire.ID
 	p.InstallPolicy = *wire.InstallPolicy
 	p.Installed = *wire.Installed
 	p.Interface = wire.Interface
+	p.Keywords = wire.Keywords
+	p.LocalVersion = wire.LocalVersion
 	p.Name = *wire.Name
+	p.RemotePluginID = wire.RemotePluginID
+	p.ShareContext = wire.ShareContext
 	p.Source = *wire.Source
 	if err := validatePluginAuthPolicyField("plugin.summary.authPolicy", p.AuthPolicy); err != nil {
 		return err
 	}
 	if err := validatePluginInstallPolicyField("plugin.summary.installPolicy", p.InstallPolicy); err != nil {
+		return err
+	}
+	if err := validateOptionalPluginAvailabilityField("plugin.summary.availability", p.Availability); err != nil {
 		return err
 	}
 	return nil
@@ -235,12 +318,12 @@ func (p *PluginSummary) UnmarshalJSON(data []byte) error {
 type PluginMarketplaceEntry struct {
 	Interface *MarketplaceInterface `json:"interface,omitempty"`
 	Name      string                `json:"name"`
-	Path      string                `json:"path"`
+	Path      *string               `json:"path,omitempty"`
 	Plugins   []PluginSummary       `json:"plugins"`
 }
 
 func (p *PluginMarketplaceEntry) UnmarshalJSON(data []byte) error {
-	if err := validateRequiredObjectFields(data, "name", "path", "plugins"); err != nil {
+	if err := validateRequiredObjectFields(data, "name", "plugins"); err != nil {
 		return err
 	}
 	type wire PluginMarketplaceEntry
@@ -248,7 +331,7 @@ func (p *PluginMarketplaceEntry) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
-	validatedPath, err := validateInboundAbsolutePathField("plugin.marketplace.path", decoded.Path)
+	validatedPath, err := validateInboundAbsolutePathPointerField("plugin.marketplace.path", decoded.Path)
 	if err != nil {
 		return err
 	}
@@ -259,8 +342,8 @@ func (p *PluginMarketplaceEntry) UnmarshalJSON(data []byte) error {
 
 // PluginListParams lists plugins across marketplaces.
 type PluginListParams struct {
-	Cwds            []string `json:"cwds,omitempty"`
-	ForceRemoteSync *bool    `json:"forceRemoteSync,omitempty"`
+	Cwds             []string                    `json:"cwds,omitempty"`
+	MarketplaceKinds []PluginListMarketplaceKind `json:"marketplaceKinds,omitempty"`
 }
 
 // PluginListResponse contains marketplace plugin listings.
@@ -303,6 +386,7 @@ type AppSummary struct {
 	ID          string  `json:"id"`
 	InstallURL  *string `json:"installUrl,omitempty"`
 	Name        string  `json:"name"`
+	NeedsAuth   bool    `json:"needsAuth"`
 }
 
 func (a *AppSummary) UnmarshalJSON(data []byte) error {
@@ -311,6 +395,7 @@ func (a *AppSummary) UnmarshalJSON(data []byte) error {
 		ID          *string `json:"id"`
 		InstallURL  *string `json:"installUrl"`
 		Name        *string `json:"name"`
+		NeedsAuth   *bool   `json:"needsAuth"`
 	}
 
 	var wire appSummaryWire
@@ -322,27 +407,32 @@ func (a *AppSummary) UnmarshalJSON(data []byte) error {
 		return errors.New("missing plugin.app.id")
 	case wire.Name == nil:
 		return errors.New("missing plugin.app.name")
+	case wire.NeedsAuth == nil:
+		return errors.New("missing plugin.app.needsAuth")
 	}
 
 	a.Description = wire.Description
 	a.ID = *wire.ID
 	a.InstallURL = wire.InstallURL
 	a.Name = *wire.Name
+	a.NeedsAuth = *wire.NeedsAuth
 	return nil
 }
 
 // SkillSummary describes a skill bundled with a plugin.
 type SkillSummary struct {
 	Description      string          `json:"description"`
+	Enabled          bool            `json:"enabled"`
 	Interface        *SkillInterface `json:"interface,omitempty"`
 	Name             string          `json:"name"`
-	Path             string          `json:"path"`
+	Path             *string         `json:"path,omitempty"`
 	ShortDescription *string         `json:"shortDescription,omitempty"`
 }
 
 func (s *SkillSummary) UnmarshalJSON(data []byte) error {
 	type skillSummaryWire struct {
 		Description      *string         `json:"description"`
+		Enabled          *bool           `json:"enabled"`
 		Interface        *SkillInterface `json:"interface"`
 		Name             *string         `json:"name"`
 		Path             *string         `json:"path"`
@@ -357,16 +447,17 @@ func (s *SkillSummary) UnmarshalJSON(data []byte) error {
 	switch {
 	case wire.Description == nil:
 		return errors.New("missing plugin.skill.description")
+	case wire.Enabled == nil:
+		return errors.New("missing plugin.skill.enabled")
 	case wire.Name == nil:
 		return errors.New("missing plugin.skill.name")
-	case wire.Path == nil:
-		return errors.New("missing plugin.skill.path")
 	}
 
 	s.Description = *wire.Description
+	s.Enabled = *wire.Enabled
 	s.Interface = wire.Interface
 	s.Name = *wire.Name
-	validatedPath, err := validateInboundAbsolutePathField("plugin.skill.path", *wire.Path)
+	validatedPath, err := validateInboundAbsolutePathPointerField("plugin.skill.path", wire.Path)
 	if err != nil {
 		return err
 	}
@@ -377,24 +468,26 @@ func (s *SkillSummary) UnmarshalJSON(data []byte) error {
 
 // PluginDetail contains full plugin details.
 type PluginDetail struct {
-	Apps            []AppSummary   `json:"apps"`
-	Description     *string        `json:"description,omitempty"`
-	MarketplaceName string         `json:"marketplaceName"`
-	MarketplacePath string         `json:"marketplacePath"`
-	McpServers      []string       `json:"mcpServers"`
-	Skills          []SkillSummary `json:"skills"`
-	Summary         PluginSummary  `json:"summary"`
+	Apps            []AppSummary        `json:"apps"`
+	Description     *string             `json:"description,omitempty"`
+	Hooks           []PluginHookSummary `json:"hooks"`
+	MarketplaceName string              `json:"marketplaceName"`
+	MarketplacePath *string             `json:"marketplacePath,omitempty"`
+	McpServers      []string            `json:"mcpServers"`
+	Skills          []SkillSummary      `json:"skills"`
+	Summary         PluginSummary       `json:"summary"`
 }
 
 func (p *PluginDetail) UnmarshalJSON(data []byte) error {
 	type pluginDetailWire struct {
-		Apps            *[]AppSummary   `json:"apps"`
-		Description     *string         `json:"description"`
-		MarketplaceName *string         `json:"marketplaceName"`
-		MarketplacePath *string         `json:"marketplacePath"`
-		McpServers      *[]string       `json:"mcpServers"`
-		Skills          *[]SkillSummary `json:"skills"`
-		Summary         *PluginSummary  `json:"summary"`
+		Apps            *[]AppSummary        `json:"apps"`
+		Description     *string              `json:"description"`
+		Hooks           *[]PluginHookSummary `json:"hooks"`
+		MarketplaceName *string              `json:"marketplaceName"`
+		MarketplacePath *string              `json:"marketplacePath"`
+		McpServers      *[]string            `json:"mcpServers"`
+		Skills          *[]SkillSummary      `json:"skills"`
+		Summary         *PluginSummary       `json:"summary"`
 	}
 
 	var wire pluginDetailWire
@@ -404,10 +497,10 @@ func (p *PluginDetail) UnmarshalJSON(data []byte) error {
 	switch {
 	case wire.Apps == nil:
 		return errors.New("missing plugin.apps")
+	case wire.Hooks == nil:
+		return errors.New("missing plugin.hooks")
 	case wire.MarketplaceName == nil:
 		return errors.New("missing plugin.marketplaceName")
-	case wire.MarketplacePath == nil:
-		return errors.New("missing plugin.marketplacePath")
 	case wire.McpServers == nil:
 		return errors.New("missing plugin.mcpServers")
 	case wire.Skills == nil:
@@ -418,8 +511,9 @@ func (p *PluginDetail) UnmarshalJSON(data []byte) error {
 
 	p.Apps = *wire.Apps
 	p.Description = wire.Description
+	p.Hooks = *wire.Hooks
 	p.MarketplaceName = *wire.MarketplaceName
-	validatedMarketplacePath, err := validateInboundAbsolutePathField("plugin.marketplacePath", *wire.MarketplacePath)
+	validatedMarketplacePath, err := validateInboundAbsolutePathPointerField("plugin.marketplacePath", wire.MarketplacePath)
 	if err != nil {
 		return err
 	}
@@ -457,7 +551,6 @@ func (r PluginReadResponse) validate() error {
 
 // PluginInstallParams installs a plugin from a marketplace.
 type PluginInstallParams struct {
-	ForceRemoteSync       *bool   `json:"forceRemoteSync,omitempty"`
 	MarketplacePath       string  `json:"marketplacePath,omitempty"`
 	PluginName            string  `json:"pluginName"`
 	RemoteMarketplaceName *string `json:"remoteMarketplaceName,omitempty"`
@@ -497,8 +590,7 @@ func (r PluginInstallResponse) validate() error {
 
 // PluginUninstallParams removes an installed plugin.
 type PluginUninstallParams struct {
-	ForceRemoteSync *bool  `json:"forceRemoteSync,omitempty"`
-	PluginID        string `json:"pluginId"`
+	PluginID string `json:"pluginId"`
 }
 
 // PluginUninstallResponse is the empty response from plugin/uninstall.

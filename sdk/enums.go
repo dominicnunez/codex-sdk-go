@@ -388,6 +388,29 @@ func (k *ThreadSourceKind) UnmarshalJSON(data []byte) error {
 	return unmarshalEnumString(data, "sourceKinds", validThreadSourceKinds, k)
 }
 
+// ThreadSource is an analytics source classification for a thread.
+type ThreadSource string
+
+const (
+	ThreadSourceUser                ThreadSource = "user"
+	ThreadSourceSubagent            ThreadSource = "subagent"
+	ThreadSourceMemoryConsolidation ThreadSource = "memory_consolidation"
+)
+
+var validThreadSources = map[ThreadSource]struct{}{
+	ThreadSourceUser:                {},
+	ThreadSourceSubagent:            {},
+	ThreadSourceMemoryConsolidation: {},
+}
+
+func (s ThreadSource) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("threadSource", s, validThreadSources)
+}
+
+func (s *ThreadSource) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "threadSource", validThreadSources, s)
+}
+
 // ForcedLoginMethod represents the forced login method for account authentication.
 type ForcedLoginMethod string
 

@@ -210,18 +210,6 @@ func TestClientRejectsInvalidOutboundEnumsBeforeSending(t *testing.T) {
 			},
 		},
 		{
-			name:    "thread turns list sort direction",
-			wantErr: `invalid sortDirection "forward"`,
-			call: func(client *codex.Client) error {
-				sortDirection := codex.SortDirection("forward")
-				_, err := client.Thread.TurnsList(context.Background(), codex.ThreadTurnsListParams{
-					ThreadID:      "thread-1",
-					SortDirection: &sortDirection,
-				})
-				return err
-			},
-		},
-		{
 			name:    "windows sandbox setup mode",
 			wantErr: `invalid windowsSandbox.mode "automatic"`,
 			call: func(client *codex.Client) error {
@@ -237,19 +225,6 @@ func TestClientRejectsInvalidOutboundEnumsBeforeSending(t *testing.T) {
 			call: func(client *codex.Client) error {
 				_, err := client.Account.SendAddCreditsNudgeEmail(context.Background(), codex.SendAddCreditsNudgeEmailParams{
 					CreditType: codex.AddCreditsNudgeCreditType("tokens"),
-				})
-				return err
-			},
-		},
-		{
-			name:    "device key protection policy",
-			wantErr: `invalid protectionPolicy "software"`,
-			call: func(client *codex.Client) error {
-				policy := codex.DeviceKeyProtectionPolicy("software")
-				_, err := client.DeviceKey.Create(context.Background(), codex.DeviceKeyCreateParams{
-					AccountUserID:    "user-1",
-					ClientID:         "client-1",
-					ProtectionPolicy: &policy,
 				})
 				return err
 			},

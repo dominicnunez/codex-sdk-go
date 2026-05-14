@@ -15,6 +15,7 @@ type ApprovalHandlers struct {
 	OnToolRequestUserInput            func(context.Context, ToolRequestUserInputParams) (ToolRequestUserInputResponse, error)
 	OnChatgptAuthTokensRefresh        func(context.Context, ChatgptAuthTokensRefreshParams) (ChatgptAuthTokensRefreshResponse, error)
 	OnMcpServerElicitationRequest     func(context.Context, McpServerElicitationRequestParams) (McpServerElicitationRequestResponse, error)
+	OnAttestationGenerate             func(context.Context, AttestationGenerateParams) (AttestationGenerateResponse, error)
 }
 
 // SetApprovalHandlers registers approval handlers on the client for server→client requests.
