@@ -28,8 +28,7 @@ This SDK uses **stdlib only** — no external dependencies. Do NOT introduce any
 
 ### Transport Layer
 - `Transport` interface: `Send`, `Notify`, `OnRequest`, `OnNotify`, `Close`
-- `StdioTransport`: production implementation over stdin/stdout
-- All JSON-RPC framing handled internally — no external JSON-RPC libraries
+- Runtime transports are provided by callers or companion packages
 
 ### Client Pattern
 `Client` wraps a `Transport` and provides typed methods for every JSON-RPC request. Timeout handling, error classification (`RPCError`, `TimeoutError`, `CanceledError`, `TransportError`), and notification dispatch all live here.
@@ -44,3 +43,6 @@ Server→client requests for user approval (command exec, file write, etc.) flow
 - `MockTransport`: instant responses, records calls, supports injection
 - `SlowMockTransport`: delayed responses for timeout testing
 - `TestSpecCoverage`: ensures every spec schema has a Go type
+
+### Runner Package
+Process management, stdio framing, single-turn `Run`, streamed run helpers, and conversation helpers live in the private `github.com/dominicnunez/codex-runner-go` repository.

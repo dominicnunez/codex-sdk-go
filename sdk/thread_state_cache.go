@@ -28,6 +28,11 @@ func (c *Client) cacheThreadState(thread Thread) {
 	c.notifyThreadStateListeners(snapshot, listeners)
 }
 
+// CacheThreadState stores a best-effort latest snapshot for a thread.
+func (c *Client) CacheThreadState(thread Thread) {
+	c.cacheThreadState(thread)
+}
+
 func (c *Client) threadStateSnapshot(threadID string) (Thread, bool) {
 	c.threadStateMu.RLock()
 	entry, ok := c.threadStates[threadID]
@@ -36,6 +41,11 @@ func (c *Client) threadStateSnapshot(threadID string) (Thread, bool) {
 		return Thread{}, false
 	}
 	return cloneThreadState(entry.thread), true
+}
+
+// ThreadStateSnapshot returns the latest cached thread snapshot, if one exists.
+func (c *Client) ThreadStateSnapshot(threadID string) (Thread, bool) {
+	return c.threadStateSnapshot(threadID)
 }
 
 func (c *Client) mutateThreadState(threadID string, mutate func(*Thread)) {
@@ -149,6 +159,11 @@ func (c *Client) addThreadStateListener(threadID string, onUpdate func(Thread), 
 			break
 		}
 	}
+}
+
+// AddThreadStateListener subscribes to cached thread-state updates for threadID.
+func (c *Client) AddThreadStateListener(threadID string, onUpdate func(Thread), onClose func()) func() {
+	return c.addThreadStateListener(threadID, onUpdate, onClose)
 }
 
 func (c *Client) touchThreadStateLocked(threadID string) {

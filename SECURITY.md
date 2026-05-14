@@ -19,10 +19,10 @@ Security fixes will be released as patch versions following semantic versioning.
 
 ## Scope
 
-This SDK handles JSON-RPC communication over stdio/WebSocket. Security considerations include:
+This SDK handles typed JSON-RPC request, response, and notification data over caller-provided transports. Security considerations include:
 
 - **Input Validation**: Core request payloads and typed responses enforce required-field validation during decoding, but callers must still treat inbound notifications and unknown future fields as untrusted input
-- **Transport Security**: stdio transport uses local process communication; WebSocket transport (when implemented) should use TLS
+- **Transport Security**: callers are responsible for choosing and securing the transport implementation used with the SDK
 - **Error Handling**: Errors are typed and wrapped to prevent information leakage
 - **Concurrency**: All shared state is protected by mutexes to prevent data races
 

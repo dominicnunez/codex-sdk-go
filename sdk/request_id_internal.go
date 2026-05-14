@@ -2,11 +2,15 @@ package codex
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
 	"strings"
 )
+
+var errUnexpectedIDType = errors.New("unexpected ID type")
+var errNullID = errors.New("null request ID")
 
 func canonicalRequestIDValue(value interface{}, allowNull bool) (interface{}, error) {
 	switch v := value.(type) {
@@ -38,6 +42,10 @@ func canonicalNumericRequestIDString(value interface{}) (string, bool, error) {
 		return "", false, nil
 	}
 	return strconv.FormatInt(intID, 10), true, nil
+}
+
+func normalizeNumericID(id interface{}) (string, bool, error) {
+	return canonicalNumericRequestIDString(id)
 }
 
 func canonicalInt64RequestID(value interface{}) (int64, bool, error) {

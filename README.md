@@ -16,10 +16,10 @@ Go 1.25+
 
 ## Quick Start
 
-```go
-transport := codex.NewStdioTransport(os.Stdin, os.Stdout)
-defer transport.Close()
+This SDK is protocol-only. Provide a `codex.Transport` implementation for the
+runtime you are using, then construct a typed client:
 
+```go
 client := codex.NewClient(transport, codex.WithRequestTimeout(30*time.Second))
 
 // Initialize handshake
@@ -47,6 +47,9 @@ client.Turn.Start(ctx, codex.TurnStartParams{
 	},
 })
 ```
+
+Process management, stdio framing, and single-turn runner helpers live in the
+private `github.com/dominicnunez/codex-runner-go` repository.
 
 ## Approval Handlers
 

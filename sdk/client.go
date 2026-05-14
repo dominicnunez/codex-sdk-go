@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-var errInvalidParams = errors.New("invalid params")
+var errInvalidParams = ErrInvalidParams
 
 // ErrEmptyResult indicates the server returned a successful response with a
 // missing or null result where the caller expected a value.
@@ -390,6 +390,11 @@ func (c *Client) reportHandlerError(method string, err error) {
 	cb(method, err)
 }
 
+// ReportHandlerError invokes the client's handler error callback, if configured.
+func (c *Client) ReportHandlerError(method string, err error) {
+	c.reportHandlerError(method, err)
+}
+
 // safeCallNotificationHandler calls fn, recovering any panic and reporting it
 // via reportHandlerError.
 func (c *Client) safeCallNotificationHandler(method string, fn func()) {
@@ -434,6 +439,9 @@ func (c *Client) handleNotification(ctx context.Context, notif Notification) {
 // Returns an unsubscribe function that removes this specific listener.
 // Unlike OnNotification, multiple listeners can coexist for the same method.
 func (c *Client) addNotificationListener(method string, handler NotificationHandler) func() {
+	if handler == nil {
+		return func() {}
+	}
 	c.listenersMu.Lock()
 	c.internalListenerSeq++
 	id := c.internalListenerSeq
@@ -454,6 +462,12 @@ func (c *Client) addNotificationListener(method string, handler NotificationHand
 			}
 		}
 	}
+}
+
+// AddNotificationListener appends a notification listener for method and returns
+// an unsubscribe function for that specific listener.
+func (c *Client) AddNotificationListener(method string, handler NotificationHandler) func() {
+	return c.addNotificationListener(method, handler)
 }
 
 // handleRequest is the internal handler for server→client requests (approval flows).

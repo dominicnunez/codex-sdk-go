@@ -144,6 +144,11 @@ func (c *Client) initializedParams() (InitializeParams, bool) {
 	return cloneInitializeParams(c.initializeParams), true
 }
 
+// InitializedParams reports the latched initialize params after a successful initialize call.
+func (c *Client) InitializedParams() (InitializeParams, bool) {
+	return c.initializedParams()
+}
+
 // Initialize sends an initialize request to the server.
 // This is the one-time handshake that must be performed before using v2
 // protocol methods. Successful calls are cached so repeated callers share the

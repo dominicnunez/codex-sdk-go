@@ -1,12 +1,10 @@
 package codex_test
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -16,10 +14,9 @@ import (
 )
 
 const (
-	stdioNoParamRequestTimeout = 2 * time.Second
-	rateLimitUsedPercent       = 50
-	rateLimitResetsAt          = 1234567890
-	rateLimitWindowMins        = 60
+	rateLimitUsedPercent = 50
+	rateLimitResetsAt    = 1234567890
+	rateLimitWindowMins  = 60
 )
 
 // TestClientSendRequest verifies that the Client can send a request and receive a response.
@@ -67,7 +64,7 @@ func TestClientSendRequest(t *testing.T) {
 	}
 }
 
-func TestNoParamServiceRequestsOmitParamsOverStdio(t *testing.T) {
+func TestNoParamServiceRequestsOmitParams(t *testing.T) {
 	tests := []struct {
 		name   string
 		method string
@@ -130,66 +127,26 @@ func TestNoParamServiceRequestsOmitParamsOverStdio(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			clientReader, serverWriter := io.Pipe()
-			serverReader, clientWriter := io.Pipe()
-			defer func() { _ = clientReader.Close() }()
-			defer func() { _ = serverWriter.Close() }()
-			defer func() { _ = serverReader.Close() }()
-			defer func() { _ = clientWriter.Close() }()
+			mock := NewMockTransport()
+			_ = mock.SetResponseData(tt.method, tt.result)
+			client := codex.NewClient(mock)
 
-			serverErrCh := make(chan error, 1)
-			go func() {
-				scanner := bufio.NewScanner(serverReader)
-				if !scanner.Scan() {
-					if err := scanner.Err(); err != nil {
-						serverErrCh <- fmt.Errorf("scan request: %w", err)
-					} else {
-						serverErrCh <- io.ErrUnexpectedEOF
-					}
-					return
-				}
-
-				var raw map[string]json.RawMessage
-				if err := json.Unmarshal(scanner.Bytes(), &raw); err != nil {
-					serverErrCh <- fmt.Errorf("unmarshal raw request: %w", err)
-					return
-				}
-				if _, ok := raw["params"]; ok {
-					serverErrCh <- fmt.Errorf("%s request included params: %s", tt.method, raw["params"])
-					return
-				}
-
-				var req codex.Request
-				if err := json.Unmarshal(scanner.Bytes(), &req); err != nil {
-					serverErrCh <- fmt.Errorf("unmarshal request: %w", err)
-					return
-				}
-				if req.Method != tt.method {
-					serverErrCh <- fmt.Errorf("method = %q; want %q", req.Method, tt.method)
-					return
-				}
-
-				serverErrCh <- writeStdioResult(json.NewEncoder(serverWriter), req.ID, tt.result)
-			}()
-
-			transport := codex.NewStdioTransport(clientReader, clientWriter)
-			defer func() { _ = transport.Close() }()
-			client := codex.NewClient(transport)
-
-			ctx, cancel := context.WithTimeout(context.Background(), stdioNoParamRequestTimeout)
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
 
 			if err := tt.call(ctx, client); err != nil {
 				t.Fatalf("%s call error = %v", tt.method, err)
 			}
 
-			select {
-			case err := <-serverErrCh:
-				if err != nil {
-					t.Fatal(err)
-				}
-			case <-ctx.Done():
-				t.Fatalf("timeout waiting for %s request assertion", tt.method)
+			req := mock.GetSentRequest(0)
+			if req == nil {
+				t.Fatal("no request was sent")
+			}
+			if req.Method != tt.method {
+				t.Fatalf("method = %q; want %q", req.Method, tt.method)
+			}
+			if len(req.Params) != 0 {
+				t.Fatalf("%s request included params: %s", tt.method, req.Params)
 			}
 		})
 	}
@@ -332,27 +289,9 @@ func TestClientSendRejectsNilContext(t *testing.T) {
 }
 
 func TestClientSendTransportCloseReturnsTransportError(t *testing.T) {
-	clientReader, serverWriter := io.Pipe()
-	serverReader, clientWriter := io.Pipe()
-	defer func() { _ = clientReader.Close() }()
-	defer func() { _ = serverWriter.Close() }()
-	defer func() { _ = serverReader.Close() }()
-	defer func() { _ = clientWriter.Close() }()
-
-	transport := codex.NewStdioTransport(clientReader, clientWriter)
+	transport := newCloseSignalTransport()
 	client := codex.NewClient(transport)
 	defer func() { _ = transport.Close() }()
-
-	// Drain outbound requests so Send can block waiting on a response.
-	go func() {
-		dec := json.NewDecoder(serverReader)
-		for {
-			var req codex.Request
-			if err := dec.Decode(&req); err != nil {
-				return
-			}
-		}
-	}()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -388,6 +327,35 @@ func TestClientSendTransportCloseReturnsTransportError(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("timeout waiting for Send to return")
 	}
+}
+
+type closeSignalTransport struct {
+	closed chan struct{}
+	once   atomic.Bool
+}
+
+func newCloseSignalTransport() *closeSignalTransport {
+	return &closeSignalTransport{closed: make(chan struct{})}
+}
+
+func (t *closeSignalTransport) Send(ctx context.Context, _ codex.Request) (codex.Response, error) {
+	select {
+	case <-ctx.Done():
+		return codex.Response{}, ctx.Err()
+	case <-t.closed:
+		return codex.Response{}, errors.New("transport closed")
+	}
+}
+
+func (t *closeSignalTransport) Notify(_ context.Context, _ codex.Notification) error { return nil }
+func (t *closeSignalTransport) OnRequest(_ codex.RequestHandler)                     {}
+func (t *closeSignalTransport) OnNotify(_ codex.NotificationHandler)                 {}
+
+func (t *closeSignalTransport) Close() error {
+	if t.once.CompareAndSwap(false, true) {
+		close(t.closed)
+	}
+	return nil
 }
 
 func TestClientSendForgedTransportFailureResponseReturnsRPCError(t *testing.T) {

@@ -10,6 +10,9 @@ import (
 // ErrNilContext indicates a public API call was passed a nil context.
 var ErrNilContext = errors.New("context must not be nil")
 
+// ErrInvalidParams indicates JSON-RPC params failed request-specific decoding.
+var ErrInvalidParams = errors.New("invalid params")
+
 func validateContext(ctx context.Context) error {
 	if ctx == nil {
 		return ErrNilContext
