@@ -1,8 +1,8 @@
 # codex-sdk-go
 
-Idiomatic Go SDK for the [OpenAI Codex CLI](https://github.com/openai/codex) JSON-RPC 2.0 protocol. Stdlib only, zero external dependencies.
+Idiomatic Go SDK for the [OpenAI Codex](https://github.com/openai/codex) JSON-RPC 2.0 protocol. Stdlib only, zero external dependencies.
 
-Built against the [protocol schemas](specs/) extracted from the Codex TypeScript source — full coverage of all current request methods, 40+ notification types, and 9 server→client approval flows.
+Built against the [Codex app-server protocol schemas](specs/) — full coverage of all current request methods, 40+ notification types, and 9 server→client approval flows.
 
 ## Installation
 
@@ -16,40 +16,49 @@ Go 1.25+
 
 ## Quick Start
 
-This SDK is protocol-only. Provide a `codex.Transport` implementation for the
-runtime you are using, then construct a typed client:
+This SDK is protocol-only. It provides typed JSON-RPC requests, notifications,
+responses, and approval handlers over a caller-provided `codex.Transport`.
+
+Process management, stdio framing, WebSocket framing, and other runtime concerns
+are intentionally outside this package.
 
 ```go
-client := codex.NewClient(transport, codex.WithRequestTimeout(30*time.Second))
+func run(ctx context.Context, transport codex.Transport) error {
+	client := codex.NewClient(transport, codex.WithRequestTimeout(30*time.Second))
 
-// Initialize handshake
-initResp, err := client.Initialize(ctx, codex.InitializeParams{
-	ClientInfo: codex.ClientInfo{
-		Name:    "my-codex-client",
-		Version: "1.0.0",
-	},
-})
+	// Initialize handshake
+	_, err := client.Initialize(ctx, codex.InitializeParams{
+		ClientInfo: codex.ClientInfo{
+			Name:    "my-codex-client",
+			Version: "1.0.0",
+		},
+	})
+	if err != nil {
+		return err
+	}
 
-// Listen for streaming events
-client.OnAgentMessageDelta(func(notif codex.AgentMessageDeltaNotification) {
-	fmt.Print(notif.Delta)
-})
+	// Listen for protocol notifications
+	client.OnAgentMessageDelta(func(notif codex.AgentMessageDeltaNotification) {
+		fmt.Print(notif.Delta)
+	})
 
-// Start a thread and turn
-threadResp, _ := client.Thread.Start(ctx, codex.ThreadStartParams{
-	Model: codex.Ptr("gpt-4"),
-})
+	// Start a thread and turn
+	threadResp, err := client.Thread.Start(ctx, codex.ThreadStartParams{
+		Model: codex.Ptr("gpt-4"),
+	})
+	if err != nil {
+		return err
+	}
 
-client.Turn.Start(ctx, codex.TurnStartParams{
-	ThreadID: threadResp.Thread.ID,
-	Input: []codex.UserInput{
-		&codex.TextUserInput{Text: "What is the capital of France?"},
-	},
-})
+	_, err = client.Turn.Start(ctx, codex.TurnStartParams{
+		ThreadID: threadResp.Thread.ID,
+		Input: []codex.UserInput{
+			&codex.TextUserInput{Text: "What is the capital of France?"},
+		},
+	})
+	return err
+}
 ```
-
-Process management, stdio framing, and single-turn runner helpers live in the
-private `github.com/dominicnunez/codex-runner-go` repository.
 
 ## Approval Handlers
 
@@ -80,7 +89,7 @@ Services: `client.Thread`, `client.Turn`, `client.Account`, `client.Config`, `cl
 
 ## Origin
 
-Built from 150+ JSON schemas extracted from the [OpenAI Codex CLI](https://github.com/openai/codex) TypeScript source. This is an unofficial community SDK.
+Built from 150+ JSON schemas in the [OpenAI Codex](https://github.com/openai/codex) app-server protocol. This is an unofficial community SDK.
 
 ## Contributing
 
