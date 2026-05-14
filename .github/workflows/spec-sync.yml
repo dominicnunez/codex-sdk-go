@@ -174,9 +174,31 @@ jobs:
           # --- 8. Ensure the label exists ---
           gh label create "${label}" --description "Upstream spec schema changes" --color "D93F0B" 2>/dev/null || true
 
-          # --- 9. Close stale spec-sync PRs ---
-          gh pr list --label "${label}" --state open --json number --jq '.[].number' | while read -r num; do
-            gh pr close "${num}" --comment "Superseded by newer spec-sync."
+          # --- 9. Close stale workflow spec-sync PRs and delete their branches ---
+          gh pr list --label "${label}" --state open --json number,author,headRefName,isCrossRepository --jq '.[] | [.number, .author.login, .headRefName, .isCrossRepository] | @tsv' | while IFS=$'\t' read -r num author head_ref cross_repo; do
+            [ -z "${num}" ] && continue
+
+            if [ "${author}" != "github-actions[bot]" ]; then
+              echo "Skipping PR #${num}: author ${author} is not github-actions[bot]."
+              continue
+            fi
+            if [ "${cross_repo}" != "false" ]; then
+              echo "Skipping PR #${num}: head branch is from another repository."
+              continue
+            fi
+            case "${head_ref}" in
+              spec-sync/*) ;;
+              *)
+                echo "Skipping PR #${num}: head branch ${head_ref} is not a spec-sync branch."
+                continue
+                ;;
+            esac
+            if [ "${head_ref}" = "${branch}" ]; then
+              echo "Skipping PR #${num}: head branch is the current sync branch."
+              continue
+            fi
+
+            gh pr close "${num}" --delete-branch --comment "Superseded by newer spec-sync PR for ${short_upstream}."
           done
 
           # --- 10. Open PR ---
