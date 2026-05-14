@@ -54,31 +54,6 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 		_, _ = client.Apps.List(context.Background(), codex.AppsListParams{})
 	})
 
-	// Verify Device Key service
-	verified["device/key/create"] = verifyMethod(t, transport, "device/key/create", func() {
-		_, _ = client.DeviceKey.Create(context.Background(), codex.DeviceKeyCreateParams{AccountUserID: "user-1", ClientID: "client-1"})
-	})
-	verified["device/key/public"] = verifyMethod(t, transport, "device/key/public", func() {
-		_, _ = client.DeviceKey.Public(context.Background(), codex.DeviceKeyPublicParams{KeyID: "key-1"})
-	})
-	verified["device/key/sign"] = verifyMethod(t, transport, "device/key/sign", func() {
-		_, _ = client.DeviceKey.Sign(context.Background(), codex.DeviceKeySignParams{
-			KeyID: "key-1",
-			Payload: &codex.RemoteControlClientEnrollmentDeviceKeySignPayload{
-				Type:                          "remoteControlClientEnrollment",
-				AccountUserID:                 "user-1",
-				Audience:                      codex.RemoteControlClientEnrollmentAudienceEnrollment,
-				ChallengeExpiresAt:            1,
-				ChallengeID:                   "challenge-1",
-				ClientID:                      "client-1",
-				DeviceIdentitySha256Base64url: validDeviceKeyHashBase64URL(),
-				Nonce:                         "nonce",
-				TargetOrigin:                  "https://example.com",
-				TargetPath:                    "/client/enroll",
-			},
-		})
-	})
-
 	// Verify Command service
 	verified["command/exec"] = verifyMethod(t, transport, "command/exec", func() {
 		_, _ = client.Command.Exec(context.Background(), codex.CommandExecParams{
@@ -233,6 +208,28 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 	verified["plugin/uninstall"] = verifyMethod(t, transport, "plugin/uninstall", func() {
 		_, _ = client.Plugin.Uninstall(context.Background(), codex.PluginUninstallParams{PluginID: "plugin-1"})
 	})
+	verified["plugin/skill/read"] = verifyMethod(t, transport, "plugin/skill/read", func() {
+		_, _ = client.Plugin.SkillRead(context.Background(), codex.PluginSkillReadParams{RemoteMarketplaceName: "market", RemotePluginID: "remote-1", SkillName: "skill"})
+	})
+	verified["plugin/share/save"] = verifyMethod(t, transport, "plugin/share/save", func() {
+		_, _ = client.Plugin.ShareSave(context.Background(), codex.PluginShareSaveParams{PluginPath: "/tmp/plugin"})
+	})
+	verified["plugin/share/updateTargets"] = verifyMethod(t, transport, "plugin/share/updateTargets", func() {
+		_, _ = client.Plugin.ShareUpdateTargets(context.Background(), codex.PluginShareUpdateTargetsParams{
+			Discoverability: codex.PluginShareUpdateDiscoverabilityPrivate,
+			RemotePluginID:  "remote-1",
+			ShareTargets:    []codex.PluginShareTarget{},
+		})
+	})
+	verified["plugin/share/list"] = verifyMethod(t, transport, "plugin/share/list", func() {
+		_, _ = client.Plugin.ShareList(context.Background(), codex.PluginShareListParams{})
+	})
+	verified["plugin/share/checkout"] = verifyMethod(t, transport, "plugin/share/checkout", func() {
+		_, _ = client.Plugin.ShareCheckout(context.Background(), codex.PluginShareCheckoutParams{RemotePluginID: "remote-1"})
+	})
+	verified["plugin/share/delete"] = verifyMethod(t, transport, "plugin/share/delete", func() {
+		_, _ = client.Plugin.ShareDelete(context.Background(), codex.PluginShareDeleteParams{RemotePluginID: "remote-1"})
+	})
 
 	// Verify Marketplace service
 	verified["marketplace/add"] = verifyMethod(t, transport, "marketplace/add", func() {
@@ -256,6 +253,11 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 		})
 	})
 
+	// Verify Hooks service
+	verified["hooks/list"] = verifyMethod(t, transport, "hooks/list", func() {
+		_, _ = client.Hooks.List(context.Background(), codex.HooksListParams{})
+	})
+
 	// Verify Thread service
 	verified["thread/start"] = verifyMethod(t, transport, "thread/start", func() {
 		_, _ = client.Thread.Start(context.Background(), codex.ThreadStartParams{})
@@ -268,9 +270,6 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 	})
 	verified["thread/loaded/list"] = verifyMethod(t, transport, "thread/loaded/list", func() {
 		_, _ = client.Thread.LoadedList(context.Background(), codex.ThreadLoadedListParams{})
-	})
-	verified["thread/turns/list"] = verifyMethod(t, transport, "thread/turns/list", func() {
-		_, _ = client.Thread.TurnsList(context.Background(), codex.ThreadTurnsListParams{ThreadID: "thread-1"})
 	})
 	verified["thread/shellCommand"] = verifyMethod(t, transport, "thread/shellCommand", func() {
 		_, _ = client.Thread.ShellCommand(context.Background(), codex.ThreadShellCommandParams{ThreadID: "thread-1", Command: "pwd"})
@@ -332,6 +331,9 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 		_, _ = client.System.WindowsSandboxSetupStart(context.Background(), codex.WindowsSandboxSetupStartParams{
 			Mode: codex.WindowsSandboxSetupModeElevated,
 		})
+	})
+	verified["windowsSandbox/readiness"] = verifyMethod(t, transport, "windowsSandbox/readiness", func() {
+		_, _ = client.System.WindowsSandboxReadiness(context.Background())
 	})
 
 	// Check that all methods were verified

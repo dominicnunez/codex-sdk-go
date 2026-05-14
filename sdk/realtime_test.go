@@ -78,7 +78,7 @@ func TestThreadRealtimeStartedNotification(t *testing.T) {
 			Method:  "thread/realtime/started",
 			Params: json.RawMessage(`{
 				"threadId": "thread_test",
-				"sessionId": "session_test",
+				"realtimeSessionId": "session_test",
 				"version": "v2"
 			}`),
 		})
@@ -89,8 +89,8 @@ func TestThreadRealtimeStartedNotification(t *testing.T) {
 		if received.ThreadID != "thread_test" {
 			t.Errorf("expected ThreadID thread_test, got %s", received.ThreadID)
 		}
-		if received.SessionID == nil || *received.SessionID != "session_test" {
-			t.Error("expected SessionID session_test")
+		if received.RealtimeSessionID == nil || *received.RealtimeSessionID != "session_test" {
+			t.Error("expected RealtimeSessionID session_test")
 		}
 		if received.Version != codex.RealtimeConversationVersionV2 {
 			t.Errorf("expected Version v2, got %q", received.Version)

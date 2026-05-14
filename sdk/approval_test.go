@@ -156,7 +156,7 @@ func TestApprovalRequestParamsRejectEmptyBindingFields(t *testing.T) {
 	}{
 		{
 			name:  "command execution item id",
-			input: `{"itemId":"","threadId":"thread-1","turnId":"turn-1"}`,
+			input: `{"itemId":"","startedAtMs":1,"threadId":"thread-1","turnId":"turn-1"}`,
 			decode: func(data []byte) error {
 				var params codex.CommandExecutionRequestApprovalParams
 				return json.Unmarshal(data, &params)
@@ -165,7 +165,7 @@ func TestApprovalRequestParamsRejectEmptyBindingFields(t *testing.T) {
 		},
 		{
 			name:  "file change thread id",
-			input: `{"itemId":"item-1","threadId":"","turnId":"turn-1"}`,
+			input: `{"itemId":"item-1","startedAtMs":1,"threadId":"","turnId":"turn-1"}`,
 			decode: func(data []byte) error {
 				var params codex.FileChangeRequestApprovalParams
 				return json.Unmarshal(data, &params)
@@ -174,7 +174,7 @@ func TestApprovalRequestParamsRejectEmptyBindingFields(t *testing.T) {
 		},
 		{
 			name:  "permissions turn id",
-			input: `{"cwd":"/tmp","itemId":"item-1","permissions":{},"threadId":"thread-1","turnId":""}`,
+			input: `{"cwd":"/tmp","itemId":"item-1","permissions":{},"startedAtMs":1,"threadId":"thread-1","turnId":""}`,
 			decode: func(data []byte) error {
 				var params codex.PermissionsRequestApprovalParams
 				return json.Unmarshal(data, &params)
@@ -248,6 +248,7 @@ func TestPermissionsRequestApprovalParamsNormalizeFileSystemRoots(t *testing.T) 
 	err := json.Unmarshal([]byte(`{
 		"cwd":"/tmp",
 		"itemId":"item-1",
+		"startedAtMs":1,
 		"threadId":"thread-1",
 		"turnId":"turn-1",
 		"permissions":{
@@ -274,6 +275,7 @@ func TestPermissionsRequestApprovalParamsRejectRelativeFileSystemRoots(t *testin
 	err := json.Unmarshal([]byte(`{
 		"cwd":"/tmp",
 		"itemId":"item-1",
+		"startedAtMs":1,
 		"threadId":"thread-1",
 		"turnId":"turn-1",
 		"permissions":{"fileSystem":{"read":["relative/path"]}}
@@ -301,6 +303,7 @@ func TestPermissionsRequestApprovalParamsRejectInvalidCwd(t *testing.T) {
 			data := fmt.Sprintf(`{
 				"cwd":%q,
 				"itemId":"item-1",
+				"startedAtMs":1,
 				"threadId":"thread-1",
 				"turnId":"turn-1",
 				"permissions":{"fileSystem":{"read":["/tmp"]}}
@@ -320,6 +323,7 @@ func TestCommandExecutionRequestApprovalParamsRejectInvalidNetworkPolicyAmendmen
 	var params codex.CommandExecutionRequestApprovalParams
 	err := json.Unmarshal([]byte(`{
 		"itemId":"item-1",
+		"startedAtMs":1,
 		"threadId":"thread-1",
 		"turnId":"turn-1",
 		"proposedNetworkPolicyAmendments":[{"action":"bogus","host":"example.com"}]
@@ -337,6 +341,7 @@ func TestApprovalParamsNormalizeAndValidatePaths(t *testing.T) {
 		var params codex.CommandExecutionRequestApprovalParams
 		err := json.Unmarshal([]byte(`{
 			"itemId":"item-1",
+			"startedAtMs":1,
 			"threadId":"thread-1",
 			"turnId":"turn-1",
 			"cwd":"/workspace/project",
@@ -380,6 +385,7 @@ func TestApprovalParamsNormalizeAndValidatePaths(t *testing.T) {
 		var params codex.CommandExecutionRequestApprovalParams
 		err := json.Unmarshal([]byte(`{
 			"itemId":"item-1",
+			"startedAtMs":1,
 			"threadId":"thread-1",
 			"turnId":"turn-1",
 			"commandActions":[{"type":"read","command":"cat","name":"config","path":"../config.yaml"}]
@@ -396,6 +402,7 @@ func TestApprovalParamsNormalizeAndValidatePaths(t *testing.T) {
 		var params codex.CommandExecutionRequestApprovalParams
 		err := json.Unmarshal([]byte(`{
 			"itemId":"item-1",
+			"startedAtMs":1,
 			"threadId":"thread-1",
 			"turnId":"turn-1",
 			"cwd":"/workspace/../project"
@@ -412,6 +419,7 @@ func TestApprovalParamsNormalizeAndValidatePaths(t *testing.T) {
 		var params codex.CommandExecutionRequestApprovalParams
 		err := json.Unmarshal([]byte(`{
 			"itemId":"item-1",
+			"startedAtMs":1,
 			"threadId":"thread-1",
 			"turnId":"turn-1",
 			"cwd":"/workspace/project",
@@ -455,6 +463,7 @@ func TestApprovalParamsNormalizeAndValidatePaths(t *testing.T) {
 		var params codex.FileChangeRequestApprovalParams
 		err := json.Unmarshal([]byte(`{
 			"itemId":"item-1",
+			"startedAtMs":1,
 			"threadId":"thread-1",
 			"turnId":"turn-1",
 			"grantRoot":"../secret"
@@ -918,7 +927,7 @@ func TestApprovalHandlerDispatch(t *testing.T) {
 		JSONRPC: "2.0",
 		ID:      codex.RequestID{Value: 2},
 		Method:  "item/commandExecution/requestApproval",
-		Params:  json.RawMessage(`{"itemId":"i1","threadId":"t1","turnId":"tu1"}`),
+		Params:  json.RawMessage(`{"itemId":"i1","startedAtMs":1,"threadId":"t1","turnId":"tu1"}`),
 	})
 
 	// 3. ExecCommandApproval (legacy)
@@ -934,7 +943,7 @@ func TestApprovalHandlerDispatch(t *testing.T) {
 		JSONRPC: "2.0",
 		ID:      codex.RequestID{Value: 4},
 		Method:  "item/fileChange/requestApproval",
-		Params:  json.RawMessage(`{"itemId":"i1","threadId":"t1","turnId":"tu1"}`),
+		Params:  json.RawMessage(`{"itemId":"i1","startedAtMs":1,"threadId":"t1","turnId":"tu1"}`),
 	})
 
 	// 5. DynamicToolCall
@@ -958,7 +967,7 @@ func TestApprovalHandlerDispatch(t *testing.T) {
 		JSONRPC: "2.0",
 		ID:      codex.RequestID{Value: 7},
 		Method:  "item/permissions/requestApproval",
-		Params:  json.RawMessage(`{"cwd":"/tmp","itemId":"i1","threadId":"t1","turnId":"tu1","permissions":{"network":{"enabled":true}}}`),
+		Params:  json.RawMessage(`{"cwd":"/tmp","itemId":"i1","permissions":{"network":{"enabled":true}},"startedAtMs":1,"threadId":"t1","turnId":"tu1"}`),
 	})
 
 	// 8. ChatgptAuthTokensRefresh
@@ -1069,7 +1078,7 @@ func TestApprovalEndToEnd(t *testing.T) {
 		JSONRPC: "2.0",
 		ID:      codex.RequestID{Value: 99},
 		Method:  "item/commandExecution/requestApproval",
-		Params:  json.RawMessage(`{"itemId":"item-abc","threadId":"t1","turnId":"tu1","command":"ls -la"}`),
+		Params:  json.RawMessage(`{"itemId":"item-abc","startedAtMs":1,"threadId":"t1","turnId":"tu1","command":"ls -la"}`),
 	})
 
 	// Verify response was sent
@@ -1131,7 +1140,7 @@ func TestAdditionalApprovalEndToEnd(t *testing.T) {
 			JSONRPC: "2.0",
 			ID:      codex.RequestID{Value: 101},
 			Method:  "item/permissions/requestApproval",
-			Params:  json.RawMessage(`{"cwd":"/tmp","itemId":"item-abc","threadId":"t1","turnId":"tu1","permissions":{"fileSystem":{"read":["/tmp/../sandbox"]},"network":{"enabled":true}}}`),
+			Params:  json.RawMessage(`{"cwd":"/tmp","itemId":"item-abc","permissions":{"fileSystem":{"read":["/tmp/../sandbox"]},"network":{"enabled":true}},"startedAtMs":1,"threadId":"t1","turnId":"tu1"}`),
 		})
 		if err != nil {
 			t.Fatalf("InjectServerRequest() error = %v", err)

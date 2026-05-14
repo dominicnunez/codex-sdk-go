@@ -285,14 +285,6 @@ func TestThreadRequestsRejectEmptyRequiredIDs(t *testing.T) {
 			wantErr: "threadId must not be empty",
 		},
 		{
-			name: "turns list rejects empty thread id",
-			call: func(client *codex.Client) error {
-				_, err := client.Thread.TurnsList(context.Background(), codex.ThreadTurnsListParams{})
-				return err
-			},
-			wantErr: "threadId must not be empty",
-		},
-		{
 			name: "shell command rejects empty thread id",
 			call: func(client *codex.Client) error {
 				_, err := client.Thread.ShellCommand(context.Background(), codex.ThreadShellCommandParams{

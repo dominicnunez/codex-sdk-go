@@ -40,6 +40,43 @@ type WindowsSandboxSetupStartResponse struct {
 	Started bool `json:"started"`
 }
 
+// WindowsSandboxReadiness is the current readiness state of Windows sandbox support.
+type WindowsSandboxReadiness string
+
+const (
+	WindowsSandboxReadinessReady          WindowsSandboxReadiness = "ready"
+	WindowsSandboxReadinessNotConfigured  WindowsSandboxReadiness = "notConfigured"
+	WindowsSandboxReadinessUpdateRequired WindowsSandboxReadiness = "updateRequired"
+)
+
+var validWindowsSandboxReadinesses = map[WindowsSandboxReadiness]struct{}{
+	WindowsSandboxReadinessReady:          {},
+	WindowsSandboxReadinessNotConfigured:  {},
+	WindowsSandboxReadinessUpdateRequired: {},
+}
+
+func (r *WindowsSandboxReadiness) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "windowsSandbox.readiness", validWindowsSandboxReadinesses, r)
+}
+
+// WindowsSandboxReadinessResponse is the response from windowsSandbox/readiness.
+type WindowsSandboxReadinessResponse struct {
+	Status WindowsSandboxReadiness `json:"status"`
+}
+
+func (r *WindowsSandboxReadinessResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "status"); err != nil {
+		return err
+	}
+	type wire WindowsSandboxReadinessResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = WindowsSandboxReadinessResponse(decoded)
+	return nil
+}
+
 func (r *WindowsSandboxSetupStartResponse) UnmarshalJSON(data []byte) error {
 	if err := validateRequiredObjectFields(data, "started"); err != nil {
 		return err
@@ -202,14 +239,15 @@ const (
 
 // RemoteControlStatusChangedNotification reports remote-control connection status.
 type RemoteControlStatusChangedNotification struct {
-	EnvironmentID *string                       `json:"environmentId,omitempty"`
-	Status        RemoteControlConnectionStatus `json:"status"`
+	EnvironmentID  *string                       `json:"environmentId,omitempty"`
+	InstallationID string                        `json:"installationId"`
+	Status         RemoteControlConnectionStatus `json:"status"`
 }
 
 func (n *RemoteControlStatusChangedNotification) UnmarshalJSON(data []byte) error {
 	type wire RemoteControlStatusChangedNotification
 	var decoded wire
-	required := []string{"status"}
+	required := []string{"installationId", "status"}
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
@@ -244,6 +282,15 @@ func (s *SystemService) WindowsSandboxSetupStart(ctx context.Context, params Win
 	var resp WindowsSandboxSetupStartResponse
 	if err := s.client.sendRequest(ctx, methodWindowsSandboxSetupStart, params, &resp); err != nil {
 		return WindowsSandboxSetupStartResponse{}, err
+	}
+	return resp, nil
+}
+
+// WindowsSandboxReadiness checks whether Windows sandbox support is ready.
+func (s *SystemService) WindowsSandboxReadiness(ctx context.Context) (WindowsSandboxReadinessResponse, error) {
+	var resp WindowsSandboxReadinessResponse
+	if err := s.client.sendRequest(ctx, methodWindowsSandboxReadiness, nil, &resp); err != nil {
+		return WindowsSandboxReadinessResponse{}, err
 	}
 	return resp, nil
 }

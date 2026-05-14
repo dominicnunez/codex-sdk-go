@@ -26,9 +26,9 @@ func (v *RealtimeConversationVersion) UnmarshalJSON(data []byte) error {
 // ThreadRealtimeStartedNotification is sent when a realtime connection starts for a thread.
 // Method: thread/realtime/started
 type ThreadRealtimeStartedNotification struct {
-	ThreadID  string                      `json:"threadId"`
-	SessionID *string                     `json:"sessionId,omitempty"`
-	Version   RealtimeConversationVersion `json:"version"`
+	ThreadID          string                      `json:"threadId"`
+	RealtimeSessionID *string                     `json:"realtimeSessionId,omitempty"`
+	Version           RealtimeConversationVersion `json:"version"`
 }
 
 func (n *ThreadRealtimeStartedNotification) UnmarshalJSON(data []byte) error {

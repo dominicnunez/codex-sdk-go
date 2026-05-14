@@ -442,6 +442,7 @@ type ConfigRequirements struct {
 	AllowedApprovalPolicies *[]AskForApprovalWrapper `json:"allowedApprovalPolicies,omitempty"`
 	AllowedSandboxModes     *[]SandboxMode           `json:"allowedSandboxModes,omitempty"`
 	AllowedWebSearchModes   *[]WebSearchMode         `json:"allowedWebSearchModes,omitempty"`
+	AllowManagedHooksOnly   *bool                    `json:"allowManagedHooksOnly,omitempty"`
 	EnforceResidency        *ResidencyRequirement    `json:"enforceResidency,omitempty"`
 	FeatureRequirements     map[string]bool          `json:"featureRequirements,omitempty"`
 }

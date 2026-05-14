@@ -11,6 +11,7 @@ const (
 	methodToolRequestUserInput            = "item/tool/requestUserInput"
 	methodChatgptAuthTokensRefresh        = "account/chatgptAuthTokens/refresh"
 	methodMcpServerElicitationRequest     = "mcpServer/elicitation/request"
+	methodAttestationGenerate             = "attestation/generate"
 )
 
 // Notification method names for server→client event dispatch.
@@ -89,6 +90,10 @@ const (
 	notifyCommandExecOutputDelta      = "command/exec/outputDelta"
 	notifyFileChangePatchUpdated      = "item/fileChange/patchUpdated"
 
+	// Process notifications
+	notifyProcessOutputDelta = "process/outputDelta"
+	notifyProcessExited      = "process/exited"
+
 	// Filesystem notifications
 	notifyFsChanged = "fs/changed"
 
@@ -130,7 +135,6 @@ const (
 	methodThreadRollback                    = "thread/rollback"
 	methodThreadShellCommand                = "thread/shellCommand"
 	methodThreadApproveGuardianDeniedAction = "thread/approveGuardianDeniedAction"
-	methodThreadTurnsList                   = "thread/turns/list"
 	methodThreadInjectItems                 = "thread/inject_items"
 	methodThreadNameSet                     = "thread/name/set"
 	methodThreadArchive                     = "thread/archive"
@@ -157,6 +161,7 @@ const (
 	methodMcpServerToolCall                 = "mcpServer/tool/call"
 	methodFeedbackUpload                    = "feedback/upload"
 	methodWindowsSandboxSetupStart          = "windowsSandbox/setupStart"
+	methodWindowsSandboxReadiness           = "windowsSandbox/readiness"
 	methodExperimentalFeatureList           = "experimentalFeature/list"
 	methodExperimentalFeatureEnablementSet  = "experimentalFeature/enablement/set"
 	methodAppList                           = "app/list"
@@ -165,16 +170,20 @@ const (
 	methodExternalAgentConfigImport         = "externalAgentConfig/import"
 	methodSkillsList                        = "skills/list"
 	methodSkillsConfigWrite                 = "skills/config/write"
+	methodHooksList                         = "hooks/list"
 	methodPluginList                        = "plugin/list"
 	methodPluginRead                        = "plugin/read"
 	methodPluginInstall                     = "plugin/install"
 	methodPluginUninstall                   = "plugin/uninstall"
+	methodPluginSkillRead                   = "plugin/skill/read"
+	methodPluginShareSave                   = "plugin/share/save"
+	methodPluginShareUpdateTargets          = "plugin/share/updateTargets"
+	methodPluginShareList                   = "plugin/share/list"
+	methodPluginShareCheckout               = "plugin/share/checkout"
+	methodPluginShareDelete                 = "plugin/share/delete"
 	methodMarketplaceAdd                    = "marketplace/add"
 	methodMarketplaceRemove                 = "marketplace/remove"
 	methodMarketplaceUpgrade                = "marketplace/upgrade"
-	methodDeviceKeyCreate                   = "device/key/create"
-	methodDeviceKeyPublic                   = "device/key/public"
-	methodDeviceKeySign                     = "device/key/sign"
 	methodFsReadFile                        = "fs/readFile"
 	methodFsWriteFile                       = "fs/writeFile"
 	methodFsCreateDirectory                 = "fs/createDirectory"

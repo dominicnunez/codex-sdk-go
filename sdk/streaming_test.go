@@ -436,6 +436,7 @@ func TestOnCollabToolCallStarted(t *testing.T) {
 		JSONRPC: "2.0",
 		Method:  "item/started",
 		Params: json.RawMessage(`{
+			"startedAtMs":1,
 			"threadId":"thread-1","turnId":"turn-1",
 			"item":{
 				"type":"collabAgentToolCall","id":"tc-1",
@@ -471,7 +472,7 @@ func TestOnCollabToolCallStartedIgnoresNonCollab(t *testing.T) {
 	mock.InjectServerNotification(context.Background(), codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "item/started",
-		Params:  json.RawMessage(`{"threadId":"t1","turnId":"t1","item":{"type":"agentMessage","id":"m1","text":"hi"}}`),
+		Params:  json.RawMessage(`{"startedAtMs":1,"threadId":"t1","turnId":"t1","item":{"type":"agentMessage","id":"m1","text":"hi"}}`),
 	})
 
 	if called {
@@ -499,6 +500,7 @@ func TestOnCollabToolCallStartedInvalidAgentStatusReportsHandlerError(t *testing
 		JSONRPC: "2.0",
 		Method:  "item/started",
 		Params: json.RawMessage(`{
+			"startedAtMs":1,
 			"threadId":"thread-1","turnId":"turn-1",
 			"item":{
 				"type":"collabAgentToolCall","id":"tc-1",
@@ -533,6 +535,7 @@ func TestItemNotificationsInvalidEnumsReportHandlerError(t *testing.T) {
 			name:   "item started invalid message phase",
 			method: "item/started",
 			payload: `{
+				"startedAtMs":1,
 				"threadId":"thread-1","turnId":"turn-1",
 				"item":{"type":"agentMessage","id":"m1","text":"hello","phase":"draft"}
 			}`,
@@ -547,6 +550,7 @@ func TestItemNotificationsInvalidEnumsReportHandlerError(t *testing.T) {
 			name:   "item completed invalid command status",
 			method: "item/completed",
 			payload: `{
+				"completedAtMs":1,
 				"threadId":"thread-1","turnId":"turn-1",
 				"item":{"type":"commandExecution","id":"c1","command":"ls","commandActions":[],"cwd":"/tmp","status":"queued"}
 			}`,
@@ -618,6 +622,7 @@ func TestOnCollabToolCallCompleted(t *testing.T) {
 		JSONRPC: "2.0",
 		Method:  "item/completed",
 		Params: json.RawMessage(`{
+			"completedAtMs":1,
 			"threadId":"thread-1","turnId":"turn-1",
 			"item":{
 				"type":"collabAgentToolCall","id":"tc-1",
@@ -662,6 +667,7 @@ func TestItemStarted(t *testing.T) {
 			name: "user message item",
 			json: `{
 				"item": {"type": "userMessage", "id": "item-123", "content": []},
+				"startedAtMs": 1,
 				"threadId": "thread-456",
 				"turnId": "turn-789"
 			}`,
@@ -688,6 +694,7 @@ func TestItemStarted(t *testing.T) {
 			name: "agent message item",
 			json: `{
 				"item": {"type": "agentMessage", "id": "item-456", "text": "Hello!"},
+				"startedAtMs": 1,
 				"threadId": "thread-456",
 				"turnId": "turn-789"
 			}`,
@@ -746,6 +753,7 @@ func TestItemCompleted(t *testing.T) {
 		{
 			name: "completed agent message",
 			json: `{
+				"completedAtMs": 1,
 				"item": {"type": "agentMessage", "id": "item-123", "text": "Done!"},
 				"threadId": "thread-456",
 				"turnId": "turn-789"

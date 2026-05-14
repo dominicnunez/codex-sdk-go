@@ -88,7 +88,7 @@ func TestRunSuccess(t *testing.T) {
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "item/completed",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-1","text":"Hello there!"}}`),
+		Params:  json.RawMessage(`{"completedAtMs":1,"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-1","text":"Hello there!"}}`),
 	})
 
 	// Inject turn/completed notification.
@@ -159,7 +159,7 @@ func TestRunResultSnapshotsAreIndependent(t *testing.T) {
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "item/completed",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-1","text":"Hello there!"}}`),
+		Params:  json.RawMessage(`{"completedAtMs":1,"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-1","text":"Hello there!"}}`),
 	})
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
@@ -516,7 +516,7 @@ func TestRunWithAllOptions(t *testing.T) {
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "item/completed",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-1","text":"Done"}}`),
+		Params:  json.RawMessage(`{"completedAtMs":1,"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-1","text":"Done"}}`),
 	})
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
@@ -558,17 +558,17 @@ func TestRunMultipleItems(t *testing.T) {
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "item/completed",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"reasoning","id":"item-1"}}`),
+		Params:  json.RawMessage(`{"completedAtMs":1,"threadId":"thread-1","turnId":"turn-1","item":{"type":"reasoning","id":"item-1"}}`),
 	})
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "item/completed",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-2","text":"First message"}}`),
+		Params:  json.RawMessage(`{"completedAtMs":1,"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-2","text":"First message"}}`),
 	})
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "item/completed",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-3","text":"Final answer"}}`),
+		Params:  json.RawMessage(`{"completedAtMs":1,"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-3","text":"Final answer"}}`),
 	})
 
 	// Inject turn/completed.
@@ -711,7 +711,7 @@ func TestRunItemCompletedUnmarshalFailureStillCollectsFallbackItem(t *testing.T)
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "item/completed",
-		Params:  json.RawMessage(`{"threadId":"thread-1","item":"bad-item","turnId":"turn-1"}`),
+		Params:  json.RawMessage(`{"completedAtMs":1,"threadId":"thread-1","item":"bad-item","turnId":"turn-1"}`),
 	})
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
@@ -780,10 +780,11 @@ func TestRunApprovalFlowDuringTurn(t *testing.T) {
 
 	// Inject a server→client approval request mid-turn.
 	approvalParams, _ := json.Marshal(codex.CommandExecutionRequestApprovalParams{
-		ItemID:   "item-cmd-1",
-		ThreadID: "thread-1",
-		TurnID:   "turn-1",
-		Command:  codex.Ptr("ls -la"),
+		ItemID:      "item-cmd-1",
+		StartedAtMs: 1,
+		ThreadID:    "thread-1",
+		TurnID:      "turn-1",
+		Command:     codex.Ptr("ls -la"),
 	})
 	resp, err := mock.InjectServerRequest(ctx, codex.Request{
 		JSONRPC: "2.0",
@@ -806,7 +807,7 @@ func TestRunApprovalFlowDuringTurn(t *testing.T) {
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "item/completed",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-1","text":"Done"}}`),
+		Params:  json.RawMessage(`{"completedAtMs":1,"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-1","text":"Done"}}`),
 	})
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
@@ -848,7 +849,7 @@ func TestRunIgnoresCrossThreadNotifications(t *testing.T) {
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "item/completed",
-		Params:  json.RawMessage(`{"threadId":"thread-OTHER","turnId":"turn-1","item":{"type":"agentMessage","id":"item-wrong","text":"Wrong thread"}}`),
+		Params:  json.RawMessage(`{"completedAtMs":1,"threadId":"thread-OTHER","turnId":"turn-1","item":{"type":"agentMessage","id":"item-wrong","text":"Wrong thread"}}`),
 	})
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
@@ -860,7 +861,7 @@ func TestRunIgnoresCrossThreadNotifications(t *testing.T) {
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "item/completed",
-		Params:  json.RawMessage(`{"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-1","text":"Correct thread"}}`),
+		Params:  json.RawMessage(`{"completedAtMs":1,"threadId":"thread-1","turnId":"turn-1","item":{"type":"agentMessage","id":"item-1","text":"Correct thread"}}`),
 	})
 	mock.InjectServerNotification(ctx, codex.Notification{
 		JSONRPC: "2.0",

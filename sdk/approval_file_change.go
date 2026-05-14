@@ -364,17 +364,18 @@ func validateReviewDecisionWrapper(decision ReviewDecisionWrapper) error {
 
 // FileChangeRequestApprovalParams represents parameters for file change approval.
 type FileChangeRequestApprovalParams struct {
-	ItemID    string  `json:"itemId"`
-	ThreadID  string  `json:"threadId"`
-	TurnID    string  `json:"turnId"`
-	GrantRoot *string `json:"grantRoot,omitempty"`
-	Reason    *string `json:"reason,omitempty"`
+	ItemID      string  `json:"itemId"`
+	StartedAtMs int64   `json:"startedAtMs"`
+	ThreadID    string  `json:"threadId"`
+	TurnID      string  `json:"turnId"`
+	GrantRoot   *string `json:"grantRoot,omitempty"`
+	Reason      *string `json:"reason,omitempty"`
 }
 
 func (p *FileChangeRequestApprovalParams) UnmarshalJSON(data []byte) error {
 	type wire FileChangeRequestApprovalParams
 	var decoded wire
-	required := []string{"itemId", "threadId", "turnId"}
+	required := []string{"itemId", "startedAtMs", "threadId", "turnId"}
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}

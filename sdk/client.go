@@ -217,7 +217,7 @@ type Client struct {
 	Turn            *TurnService
 	Account         *AccountService
 	Config          *ConfigService
-	DeviceKey       *DeviceKeyService
+	Hooks           *HooksService
 	Model           *ModelService
 	ModelProvider   *ModelProviderService
 	Skills          *SkillsService
@@ -280,7 +280,7 @@ func NewClient(transport Transport, opts ...ClientOption) *Client {
 	c.Turn = newTurnService(c)
 	c.Account = newAccountService(c)
 	c.Config = newConfigService(c)
-	c.DeviceKey = newDeviceKeyService(c)
+	c.Hooks = newHooksService(c)
 	c.Model = newModelService(c)
 	c.ModelProvider = newModelProviderService(c)
 	c.Skills = newSkillsService(c)
@@ -542,6 +542,12 @@ func (c *Client) dispatchApproval(ctx context.Context, req Request) (Response, e
 			return methodNotFoundResponse(req.ID), nil
 		}
 		return handleApproval(ctx, req, handlers.OnMcpServerElicitationRequest)
+
+	case methodAttestationGenerate:
+		if handlers.OnAttestationGenerate == nil {
+			return methodNotFoundResponse(req.ID), nil
+		}
+		return handleApproval(ctx, req, handlers.OnAttestationGenerate)
 
 	default:
 		// Unknown method - return method not found error

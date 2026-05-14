@@ -247,9 +247,10 @@ func TestKnownApprovalHandlerDispatch(t *testing.T) {
 			name:   "item/commandExecution/requestApproval",
 			method: "item/commandExecution/requestApproval",
 			params: map[string]interface{}{
-				"itemId":   "item-1",
-				"threadId": "thread-1",
-				"turnId":   "turn-1",
+				"itemId":      "item-1",
+				"startedAtMs": int64(1),
+				"threadId":    "thread-1",
+				"turnId":      "turn-1",
 			},
 			handler: func(ah *codex.ApprovalHandlers) {
 				ah.OnCommandExecutionRequestApproval = func(ctx context.Context, p codex.CommandExecutionRequestApprovalParams) (codex.CommandExecutionRequestApprovalResponse, error) {
@@ -283,9 +284,10 @@ func TestKnownApprovalHandlerDispatch(t *testing.T) {
 			name:   "item/fileChange/requestApproval",
 			method: "item/fileChange/requestApproval",
 			params: map[string]interface{}{
-				"itemId":   "item-1",
-				"threadId": "thread-1",
-				"turnId":   "turn-1",
+				"itemId":      "item-1",
+				"startedAtMs": int64(1),
+				"threadId":    "thread-1",
+				"turnId":      "turn-1",
 			},
 			handler: func(ah *codex.ApprovalHandlers) {
 				ah.OnFileChangeRequestApproval = func(ctx context.Context, p codex.FileChangeRequestApprovalParams) (codex.FileChangeRequestApprovalResponse, error) {
@@ -349,6 +351,7 @@ func TestKnownApprovalHandlerDispatch(t *testing.T) {
 				"cwd":         "/tmp",
 				"itemId":      "item-1",
 				"permissions": map[string]interface{}{},
+				"startedAtMs": int64(1),
 				"threadId":    "thread-1",
 				"turnId":      "turn-1",
 			},
@@ -533,8 +536,9 @@ func TestMalformedApprovalRequestReturnsInvalidParams(t *testing.T) {
 			name:   "item/commandExecution/requestApproval missing item id",
 			method: "item/commandExecution/requestApproval",
 			params: map[string]interface{}{
-				"threadId": "thread-1",
-				"turnId":   "turn-1",
+				"startedAtMs": int64(1),
+				"threadId":    "thread-1",
+				"turnId":      "turn-1",
 			},
 			handler: func(ah *codex.ApprovalHandlers, called *bool) {
 				ah.OnCommandExecutionRequestApproval = func(context.Context, codex.CommandExecutionRequestApprovalParams) (codex.CommandExecutionRequestApprovalResponse, error) {
@@ -563,8 +567,9 @@ func TestMalformedApprovalRequestReturnsInvalidParams(t *testing.T) {
 			name:   "item/fileChange/requestApproval missing item id",
 			method: "item/fileChange/requestApproval",
 			params: map[string]interface{}{
-				"threadId": "thread-1",
-				"turnId":   "turn-1",
+				"startedAtMs": int64(1),
+				"threadId":    "thread-1",
+				"turnId":      "turn-1",
 			},
 			handler: func(ah *codex.ApprovalHandlers, called *bool) {
 				ah.OnFileChangeRequestApproval = func(context.Context, codex.FileChangeRequestApprovalParams) (codex.FileChangeRequestApprovalResponse, error) {
@@ -621,10 +626,11 @@ func TestMalformedApprovalRequestReturnsInvalidParams(t *testing.T) {
 			name:   "item/permissions/requestApproval missing permissions",
 			method: "item/permissions/requestApproval",
 			params: map[string]interface{}{
-				"cwd":      "/tmp",
-				"itemId":   "item-1",
-				"threadId": "thread-1",
-				"turnId":   "turn-1",
+				"cwd":         "/tmp",
+				"itemId":      "item-1",
+				"startedAtMs": int64(1),
+				"threadId":    "thread-1",
+				"turnId":      "turn-1",
 			},
 			handler: func(ah *codex.ApprovalHandlers, called *bool) {
 				ah.OnPermissionsRequestApproval = func(context.Context, codex.PermissionsRequestApprovalParams) (codex.PermissionsRequestApprovalResponse, error) {
@@ -637,10 +643,11 @@ func TestMalformedApprovalRequestReturnsInvalidParams(t *testing.T) {
 			name:   "item/permissions/requestApproval relative filesystem root",
 			method: "item/permissions/requestApproval",
 			params: map[string]interface{}{
-				"cwd":      "/tmp",
-				"itemId":   "item-1",
-				"threadId": "thread-1",
-				"turnId":   "turn-1",
+				"cwd":         "/tmp",
+				"itemId":      "item-1",
+				"startedAtMs": int64(1),
+				"threadId":    "thread-1",
+				"turnId":      "turn-1",
 				"permissions": map[string]interface{}{
 					"fileSystem": map[string]interface{}{
 						"read": []interface{}{"relative/path"},
@@ -658,9 +665,10 @@ func TestMalformedApprovalRequestReturnsInvalidParams(t *testing.T) {
 			name:   "item/commandExecution/requestApproval invalid network policy amendment",
 			method: "item/commandExecution/requestApproval",
 			params: map[string]interface{}{
-				"itemId":   "item-1",
-				"threadId": "thread-1",
-				"turnId":   "turn-1",
+				"itemId":      "item-1",
+				"startedAtMs": int64(1),
+				"threadId":    "thread-1",
+				"turnId":      "turn-1",
 				"proposedNetworkPolicyAmendments": []interface{}{
 					map[string]interface{}{
 						"action": "bogus",
@@ -891,7 +899,7 @@ func TestApprovalHandlerRejectsInvalidResponsePayloads(t *testing.T) {
 		{
 			name:   "command execution approval invalid decision",
 			method: "item/commandExecution/requestApproval",
-			params: `{"itemId":"item-1","threadId":"thread-1","turnId":"turn-1"}`,
+			params: `{"itemId":"item-1","startedAtMs":1000,"threadId":"thread-1","turnId":"turn-1"}`,
 			register: func(client *codex.Client) {
 				client.SetApprovalHandlers(codex.ApprovalHandlers{
 					OnCommandExecutionRequestApproval: func(context.Context, codex.CommandExecutionRequestApprovalParams) (codex.CommandExecutionRequestApprovalResponse, error) {
@@ -919,7 +927,7 @@ func TestApprovalHandlerRejectsInvalidResponsePayloads(t *testing.T) {
 		{
 			name:   "file change approval invalid decision",
 			method: "item/fileChange/requestApproval",
-			params: `{"itemId":"item-1","threadId":"thread-1","turnId":"turn-1"}`,
+			params: `{"itemId":"item-1","startedAtMs":1000,"threadId":"thread-1","turnId":"turn-1"}`,
 			register: func(client *codex.Client) {
 				client.SetApprovalHandlers(codex.ApprovalHandlers{
 					OnFileChangeRequestApproval: func(context.Context, codex.FileChangeRequestApprovalParams) (codex.FileChangeRequestApprovalResponse, error) {
@@ -932,7 +940,7 @@ func TestApprovalHandlerRejectsInvalidResponsePayloads(t *testing.T) {
 		{
 			name:   "permissions approval invalid scope",
 			method: "item/permissions/requestApproval",
-			params: `{"cwd":"/tmp","itemId":"item-1","permissions":{},"threadId":"thread-1","turnId":"turn-1"}`,
+			params: `{"cwd":"/tmp","itemId":"item-1","permissions":{},"startedAtMs":1000,"threadId":"thread-1","turnId":"turn-1"}`,
 			register: func(client *codex.Client) {
 				client.SetApprovalHandlers(codex.ApprovalHandlers{
 					OnPermissionsRequestApproval: func(context.Context, codex.PermissionsRequestApprovalParams) (codex.PermissionsRequestApprovalResponse, error) {
@@ -946,7 +954,7 @@ func TestApprovalHandlerRejectsInvalidResponsePayloads(t *testing.T) {
 		{
 			name:   "permissions approval relative granted filesystem root",
 			method: "item/permissions/requestApproval",
-			params: `{"cwd":"/tmp","itemId":"item-1","permissions":{},"threadId":"thread-1","turnId":"turn-1"}`,
+			params: `{"cwd":"/tmp","itemId":"item-1","permissions":{},"startedAtMs":1000,"threadId":"thread-1","turnId":"turn-1"}`,
 			register: func(client *codex.Client) {
 				client.SetApprovalHandlers(codex.ApprovalHandlers{
 					OnPermissionsRequestApproval: func(context.Context, codex.PermissionsRequestApprovalParams) (codex.PermissionsRequestApprovalResponse, error) {

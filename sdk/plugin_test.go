@@ -14,7 +14,6 @@ func TestPluginList(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		transport := NewMockTransport()
 		client := codex.NewClient(transport)
-		forceRemoteSync := true
 		transport.SetResponse("plugin/list", codex.Response{
 			JSONRPC: "2.0",
 			Result: json.RawMessage(`{
@@ -40,8 +39,7 @@ func TestPluginList(t *testing.T) {
 		})
 
 		resp, err := client.Plugin.List(context.Background(), codex.PluginListParams{
-			Cwds:            []string{"/workspace"},
-			ForceRemoteSync: &forceRemoteSync,
+			Cwds: []string{"/workspace"},
 		})
 		if err != nil {
 			t.Fatalf("List() error = %v", err)
@@ -64,7 +62,7 @@ func TestPluginList(t *testing.T) {
 		if err := json.Unmarshal(req.Params, &params); err != nil {
 			t.Fatalf("unmarshal params: %v", err)
 		}
-		if len(params.Cwds) != 1 || params.Cwds[0] != "/workspace" || params.ForceRemoteSync == nil || !*params.ForceRemoteSync {
+		if len(params.Cwds) != 1 || params.Cwds[0] != "/workspace" {
 			t.Fatalf("params = %+v; want list payload preserved", params)
 		}
 	})
@@ -118,12 +116,13 @@ func TestPluginRead(t *testing.T) {
 			JSONRPC: "2.0",
 			Result: json.RawMessage(`{
 				"plugin":{
-					"apps":[{"id":"app-1","name":"Calendar","description":"desc"}],
+					"apps":[{"id":"app-1","name":"Calendar","description":"desc","needsAuth":true}],
 					"description":"Plugin description",
+					"hooks":[],
 					"marketplaceName":"official",
 					"marketplacePath":"/plugins",
 					"mcpServers":["calendar"],
-					"skills":[{"description":"skill desc","name":"book","path":"/plugins/book"}],
+					"skills":[{"description":"skill desc","enabled":true,"name":"book","path":"/plugins/book"}],
 					"summary":{
 						"authPolicy":"ON_USE",
 						"enabled":true,
@@ -161,6 +160,39 @@ func TestPluginRead(t *testing.T) {
 		}
 		if params.MarketplacePath != "/plugins" || params.PluginName != "calendar" {
 			t.Fatalf("params = %+v; want read payload preserved", params)
+		}
+	})
+
+	t.Run("omits marketplace path for remote read", func(t *testing.T) {
+		transport := NewMockTransport()
+		client := codex.NewClient(transport)
+		transport.SetResponseData("plugin/read", map[string]interface{}{
+			"plugin": pluginReadPayloadWithSummary(map[string]interface{}{
+				"authPolicy":    "ON_USE",
+				"enabled":       true,
+				"id":            "plugin-1",
+				"installPolicy": "AVAILABLE",
+				"installed":     false,
+				"name":          "calendar",
+				"source":        map[string]interface{}{"type": "remote"},
+			}),
+		})
+
+		remoteMarketplaceName := "official"
+		_, err := client.Plugin.Read(context.Background(), codex.PluginReadParams{
+			PluginName:            "calendar",
+			RemoteMarketplaceName: &remoteMarketplaceName,
+		})
+		if err != nil {
+			t.Fatalf("Read() error = %v", err)
+		}
+
+		var params map[string]json.RawMessage
+		if err := json.Unmarshal(transport.GetSentRequest(0).Params, &params); err != nil {
+			t.Fatalf("unmarshal params: %v", err)
+		}
+		if _, ok := params["marketplacePath"]; ok {
+			t.Fatalf("params included marketplacePath: %s", transport.GetSentRequest(0).Params)
 		}
 	})
 
@@ -218,11 +250,10 @@ func TestPluginInstall(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		transport := NewMockTransport()
 		client := codex.NewClient(transport)
-		forceRemoteSync := true
 		transport.SetResponse("plugin/install", codex.Response{
 			JSONRPC: "2.0",
 			Result: json.RawMessage(`{
-				"appsNeedingAuth":[{"id":"app-1","name":"Calendar","installUrl":"https://example.com/install"}],
+				"appsNeedingAuth":[{"id":"app-1","name":"Calendar","installUrl":"https://example.com/install","needsAuth":true}],
 				"authPolicy":"ON_INSTALL"
 			}`),
 		})
@@ -230,7 +261,6 @@ func TestPluginInstall(t *testing.T) {
 		resp, err := client.Plugin.Install(context.Background(), codex.PluginInstallParams{
 			MarketplacePath: "/plugins",
 			PluginName:      "calendar",
-			ForceRemoteSync: &forceRemoteSync,
 		})
 		if err != nil {
 			t.Fatalf("Install() error = %v", err)
@@ -250,8 +280,34 @@ func TestPluginInstall(t *testing.T) {
 		if err := json.Unmarshal(req.Params, &params); err != nil {
 			t.Fatalf("unmarshal params: %v", err)
 		}
-		if params.MarketplacePath != "/plugins" || params.PluginName != "calendar" || params.ForceRemoteSync == nil || !*params.ForceRemoteSync {
+		if params.MarketplacePath != "/plugins" || params.PluginName != "calendar" {
 			t.Fatalf("params = %+v; want install payload preserved", params)
+		}
+	})
+
+	t.Run("omits marketplace path for remote install", func(t *testing.T) {
+		transport := NewMockTransport()
+		client := codex.NewClient(transport)
+		transport.SetResponse("plugin/install", codex.Response{
+			JSONRPC: "2.0",
+			Result:  json.RawMessage(`{"appsNeedingAuth":[],"authPolicy":"ON_INSTALL"}`),
+		})
+
+		remoteMarketplaceName := "official"
+		_, err := client.Plugin.Install(context.Background(), codex.PluginInstallParams{
+			PluginName:            "calendar",
+			RemoteMarketplaceName: &remoteMarketplaceName,
+		})
+		if err != nil {
+			t.Fatalf("Install() error = %v", err)
+		}
+
+		var params map[string]json.RawMessage
+		if err := json.Unmarshal(transport.GetSentRequest(0).Params, &params); err != nil {
+			t.Fatalf("unmarshal params: %v", err)
+		}
+		if _, ok := params["marketplacePath"]; ok {
+			t.Fatalf("params included marketplacePath: %s", transport.GetSentRequest(0).Params)
 		}
 	})
 
@@ -329,9 +385,9 @@ func TestPluginRequiredFieldValidation(t *testing.T) {
 			wantErr: "missing plugin.apps",
 		},
 		{
-			name:     "read rejects plugin missing marketplacePath",
+			name:     "read rejects plugin missing hooks",
 			method:   "plugin/read",
-			response: pluginReadResponseWithMissingField("marketplacePath"),
+			response: pluginReadResponseWithMissingField("hooks"),
 			call: func(client *codex.Client) error {
 				_, err := client.Plugin.Read(context.Background(), codex.PluginReadParams{
 					MarketplacePath: "/plugins",
@@ -339,7 +395,7 @@ func TestPluginRequiredFieldValidation(t *testing.T) {
 				})
 				return err
 			},
-			wantErr: "missing plugin.marketplacePath",
+			wantErr: "missing plugin.hooks",
 		},
 		{
 			name:   "install rejects missing appsNeedingAuth",
@@ -376,7 +432,7 @@ func TestPluginRequiredFieldValidation(t *testing.T) {
 			method: "plugin/install",
 			response: map[string]interface{}{
 				"appsNeedingAuth": []interface{}{
-					map[string]interface{}{"name": "Calendar"},
+					map[string]interface{}{"name": "Calendar", "needsAuth": true},
 				},
 				"authPolicy": "ON_INSTALL",
 			},
@@ -417,7 +473,7 @@ func TestPluginEnumValidation(t *testing.T) {
 		wantErr  string
 	}{
 		{
-			name:   "list rejects invalid source type",
+			name:   "list rejects unknown source type",
 			method: "plugin/list",
 			response: map[string]interface{}{
 				"marketplaces": []interface{}{
@@ -434,7 +490,7 @@ func TestPluginEnumValidation(t *testing.T) {
 								"name":          "calendar",
 								"source": map[string]interface{}{
 									"path": "/plugins/calendar",
-									"type": "remote",
+									"type": "archive",
 								},
 							},
 						},
@@ -445,7 +501,7 @@ func TestPluginEnumValidation(t *testing.T) {
 				_, err := client.Plugin.List(context.Background(), codex.PluginListParams{})
 				return err
 			},
-			wantErr: `invalid plugin.source.type "remote"`,
+			wantErr: `invalid plugin.source.type "archive"`,
 		},
 		{
 			name:   "read rejects invalid auth policy",
@@ -554,6 +610,7 @@ func pluginReadResponseWithMissingField(missingField string) map[string]interfac
 func pluginReadPayloadWithSummary(summary map[string]interface{}) map[string]interface{} {
 	return map[string]interface{}{
 		"apps":            []interface{}{},
+		"hooks":           []interface{}{},
 		"marketplaceName": "official",
 		"marketplacePath": "/plugins",
 		"mcpServers":      []interface{}{"calendar"},
@@ -566,11 +623,9 @@ func TestPluginUninstall(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		transport := NewMockTransport()
 		client := codex.NewClient(transport)
-		forceRemoteSync := true
 
 		_, err := client.Plugin.Uninstall(context.Background(), codex.PluginUninstallParams{
-			PluginID:        "plugin-1",
-			ForceRemoteSync: &forceRemoteSync,
+			PluginID: "plugin-1",
 		})
 		if err != nil {
 			t.Fatalf("Uninstall() error = %v", err)
@@ -584,7 +639,7 @@ func TestPluginUninstall(t *testing.T) {
 		if err := json.Unmarshal(req.Params, &params); err != nil {
 			t.Fatalf("unmarshal params: %v", err)
 		}
-		if params.PluginID != "plugin-1" || params.ForceRemoteSync == nil || !*params.ForceRemoteSync {
+		if params.PluginID != "plugin-1" {
 			t.Fatalf("params = %+v; want uninstall payload preserved", params)
 		}
 	})
