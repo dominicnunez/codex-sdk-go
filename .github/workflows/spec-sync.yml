@@ -23,7 +23,7 @@ jobs:
 
           upstream_repo="openai/codex"
           upstream_path="codex-rs/app-server-protocol/schema/json"
-          local_specs="specs"
+          local_specs="appserver/protocol/schema/json"
           label="spec-sync"
 
           # --- 1. Read baseline SHA ---
@@ -137,7 +137,7 @@ jobs:
           $(echo -e "${del_section}")
 
           ### Next Steps
-          1. Review the synced \`specs/\` changes in this PR
+          1. Review the synced \`appserver/protocol/schema/json/\` changes in this PR
           2. Add/update Go types for new/modified schemas
           3. Run \`go test -run TestSpecCoverage\` to verify
           4. Merge when ready"
@@ -145,7 +145,7 @@ jobs:
           # Strip leading whitespace from indented heredoc-style string
           body="$(echo "${body}" | sed 's/^          //')"
 
-          # --- 6. Sync upstream schemas into specs/ ---
+          # --- 6. Sync upstream schemas into appserver/protocol/schema/json/ ---
           rsync -a --delete --include='*.json' --exclude='*' "${tmpdir}/" "${local_specs}/"
           for subdir in v1 v2; do
             if [ -d "${tmpdir}/${subdir}" ]; then

@@ -5,213 +5,213 @@ import (
 	"errors"
 	"time"
 
-	sdk "github.com/dominicnunez/codex-sdk-go/sdk"
+	protocol "github.com/dominicnunez/codex-sdk-go/appserver/protocol"
 )
 
 const jsonrpcVersion = "2.0"
 
 const (
-	ErrCodeParseError     = sdk.ErrCodeParseError
-	ErrCodeInvalidRequest = sdk.ErrCodeInvalidRequest
-	ErrCodeMethodNotFound = sdk.ErrCodeMethodNotFound
-	ErrCodeInvalidParams  = sdk.ErrCodeInvalidParams
-	ErrCodeInternalError  = sdk.ErrCodeInternalError
+	ErrCodeParseError     = protocol.ErrCodeParseError
+	ErrCodeInvalidRequest = protocol.ErrCodeInvalidRequest
+	ErrCodeMethodNotFound = protocol.ErrCodeMethodNotFound
+	ErrCodeInvalidParams  = protocol.ErrCodeInvalidParams
+	ErrCodeInternalError  = protocol.ErrCodeInternalError
 )
 
 var (
-	ErrNilContext           = sdk.ErrNilContext
-	ErrInvalidParams        = sdk.ErrInvalidParams
-	NewTransportError       = sdk.NewTransportError
-	ApprovalPolicyNever     = sdk.ApprovalPolicyNever
-	ApprovalPolicyOnFailure = sdk.ApprovalPolicyOnFailure
-	ApprovalPolicyOnRequest = sdk.ApprovalPolicyOnRequest
-	ApprovalPolicyUntrusted = sdk.ApprovalPolicyUntrusted
+	ErrNilContext           = protocol.ErrNilContext
+	ErrInvalidParams        = protocol.ErrInvalidParams
+	NewTransportError       = protocol.NewTransportError
+	ApprovalPolicyNever     = protocol.ApprovalPolicyNever
+	ApprovalPolicyOnFailure = protocol.ApprovalPolicyOnFailure
+	ApprovalPolicyOnRequest = protocol.ApprovalPolicyOnRequest
+	ApprovalPolicyUntrusted = protocol.ApprovalPolicyUntrusted
 )
 
 var errInvalidParams = ErrInvalidParams
 
 type (
-	Client                 = sdk.Client
-	ClientInfo             = sdk.ClientInfo
-	ClientOption           = sdk.ClientOption
-	Error                  = sdk.Error
-	InitializeCapabilities = sdk.InitializeCapabilities
-	InitializeParams       = sdk.InitializeParams
-	Notification           = sdk.Notification
-	NotificationHandler    = sdk.NotificationHandler
-	Request                = sdk.Request
-	RequestHandler         = sdk.RequestHandler
-	RequestID              = sdk.RequestID
-	Response               = sdk.Response
-	Transport              = sdk.Transport
-	TransportError         = sdk.TransportError
+	Client                 = protocol.Client
+	ClientInfo             = protocol.ClientInfo
+	ClientOption           = protocol.ClientOption
+	Error                  = protocol.Error
+	InitializeCapabilities = protocol.InitializeCapabilities
+	InitializeParams       = protocol.InitializeParams
+	Notification           = protocol.Notification
+	NotificationHandler    = protocol.NotificationHandler
+	Request                = protocol.Request
+	RequestHandler         = protocol.RequestHandler
+	RequestID              = protocol.RequestID
+	Response               = protocol.Response
+	Transport              = protocol.Transport
+	TransportError         = protocol.TransportError
 
-	AgentMessageDeltaNotification           = sdk.AgentMessageDeltaNotification
-	AgentMessageThreadItem                  = sdk.AgentMessageThreadItem
-	AddPatchChangeKind                      = sdk.AddPatchChangeKind
-	CommandExecutionOutputDeltaNotification = sdk.CommandExecutionOutputDeltaNotification
-	ErrorNotification                       = sdk.ErrorNotification
-	FileChangeOutputDeltaNotification       = sdk.FileChangeOutputDeltaNotification
-	FileChangePatchUpdatedNotification      = sdk.FileChangePatchUpdatedNotification
-	ItemCompletedNotification               = sdk.ItemCompletedNotification
-	ItemStartedNotification                 = sdk.ItemStartedNotification
-	PlanDeltaNotification                   = sdk.PlanDeltaNotification
-	ReasoningSummaryTextDeltaNotification   = sdk.ReasoningSummaryTextDeltaNotification
-	ReasoningTextDeltaNotification          = sdk.ReasoningTextDeltaNotification
-	ThreadRealtimeErrorNotification         = sdk.ThreadRealtimeErrorNotification
-	ThreadTokenUsageUpdatedNotification     = sdk.ThreadTokenUsageUpdatedNotification
-	TurnCompletedNotification               = sdk.TurnCompletedNotification
-	TurnStartedNotification                 = sdk.TurnStartedNotification
+	AgentMessageDeltaNotification           = protocol.AgentMessageDeltaNotification
+	AgentMessageThreadItem                  = protocol.AgentMessageThreadItem
+	AddPatchChangeKind                      = protocol.AddPatchChangeKind
+	CommandExecutionOutputDeltaNotification = protocol.CommandExecutionOutputDeltaNotification
+	ErrorNotification                       = protocol.ErrorNotification
+	FileChangeOutputDeltaNotification       = protocol.FileChangeOutputDeltaNotification
+	FileChangePatchUpdatedNotification      = protocol.FileChangePatchUpdatedNotification
+	ItemCompletedNotification               = protocol.ItemCompletedNotification
+	ItemStartedNotification                 = protocol.ItemStartedNotification
+	PlanDeltaNotification                   = protocol.PlanDeltaNotification
+	ReasoningSummaryTextDeltaNotification   = protocol.ReasoningSummaryTextDeltaNotification
+	ReasoningTextDeltaNotification          = protocol.ReasoningTextDeltaNotification
+	ThreadRealtimeErrorNotification         = protocol.ThreadRealtimeErrorNotification
+	ThreadTokenUsageUpdatedNotification     = protocol.ThreadTokenUsageUpdatedNotification
+	TurnCompletedNotification               = protocol.TurnCompletedNotification
+	TurnStartedNotification                 = protocol.TurnStartedNotification
 
-	AskForApproval                             = sdk.AskForApproval
-	ApplyPatchApprovalParams                   = sdk.ApplyPatchApprovalParams
-	ApplyPatchApprovalResponse                 = sdk.ApplyPatchApprovalResponse
-	ApprovalHandlers                           = sdk.ApprovalHandlers
-	CollabAgentState                           = sdk.CollabAgentState
-	CollabAgentStatus                          = sdk.CollabAgentStatus
-	CollabAgentTool                            = sdk.CollabAgentTool
-	CollabAgentToolCallStatus                  = sdk.CollabAgentToolCallStatus
-	CollabAgentToolCallThreadItem              = sdk.CollabAgentToolCallThreadItem
-	CollaborationMode                          = sdk.CollaborationMode
-	CollaborationModeSettings                  = sdk.CollaborationModeSettings
-	CommandActionWrapper                       = sdk.CommandActionWrapper
-	CommandExecutionApprovalDecisionWrapper    = sdk.CommandExecutionApprovalDecisionWrapper
-	CommandExecutionRequestApprovalParams      = sdk.CommandExecutionRequestApprovalParams
-	CommandExecutionRequestApprovalResponse    = sdk.CommandExecutionRequestApprovalResponse
-	CommandExecutionStatus                     = sdk.CommandExecutionStatus
-	CommandExecutionThreadItem                 = sdk.CommandExecutionThreadItem
-	ContextCompactionThreadItem                = sdk.ContextCompactionThreadItem
-	DeletePatchChangeKind                      = sdk.DeletePatchChangeKind
-	DynamicToolCallOutputContentItemWrapper    = sdk.DynamicToolCallOutputContentItemWrapper
-	DynamicToolCallThreadItem                  = sdk.DynamicToolCallThreadItem
-	FileChangeThreadItem                       = sdk.FileChangeThreadItem
-	FileChangeRequestApprovalParams            = sdk.FileChangeRequestApprovalParams
-	FileChangeRequestApprovalResponse          = sdk.FileChangeRequestApprovalResponse
-	FileUpdateChange                           = sdk.FileUpdateChange
-	GitInfo                                    = sdk.GitInfo
-	ImageUserInput                             = sdk.ImageUserInput
-	ImageViewThreadItem                        = sdk.ImageViewThreadItem
-	InputImageDynamicToolCallOutputContentItem = sdk.InputImageDynamicToolCallOutputContentItem
-	InputTextDynamicToolCallOutputContentItem  = sdk.InputTextDynamicToolCallOutputContentItem
-	ListFilesCommandAction                     = sdk.ListFilesCommandAction
-	LocalImageUserInput                        = sdk.LocalImageUserInput
-	MentionUserInput                           = sdk.MentionUserInput
-	McpToolCallError                           = sdk.McpToolCallError
-	McpToolCallResult                          = sdk.McpToolCallResult
-	McpToolCallStatus                          = sdk.McpToolCallStatus
-	McpToolCallThreadItem                      = sdk.McpToolCallThreadItem
-	MessagePhase                               = sdk.MessagePhase
-	ModeKind                                   = sdk.ModeKind
-	PatchApplyStatus                           = sdk.PatchApplyStatus
-	PatchChangeKindWrapper                     = sdk.PatchChangeKindWrapper
-	Personality                                = sdk.Personality
-	PlanThreadItem                             = sdk.PlanThreadItem
-	ReasoningEffort                            = sdk.ReasoningEffort
-	ReviewDecisionWrapper                      = sdk.ReviewDecisionWrapper
-	ReasoningThreadItem                        = sdk.ReasoningThreadItem
-	ReadCommandAction                          = sdk.ReadCommandAction
-	SandboxMode                                = sdk.SandboxMode
-	SearchCommandAction                        = sdk.SearchCommandAction
-	SearchWebSearchAction                      = sdk.SearchWebSearchAction
-	SkillUserInput                             = sdk.SkillUserInput
-	SessionSource                              = sdk.SessionSource
-	SessionSourceSubAgent                      = sdk.SessionSourceSubAgent
-	SessionSourceWrapper                       = sdk.SessionSourceWrapper
-	SubAgentSource                             = sdk.SubAgentSource
-	SubAgentSourceOther                        = sdk.SubAgentSourceOther
-	SubAgentSourceThreadSpawn                  = sdk.SubAgentSourceThreadSpawn
-	TextElement                                = sdk.TextElement
-	TextUserInput                              = sdk.TextUserInput
-	Thread                                     = sdk.Thread
-	ThreadActiveFlag                           = sdk.ThreadActiveFlag
-	ThreadItem                                 = sdk.ThreadItem
-	ThreadItemWrapper                          = sdk.ThreadItemWrapper
-	ThreadReadParams                           = sdk.ThreadReadParams
-	ThreadStartParams                          = sdk.ThreadStartParams
-	ThreadStatusActive                         = sdk.ThreadStatusActive
-	ThreadStatusIdle                           = sdk.ThreadStatusIdle
-	ThreadStatusNotLoaded                      = sdk.ThreadStatusNotLoaded
-	ThreadStatusSystemError                    = sdk.ThreadStatusSystemError
-	ThreadStatusWrapper                        = sdk.ThreadStatusWrapper
-	ThreadTokenUsage                           = sdk.ThreadTokenUsage
-	Turn                                       = sdk.Turn
-	TurnError                                  = sdk.TurnError
-	TurnStartParams                            = sdk.TurnStartParams
-	TurnStatus                                 = sdk.TurnStatus
-	UnknownCommandAction                       = sdk.UnknownCommandAction
-	UnknownDynamicToolCallOutputContentItem    = sdk.UnknownDynamicToolCallOutputContentItem
-	UnknownPatchChangeKind                     = sdk.UnknownPatchChangeKind
-	UnknownSessionSource                       = sdk.UnknownSessionSource
-	UnknownSubAgentSource                      = sdk.UnknownSubAgentSource
-	UnknownThreadItem                          = sdk.UnknownThreadItem
-	UnknownThreadStatus                        = sdk.UnknownThreadStatus
-	UnknownUserInput                           = sdk.UnknownUserInput
-	UpdatePatchChangeKind                      = sdk.UpdatePatchChangeKind
-	UserInput                                  = sdk.UserInput
-	UserMessageThreadItem                      = sdk.UserMessageThreadItem
-	EnteredReviewModeThreadItem                = sdk.EnteredReviewModeThreadItem
-	ExitedReviewModeThreadItem                 = sdk.ExitedReviewModeThreadItem
-	OpenPageWebSearchAction                    = sdk.OpenPageWebSearchAction
-	FindInPageWebSearchAction                  = sdk.FindInPageWebSearchAction
-	OtherWebSearchAction                       = sdk.OtherWebSearchAction
-	UnknownWebSearchAction                     = sdk.UnknownWebSearchAction
-	WebSearchActionWrapper                     = sdk.WebSearchActionWrapper
-	WebSearchThreadItem                        = sdk.WebSearchThreadItem
+	AskForApproval                             = protocol.AskForApproval
+	ApplyPatchApprovalParams                   = protocol.ApplyPatchApprovalParams
+	ApplyPatchApprovalResponse                 = protocol.ApplyPatchApprovalResponse
+	ApprovalHandlers                           = protocol.ApprovalHandlers
+	CollabAgentState                           = protocol.CollabAgentState
+	CollabAgentStatus                          = protocol.CollabAgentStatus
+	CollabAgentTool                            = protocol.CollabAgentTool
+	CollabAgentToolCallStatus                  = protocol.CollabAgentToolCallStatus
+	CollabAgentToolCallThreadItem              = protocol.CollabAgentToolCallThreadItem
+	CollaborationMode                          = protocol.CollaborationMode
+	CollaborationModeSettings                  = protocol.CollaborationModeSettings
+	CommandActionWrapper                       = protocol.CommandActionWrapper
+	CommandExecutionApprovalDecisionWrapper    = protocol.CommandExecutionApprovalDecisionWrapper
+	CommandExecutionRequestApprovalParams      = protocol.CommandExecutionRequestApprovalParams
+	CommandExecutionRequestApprovalResponse    = protocol.CommandExecutionRequestApprovalResponse
+	CommandExecutionStatus                     = protocol.CommandExecutionStatus
+	CommandExecutionThreadItem                 = protocol.CommandExecutionThreadItem
+	ContextCompactionThreadItem                = protocol.ContextCompactionThreadItem
+	DeletePatchChangeKind                      = protocol.DeletePatchChangeKind
+	DynamicToolCallOutputContentItemWrapper    = protocol.DynamicToolCallOutputContentItemWrapper
+	DynamicToolCallThreadItem                  = protocol.DynamicToolCallThreadItem
+	FileChangeThreadItem                       = protocol.FileChangeThreadItem
+	FileChangeRequestApprovalParams            = protocol.FileChangeRequestApprovalParams
+	FileChangeRequestApprovalResponse          = protocol.FileChangeRequestApprovalResponse
+	FileUpdateChange                           = protocol.FileUpdateChange
+	GitInfo                                    = protocol.GitInfo
+	ImageUserInput                             = protocol.ImageUserInput
+	ImageViewThreadItem                        = protocol.ImageViewThreadItem
+	InputImageDynamicToolCallOutputContentItem = protocol.InputImageDynamicToolCallOutputContentItem
+	InputTextDynamicToolCallOutputContentItem  = protocol.InputTextDynamicToolCallOutputContentItem
+	ListFilesCommandAction                     = protocol.ListFilesCommandAction
+	LocalImageUserInput                        = protocol.LocalImageUserInput
+	MentionUserInput                           = protocol.MentionUserInput
+	McpToolCallError                           = protocol.McpToolCallError
+	McpToolCallResult                          = protocol.McpToolCallResult
+	McpToolCallStatus                          = protocol.McpToolCallStatus
+	McpToolCallThreadItem                      = protocol.McpToolCallThreadItem
+	MessagePhase                               = protocol.MessagePhase
+	ModeKind                                   = protocol.ModeKind
+	PatchApplyStatus                           = protocol.PatchApplyStatus
+	PatchChangeKindWrapper                     = protocol.PatchChangeKindWrapper
+	Personality                                = protocol.Personality
+	PlanThreadItem                             = protocol.PlanThreadItem
+	ReasoningEffort                            = protocol.ReasoningEffort
+	ReviewDecisionWrapper                      = protocol.ReviewDecisionWrapper
+	ReasoningThreadItem                        = protocol.ReasoningThreadItem
+	ReadCommandAction                          = protocol.ReadCommandAction
+	SandboxMode                                = protocol.SandboxMode
+	SearchCommandAction                        = protocol.SearchCommandAction
+	SearchWebSearchAction                      = protocol.SearchWebSearchAction
+	SkillUserInput                             = protocol.SkillUserInput
+	SessionSource                              = protocol.SessionSource
+	SessionSourceSubAgent                      = protocol.SessionSourceSubAgent
+	SessionSourceWrapper                       = protocol.SessionSourceWrapper
+	SubAgentSource                             = protocol.SubAgentSource
+	SubAgentSourceOther                        = protocol.SubAgentSourceOther
+	SubAgentSourceThreadSpawn                  = protocol.SubAgentSourceThreadSpawn
+	TextElement                                = protocol.TextElement
+	TextUserInput                              = protocol.TextUserInput
+	Thread                                     = protocol.Thread
+	ThreadActiveFlag                           = protocol.ThreadActiveFlag
+	ThreadItem                                 = protocol.ThreadItem
+	ThreadItemWrapper                          = protocol.ThreadItemWrapper
+	ThreadReadParams                           = protocol.ThreadReadParams
+	ThreadStartParams                          = protocol.ThreadStartParams
+	ThreadStatusActive                         = protocol.ThreadStatusActive
+	ThreadStatusIdle                           = protocol.ThreadStatusIdle
+	ThreadStatusNotLoaded                      = protocol.ThreadStatusNotLoaded
+	ThreadStatusSystemError                    = protocol.ThreadStatusSystemError
+	ThreadStatusWrapper                        = protocol.ThreadStatusWrapper
+	ThreadTokenUsage                           = protocol.ThreadTokenUsage
+	Turn                                       = protocol.Turn
+	TurnError                                  = protocol.TurnError
+	TurnStartParams                            = protocol.TurnStartParams
+	TurnStatus                                 = protocol.TurnStatus
+	UnknownCommandAction                       = protocol.UnknownCommandAction
+	UnknownDynamicToolCallOutputContentItem    = protocol.UnknownDynamicToolCallOutputContentItem
+	UnknownPatchChangeKind                     = protocol.UnknownPatchChangeKind
+	UnknownSessionSource                       = protocol.UnknownSessionSource
+	UnknownSubAgentSource                      = protocol.UnknownSubAgentSource
+	UnknownThreadItem                          = protocol.UnknownThreadItem
+	UnknownThreadStatus                        = protocol.UnknownThreadStatus
+	UnknownUserInput                           = protocol.UnknownUserInput
+	UpdatePatchChangeKind                      = protocol.UpdatePatchChangeKind
+	UserInput                                  = protocol.UserInput
+	UserMessageThreadItem                      = protocol.UserMessageThreadItem
+	EnteredReviewModeThreadItem                = protocol.EnteredReviewModeThreadItem
+	ExitedReviewModeThreadItem                 = protocol.ExitedReviewModeThreadItem
+	OpenPageWebSearchAction                    = protocol.OpenPageWebSearchAction
+	FindInPageWebSearchAction                  = protocol.FindInPageWebSearchAction
+	OtherWebSearchAction                       = protocol.OtherWebSearchAction
+	UnknownWebSearchAction                     = protocol.UnknownWebSearchAction
+	WebSearchActionWrapper                     = protocol.WebSearchActionWrapper
+	WebSearchThreadItem                        = protocol.WebSearchThreadItem
 )
 
 const (
-	CollabAgentStatusCompleted          = sdk.CollabAgentStatusCompleted
-	CollabAgentStatusErrored            = sdk.CollabAgentStatusErrored
-	CollabAgentStatusInterrupted        = sdk.CollabAgentStatusInterrupted
-	CollabAgentStatusNotFound           = sdk.CollabAgentStatusNotFound
-	CollabAgentStatusPendingInit        = sdk.CollabAgentStatusPendingInit
-	CollabAgentStatusRunning            = sdk.CollabAgentStatusRunning
-	CollabAgentStatusShutdown           = sdk.CollabAgentStatusShutdown
-	CollabAgentToolCallStatusCompleted  = sdk.CollabAgentToolCallStatusCompleted
-	CollabAgentToolCallStatusFailed     = sdk.CollabAgentToolCallStatusFailed
-	CollabAgentToolCallStatusInProgress = sdk.CollabAgentToolCallStatusInProgress
-	CollabAgentToolCloseAgent           = sdk.CollabAgentToolCloseAgent
-	CollabAgentToolResumeAgent          = sdk.CollabAgentToolResumeAgent
-	CollabAgentToolSendInput            = sdk.CollabAgentToolSendInput
-	CollabAgentToolSpawnAgent           = sdk.CollabAgentToolSpawnAgent
-	CollabAgentToolWait                 = sdk.CollabAgentToolWait
-	CommandExecutionStatusCompleted     = sdk.CommandExecutionStatusCompleted
-	CommandExecutionStatusFailed        = sdk.CommandExecutionStatusFailed
-	CommandExecutionStatusInProgress    = sdk.CommandExecutionStatusInProgress
-	McpToolCallStatusCompleted          = sdk.McpToolCallStatusCompleted
-	McpToolCallStatusFailed             = sdk.McpToolCallStatusFailed
-	McpToolCallStatusInProgress         = sdk.McpToolCallStatusInProgress
-	ModeKindPlan                        = sdk.ModeKindPlan
-	PatchApplyStatusCompleted           = sdk.PatchApplyStatusCompleted
-	PatchApplyStatusFailed              = sdk.PatchApplyStatusFailed
-	PatchApplyStatusInProgress          = sdk.PatchApplyStatusInProgress
-	PersonalityFriendly                 = sdk.PersonalityFriendly
-	ReasoningEffortHigh                 = sdk.ReasoningEffortHigh
-	SandboxModeDangerFullAccess         = sdk.SandboxModeDangerFullAccess
-	SandboxModeReadOnly                 = sdk.SandboxModeReadOnly
-	SandboxModeWorkspaceWrite           = sdk.SandboxModeWorkspaceWrite
-	ThreadActiveFlagWaitingOnApproval   = sdk.ThreadActiveFlagWaitingOnApproval
-	ThreadActiveFlagWaitingOnUserInput  = sdk.ThreadActiveFlagWaitingOnUserInput
-	TurnStatusCompleted                 = sdk.TurnStatusCompleted
-	TurnStatusFailed                    = sdk.TurnStatusFailed
-	TurnStatusInterrupted               = sdk.TurnStatusInterrupted
-	UnmarshalErrorItemType              = sdk.UnmarshalErrorItemType
+	CollabAgentStatusCompleted          = protocol.CollabAgentStatusCompleted
+	CollabAgentStatusErrored            = protocol.CollabAgentStatusErrored
+	CollabAgentStatusInterrupted        = protocol.CollabAgentStatusInterrupted
+	CollabAgentStatusNotFound           = protocol.CollabAgentStatusNotFound
+	CollabAgentStatusPendingInit        = protocol.CollabAgentStatusPendingInit
+	CollabAgentStatusRunning            = protocol.CollabAgentStatusRunning
+	CollabAgentStatusShutdown           = protocol.CollabAgentStatusShutdown
+	CollabAgentToolCallStatusCompleted  = protocol.CollabAgentToolCallStatusCompleted
+	CollabAgentToolCallStatusFailed     = protocol.CollabAgentToolCallStatusFailed
+	CollabAgentToolCallStatusInProgress = protocol.CollabAgentToolCallStatusInProgress
+	CollabAgentToolCloseAgent           = protocol.CollabAgentToolCloseAgent
+	CollabAgentToolResumeAgent          = protocol.CollabAgentToolResumeAgent
+	CollabAgentToolSendInput            = protocol.CollabAgentToolSendInput
+	CollabAgentToolSpawnAgent           = protocol.CollabAgentToolSpawnAgent
+	CollabAgentToolWait                 = protocol.CollabAgentToolWait
+	CommandExecutionStatusCompleted     = protocol.CommandExecutionStatusCompleted
+	CommandExecutionStatusFailed        = protocol.CommandExecutionStatusFailed
+	CommandExecutionStatusInProgress    = protocol.CommandExecutionStatusInProgress
+	McpToolCallStatusCompleted          = protocol.McpToolCallStatusCompleted
+	McpToolCallStatusFailed             = protocol.McpToolCallStatusFailed
+	McpToolCallStatusInProgress         = protocol.McpToolCallStatusInProgress
+	ModeKindPlan                        = protocol.ModeKindPlan
+	PatchApplyStatusCompleted           = protocol.PatchApplyStatusCompleted
+	PatchApplyStatusFailed              = protocol.PatchApplyStatusFailed
+	PatchApplyStatusInProgress          = protocol.PatchApplyStatusInProgress
+	PersonalityFriendly                 = protocol.PersonalityFriendly
+	ReasoningEffortHigh                 = protocol.ReasoningEffortHigh
+	SandboxModeDangerFullAccess         = protocol.SandboxModeDangerFullAccess
+	SandboxModeReadOnly                 = protocol.SandboxModeReadOnly
+	SandboxModeWorkspaceWrite           = protocol.SandboxModeWorkspaceWrite
+	ThreadActiveFlagWaitingOnApproval   = protocol.ThreadActiveFlagWaitingOnApproval
+	ThreadActiveFlagWaitingOnUserInput  = protocol.ThreadActiveFlagWaitingOnUserInput
+	TurnStatusCompleted                 = protocol.TurnStatusCompleted
+	TurnStatusFailed                    = protocol.TurnStatusFailed
+	TurnStatusInterrupted               = protocol.TurnStatusInterrupted
+	UnmarshalErrorItemType              = protocol.UnmarshalErrorItemType
 )
 
 func NewClient(transport Transport, opts ...ClientOption) *Client {
-	return sdk.NewClient(transport, opts...)
+	return protocol.NewClient(transport, opts...)
 }
 
 func WithRequestTimeout(timeout time.Duration) ClientOption {
-	return sdk.WithRequestTimeout(timeout)
+	return protocol.WithRequestTimeout(timeout)
 }
 
 func WithHandlerErrorCallback(cb func(method string, err error)) ClientOption {
-	return sdk.WithHandlerErrorCallback(cb)
+	return protocol.WithHandlerErrorCallback(cb)
 }
 
 func Ptr[T any](v T) *T {
-	return sdk.Ptr(v)
+	return protocol.Ptr(v)
 }
 
 func validateContext(ctx context.Context) error {

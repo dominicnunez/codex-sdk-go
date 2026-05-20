@@ -1,0 +1,906 @@
+package protocol_test
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"strings"
+	"testing"
+
+	codex "github.com/dominicnunez/codex-sdk-go/appserver/protocol"
+)
+
+func TestClientMethodsRejectMalformedSuccessResponses(t *testing.T) {
+	tests := []struct {
+		name            string
+		method          string
+		missingObject   interface{}
+		invalidObject   interface{}
+		invalidContains string
+		nullFieldObject interface{}
+		call            func(*codex.Client) error
+	}{
+		{
+			name:          "config read",
+			method:        "config/read",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"config": map[string]interface{}{},
+				"origins": map[string]interface{}{
+					"user": map[string]interface{}{},
+				},
+			},
+			nullFieldObject: map[string]interface{}{
+				"config":  nil,
+				"origins": map[string]interface{}{},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Config.Read(context.Background(), codex.ConfigReadParams{})
+				return err
+			},
+		},
+		{
+			name:          "config write",
+			method:        "config/value/write",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"filePath": "/tmp/config.toml",
+				"status":   "okOverridden",
+				"version":  "v1",
+				"overriddenMetadata": map[string]interface{}{
+					"message": "overridden",
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Config.Write(context.Background(), codex.ConfigValueWriteParams{
+					KeyPath:       "model",
+					MergeStrategy: codex.MergeStrategyReplace,
+					Value:         json.RawMessage(`"gpt-5"`),
+				})
+				return err
+			},
+		},
+		{
+			name:          "config batch write",
+			method:        "config/batchWrite",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"filePath": "/tmp/config.toml",
+				"status":   "okOverridden",
+				"version":  "v1",
+				"overriddenMetadata": map[string]interface{}{
+					"message": "overridden",
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Config.BatchWrite(context.Background(), codex.ConfigBatchWriteParams{
+					Edits: []codex.ConfigEdit{
+						{
+							KeyPath:       "model",
+							MergeStrategy: codex.MergeStrategyReplace,
+							Value:         json.RawMessage(`"gpt-5"`),
+						},
+					},
+				})
+				return err
+			},
+		},
+		{
+			name:          "account read",
+			method:        "account/read",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"requiresOpenaiAuth": true,
+				"account":            map[string]interface{}{},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Account.Get(context.Background(), codex.GetAccountParams{})
+				return err
+			},
+		},
+		{
+			name:          "account rate limits read",
+			method:        "account/rateLimits/read",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"rateLimits": map[string]interface{}{
+					"credits": map[string]interface{}{},
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Account.GetRateLimits(context.Background())
+				return err
+			},
+		},
+		{
+			name:          "account login cancel",
+			method:        "account/login/cancel",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"status": "bogus",
+			},
+			invalidContains: "invalid status",
+			nullFieldObject: map[string]interface{}{
+				"status": nil,
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Account.CancelLogin(context.Background(), codex.CancelLoginAccountParams{LoginId: "login-1"})
+				return err
+			},
+		},
+		{
+			name:          "feedback upload",
+			method:        "feedback/upload",
+			missingObject: map[string]interface{}{},
+			call: func(client *codex.Client) error {
+				_, err := client.Feedback.Upload(context.Background(), codex.FeedbackUploadParams{
+					Classification: "bug",
+					IncludeLogs:    true,
+				})
+				return err
+			},
+		},
+		{
+			name:          "model list",
+			method:        "model/list",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"data": []interface{}{
+					map[string]interface{}{},
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Model.List(context.Background(), codex.ModelListParams{})
+				return err
+			},
+		},
+		{
+			name:          "experimental feature list",
+			method:        "experimentalFeature/list",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"data": []interface{}{
+					map[string]interface{}{},
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Experimental.FeatureList(context.Background(), codex.ExperimentalFeatureListParams{})
+				return err
+			},
+		},
+		{
+			name:          "windows sandbox setup start",
+			method:        "windowsSandbox/setupStart",
+			missingObject: map[string]interface{}{},
+			call: func(client *codex.Client) error {
+				_, err := client.System.WindowsSandboxSetupStart(context.Background(), codex.WindowsSandboxSetupStartParams{
+					Mode: codex.WindowsSandboxSetupModeElevated,
+				})
+				return err
+			},
+		},
+		{
+			name:          "turn start",
+			method:        "turn/start",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"turn": map[string]interface{}{},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Turn.Start(context.Background(), codex.TurnStartParams{
+					ThreadID: "thread-123",
+					Input: []codex.UserInput{
+						&codex.TextUserInput{Text: "hello"},
+					},
+				})
+				return err
+			},
+		},
+		{
+			name:          "turn steer",
+			method:        "turn/steer",
+			missingObject: map[string]interface{}{},
+			call: func(client *codex.Client) error {
+				_, err := client.Turn.Steer(context.Background(), codex.TurnSteerParams{
+					ThreadID:       "thread-123",
+					ExpectedTurnID: "turn-456",
+					Input: []codex.UserInput{
+						&codex.TextUserInput{Text: "actually do this"},
+					},
+				})
+				return err
+			},
+		},
+		{
+			name:          "mcp server status list",
+			method:        "mcpServerStatus/list",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"data": []interface{}{
+					map[string]interface{}{},
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Mcp.ListServerStatus(context.Background(), codex.ListMcpServerStatusParams{})
+				return err
+			},
+		},
+		{
+			name:          "mcp oauth login",
+			method:        "mcpServer/oauth/login",
+			missingObject: map[string]interface{}{},
+			call: func(client *codex.Client) error {
+				_, err := client.Mcp.OauthLogin(context.Background(), codex.McpServerOauthLoginParams{Name: "github"})
+				return err
+			},
+		},
+		{
+			name:          "review start",
+			method:        "review/start",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"reviewThreadId": "review-thread-123",
+				"turn":           map[string]interface{}{},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Review.Start(context.Background(), codex.ReviewStartParams{
+					ThreadID: "thread-123",
+					Target: codex.ReviewTargetWrapper{
+						Value: &codex.UncommittedChangesReviewTarget{},
+					},
+				})
+				return err
+			},
+		},
+		{
+			name:          "skills list",
+			method:        "skills/list",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"data": []interface{}{
+					map[string]interface{}{},
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Skills.List(context.Background(), codex.SkillsListParams{})
+				return err
+			},
+		},
+		{
+			name:          "skills config write",
+			method:        "skills/config/write",
+			missingObject: map[string]interface{}{},
+			call: func(client *codex.Client) error {
+				_, err := client.Skills.ConfigWrite(context.Background(), codex.SkillsConfigWriteParams{
+					Path:    "/tmp/skill",
+					Enabled: true,
+				})
+				return err
+			},
+		},
+		{
+			name:          "thread list",
+			method:        "thread/list",
+			missingObject: map[string]interface{}{},
+			nullFieldObject: map[string]interface{}{
+				"data": nil,
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.List(context.Background(), codex.ThreadListParams{})
+				return err
+			},
+		},
+		{
+			name:          "thread loaded list",
+			method:        "thread/loaded/list",
+			missingObject: map[string]interface{}{},
+			nullFieldObject: map[string]interface{}{
+				"data": nil,
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.LoadedList(context.Background(), codex.ThreadLoadedListParams{})
+				return err
+			},
+		},
+		{
+			name:          "thread unsubscribe",
+			method:        "thread/unsubscribe",
+			missingObject: map[string]interface{}{},
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Unsubscribe(context.Background(), codex.ThreadUnsubscribeParams{
+					ThreadID: "thread-123",
+				})
+				return err
+			},
+		},
+		{
+			name:          "fuzzy file search",
+			method:        "fuzzyFileSearch",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"files": []interface{}{
+					map[string]interface{}{},
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.FuzzyFileSearch.Search(context.Background(), codex.FuzzyFileSearchParams{
+					Query: "main",
+					Roots: []string{"/tmp/project"},
+				})
+				return err
+			},
+		},
+		{
+			name:          "plugin list",
+			method:        "plugin/list",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"marketplaces": []interface{}{
+					map[string]interface{}{},
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Plugin.List(context.Background(), codex.PluginListParams{})
+				return err
+			},
+		},
+		{
+			name:          "plugin share save",
+			method:        "plugin/share/save",
+			missingObject: map[string]interface{}{},
+			nullFieldObject: map[string]interface{}{
+				"remotePluginId": nil,
+				"shareUrl":       "https://example.com/share/plugin-1",
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Plugin.ShareSave(context.Background(), codex.PluginShareSaveParams{PluginPath: "/tmp/plugin"})
+				return err
+			},
+		},
+		{
+			name:          "plugin share update targets",
+			method:        "plugin/share/updateTargets",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"discoverability": "PRIVATE",
+				"principals": []interface{}{
+					map[string]interface{}{},
+				},
+			},
+			invalidContains: "missing plugin.sharePrincipal.name",
+			call: func(client *codex.Client) error {
+				_, err := client.Plugin.ShareUpdateTargets(context.Background(), codex.PluginShareUpdateTargetsParams{
+					Discoverability: codex.PluginShareUpdateDiscoverabilityPrivate,
+					RemotePluginID:  "remote-1",
+					ShareTargets:    []codex.PluginShareTarget{},
+				})
+				return err
+			},
+		},
+		{
+			name:          "plugin share list",
+			method:        "plugin/share/list",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"data": []interface{}{
+					map[string]interface{}{},
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Plugin.ShareList(context.Background(), codex.PluginShareListParams{})
+				return err
+			},
+		},
+		{
+			name:          "plugin share checkout",
+			method:        "plugin/share/checkout",
+			missingObject: map[string]interface{}{},
+			nullFieldObject: map[string]interface{}{
+				"marketplaceName": "official",
+				"marketplacePath": "/plugins",
+				"pluginId":        "plugin-1",
+				"pluginName":      nil,
+				"pluginPath":      "/plugins/calendar",
+				"remotePluginId":  "remote-1",
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Plugin.ShareCheckout(context.Background(), codex.PluginShareCheckoutParams{RemotePluginID: "remote-1"})
+				return err
+			},
+		},
+		{
+			name:          "hooks list",
+			method:        "hooks/list",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"data": []interface{}{
+					map[string]interface{}{
+						"cwd":      "repo",
+						"errors":   []interface{}{},
+						"hooks":    []interface{}{map[string]interface{}{}},
+						"warnings": []interface{}{},
+					},
+				},
+			},
+			invalidContains: "missing required field",
+			call: func(client *codex.Client) error {
+				_, err := client.Hooks.List(context.Background(), codex.HooksListParams{})
+				return err
+			},
+		},
+		{
+			name:          "apps list",
+			method:        "app/list",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"data": []interface{}{
+					map[string]interface{}{
+						"id":   "app-1",
+						"name": "App One",
+						"branding": map[string]interface{}{
+							"category": "tools",
+						},
+					},
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Apps.List(context.Background(), codex.AppsListParams{})
+				return err
+			},
+		},
+		{
+			name:          "external agent config detect",
+			method:        "externalAgentConfig/detect",
+			missingObject: map[string]interface{}{},
+			invalidObject: map[string]interface{}{
+				"items": []interface{}{
+					map[string]interface{}{},
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.ExternalAgent.ConfigDetect(context.Background(), codex.ExternalAgentConfigDetectParams{})
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name+"/null result", func(t *testing.T) {
+			mock := NewMockTransport()
+			client := codex.NewClient(mock)
+			mock.SetResponse(tt.method, codex.Response{
+				JSONRPC: "2.0",
+				Result:  json.RawMessage(`null`),
+			})
+
+			err := tt.call(client)
+			if !errors.Is(err, codex.ErrEmptyResult) {
+				t.Fatalf("error = %v; want ErrEmptyResult", err)
+			}
+		})
+
+		t.Run(tt.name+"/missing required fields", func(t *testing.T) {
+			mock := NewMockTransport()
+			client := codex.NewClient(mock)
+			if err := mock.SetResponseData(tt.method, tt.missingObject); err != nil {
+				t.Fatalf("SetResponseData(%q): %v", tt.method, err)
+			}
+
+			err := tt.call(client)
+			if !errors.Is(err, codex.ErrMissingResultField) {
+				t.Fatalf("error = %v; want ErrMissingResultField", err)
+			}
+		})
+
+		if tt.invalidObject != nil {
+			t.Run(tt.name+"/invalid object", func(t *testing.T) {
+				mock := NewMockTransport()
+				client := codex.NewClient(mock)
+				if err := mock.SetResponseData(tt.method, tt.invalidObject); err != nil {
+					t.Fatalf("SetResponseData(%q): %v", tt.method, err)
+				}
+
+				err := tt.call(client)
+				if tt.invalidContains != "" {
+					if err == nil || !strings.Contains(err.Error(), tt.invalidContains) {
+						t.Fatalf("error = %v; want to contain %q", err, tt.invalidContains)
+					}
+					return
+				}
+				if !errors.Is(err, codex.ErrMissingResultField) {
+					t.Fatalf("error = %v; want ErrMissingResultField", err)
+				}
+			})
+		}
+
+		if tt.nullFieldObject != nil {
+			t.Run(tt.name+"/null required field", func(t *testing.T) {
+				mock := NewMockTransport()
+				client := codex.NewClient(mock)
+				if err := mock.SetResponseData(tt.method, tt.nullFieldObject); err != nil {
+					t.Fatalf("SetResponseData(%q): %v", tt.method, err)
+				}
+
+				err := tt.call(client)
+				if !errors.Is(err, codex.ErrNullResultField) {
+					t.Fatalf("error = %v; want ErrNullResultField", err)
+				}
+			})
+		}
+	}
+}
+
+func TestClientMethodsRejectMalformedAbsolutePathResponses(t *testing.T) {
+	tests := []struct {
+		name         string
+		method       string
+		payload      map[string]interface{}
+		call         func(*codex.Client) error
+		wantContains string
+	}{
+		{
+			name:   "thread read rejects relative cwd",
+			method: "thread/read",
+			payload: map[string]interface{}{
+				"thread": map[string]interface{}{
+					"id":            "thread-1",
+					"cliVersion":    "1.0.0",
+					"createdAt":     int64(1700000000),
+					"cwd":           "relative/path",
+					"modelProvider": "openai",
+					"preview":       "",
+					"source":        "exec",
+					"status":        map[string]interface{}{"type": "idle"},
+					"turns":         []interface{}{},
+					"updatedAt":     int64(1700000000),
+					"ephemeral":     true,
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Read(context.Background(), codex.ThreadReadParams{ThreadID: "thread-1"})
+				return err
+			},
+			wantContains: `thread.cwd: must be an absolute path`,
+		},
+		{
+			name:   "thread read rejects non-normalized thread path",
+			method: "thread/read",
+			payload: map[string]interface{}{
+				"thread": map[string]interface{}{
+					"id":            "thread-1",
+					"cliVersion":    "1.0.0",
+					"createdAt":     int64(1700000000),
+					"cwd":           "/tmp",
+					"modelProvider": "openai",
+					"path":          "/tmp/../workspace",
+					"preview":       "",
+					"source":        "exec",
+					"status":        map[string]interface{}{"type": "idle"},
+					"turns":         []interface{}{},
+					"updatedAt":     int64(1700000000),
+					"ephemeral":     true,
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Read(context.Background(), codex.ThreadReadParams{ThreadID: "thread-1"})
+				return err
+			},
+			wantContains: `thread.path: must be normalized`,
+		},
+		{
+			name:   "thread start rejects relative readable roots",
+			method: "thread/start",
+			payload: threadLifecycleResponseWithSandbox(map[string]interface{}{
+				"type": "workspaceWrite",
+				"readOnlyAccess": map[string]interface{}{
+					"type":          "restricted",
+					"readableRoots": []interface{}{"relative/root"},
+				},
+				"writableRoots": []interface{}{"/workspace"},
+			}),
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Start(context.Background(), codex.ThreadStartParams{})
+				return err
+			},
+			wantContains: `readOnlyAccess.readableRoots[0]: must be an absolute path`,
+		},
+		{
+			name:   "thread start rejects non-normalized writable roots",
+			method: "thread/start",
+			payload: threadLifecycleResponseWithSandbox(map[string]interface{}{
+				"type": "workspaceWrite",
+				"readOnlyAccess": map[string]interface{}{
+					"type":          "restricted",
+					"readableRoots": []interface{}{"/workspace"},
+				},
+				"writableRoots": []interface{}{"/tmp/../workspace"},
+			}),
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Start(context.Background(), codex.ThreadStartParams{})
+				return err
+			},
+			wantContains: `sandboxPolicy.writableRoots[0]: must be normalized`,
+		},
+		{
+			name:   "thread start rejects non-normalized response cwd",
+			method: "thread/start",
+			payload: func() map[string]interface{} {
+				payload := validProcessThreadStartResponse(validProcessThreadPayload("thread-1"))
+				payload["cwd"] = "/tmp/../workspace"
+				return payload
+			}(),
+			call: func(client *codex.Client) error {
+				_, err := client.Thread.Start(context.Background(), codex.ThreadStartParams{})
+				return err
+			},
+			wantContains: `cwd: must be normalized`,
+		},
+		{
+			name:   "plugin list rejects relative marketplace path",
+			method: "plugin/list",
+			payload: map[string]interface{}{
+				"marketplaces": []interface{}{
+					map[string]interface{}{
+						"name": "official",
+						"path": "plugins",
+						"plugins": []interface{}{
+							map[string]interface{}{
+								"authPolicy":    "ON_INSTALL",
+								"enabled":       true,
+								"id":            "plugin-1",
+								"installPolicy": "AVAILABLE",
+								"installed":     true,
+								"name":          "calendar",
+								"source":        map[string]interface{}{"path": "/plugins/calendar", "type": "local"},
+							},
+						},
+					},
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Plugin.List(context.Background(), codex.PluginListParams{})
+				return err
+			},
+			wantContains: `plugin.marketplace.path: must be an absolute path`,
+		},
+		{
+			name:   "plugin read rejects non-normalized skill path",
+			method: "plugin/read",
+			payload: map[string]interface{}{
+				"plugin": map[string]interface{}{
+					"apps":            []interface{}{},
+					"hooks":           []interface{}{},
+					"marketplaceName": "official",
+					"marketplacePath": "/plugins",
+					"mcpServers":      []interface{}{},
+					"skills": []interface{}{
+						map[string]interface{}{
+							"description": "skill desc",
+							"enabled":     true,
+							"name":        "book",
+							"path":        "/plugins/../skills/book",
+						},
+					},
+					"summary": map[string]interface{}{
+						"authPolicy":    "ON_USE",
+						"enabled":       true,
+						"id":            "plugin-1",
+						"installPolicy": "AVAILABLE",
+						"installed":     true,
+						"name":          "calendar",
+						"source":        map[string]interface{}{"path": "/plugins/calendar", "type": "local"},
+					},
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Plugin.Read(context.Background(), codex.PluginReadParams{
+					MarketplacePath: "/plugins",
+					PluginName:      "calendar",
+				})
+				return err
+			},
+			wantContains: `plugin.skill.path: must be normalized`,
+		},
+		{
+			name:   "config read rejects relative layer file path",
+			method: "config/read",
+			payload: map[string]interface{}{
+				"config": map[string]interface{}{},
+				"layers": []interface{}{
+					map[string]interface{}{
+						"name":    map[string]interface{}{"type": "user", "file": "config.toml"},
+						"version": "v1",
+						"config":  map[string]interface{}{},
+					},
+				},
+				"origins": map[string]interface{}{
+					"user": map[string]interface{}{
+						"name":    map[string]interface{}{"type": "user", "file": "/home/user/.codex/config.toml"},
+						"version": "v1",
+					},
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Config.Read(context.Background(), codex.ConfigReadParams{})
+				return err
+			},
+			wantContains: `config.layer.user.file: must be an absolute path`,
+		},
+		{
+			name:   "plugin share list rejects relative local plugin path",
+			method: "plugin/share/list",
+			payload: map[string]interface{}{
+				"data": []interface{}{
+					map[string]interface{}{
+						"localPluginPath": "plugins/calendar",
+						"plugin": map[string]interface{}{
+							"authPolicy":    "ON_USE",
+							"enabled":       true,
+							"id":            "plugin-1",
+							"installPolicy": "AVAILABLE",
+							"installed":     true,
+							"name":          "calendar",
+							"source":        map[string]interface{}{"path": "/plugins/calendar", "type": "local"},
+						},
+					},
+				},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Plugin.ShareList(context.Background(), codex.PluginShareListParams{})
+				return err
+			},
+			wantContains: `plugin.shareListItem.localPluginPath: must be an absolute path`,
+		},
+		{
+			name:   "plugin share checkout rejects relative plugin path",
+			method: "plugin/share/checkout",
+			payload: map[string]interface{}{
+				"marketplaceName": "official",
+				"marketplacePath": "/plugins",
+				"pluginId":        "plugin-1",
+				"pluginName":      "calendar",
+				"pluginPath":      "plugins/calendar",
+				"remotePluginId":  "remote-1",
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Plugin.ShareCheckout(context.Background(), codex.PluginShareCheckoutParams{RemotePluginID: "remote-1"})
+				return err
+			},
+			wantContains: `plugin.shareCheckout.pluginPath: must be an absolute path`,
+		},
+		{
+			name:   "config write rejects non-normalized file path",
+			method: "config/value/write",
+			payload: map[string]interface{}{
+				"filePath": "/tmp/../config.toml",
+				"status":   "ok",
+				"version":  "v1",
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Config.Write(context.Background(), codex.ConfigValueWriteParams{
+					KeyPath:       "model",
+					MergeStrategy: codex.MergeStrategyReplace,
+					Value:         json.RawMessage(`"gpt-5"`),
+				})
+				return err
+			},
+			wantContains: `config.write.filePath: must be normalized`,
+		},
+		{
+			name:   "fs watch rejects relative response path",
+			method: "fs/watch",
+			payload: map[string]interface{}{
+				"path": "project",
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Fs.Watch(context.Background(), codex.FsWatchParams{
+					Path:    "/tmp/project",
+					WatchID: "watch-1",
+				})
+				return err
+			},
+			wantContains: `fs.watch.path: must be an absolute path`,
+		},
+		{
+			name:   "fs watch rejects non-normalized response path",
+			method: "fs/watch",
+			payload: map[string]interface{}{
+				"path": "/tmp/../project",
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Fs.Watch(context.Background(), codex.FsWatchParams{
+					Path:    "/tmp/project",
+					WatchID: "watch-1",
+				})
+				return err
+			},
+			wantContains: `fs.watch.path: must be normalized`,
+		},
+		{
+			name:   "marketplace add rejects relative installed root",
+			method: "marketplace/add",
+			payload: map[string]interface{}{
+				"alreadyAdded":    false,
+				"installedRoot":   "marketplaces/official",
+				"marketplaceName": "official",
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Marketplace.Add(context.Background(), codex.MarketplaceAddParams{
+					Source: "https://example.com/official.git",
+				})
+				return err
+			},
+			wantContains: `marketplace.add.installedRoot: must be an absolute path`,
+		},
+		{
+			name:   "marketplace remove rejects non-normalized installed root",
+			method: "marketplace/remove",
+			payload: map[string]interface{}{
+				"installedRoot":   "/tmp/../marketplaces/official",
+				"marketplaceName": "official",
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Marketplace.Remove(context.Background(), codex.MarketplaceRemoveParams{
+					MarketplaceName: "official",
+				})
+				return err
+			},
+			wantContains: `marketplace.remove.installedRoot: must be normalized`,
+		},
+		{
+			name:   "marketplace upgrade rejects relative upgraded root",
+			method: "marketplace/upgrade",
+			payload: map[string]interface{}{
+				"errors":               []interface{}{},
+				"selectedMarketplaces": []interface{}{"official"},
+				"upgradedRoots":        []interface{}{"marketplaces/official"},
+			},
+			call: func(client *codex.Client) error {
+				_, err := client.Marketplace.Upgrade(context.Background(), codex.MarketplaceUpgradeParams{})
+				return err
+			},
+			wantContains: `marketplace.upgrade.upgradedRoots[0]: must be an absolute path`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := NewMockTransport()
+			client := codex.NewClient(mock)
+			if err := mock.SetResponseData(tt.method, tt.payload); err != nil {
+				t.Fatalf("SetResponseData(%q): %v", tt.method, err)
+			}
+
+			err := tt.call(client)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.wantContains) {
+				t.Fatalf("error = %q; want substring %q", err.Error(), tt.wantContains)
+			}
+		})
+	}
+}
+
+func TestHooksListAllowsSchemaStringCwd(t *testing.T) {
+	transport := NewMockTransport()
+	client := codex.NewClient(transport)
+	transport.SetResponse("hooks/list", codex.Response{
+		JSONRPC: "2.0",
+		Result:  json.RawMessage(`{"data":[{"cwd":"repo","errors":[],"hooks":[],"warnings":[]}]}`),
+	})
+
+	resp, err := client.Hooks.List(context.Background(), codex.HooksListParams{})
+	if err != nil {
+		t.Fatalf("Hooks.List() error = %v", err)
+	}
+	if len(resp.Data) != 1 || resp.Data[0].Cwd != "repo" {
+		t.Fatalf("data = %+v; want relative cwd preserved", resp.Data)
+	}
+}
+
+func threadLifecycleResponseWithSandbox(sandbox map[string]interface{}) map[string]interface{} {
+	payload := validProcessThreadStartResponse(validProcessThreadPayload("thread-1"))
+	payload["sandbox"] = sandbox
+	return payload
+}

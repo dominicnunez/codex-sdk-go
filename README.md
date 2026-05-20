@@ -2,12 +2,12 @@
 
 Idiomatic Go SDK for the [OpenAI Codex](https://github.com/openai/codex) JSON-RPC 2.0 protocol, app-server runtime helpers, and Codex login helpers. Stdlib only, zero external dependencies.
 
-Built against the [Codex app-server protocol schemas](specs/) — full coverage of all current request methods, 40+ notification types, and 9 server→client approval flows.
+Built against the [Codex app-server protocol schemas](appserver/protocol/schema/json/) — full coverage of all current request methods, 40+ notification types, and 9 server→client approval flows.
 
 ## Installation
 
 ```go
-import codex "github.com/dominicnunez/codex-sdk-go/sdk"
+import codex "github.com/dominicnunez/codex-sdk-go/appserver/protocol"
 ```
 
 ## Requirements
@@ -16,7 +16,7 @@ Go 1.25+
 
 ## Quick Start
 
-The `sdk/` package is protocol-only. It provides typed JSON-RPC requests,
+The `appserver/protocol/` package is protocol-only. It provides typed JSON-RPC requests,
 notifications, responses, and approval handlers over a caller-provided
 `codex.Transport`.
 
@@ -94,7 +94,7 @@ JSON-RPC 2.0 over a pluggable transport layer. The protocol is bidirectional:
 Services: `client.Thread`, `client.Turn`, `client.Account`, `client.Config`, `client.Model`, `client.Skills`, `client.Apps`, `client.Mcp`, `client.Command`, `client.Review`, `client.Feedback`, `client.ExternalAgent`, `client.Experimental`, `client.System`
 
 Runtime helpers import the protocol package instead of redefining schema-owned
-types, so `specs/` remains the source of truth for the app-server contract.
+types, so `appserver/protocol/schema/json/` remains the source of truth for the app-server contract.
 
 ## Origin
 

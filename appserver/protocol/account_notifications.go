@@ -1,0 +1,132 @@
+package protocol
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+)
+
+// AuthMode represents the authentication mode
+type AuthMode string
+
+const (
+	AuthModeAPIKey            AuthMode = "apikey"
+	AuthModeChatGPT           AuthMode = "chatgpt"
+	AuthModeChatGPTAuthTokens AuthMode = "chatgptAuthTokens"
+	AuthModeAgentIdentity     AuthMode = "agentIdentity"
+)
+
+var validAuthModes = map[AuthMode]struct{}{
+	AuthModeAPIKey:            {},
+	AuthModeChatGPT:           {},
+	AuthModeChatGPTAuthTokens: {},
+	AuthModeAgentIdentity:     {},
+}
+
+func validateOptionalAuthModeField(field string, value *AuthMode) error {
+	return validateOptionalEnumValue(field, value, validAuthModes)
+}
+
+// AccountUpdatedNotification is sent when account information changes
+type AccountUpdatedNotification struct {
+	AuthMode *AuthMode `json:"authMode,omitempty"`
+	PlanType *PlanType `json:"planType,omitempty"`
+}
+
+func (n *AccountUpdatedNotification) UnmarshalJSON(data []byte) error {
+	type wire AccountUpdatedNotification
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	if err := validateOptionalAuthModeField("account.authMode", decoded.AuthMode); err != nil {
+		return err
+	}
+	if err := validateOptionalPlanTypeField("account.planType", decoded.PlanType); err != nil {
+		return err
+	}
+	*n = AccountUpdatedNotification(decoded)
+	return nil
+}
+
+// AccountLoginCompletedNotification is sent when a login attempt completes
+type AccountLoginCompletedNotification struct {
+	Success bool    `json:"success"`
+	LoginId *string `json:"loginId,omitempty"`
+	Error   *string `json:"error,omitempty"`
+}
+
+func (n *AccountLoginCompletedNotification) UnmarshalJSON(data []byte) error {
+	type wire AccountLoginCompletedNotification
+	var decoded wire
+	required := []string{"success"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = AccountLoginCompletedNotification(decoded)
+	return nil
+}
+
+// AccountRateLimitsUpdatedNotification is sent when rate limits are updated
+type AccountRateLimitsUpdatedNotification struct {
+	RateLimits RateLimitSnapshot `json:"rateLimits"`
+}
+
+func (n *AccountRateLimitsUpdatedNotification) UnmarshalJSON(data []byte) error {
+	type wire AccountRateLimitsUpdatedNotification
+	var decoded wire
+	required := []string{"rateLimits"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = AccountRateLimitsUpdatedNotification(decoded)
+	return nil
+}
+
+// OnAccountUpdated registers a listener for account/updated notifications
+func (c *Client) OnAccountUpdated(handler func(AccountUpdatedNotification)) {
+	if handler == nil {
+		c.OnNotification(notifyAccountUpdated, nil)
+		return
+	}
+	c.OnNotification(notifyAccountUpdated, func(ctx context.Context, notif Notification) {
+		var n AccountUpdatedNotification
+		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			c.reportHandlerError(notifyAccountUpdated, fmt.Errorf("unmarshal %s: %w", notifyAccountUpdated, err))
+			return
+		}
+		handler(n)
+	})
+}
+
+// OnAccountLoginCompleted registers a listener for account/login/completed notifications
+func (c *Client) OnAccountLoginCompleted(handler func(AccountLoginCompletedNotification)) {
+	if handler == nil {
+		c.OnNotification(notifyAccountLoginCompleted, nil)
+		return
+	}
+	c.OnNotification(notifyAccountLoginCompleted, func(ctx context.Context, notif Notification) {
+		var n AccountLoginCompletedNotification
+		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			c.reportHandlerError(notifyAccountLoginCompleted, fmt.Errorf("unmarshal %s: %w", notifyAccountLoginCompleted, err))
+			return
+		}
+		handler(n)
+	})
+}
+
+// OnAccountRateLimitsUpdated registers a listener for account/rateLimits/updated notifications
+func (c *Client) OnAccountRateLimitsUpdated(handler func(AccountRateLimitsUpdatedNotification)) {
+	if handler == nil {
+		c.OnNotification(notifyAccountRateLimitsUpdated, nil)
+		return
+	}
+	c.OnNotification(notifyAccountRateLimitsUpdated, func(ctx context.Context, notif Notification) {
+		var n AccountRateLimitsUpdatedNotification
+		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			c.reportHandlerError(notifyAccountRateLimitsUpdated, fmt.Errorf("unmarshal %s: %w", notifyAccountRateLimitsUpdated, err))
+			return
+		}
+		handler(n)
+	})
+}

@@ -1,0 +1,203 @@
+package protocol
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+)
+
+// AppsListParams contains parameters for the apps/list request.
+type AppsListParams struct {
+	Cursor       *string `json:"cursor,omitempty"`
+	ForceRefetch bool    `json:"forceRefetch,omitempty"`
+	Limit        *uint32 `json:"limit,omitempty"`
+	ThreadID     *string `json:"threadId,omitempty"`
+}
+
+// AppsListResponse contains the response from apps/list.
+type AppsListResponse struct {
+	Data       []AppInfo `json:"data"`
+	NextCursor *string   `json:"nextCursor,omitempty"`
+}
+
+func (r *AppsListResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "data"); err != nil {
+		return err
+	}
+	type wire AppsListResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = AppsListResponse(decoded)
+	return nil
+}
+
+// AppInfo represents metadata for an app/connector.
+type AppInfo struct {
+	ID                  string            `json:"id"`
+	Name                string            `json:"name"`
+	Description         *string           `json:"description,omitempty"`
+	DistributionChannel *string           `json:"distributionChannel,omitempty"`
+	InstallURL          *string           `json:"installUrl,omitempty"`
+	IsAccessible        bool              `json:"isAccessible"`
+	IsEnabled           bool              `json:"isEnabled"`
+	Labels              map[string]string `json:"labels,omitempty"`
+	LogoURL             *string           `json:"logoUrl,omitempty"`
+	LogoURLDark         *string           `json:"logoUrlDark,omitempty"`
+	PluginDisplayNames  []string          `json:"pluginDisplayNames,omitempty"`
+	Branding            *AppBranding      `json:"branding,omitempty"`
+	AppMetadata         *AppMetadata      `json:"appMetadata,omitempty"`
+}
+
+func (a *AppInfo) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "id", "name"); err != nil {
+		return err
+	}
+	type wire AppInfo
+	var decoded struct {
+		wire
+		IsEnabled *bool `json:"isEnabled"`
+	}
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	appInfo := AppInfo(decoded.wire)
+	if decoded.IsEnabled == nil {
+		appInfo.IsEnabled = true
+	} else {
+		appInfo.IsEnabled = *decoded.IsEnabled
+	}
+	if appInfo.PluginDisplayNames == nil {
+		appInfo.PluginDisplayNames = []string{}
+	}
+	*a = appInfo
+	return nil
+}
+
+// AppBranding contains branding information for an app.
+type AppBranding struct {
+	IsDiscoverableApp bool    `json:"isDiscoverableApp"`
+	Category          *string `json:"category,omitempty"`
+	Developer         *string `json:"developer,omitempty"`
+	PrivacyPolicy     *string `json:"privacyPolicy,omitempty"`
+	TermsOfService    *string `json:"termsOfService,omitempty"`
+	Website           *string `json:"website,omitempty"`
+}
+
+func (b *AppBranding) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "isDiscoverableApp"); err != nil {
+		return err
+	}
+	type wire AppBranding
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*b = AppBranding(decoded)
+	return nil
+}
+
+// AppMetadata contains extended metadata for an app.
+type AppMetadata struct {
+	Categories                 *[]string        `json:"categories,omitempty"`
+	SubCategories              *[]string        `json:"subCategories,omitempty"`
+	Developer                  *string          `json:"developer,omitempty"`
+	FirstPartyRequiresInstall  *bool            `json:"firstPartyRequiresInstall,omitempty"`
+	FirstPartyType             *string          `json:"firstPartyType,omitempty"`
+	Review                     *AppReview       `json:"review,omitempty"`
+	Screenshots                *[]AppScreenshot `json:"screenshots,omitempty"`
+	SEODescription             *string          `json:"seoDescription,omitempty"`
+	ShowInComposerWhenUnlinked *bool            `json:"showInComposerWhenUnlinked,omitempty"`
+	Version                    *string          `json:"version,omitempty"`
+	VersionID                  *string          `json:"versionId,omitempty"`
+	VersionNotes               *string          `json:"versionNotes,omitempty"`
+}
+
+// AppReview contains review status information.
+type AppReview struct {
+	Status string `json:"status"`
+}
+
+func (r *AppReview) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "status"); err != nil {
+		return err
+	}
+	type wire AppReview
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = AppReview(decoded)
+	return nil
+}
+
+// AppScreenshot represents a screenshot for an app.
+type AppScreenshot struct {
+	UserPrompt string  `json:"userPrompt"`
+	FileID     *string `json:"fileId,omitempty"`
+	URL        *string `json:"url,omitempty"`
+}
+
+func (s *AppScreenshot) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "userPrompt"); err != nil {
+		return err
+	}
+	type wire AppScreenshot
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*s = AppScreenshot(decoded)
+	return nil
+}
+
+// AppListUpdatedNotification is sent when the app list changes.
+type AppListUpdatedNotification struct {
+	Data []AppInfo `json:"data"`
+}
+
+func (n *AppListUpdatedNotification) UnmarshalJSON(data []byte) error {
+	type wire AppListUpdatedNotification
+	var decoded wire
+	required := []string{"data"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*n = AppListUpdatedNotification(decoded)
+	return nil
+}
+
+// AppsService provides access to app-related operations.
+type AppsService struct {
+	client *Client
+}
+
+func newAppsService(client *Client) *AppsService {
+	return &AppsService{client: client}
+}
+
+// List retrieves the list of available apps/connectors.
+func (s *AppsService) List(ctx context.Context, params AppsListParams) (AppsListResponse, error) {
+	var resp AppsListResponse
+	if err := s.client.sendRequest(ctx, methodAppList, params, &resp); err != nil {
+		return AppsListResponse{}, err
+	}
+	return resp, nil
+}
+
+// OnAppListUpdated registers a listener for app/list/updated notifications.
+func (c *Client) OnAppListUpdated(handler func(AppListUpdatedNotification)) {
+	if handler == nil {
+		c.OnNotification(notifyAppListUpdated, nil)
+		return
+	}
+	c.OnNotification(notifyAppListUpdated, func(ctx context.Context, notif Notification) {
+		var params AppListUpdatedNotification
+		if err := json.Unmarshal(notif.Params, &params); err != nil {
+			c.reportHandlerError(notifyAppListUpdated, fmt.Errorf("unmarshal %s: %w", notifyAppListUpdated, err))
+			return
+		}
+		handler(params)
+	})
+}

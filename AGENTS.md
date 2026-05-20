@@ -2,14 +2,14 @@
 
 ## Spec Compliance
 
-**The JSON schemas in `specs/` are the source of truth for the protocol surface.**
+**The JSON schemas in `appserver/protocol/schema/json/` are the source of truth for the protocol surface.**
 
 Do NOT:
 - Rename, remove, or change signatures of public methods (they map 1:1 to Codex JSON-RPC methods)
 - Rename public types, fields, or constants that map to spec schemas
 - Change JSON-RPC method names, parameter shapes, or notification types
 - Alter approval request/response type names or structures
-- Remove or restructure `sdk/enums.go` constants
+- Remove or restructure `appserver/protocol/enums.go` constants
 
 Do:
 - Fix internal implementation (error handling, transport, retries, etc.)
@@ -17,9 +17,9 @@ Do:
 - Tighten types (e.g. `interface{}` → concrete type) as long as the public API stays compatible
 - Fix bugs in request construction, response parsing, or notification dispatch
 
-**When in doubt:** check the type against the corresponding `specs/*.json` schema before changing it.
+**When in doubt:** check the type against the corresponding `appserver/protocol/schema/json/*.json` schema before changing it.
 
-Run `go test ./sdk -run TestSpecCoverage` to verify all specs have corresponding Go types.
+Run `go test ./appserver/protocol -run TestSpecCoverage` to verify all specs have corresponding Go types.
 
 ## Architecture
 
@@ -45,7 +45,7 @@ Server→client requests for user approval (command exec, file write, etc.) flow
 - `TestSpecCoverage`: ensures every spec schema has a Go type
 
 ### Runtime Packages
-Protocol types and generated schema coverage stay in `sdk/`. Process management, stdio framing, single-turn `Run`, streamed run helpers, and conversation helpers live in `appserver/`, `appserver/transport/`, and `exec/`.
+Protocol types and generated schema coverage stay in `appserver/protocol/`. Process management, stdio framing, single-turn `Run`, streamed run helpers, and conversation helpers live in `appserver/`, `appserver/transport/`, and `exec/`.
 
 ### Login Packages
 Codex OAuth login flow lives in `login/`. Credential persistence, token claims, redaction, and `chatgptAuthTokens` payload helpers live in `login/auth/`.
