@@ -1,0 +1,65 @@
+// Package protocol contains app-server JSON-RPC method and notification names.
+package protocol
+
+const (
+	MethodInitialize  = "initialize"
+	NotifyInitialized = "initialized"
+
+	NotifyAgentMessageDelta         = "item/agentMessage/delta"
+	NotifyFileChangeOutputDelta     = "item/fileChange/outputDelta"
+	NotifyFileChangePatchUpdated    = "item/fileChange/patchUpdated"
+	NotifyPlanDelta                 = "item/plan/delta"
+	NotifyReasoningTextDelta        = "item/reasoning/textDelta"
+	NotifyReasoningSummaryTextDelta = "item/reasoning/summaryTextDelta"
+	NotifyReasoningSummaryPartAdded = "item/reasoning/summaryPartAdded"
+	NotifyItemStarted               = "item/started"
+	NotifyItemCompleted             = "item/completed"
+
+	NotifyThreadStarted           = "thread/started"
+	NotifyThreadClosed            = "thread/closed"
+	NotifyThreadArchived          = "thread/archived"
+	NotifyThreadUnarchived        = "thread/unarchived"
+	NotifyThreadNameUpdated       = "thread/name/updated"
+	NotifyThreadStatusChanged     = "thread/status/changed"
+	NotifyThreadTokenUsageUpdated = "thread/tokenUsage/updated"
+	NotifyThreadCompacted         = "thread/compacted"
+
+	NotifyTurnStarted     = "turn/started"
+	NotifyTurnCompleted   = "turn/completed"
+	NotifyTurnPlanUpdated = "turn/plan/updated"
+	NotifyTurnDiffUpdated = "turn/diff/updated"
+
+	NotifyAccountUpdated           = "account/updated"
+	NotifyAccountLoginCompleted    = "account/login/completed"
+	NotifyAccountRateLimitsUpdated = "account/rateLimits/updated"
+
+	NotifyRealtimeStarted          = "thread/realtime/started"
+	NotifyRealtimeClosed           = "thread/realtime/closed"
+	NotifyRealtimeError            = "thread/realtime/error"
+	NotifyRealtimeItemAdded        = "thread/realtime/itemAdded"
+	NotifyRealtimeOutputAudioDelta = "thread/realtime/outputAudio/delta"
+
+	NotifyWindowsSandboxSetupCompleted = "windowsSandbox/setupCompleted"
+	NotifyWindowsWorldWritableWarning  = "windows/worldWritableWarning"
+	NotifyDeprecationNotice            = "deprecationNotice"
+	NotifyError                        = "error"
+	NotifyTerminalInteraction          = "item/commandExecution/terminalInteraction"
+
+	NotifyMcpServerOauthLoginCompleted        = "mcpServer/oauthLogin/completed"
+	NotifyMcpToolCallProgress                 = "item/mcpToolCall/progress"
+	NotifyServerRequestResolved               = "serverRequest/resolved"
+	NotifyModelRerouted                       = "model/rerouted"
+	NotifyFuzzyFileSearchSessionCompleted     = "fuzzyFileSearch/sessionCompleted"
+	NotifyFuzzyFileSearchSessionUpdated       = "fuzzyFileSearch/sessionUpdated"
+	NotifyCommandExecutionOutputDelta         = "item/commandExecution/outputDelta"
+	NotifyCommandExecOutputDelta              = "command/exec/outputDelta"
+	NotifyProcessOutputDelta                  = "process/outputDelta"
+	NotifyProcessExited                       = "process/exited"
+	NotifyAppListUpdated                      = "app/list/updated"
+	NotifyConfigWarning                       = "configWarning"
+	NotifySkillsChanged                       = "skills/changed"
+	NotifyHookStarted                         = "hook/started"
+	NotifyHookCompleted                       = "hook/completed"
+	NotifyItemGuardianApprovalReviewStarted   = "item/autoApprovalReview/started"
+	NotifyItemGuardianApprovalReviewCompleted = "item/autoApprovalReview/completed"
+)

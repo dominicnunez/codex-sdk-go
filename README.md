@@ -1,6 +1,6 @@
 # codex-sdk-go
 
-Idiomatic Go SDK for the [OpenAI Codex](https://github.com/openai/codex) JSON-RPC 2.0 protocol. Stdlib only, zero external dependencies.
+Idiomatic Go SDK for the [OpenAI Codex](https://github.com/openai/codex) JSON-RPC 2.0 protocol, app-server runtime helpers, and Codex login helpers. Stdlib only, zero external dependencies.
 
 Built against the [Codex app-server protocol schemas](specs/) — full coverage of all current request methods, 40+ notification types, and 9 server→client approval flows.
 
@@ -16,11 +16,17 @@ Go 1.25+
 
 ## Quick Start
 
-This SDK is protocol-only. It provides typed JSON-RPC requests, notifications,
-responses, and approval handlers over a caller-provided `codex.Transport`.
+The `sdk/` package is protocol-only. It provides typed JSON-RPC requests,
+notifications, responses, and approval handlers over a caller-provided
+`codex.Transport`.
 
-Process management, stdio framing, WebSocket framing, and other runtime concerns
-are intentionally outside this package.
+Companion packages provide optional runtime and auth helpers:
+
+- `appserver`: starts and manages `codex app-server --listen stdio://`
+- `appserver/transport`: newline-delimited JSON-RPC stdio transport
+- `exec`: single-turn, streamed, and conversation helpers over the app-server
+- `login`: Codex OAuth login flow
+- `login/auth`: credential storage, JWT claims, redaction, and `chatgptAuthTokens` payloads
 
 ```go
 func run(ctx context.Context, transport codex.Transport) error {
@@ -87,9 +93,12 @@ JSON-RPC 2.0 over a pluggable transport layer. The protocol is bidirectional:
 
 Services: `client.Thread`, `client.Turn`, `client.Account`, `client.Config`, `client.Model`, `client.Skills`, `client.Apps`, `client.Mcp`, `client.Command`, `client.Review`, `client.Feedback`, `client.ExternalAgent`, `client.Experimental`, `client.System`
 
+Runtime helpers import the protocol package instead of redefining schema-owned
+types, so `specs/` remains the source of truth for the app-server contract.
+
 ## Origin
 
-Built from 150+ JSON schemas in the [OpenAI Codex](https://github.com/openai/codex) app-server protocol. This is an unofficial community SDK.
+Built from 150+ JSON schemas in the [OpenAI Codex](https://github.com/openai/codex) app-server protocol and selected upstream login/runtime behavior. This is an unofficial community SDK.
 
 ## Contributing
 

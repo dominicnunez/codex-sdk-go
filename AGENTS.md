@@ -44,5 +44,8 @@ Server→client requests for user approval (command exec, file write, etc.) flow
 - `SlowMockTransport`: delayed responses for timeout testing
 - `TestSpecCoverage`: ensures every spec schema has a Go type
 
-### Runner Package
-Process management, stdio framing, single-turn `Run`, streamed run helpers, and conversation helpers live in the private `github.com/dominicnunez/codex-runner-go` repository.
+### Runtime Packages
+Protocol types and generated schema coverage stay in `sdk/`. Process management, stdio framing, single-turn `Run`, streamed run helpers, and conversation helpers live in `appserver/`, `appserver/transport/`, and `exec/`.
+
+### Login Packages
+Codex OAuth login flow lives in `login/`. Credential persistence, token claims, redaction, and `chatgptAuthTokens` payload helpers live in `login/auth/`.
