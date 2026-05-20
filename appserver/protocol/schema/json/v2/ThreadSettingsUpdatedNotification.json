@@ -5,6 +5,26 @@
       "description": "A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).\n\nIMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.",
       "type": "string"
     },
+    "ActivePermissionProfile": {
+      "properties": {
+        "extends": {
+          "default": null,
+          "description": "Parent profile identifier once permissions profiles support inheritance. This is currently always `null`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "description": "Identifier from `default_permissions` or the implicit built-in default, such as `:workspace` or a user-defined `[permissions.<id>]` profile.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
     "ApprovalsReviewer": {
       "description": "Configures who approval requests are routed to for review. Examples include sandbox escapes, blocked network access, MCP approval prompts, and ARC escalations. Defaults to `user`. `auto_review` uses a carefully prompted subagent to gather relevant context and apply a risk-based decision framework before approving or denying the request. The legacy value `guardian_subagent` is accepted for compatibility.",
       "enum": [
@@ -64,25 +84,6 @@
         }
       ]
     },
-    "ByteRange": {
-      "properties": {
-        "end": {
-          "format": "uint",
-          "minimum": 0.0,
-          "type": "integer"
-        },
-        "start": {
-          "format": "uint",
-          "minimum": 0.0,
-          "type": "integer"
-        }
-      },
-      "required": [
-        "end",
-        "start"
-      ],
-      "type": "object"
-    },
     "CollaborationMode": {
       "description": "Collaboration mode for a Codex session.",
       "properties": {
@@ -98,13 +99,6 @@
         "settings"
       ],
       "type": "object"
-    },
-    "ImageDetail": {
-      "enum": [
-        "high",
-        "original"
-      ],
-      "type": "string"
     },
     "ModeKind": {
       "description": "Initial collaboration mode to use when the TUI starts.",
@@ -288,292 +282,100 @@
       ],
       "type": "object"
     },
-    "TextElement": {
+    "ThreadSettings": {
       "properties": {
-        "byteRange": {
-          "allOf": [
+        "activePermissionProfile": {
+          "anyOf": [
             {
-              "$ref": "#/definitions/ByteRange"
+              "$ref": "#/definitions/ActivePermissionProfile"
+            },
+            {
+              "type": "null"
             }
-          ],
-          "description": "Byte range in the parent `text` buffer that this element occupies."
+          ]
         },
-        "placeholder": {
-          "description": "Optional human-readable placeholder for the element, displayed in the UI.",
+        "approvalPolicy": {
+          "$ref": "#/definitions/AskForApproval"
+        },
+        "approvalsReviewer": {
+          "$ref": "#/definitions/ApprovalsReviewer"
+        },
+        "collaborationMode": {
+          "$ref": "#/definitions/CollaborationMode"
+        },
+        "cwd": {
+          "$ref": "#/definitions/AbsolutePathBuf"
+        },
+        "effort": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ReasoningEffort"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "model": {
+          "type": "string"
+        },
+        "modelProvider": {
+          "type": "string"
+        },
+        "personality": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Personality"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sandboxPolicy": {
+          "$ref": "#/definitions/SandboxPolicy"
+        },
+        "serviceTier": {
           "type": [
             "string",
             "null"
           ]
-        }
-      },
-      "required": [
-        "byteRange"
-      ],
-      "type": "object"
-    },
-    "TurnEnvironmentParams": {
-      "properties": {
-        "cwd": {
-          "$ref": "#/definitions/AbsolutePathBuf"
         },
-        "environmentId": {
-          "type": "string"
+        "summary": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ReasoningSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
+        "approvalPolicy",
+        "approvalsReviewer",
+        "collaborationMode",
         "cwd",
-        "environmentId"
+        "model",
+        "modelProvider",
+        "sandboxPolicy"
       ],
       "type": "object"
-    },
-    "UserInput": {
-      "oneOf": [
-        {
-          "properties": {
-            "text": {
-              "type": "string"
-            },
-            "text_elements": {
-              "default": [],
-              "description": "UI-defined spans within `text` used to render or persist special elements.",
-              "items": {
-                "$ref": "#/definitions/TextElement"
-              },
-              "type": "array"
-            },
-            "type": {
-              "enum": [
-                "text"
-              ],
-              "title": "TextUserInputType",
-              "type": "string"
-            }
-          },
-          "required": [
-            "text",
-            "type"
-          ],
-          "title": "TextUserInput",
-          "type": "object"
-        },
-        {
-          "properties": {
-            "detail": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/ImageDetail"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null
-            },
-            "type": {
-              "enum": [
-                "image"
-              ],
-              "title": "ImageUserInputType",
-              "type": "string"
-            },
-            "url": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "type",
-            "url"
-          ],
-          "title": "ImageUserInput",
-          "type": "object"
-        },
-        {
-          "properties": {
-            "detail": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/ImageDetail"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null
-            },
-            "path": {
-              "type": "string"
-            },
-            "type": {
-              "enum": [
-                "localImage"
-              ],
-              "title": "LocalImageUserInputType",
-              "type": "string"
-            }
-          },
-          "required": [
-            "path",
-            "type"
-          ],
-          "title": "LocalImageUserInput",
-          "type": "object"
-        },
-        {
-          "properties": {
-            "name": {
-              "type": "string"
-            },
-            "path": {
-              "type": "string"
-            },
-            "type": {
-              "enum": [
-                "skill"
-              ],
-              "title": "SkillUserInputType",
-              "type": "string"
-            }
-          },
-          "required": [
-            "name",
-            "path",
-            "type"
-          ],
-          "title": "SkillUserInput",
-          "type": "object"
-        },
-        {
-          "properties": {
-            "name": {
-              "type": "string"
-            },
-            "path": {
-              "type": "string"
-            },
-            "type": {
-              "enum": [
-                "mention"
-              ],
-              "title": "MentionUserInputType",
-              "type": "string"
-            }
-          },
-          "required": [
-            "name",
-            "path",
-            "type"
-          ],
-          "title": "MentionUserInput",
-          "type": "object"
-        }
-      ]
     }
   },
   "properties": {
-    "approvalPolicy": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/AskForApproval"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "description": "Override the approval policy for this turn and subsequent turns."
-    },
-    "approvalsReviewer": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/ApprovalsReviewer"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "description": "Override where approval requests are routed for review on this turn and subsequent turns."
-    },
-    "cwd": {
-      "description": "Override the working directory for this turn and subsequent turns.",
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "effort": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/ReasoningEffort"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "description": "Override the reasoning effort for this turn and subsequent turns."
-    },
-    "input": {
-      "items": {
-        "$ref": "#/definitions/UserInput"
-      },
-      "type": "array"
-    },
-    "model": {
-      "description": "Override the model for this turn and subsequent turns.",
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "outputSchema": {
-      "description": "Optional JSON Schema used to constrain the final assistant message for this turn."
-    },
-    "personality": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/Personality"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "description": "Override the personality for this turn and subsequent turns."
-    },
-    "sandboxPolicy": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/SandboxPolicy"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "description": "Override the sandbox policy for this turn and subsequent turns."
-    },
-    "serviceTier": {
-      "description": "Override the service tier for this turn and subsequent turns.",
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "summary": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/ReasoningSummary"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "description": "Override the reasoning summary for this turn and subsequent turns."
-    },
     "threadId": {
       "type": "string"
+    },
+    "threadSettings": {
+      "$ref": "#/definitions/ThreadSettings"
     }
   },
   "required": [
-    "input",
-    "threadId"
+    "threadId",
+    "threadSettings"
   ],
-  "title": "TurnStartParams",
+  "title": "ThreadSettingsUpdatedNotification",
   "type": "object"
 }
