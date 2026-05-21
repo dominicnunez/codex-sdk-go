@@ -11,34 +11,32 @@ type writeEnvelope struct {
 	done    chan error
 }
 
+var errZeroByteWrite = errors.New("writer returned zero bytes written without error")
+
+const stdioFrameDelimiter = '\n'
+
 // writeRawMessage writes a pre-marshaled JSON-RPC message and trailing newline.
 func (t *StdioTransport) writeRawMessage(data []byte) error {
 	// Write message then newline delimiter, handling short writes.
 	// The newline is written separately to avoid copying the entire
 	// payload just to append one byte.
+	if err := t.writeAll(data); err != nil {
+		return err
+	}
+	return t.writeAll([]byte{stdioFrameDelimiter})
+}
+
+func (t *StdioTransport) writeAll(data []byte) error {
 	for len(data) > 0 {
 		n, err := t.writer.Write(data)
 		if err != nil {
 			return NewTransportError("write message", err)
 		}
 		if n == 0 {
-			return NewTransportError("write message", errors.New("writer returned zero bytes written without error"))
+			return NewTransportError("write message", errZeroByteWrite)
 		}
 		data = data[n:]
 	}
-
-	delim := []byte{'\n'}
-	for len(delim) > 0 {
-		n, err := t.writer.Write(delim)
-		if err != nil {
-			return NewTransportError("write message", err)
-		}
-		if n == 0 {
-			return NewTransportError("write message", errors.New("writer returned zero bytes written without error"))
-		}
-		delim = delim[n:]
-	}
-
 	return nil
 }
 

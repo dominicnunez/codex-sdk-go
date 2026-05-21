@@ -31,6 +31,42 @@
     {
       "type": "unused-type",
       "file": "appserver/protocol/*.go"
+    },
+    {
+      "type": "duplicate-code",
+      "fingerprint": "883dfff94c7884f2"
+    },
+    {
+      "type": "duplicate-code",
+      "fingerprint": "4117d0e11e2ba859"
+    },
+    {
+      "type": "duplicate-code",
+      "fingerprint": "e32d24cde3e49f58"
+    },
+    {
+      "type": "duplicate-code",
+      "fingerprint": "686990667cae6d90"
+    },
+    {
+      "type": "duplicate-code",
+      "fingerprint": "98b13ab41aa96520"
+    },
+    {
+      "type": "unused-package",
+      "fingerprint": "bb9a6ec656472dfa"
+    },
+    {
+      "type": "duplicate-code",
+      "fingerprint": "50dd6513e7f558e8"
+    },
+    {
+      "type": "duplicate-code",
+      "fingerprint": "00b9252da7316484"
+    },
+    {
+      "type": "unused-package",
+      "fingerprint": "97d53b34d5b4e768"
     }
   ]
 }

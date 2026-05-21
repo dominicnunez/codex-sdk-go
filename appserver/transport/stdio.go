@@ -537,80 +537,67 @@ func (t *StdioTransport) rejectInvalidRequestIDWithMessage(idField inboundID, me
 	if parsed, ok := idField.requestID(); ok {
 		id = parsed
 	}
-	if err := t.writeMessage(Response{
-		JSONRPC: jsonrpcVersion,
-		ID:      id,
-		Error: &Error{
-			Code:    ErrCodeInvalidRequest,
-			Message: message,
-		},
-	}); err != nil {
-		t.handleWriteFailure(err)
-	}
+	t.writeErrorResponse(id, ErrCodeInvalidRequest, message)
 }
 
 func (t *StdioTransport) failPendingWithInvalidProtocolVersion(idField inboundID) {
-	t.failPendingWithError(
-		idField,
-		func(id RequestID) pendingReqResult {
-			return pendingReqResult{
-				resp: Response{
-					JSONRPC: jsonrpcVersion,
-					ID:      id,
-					Error: &Error{
-						Code:    ErrCodeInvalidRequest,
-						Message: errInvalidResponseJSONRPC,
-					},
-				},
-			}
-		},
-	)
+	t.failPendingWithError(idField, ErrCodeInvalidRequest, errInvalidResponseJSONRPC)
 }
 
 func (t *StdioTransport) failPendingWithParseError(idField inboundID, message string) {
-	t.failPendingWithError(
-		idField,
-		func(id RequestID) pendingReqResult {
-			return pendingReqResult{
-				resp: Response{
-					JSONRPC: jsonrpcVersion,
-					ID:      id,
-					Error: &Error{
-						Code:    ErrCodeParseError,
-						Message: message,
-					},
-				},
-			}
-		},
-	)
+	t.failPendingWithError(idField, ErrCodeParseError, message)
 }
 
-func (t *StdioTransport) failPendingWithError(
-	idField inboundID,
-	build func(RequestID) pendingReqResult,
-) {
+func (t *StdioTransport) failPendingWithError(idField inboundID, code int, message string) {
 	id, ok := idField.requestID()
 	if !ok {
 		return
 	}
+	t.failPendingIDWithError(id, code, message)
+}
+
+func (t *StdioTransport) failPendingIDWithError(id RequestID, code int, message string) {
 	normalizedID, err := normalizePendingRequestID(id.Value)
 	if err != nil {
 		return
 	}
+	pending, ok := t.claimPendingReq(normalizedID)
+	if ok {
+		pending.ch <- pendingErrorResult(pending.id, code, message)
+	}
+}
 
+func (t *StdioTransport) claimPendingReq(normalizedID string) (pendingReq, bool) {
 	t.mu.Lock()
+	defer t.mu.Unlock()
 	if t.closed {
-		t.mu.Unlock()
-		return
+		return pendingReq{}, false
 	}
 	pending, ok := t.pendingReqs[normalizedID]
 	if ok {
 		delete(t.pendingReqs, normalizedID)
 	}
-	t.mu.Unlock()
+	return pending, ok
+}
 
-	if ok {
-		pending.ch <- build(pending.id)
+func pendingErrorResult(id RequestID, code int, message string) pendingReqResult {
+	return pendingReqResult{resp: errorResponse(id, code, message)}
+}
+
+func errorResponse(id RequestID, code int, message string) Response {
+	return Response{
+		JSONRPC: jsonrpcVersion,
+		ID:      id,
+		Error: &Error{
+			Code:    code,
+			Message: message,
+		},
+	}
+}
+
+func (t *StdioTransport) writeErrorResponse(id RequestID, code int, message string) {
+	if err := t.writeMessage(errorResponse(id, code, message)); err != nil {
+		t.handleWriteFailure(err)
 	}
 }
 
@@ -641,16 +628,7 @@ func pendingRequestTransportError(op string, cause error) error {
 }
 
 func (t *StdioTransport) rejectRequestForOverload(req Request) {
-	if err := t.writeMessage(Response{
-		JSONRPC: jsonrpcVersion,
-		ID:      req.ID,
-		Error: &Error{
-			Code:    ErrCodeInternalError,
-			Message: "too many pending inbound requests",
-		},
-	}); err != nil {
-		t.handleWriteFailure(err)
-	}
+	t.writeErrorResponse(req.ID, ErrCodeInternalError, "too many pending inbound requests")
 }
 
 // handleResponse routes an incoming response to the pending request channel.
@@ -663,18 +641,7 @@ func (t *StdioTransport) handleResponse(resp Response) {
 	if err != nil {
 		return
 	}
-
-	t.mu.Lock()
-	if t.closed {
-		t.mu.Unlock()
-		return
-	}
-	pending, ok := t.pendingReqs[normalizedID]
-	if ok {
-		delete(t.pendingReqs, normalizedID)
-	}
-	t.mu.Unlock()
-
+	pending, ok := t.claimPendingReq(normalizedID)
 	if ok {
 		pending.ch <- pendingReqResult{resp: resp} // safe: buffer 1, only one sender claims via delete
 	}
@@ -701,34 +668,7 @@ func (t *StdioTransport) handleMalformedFrame(data []byte) {
 	if !hasID || hasMethod {
 		return
 	}
-	normalizedID, err := normalizePendingRequestID(id.Value)
-	if err != nil {
-		return
-	}
-
-	t.mu.Lock()
-	if t.closed {
-		t.mu.Unlock()
-		return
-	}
-	pending, ok := t.pendingReqs[normalizedID]
-	if ok {
-		delete(t.pendingReqs, normalizedID)
-	}
-	t.mu.Unlock()
-
-	if ok {
-		pending.ch <- pendingReqResult{
-			resp: Response{
-				JSONRPC: jsonrpcVersion,
-				ID:      pending.id,
-				Error: &Error{
-					Code:    ErrCodeParseError,
-					Message: "failed to parse server response",
-				},
-			},
-		}
-	}
+	t.failPendingIDWithError(id, ErrCodeParseError, "failed to parse server response")
 }
 
 func (t *StdioTransport) handleMalformedInboundObject() {
@@ -751,34 +691,7 @@ func (t *StdioTransport) handleMalformedResponse(data []byte) {
 	if err != nil {
 		return
 	}
-	normalizedID, err := normalizePendingRequestID(id.Value)
-	if err != nil {
-		return
-	}
-
-	t.mu.Lock()
-	if t.closed {
-		t.mu.Unlock()
-		return
-	}
-	pending, ok := t.pendingReqs[normalizedID]
-	if ok {
-		delete(t.pendingReqs, normalizedID)
-	}
-	t.mu.Unlock()
-
-	if ok {
-		pending.ch <- pendingReqResult{
-			resp: Response{
-				JSONRPC: jsonrpcVersion,
-				ID:      pending.id,
-				Error: &Error{
-					Code:    ErrCodeParseError,
-					Message: "failed to parse server response",
-				},
-			},
-		}
-	}
+	t.failPendingIDWithError(id, ErrCodeParseError, "failed to parse server response")
 }
 
 func (t *StdioTransport) handleOversizedFrame(info oversizedFrameInfo) {
@@ -786,31 +699,7 @@ func (t *StdioTransport) handleOversizedFrame(info oversizedFrameInfo) {
 		return
 	}
 
-	normalizedID, err := normalizePendingRequestID(info.id.Value)
-	if err != nil {
-		return
-	}
-
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	if t.closed {
-		return
-	}
-	pending, ok := t.pendingReqs[normalizedID]
-	if !ok {
-		return
-	}
-	delete(t.pendingReqs, normalizedID)
-	pending.ch <- pendingReqResult{
-		resp: Response{
-			JSONRPC: jsonrpcVersion,
-			ID:      pending.id,
-			Error: &Error{
-				Code:    ErrCodeParseError,
-				Message: "oversized server response frame",
-			},
-		},
-	}
+	t.failPendingIDWithError(info.id, ErrCodeParseError, "oversized server response frame")
 }
 
 func (t *StdioTransport) stopAfterReadFailure(scanErr error) {
@@ -857,33 +746,13 @@ func (t *StdioTransport) handleRequest(req Request) {
 			return
 		}
 
-		errorResp := Response{
-			JSONRPC: jsonrpcVersion,
-			ID:      req.ID,
-			Error: &Error{
-				Code:    ErrCodeMethodNotFound,
-				Message: "method not found",
-			},
-		}
-		if err := t.writeMessage(errorResp); err != nil {
-			t.handleWriteFailure(err)
-		}
+		t.writeErrorResponse(req.ID, ErrCodeMethodNotFound, "method not found")
 		return
 	}
 
 	defer func() {
 		if r := recover(); r != nil {
-			errorResp := Response{
-				JSONRPC: jsonrpcVersion,
-				ID:      req.ID,
-				Error: &Error{
-					Code:    ErrCodeInternalError,
-					Message: "internal handler error",
-				},
-			}
-			if err := t.writeMessage(errorResp); err != nil {
-				t.handleWriteFailure(err)
-			}
+			t.writeErrorResponse(req.ID, ErrCodeInternalError, "internal handler error")
 			if panicFn != nil {
 				panicFn(r)
 			}
@@ -900,17 +769,7 @@ func (t *StdioTransport) handleRequest(req Request) {
 			code = ErrCodeInvalidParams
 			msg = "invalid params"
 		}
-		errorResp := Response{
-			JSONRPC: jsonrpcVersion,
-			ID:      req.ID,
-			Error: &Error{
-				Code:    code,
-				Message: msg,
-			},
-		}
-		if err := t.writeMessage(errorResp); err != nil {
-			t.handleWriteFailure(err)
-		}
+		t.writeErrorResponse(req.ID, code, msg)
 		return
 	}
 
@@ -950,16 +809,6 @@ func (t *StdioTransport) handleInvalidRequestObject(data []byte) bool {
 		id = RequestID{Value: nil}
 	}
 
-	errorResp := Response{
-		JSONRPC: jsonrpcVersion,
-		ID:      id,
-		Error: &Error{
-			Code:    ErrCodeInvalidRequest,
-			Message: errInvalidServerRequest,
-		},
-	}
-	if err := t.writeMessage(errorResp); err != nil {
-		t.handleWriteFailure(err)
-	}
+	t.writeErrorResponse(id, ErrCodeInvalidRequest, errInvalidServerRequest)
 	return true
 }

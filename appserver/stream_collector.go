@@ -450,8 +450,8 @@ func cloneCommandExecutionItem(in *CommandExecutionThreadItem) *CommandExecution
 		cp.CommandActions = cloneCommandActions(in.CommandActions)
 	}
 	cp.AggregatedOutput = cloneStringPtr(in.AggregatedOutput)
-	cp.DurationMs = cloneInt64Ptr(in.DurationMs)
-	cp.ExitCode = cloneInt32Ptr(in.ExitCode)
+	cp.DurationMs = clonePtr(in.DurationMs)
+	cp.ExitCode = clonePtr(in.ExitCode)
 	cp.ProcessId = cloneStringPtr(in.ProcessId)
 	return &cp
 }
@@ -464,7 +464,7 @@ func cloneMcpToolCallItem(in *McpToolCallThreadItem) *McpToolCallThreadItem {
 	cp.Arguments = cloneJSONValue(in.Arguments)
 	cp.Result = cloneMcpToolCallResult(in.Result)
 	cp.Error = cloneMcpToolCallError(in.Error)
-	cp.DurationMs = cloneInt64Ptr(in.DurationMs)
+	cp.DurationMs = clonePtr(in.DurationMs)
 	return &cp
 }
 
@@ -489,28 +489,12 @@ func cloneFileChangeItem(in *FileChangeThreadItem) *FileChangeThreadItem {
 	return &cp
 }
 
-func cloneInt64Ptr(v *int64) *int64 {
-	if v == nil {
-		return nil
-	}
-	n := *v
-	return &n
-}
-
-func cloneInt32Ptr(v *int32) *int32 {
-	if v == nil {
-		return nil
-	}
-	n := *v
-	return &n
-}
-
 func cloneThreadTokenUsage(v *ThreadTokenUsage) *ThreadTokenUsage {
 	if v == nil {
 		return nil
 	}
 	cp := *v
-	cp.ModelContextWindow = cloneInt64Ptr(v.ModelContextWindow)
+	cp.ModelContextWindow = clonePtr(v.ModelContextWindow)
 	return &cp
 }
 
@@ -524,7 +508,7 @@ func cloneNormalizedStreamError(in NormalizedStreamError) NormalizedStreamError 
 
 func cloneCommandExecutionLifecycle(in CommandExecutionLifecycle, outputChunks []string) CommandExecutionLifecycle {
 	cp := in
-	cp.Status = cloneCommandExecutionStatusPtr(in.Status)
+	cp.Status = clonePtr(in.Status)
 	cp.StartedItem = cloneCommandExecutionItem(in.StartedItem)
 	cp.CompletedItem = cloneCommandExecutionItem(in.CompletedItem)
 	cp.OutputDeltas = append([]string(nil), in.OutputDeltas...)
@@ -543,7 +527,7 @@ func (c *StreamCollector) setLatestPlanTextLocked(itemID string, text string) {
 
 func cloneMcpToolCallLifecycle(in McpToolCallLifecycle) McpToolCallLifecycle {
 	cp := in
-	cp.Status = cloneMcpToolCallStatusPtr(in.Status)
+	cp.Status = clonePtr(in.Status)
 	cp.StartedItem = cloneMcpToolCallItem(in.StartedItem)
 	cp.CompletedItem = cloneMcpToolCallItem(in.CompletedItem)
 	return cp
@@ -558,34 +542,10 @@ func cloneWebSearchLifecycle(in WebSearchLifecycle) WebSearchLifecycle {
 
 func cloneFileChangeLifecycle(in FileChangeLifecycle) FileChangeLifecycle {
 	cp := in
-	cp.Status = clonePatchApplyStatusPtr(in.Status)
+	cp.Status = clonePtr(in.Status)
 	cp.StartedItem = cloneFileChangeItem(in.StartedItem)
 	cp.CompletedItem = cloneFileChangeItem(in.CompletedItem)
 	return cp
-}
-
-func cloneCommandExecutionStatusPtr(v *CommandExecutionStatus) *CommandExecutionStatus {
-	if v == nil {
-		return nil
-	}
-	cp := *v
-	return &cp
-}
-
-func cloneMcpToolCallStatusPtr(v *McpToolCallStatus) *McpToolCallStatus {
-	if v == nil {
-		return nil
-	}
-	cp := *v
-	return &cp
-}
-
-func clonePatchApplyStatusPtr(v *PatchApplyStatus) *PatchApplyStatus {
-	if v == nil {
-		return nil
-	}
-	cp := *v
-	return &cp
 }
 
 func appendBoundedHistory[T any](history []T, next T, dropped int, limit int) ([]T, int) {
