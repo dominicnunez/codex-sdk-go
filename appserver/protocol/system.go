@@ -241,13 +241,14 @@ const (
 type RemoteControlStatusChangedNotification struct {
 	EnvironmentID  *string                       `json:"environmentId,omitempty"`
 	InstallationID string                        `json:"installationId"`
+	ServerName     string                        `json:"serverName"`
 	Status         RemoteControlConnectionStatus `json:"status"`
 }
 
 func (n *RemoteControlStatusChangedNotification) UnmarshalJSON(data []byte) error {
 	type wire RemoteControlStatusChangedNotification
 	var decoded wire
-	required := []string{"installationId", "status"}
+	required := []string{"installationId", "serverName", "status"}
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}

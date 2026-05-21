@@ -213,26 +213,27 @@ type Client struct {
 	handlerErrorCallback func(method string, err error)
 
 	// Service accessors
-	Thread          *ThreadService
-	Turn            *TurnService
-	Account         *AccountService
-	Config          *ConfigService
-	Hooks           *HooksService
-	Model           *ModelService
-	ModelProvider   *ModelProviderService
-	Skills          *SkillsService
-	Apps            *AppsService
-	Marketplace     *MarketplaceService
-	Mcp             *McpService
-	Command         *CommandService
-	Review          *ReviewService
-	Feedback        *FeedbackService
-	ExternalAgent   *ExternalAgentService
-	Experimental    *ExperimentalService
-	System          *SystemService
-	Fs              *FsService
-	Plugin          *PluginService
-	FuzzyFileSearch *FuzzyFileSearchService
+	Thread            *ThreadService
+	Turn              *TurnService
+	Account           *AccountService
+	Config            *ConfigService
+	Hooks             *HooksService
+	Model             *ModelService
+	ModelProvider     *ModelProviderService
+	Skills            *SkillsService
+	Apps              *AppsService
+	Marketplace       *MarketplaceService
+	Mcp               *McpService
+	Command           *CommandService
+	Review            *ReviewService
+	Feedback          *FeedbackService
+	ExternalAgent     *ExternalAgentService
+	Experimental      *ExperimentalService
+	System            *SystemService
+	Fs                *FsService
+	Plugin            *PluginService
+	PermissionProfile *PermissionProfileService
+	FuzzyFileSearch   *FuzzyFileSearchService
 }
 
 // ClientOption configures a Client.
@@ -295,6 +296,7 @@ func NewClient(transport Transport, opts ...ClientOption) *Client {
 	c.System = newSystemService(c)
 	c.Fs = newFsService(c)
 	c.Plugin = newPluginService(c)
+	c.PermissionProfile = newPermissionProfileService(c)
 	c.FuzzyFileSearch = newFuzzyFileSearchService(c)
 	c.installThreadStateCache()
 

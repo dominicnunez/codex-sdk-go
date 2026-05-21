@@ -34,6 +34,7 @@ const (
 	notifyThreadGoalUpdated       = "thread/goal/updated"
 	notifyThreadGoalCleared       = "thread/goal/cleared"
 	notifyThreadNameUpdated       = "thread/name/updated"
+	notifyThreadSettingsUpdated   = "thread/settings/updated"
 	notifyThreadStatusChanged     = "thread/status/changed"
 	notifyThreadTokenUsageUpdated = "thread/tokenUsage/updated"
 
@@ -172,6 +173,7 @@ const (
 	methodSkillsConfigWrite                 = "skills/config/write"
 	methodHooksList                         = "hooks/list"
 	methodPluginList                        = "plugin/list"
+	methodPluginInstalled                   = "plugin/installed"
 	methodPluginRead                        = "plugin/read"
 	methodPluginInstall                     = "plugin/install"
 	methodPluginUninstall                   = "plugin/uninstall"
@@ -184,6 +186,7 @@ const (
 	methodMarketplaceAdd                    = "marketplace/add"
 	methodMarketplaceRemove                 = "marketplace/remove"
 	methodMarketplaceUpgrade                = "marketplace/upgrade"
+	methodPermissionProfileList             = "permissionProfile/list"
 	methodFsReadFile                        = "fs/readFile"
 	methodFsWriteFile                       = "fs/writeFile"
 	methodFsCreateDirectory                 = "fs/createDirectory"

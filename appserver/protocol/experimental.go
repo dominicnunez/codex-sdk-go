@@ -72,6 +72,9 @@ type ExperimentalFeatureListParams struct {
 
 	// Optional page size; defaults to a reasonable server-side value
 	Limit *uint32 `json:"limit,omitempty"`
+
+	// Optional loaded thread id used to compute thread-scoped enablement.
+	ThreadID *string `json:"threadId,omitempty"`
 }
 
 // ExperimentalFeatureListResponse contains the response from listing experimental features

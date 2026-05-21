@@ -443,8 +443,14 @@ type ConfigRequirements struct {
 	AllowedSandboxModes     *[]SandboxMode           `json:"allowedSandboxModes,omitempty"`
 	AllowedWebSearchModes   *[]WebSearchMode         `json:"allowedWebSearchModes,omitempty"`
 	AllowManagedHooksOnly   *bool                    `json:"allowManagedHooksOnly,omitempty"`
+	ComputerUse             *ComputerUseRequirements `json:"computerUse,omitempty"`
 	EnforceResidency        *ResidencyRequirement    `json:"enforceResidency,omitempty"`
 	FeatureRequirements     map[string]bool          `json:"featureRequirements,omitempty"`
+}
+
+// ComputerUseRequirements represents computer-use policy requirements.
+type ComputerUseRequirements struct {
+	AllowLockedComputerUse *bool `json:"allowLockedComputerUse,omitempty"`
 }
 
 // ConfigValueWriteParams represents parameters for config/value/write request

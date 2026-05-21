@@ -20,6 +20,7 @@ const (
 	NotifyThreadArchived          = "thread/archived"
 	NotifyThreadUnarchived        = "thread/unarchived"
 	NotifyThreadNameUpdated       = "thread/name/updated"
+	NotifyThreadSettingsUpdated   = "thread/settings/updated"
 	NotifyThreadStatusChanged     = "thread/status/changed"
 	NotifyThreadTokenUsageUpdated = "thread/tokenUsage/updated"
 	NotifyThreadCompacted         = "thread/compacted"

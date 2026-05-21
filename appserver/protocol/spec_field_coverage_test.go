@@ -472,6 +472,8 @@ func testStructFields(t *testing.T) {
 		// v2 plugin
 		{"schema/json/v2/PluginListParams.json", reflect.TypeOf(PluginListParams{})},
 		{"schema/json/v2/PluginListResponse.json", reflect.TypeOf(PluginListResponse{})},
+		{"schema/json/v2/PluginInstalledParams.json", reflect.TypeOf(PluginInstalledParams{})},
+		{"schema/json/v2/PluginInstalledResponse.json", reflect.TypeOf(PluginInstalledResponse{})},
 		{"schema/json/v2/PluginReadParams.json", reflect.TypeOf(PluginReadParams{})},
 		{"schema/json/v2/PluginReadResponse.json", reflect.TypeOf(PluginReadResponse{})},
 		{"schema/json/v2/PluginInstallParams.json", reflect.TypeOf(PluginInstallParams{})},
@@ -496,6 +498,10 @@ func testStructFields(t *testing.T) {
 		{"schema/json/v2/MarketplaceRemoveResponse.json", reflect.TypeOf(MarketplaceRemoveResponse{})},
 		{"schema/json/v2/MarketplaceUpgradeParams.json", reflect.TypeOf(MarketplaceUpgradeParams{})},
 		{"schema/json/v2/MarketplaceUpgradeResponse.json", reflect.TypeOf(MarketplaceUpgradeResponse{})},
+
+		// v2 permission profiles
+		{"schema/json/v2/PermissionProfileListParams.json", reflect.TypeOf(PermissionProfileListParams{})},
+		{"schema/json/v2/PermissionProfileListResponse.json", reflect.TypeOf(PermissionProfileListResponse{})},
 
 		// v2 skills
 		{"schema/json/v2/SkillsListParams.json", reflect.TypeOf(SkillsListParams{})},
@@ -564,6 +570,7 @@ func testStructFields(t *testing.T) {
 		{"schema/json/v2/ThreadUnarchivedNotification.json", reflect.TypeOf(ThreadUnarchivedNotification{})},
 		{"schema/json/v2/ThreadGoalUpdatedNotification.json", reflect.TypeOf(ThreadGoalUpdatedNotification{})},
 		{"schema/json/v2/ThreadGoalClearedNotification.json", reflect.TypeOf(ThreadGoalClearedNotification{})},
+		{"schema/json/v2/ThreadSettingsUpdatedNotification.json", reflect.TypeOf(ThreadSettingsUpdatedNotification{})},
 		{"schema/json/v2/ThreadNameUpdatedNotification.json", reflect.TypeOf(ThreadNameUpdatedNotification{})},
 		{"schema/json/v2/ThreadStatusChangedNotification.json", reflect.TypeOf(ThreadStatusChangedNotification{})},
 		{"schema/json/v2/ThreadTokenUsageUpdatedNotification.json", reflect.TypeOf(ThreadTokenUsageUpdatedNotification{})},
@@ -748,13 +755,17 @@ func testStructFields(t *testing.T) {
 		{"schema/json/v2/AppsListResponse.json", "AppReview", reflect.TypeOf(AppReview{})},
 		{"schema/json/v2/AppsListResponse.json", "AppScreenshot", reflect.TypeOf(AppScreenshot{})},
 		{"schema/json/v2/ConfigRequirementsReadResponse.json", "ConfigRequirements", reflect.TypeOf(ConfigRequirements{})},
+		{"schema/json/v2/ConfigRequirementsReadResponse.json", "ComputerUseRequirements", reflect.TypeOf(ComputerUseRequirements{})},
 		{"schema/json/v2/HookStartedNotification.json", "HookOutputEntry", reflect.TypeOf(HookOutputEntry{})},
 		{"schema/json/v2/HookStartedNotification.json", "HookRunSummary", reflect.TypeOf(HookRunSummary{})},
 		{"schema/json/v2/ItemStartedNotification.json", "MemoryCitation", reflect.TypeOf(MemoryCitation{})},
 		{"schema/json/v2/ItemStartedNotification.json", "MemoryCitationEntry", reflect.TypeOf(MemoryCitationEntry{})},
 		{"schema/json/v2/ItemGuardianApprovalReviewStartedNotification.json", "GuardianApprovalReview", reflect.TypeOf(GuardianApprovalReview{})},
 		{"schema/json/v2/MarketplaceUpgradeResponse.json", "MarketplaceUpgradeErrorInfo", reflect.TypeOf(MarketplaceUpgradeErrorInfo{})},
+		{"schema/json/v2/PermissionProfileListResponse.json", "PermissionProfileSummary", reflect.TypeOf(PermissionProfileSummary{})},
 		{"schema/json/v2/PluginListResponse.json", "MarketplaceLoadErrorInfo", reflect.TypeOf(MarketplaceLoadErrorInfo{})},
+		{"schema/json/v2/ThreadSettingsUpdatedNotification.json", "ActivePermissionProfile", reflect.TypeOf(ActivePermissionProfile{})},
+		{"schema/json/v2/ThreadSettingsUpdatedNotification.json", "ThreadSettings", reflect.TypeOf(ThreadSettings{})},
 		{"schema/json/v2/ThreadGoalUpdatedNotification.json", "ThreadGoal", reflect.TypeOf(ThreadGoal{})},
 		{"schema/json/v2/ThreadRealtimeOutputAudioDeltaNotification.json", "ThreadRealtimeAudioChunk", reflect.TypeOf(ThreadRealtimeAudioChunk{})},
 	}
@@ -847,6 +858,7 @@ func testEnumValues(t *testing.T) {
 			defName:  "HookEventName",
 			goValues: enumStrings(
 				HookEventNameSessionStart, HookEventNameUserPromptSubmit,
+				HookEventNameSubagentStart,
 				HookEventNamePreToolUse, HookEventNamePermissionRequest,
 				HookEventNamePostToolUse, HookEventNamePreCompact,
 				HookEventNamePostCompact, HookEventNameStop,
