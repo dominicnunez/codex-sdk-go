@@ -9,6 +9,9 @@ import (
 	"syscall"
 )
 
+// ShutdownModeNoSignal skips graceful signals on platforms without portable interrupts.
+const ShutdownModeNoSignal ShutdownMode = ShutdownModeGraceful + 1
+
 // DefaultShutdownMode returns the platform default child-process stop mode.
 func DefaultShutdownMode() ShutdownMode {
 	return ShutdownModeNoSignal

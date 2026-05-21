@@ -1,0 +1,36 @@
+{
+  "ignoreFindings": [
+    {
+      "type": "duplicate-code",
+      "file": "**/*_test.go"
+    },
+    {
+      "type": "duplicate-code",
+      "file": "appserver/aliases.go"
+    },
+    {
+      "type": "duplicate-code",
+      "file": "appserver/protocol/*.go"
+    },
+    {
+      "type": "unused-const",
+      "file": "appserver/aliases.go"
+    },
+    {
+      "type": "unused-type",
+      "file": "appserver/aliases.go"
+    },
+    {
+      "type": "unused-var",
+      "file": "appserver/aliases.go"
+    },
+    {
+      "type": "unused-const",
+      "file": "appserver/protocol/*.go"
+    },
+    {
+      "type": "unused-type",
+      "file": "appserver/protocol/*.go"
+    }
+  ]
+}

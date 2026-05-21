@@ -13,7 +13,6 @@ type ShutdownMode uint8
 const (
 	ShutdownModeUnset ShutdownMode = iota
 	ShutdownModeGraceful
-	ShutdownModeNoSignal
 )
 
 // ShutdownAttempt records the strongest stop signal sent to a child process.
