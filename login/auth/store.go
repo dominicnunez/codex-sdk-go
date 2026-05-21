@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 )
 
 const (
@@ -19,6 +20,9 @@ func SaveCredentials(path string, creds Credentials) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, credentialDirMode); err != nil {
 		return fmt.Errorf("create credential directory: %w", err)
+	}
+	if err := ensureCredentialDirMode(dir); err != nil {
+		return err
 	}
 
 	tmp, err := os.CreateTemp(dir, ".codex-auth-*.tmp")
@@ -46,6 +50,23 @@ func SaveCredentials(path string, creds Credentials) error {
 	}
 	if err := os.Chmod(path, credentialFileMode); err != nil {
 		return fmt.Errorf("chmod credential file: %w", err)
+	}
+	return nil
+}
+
+func ensureCredentialDirMode(dir string) error {
+	if err := os.Chmod(dir, credentialDirMode); err != nil {
+		return fmt.Errorf("chmod credential directory: %w", err)
+	}
+	if runtime.GOOS == "windows" {
+		return nil
+	}
+	info, err := os.Stat(dir)
+	if err != nil {
+		return fmt.Errorf("stat credential directory: %w", err)
+	}
+	if got := info.Mode().Perm(); got != credentialDirMode {
+		return fmt.Errorf("credential directory mode = %v, want %v", got, credentialDirMode)
 	}
 	return nil
 }

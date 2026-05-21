@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+const permissiveCredentialDirMode os.FileMode = 0o755
+
 func TestExtractTokenClaims(t *testing.T) {
 	token := fakeAccessToken(t, "acct_123", "plus")
 	claims, err := ExtractTokenClaims(token)
@@ -28,12 +30,7 @@ func TestExtractTokenClaims(t *testing.T) {
 
 func TestCredentialsStoragePermissions(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "nested", "credentials.json")
-	creds := Credentials{
-		AccessToken:  fakeAccessToken(t, "acct_123", "plus"),
-		RefreshToken: "refresh-secret",
-		ExpiresAt:    time.Now().UTC().Add(time.Hour),
-		AccountID:    "acct_123",
-	}
+	creds := testCredentials(t)
 	if err := SaveCredentials(path, creds); err != nil {
 		t.Fatalf("SaveCredentials() error = %v", err)
 	}
@@ -46,6 +43,13 @@ func TestCredentialsStoragePermissions(t *testing.T) {
 		if got := info.Mode().Perm(); got != credentialFileMode {
 			t.Fatalf("credential mode = %v, want %v", got, credentialFileMode)
 		}
+		dirInfo, err := os.Stat(filepath.Dir(path))
+		if err != nil {
+			t.Fatalf("stat credential directory: %v", err)
+		}
+		if got := dirInfo.Mode().Perm(); got != credentialDirMode {
+			t.Fatalf("credential directory mode = %v, want %v", got, credentialDirMode)
+		}
 	}
 	loaded, err := LoadCredentials(path)
 	if err != nil {
@@ -53,6 +57,43 @@ func TestCredentialsStoragePermissions(t *testing.T) {
 	}
 	if loaded.AccessToken != creds.AccessToken || loaded.RefreshToken != creds.RefreshToken || loaded.AccountID != creds.AccountID {
 		t.Fatalf("loaded credentials = %+v", loaded.Redacted())
+	}
+}
+
+func TestSaveCredentialsTightensExistingDirectoryPermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows permission bits are synthetic")
+	}
+
+	dir := filepath.Join(t.TempDir(), "existing")
+	if err := os.Mkdir(dir, permissiveCredentialDirMode); err != nil {
+		t.Fatalf("mkdir credential directory: %v", err)
+	}
+	if err := os.Chmod(dir, permissiveCredentialDirMode); err != nil {
+		t.Fatalf("chmod credential directory: %v", err)
+	}
+
+	path := filepath.Join(dir, "credentials.json")
+	if err := SaveCredentials(path, testCredentials(t)); err != nil {
+		t.Fatalf("SaveCredentials() error = %v", err)
+	}
+
+	info, err := os.Stat(dir)
+	if err != nil {
+		t.Fatalf("stat credential directory: %v", err)
+	}
+	if got := info.Mode().Perm(); got != credentialDirMode {
+		t.Fatalf("credential directory mode = %v, want %v", got, credentialDirMode)
+	}
+}
+
+func testCredentials(t *testing.T) Credentials {
+	t.Helper()
+	return Credentials{
+		AccessToken:  fakeAccessToken(t, "acct_123", "plus"),
+		RefreshToken: "refresh-secret",
+		ExpiresAt:    time.Now().UTC().Add(time.Hour),
+		AccountID:    "acct_123",
 	}
 }
 
