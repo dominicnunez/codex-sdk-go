@@ -318,47 +318,32 @@ func (c *StreamCollector) mergePlanDeltaLocked(p *PlanDelta) {
 func (c *StreamCollector) ingestStartedItemLocked(threadID string, turnID string, item ThreadItem) {
 	switch v := item.(type) {
 	case *CommandExecutionThreadItem:
-		key := streamLifecycleKey(threadID, turnID, v.ID)
-		lc := c.commandExecutions[key]
-		lc.ItemID = v.ID
-		lc.ThreadID = threadID
-		lc.TurnID = turnID
-		lc.Started = true
-		status := v.Status
-		lc.Status = &status
-		lc.StartedItem = cloneCommandExecutionItem(v)
-		c.commandExecutions[key] = lc
+		updateLifecycleStateLocked(c.commandExecutions, threadID, turnID, v.ID, func(_ string, lc *CommandExecutionLifecycle) {
+			setLifecycleScope(&lc.ItemID, &lc.ThreadID, &lc.TurnID, v.ID, threadID, turnID)
+			lc.Started = true
+			lc.Status = Ptr(v.Status)
+			lc.StartedItem = cloneCommandExecutionItem(v)
+		})
 	case *McpToolCallThreadItem:
-		key := streamLifecycleKey(threadID, turnID, v.ID)
-		lc := c.mcpToolCalls[key]
-		lc.ItemID = v.ID
-		lc.ThreadID = threadID
-		lc.TurnID = turnID
-		lc.Started = true
-		status := v.Status
-		lc.Status = &status
-		lc.StartedItem = cloneMcpToolCallItem(v)
-		c.mcpToolCalls[key] = lc
+		updateLifecycleStateLocked(c.mcpToolCalls, threadID, turnID, v.ID, func(_ string, lc *McpToolCallLifecycle) {
+			setLifecycleScope(&lc.ItemID, &lc.ThreadID, &lc.TurnID, v.ID, threadID, turnID)
+			lc.Started = true
+			lc.Status = Ptr(v.Status)
+			lc.StartedItem = cloneMcpToolCallItem(v)
+		})
 	case *WebSearchThreadItem:
-		key := streamLifecycleKey(threadID, turnID, v.ID)
-		lc := c.webSearches[key]
-		lc.ItemID = v.ID
-		lc.ThreadID = threadID
-		lc.TurnID = turnID
-		lc.Started = true
-		lc.StartedItem = cloneWebSearchItem(v)
-		c.webSearches[key] = lc
+		updateLifecycleStateLocked(c.webSearches, threadID, turnID, v.ID, func(_ string, lc *WebSearchLifecycle) {
+			setLifecycleScope(&lc.ItemID, &lc.ThreadID, &lc.TurnID, v.ID, threadID, turnID)
+			lc.Started = true
+			lc.StartedItem = cloneWebSearchItem(v)
+		})
 	case *FileChangeThreadItem:
-		key := streamLifecycleKey(threadID, turnID, v.ID)
-		lc := c.fileChanges[key]
-		lc.ItemID = v.ID
-		lc.ThreadID = threadID
-		lc.TurnID = turnID
-		lc.Started = true
-		status := v.Status
-		lc.Status = &status
-		lc.StartedItem = cloneFileChangeItem(v)
-		c.fileChanges[key] = lc
+		updateLifecycleStateLocked(c.fileChanges, threadID, turnID, v.ID, func(_ string, lc *FileChangeLifecycle) {
+			setLifecycleScope(&lc.ItemID, &lc.ThreadID, &lc.TurnID, v.ID, threadID, turnID)
+			lc.Started = true
+			lc.Status = Ptr(v.Status)
+			lc.StartedItem = cloneFileChangeItem(v)
+		})
 	}
 }
 
@@ -367,56 +352,55 @@ func (c *StreamCollector) ingestCompletedItemLocked(threadID string, turnID stri
 	case *PlanThreadItem:
 		c.setLatestPlanTextLocked(v.ID, v.Text)
 	case *CommandExecutionThreadItem:
-		key := streamLifecycleKey(threadID, turnID, v.ID)
-		lc := c.commandExecutions[key]
-		lc.ItemID = v.ID
-		lc.ThreadID = threadID
-		lc.TurnID = turnID
-		lc.Completed = true
-		status := v.Status
-		lc.Status = &status
-		lc.CompletedItem = cloneCommandExecutionItem(v)
-		if v.AggregatedOutput != nil {
-			lc.AggregatedOutput = *v.AggregatedOutput
-		} else if chunks := c.commandOutputChunks[key]; len(chunks) > 0 {
-			lc.AggregatedOutput = strings.Join(chunks, "")
-		}
+		key := updateLifecycleStateLocked(c.commandExecutions, threadID, turnID, v.ID, func(key string, lc *CommandExecutionLifecycle) {
+			setLifecycleScope(&lc.ItemID, &lc.ThreadID, &lc.TurnID, v.ID, threadID, turnID)
+			lc.Completed = true
+			lc.Status = Ptr(v.Status)
+			lc.CompletedItem = cloneCommandExecutionItem(v)
+			if v.AggregatedOutput != nil {
+				lc.AggregatedOutput = *v.AggregatedOutput
+			} else if chunks := c.commandOutputChunks[key]; len(chunks) > 0 {
+				lc.AggregatedOutput = strings.Join(chunks, "")
+			}
+		})
 		delete(c.commandOutputChunks, key)
 		delete(c.commandOutputDeltaBytes, key)
 		delete(c.commandOutputBytes, key)
-		c.commandExecutions[key] = lc
 	case *McpToolCallThreadItem:
-		key := streamLifecycleKey(threadID, turnID, v.ID)
-		lc := c.mcpToolCalls[key]
-		lc.ItemID = v.ID
-		lc.ThreadID = threadID
-		lc.TurnID = turnID
-		lc.Completed = true
-		status := v.Status
-		lc.Status = &status
-		lc.CompletedItem = cloneMcpToolCallItem(v)
-		c.mcpToolCalls[key] = lc
+		updateLifecycleStateLocked(c.mcpToolCalls, threadID, turnID, v.ID, func(_ string, lc *McpToolCallLifecycle) {
+			setLifecycleScope(&lc.ItemID, &lc.ThreadID, &lc.TurnID, v.ID, threadID, turnID)
+			lc.Completed = true
+			lc.Status = Ptr(v.Status)
+			lc.CompletedItem = cloneMcpToolCallItem(v)
+		})
 	case *WebSearchThreadItem:
-		key := streamLifecycleKey(threadID, turnID, v.ID)
-		lc := c.webSearches[key]
-		lc.ItemID = v.ID
-		lc.ThreadID = threadID
-		lc.TurnID = turnID
-		lc.Completed = true
-		lc.CompletedItem = cloneWebSearchItem(v)
-		c.webSearches[key] = lc
+		updateLifecycleStateLocked(c.webSearches, threadID, turnID, v.ID, func(_ string, lc *WebSearchLifecycle) {
+			setLifecycleScope(&lc.ItemID, &lc.ThreadID, &lc.TurnID, v.ID, threadID, turnID)
+			lc.Completed = true
+			lc.CompletedItem = cloneWebSearchItem(v)
+		})
 	case *FileChangeThreadItem:
-		key := streamLifecycleKey(threadID, turnID, v.ID)
-		lc := c.fileChanges[key]
-		lc.ItemID = v.ID
-		lc.ThreadID = threadID
-		lc.TurnID = turnID
-		lc.Completed = true
-		status := v.Status
-		lc.Status = &status
-		lc.CompletedItem = cloneFileChangeItem(v)
-		c.fileChanges[key] = lc
+		updateLifecycleStateLocked(c.fileChanges, threadID, turnID, v.ID, func(_ string, lc *FileChangeLifecycle) {
+			setLifecycleScope(&lc.ItemID, &lc.ThreadID, &lc.TurnID, v.ID, threadID, turnID)
+			lc.Completed = true
+			lc.Status = Ptr(v.Status)
+			lc.CompletedItem = cloneFileChangeItem(v)
+		})
 	}
+}
+
+func updateLifecycleStateLocked[T any](states map[string]T, threadID string, turnID string, itemID string, update func(string, *T)) string {
+	key := streamLifecycleKey(threadID, turnID, itemID)
+	state := states[key]
+	update(key, &state)
+	states[key] = state
+	return key
+}
+
+func setLifecycleScope(targetItemID *string, targetThreadID *string, targetTurnID *string, itemID string, threadID string, turnID string) {
+	*targetItemID = itemID
+	*targetThreadID = threadID
+	*targetTurnID = turnID
 }
 
 func streamLifecycleKey(threadID string, turnID string, itemID string) string {

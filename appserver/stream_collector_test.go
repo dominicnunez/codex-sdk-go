@@ -76,6 +76,123 @@ func TestStreamCollectorProcessLifecycleAndPlan(t *testing.T) {
 	}
 }
 
+func TestStreamCollectorTracksStartedCompletedLifecycleStates(t *testing.T) {
+	const (
+		threadID  = "thread-lifecycle"
+		turnID    = "turn-lifecycle"
+		commandID = "cmd-lifecycle"
+		mcpID     = "mcp-lifecycle"
+	)
+
+	collector := codex.NewStreamCollector()
+
+	collector.Process(&codex.ItemStarted{
+		ThreadID: threadID,
+		TurnID:   turnID,
+		Item: codex.ThreadItemWrapper{Value: &codex.CommandExecutionThreadItem{
+			ID:             commandID,
+			Command:        "pwd",
+			CommandActions: []codex.CommandActionWrapper{},
+			Cwd:            "/tmp",
+			Status:         codex.CommandExecutionStatusInProgress,
+		}},
+	}, nil)
+	collector.Process(&codex.ItemStarted{
+		ThreadID: threadID,
+		TurnID:   turnID,
+		Item: codex.ThreadItemWrapper{Value: &codex.McpToolCallThreadItem{
+			ID:     mcpID,
+			Server: "local",
+			Tool:   "lookup",
+			Status: codex.McpToolCallStatusInProgress,
+		}},
+	}, nil)
+
+	summary := collector.Summary()
+	cmd, ok := summary.CommandExecutions[commandID]
+	if !ok {
+		t.Fatalf("missing started command lifecycle: %#v", summary.CommandExecutions)
+	}
+	if !cmd.Started || cmd.Completed {
+		t.Fatalf("started command lifecycle started/completed = %v/%v, want true/false", cmd.Started, cmd.Completed)
+	}
+	if cmd.ThreadID != threadID || cmd.TurnID != turnID {
+		t.Fatalf("started command scope = %q/%q, want %q/%q", cmd.ThreadID, cmd.TurnID, threadID, turnID)
+	}
+	if cmd.Status == nil || *cmd.Status != codex.CommandExecutionStatusInProgress {
+		t.Fatalf("started command status = %v, want %v", cmd.Status, codex.CommandExecutionStatusInProgress)
+	}
+	if cmd.StartedItem == nil || cmd.StartedItem.Command != "pwd" {
+		t.Fatalf("started command item = %#v, want pwd", cmd.StartedItem)
+	}
+
+	mcp, ok := summary.McpToolCalls[mcpID]
+	if !ok {
+		t.Fatalf("missing started MCP lifecycle: %#v", summary.McpToolCalls)
+	}
+	if !mcp.Started || mcp.Completed {
+		t.Fatalf("started MCP lifecycle started/completed = %v/%v, want true/false", mcp.Started, mcp.Completed)
+	}
+	if mcp.ThreadID != threadID || mcp.TurnID != turnID {
+		t.Fatalf("started MCP scope = %q/%q, want %q/%q", mcp.ThreadID, mcp.TurnID, threadID, turnID)
+	}
+	if mcp.Status == nil || *mcp.Status != codex.McpToolCallStatusInProgress {
+		t.Fatalf("started MCP status = %v, want %v", mcp.Status, codex.McpToolCallStatusInProgress)
+	}
+	if mcp.StartedItem == nil || mcp.StartedItem.Tool != "lookup" {
+		t.Fatalf("started MCP item = %#v, want lookup", mcp.StartedItem)
+	}
+
+	collector.Process(&codex.ItemCompleted{
+		ThreadID: threadID,
+		TurnID:   turnID,
+		Item: codex.ThreadItemWrapper{Value: &codex.CommandExecutionThreadItem{
+			ID:               commandID,
+			Command:          "pwd",
+			CommandActions:   []codex.CommandActionWrapper{},
+			Cwd:              "/tmp",
+			Status:           codex.CommandExecutionStatusCompleted,
+			AggregatedOutput: ptr("/tmp\n"),
+		}},
+	}, nil)
+	collector.Process(&codex.ItemCompleted{
+		ThreadID: threadID,
+		TurnID:   turnID,
+		Item: codex.ThreadItemWrapper{Value: &codex.McpToolCallThreadItem{
+			ID:     mcpID,
+			Server: "local",
+			Tool:   "lookup",
+			Status: codex.McpToolCallStatusCompleted,
+		}},
+	}, nil)
+
+	summary = collector.Summary()
+	cmd = summary.CommandExecutions[commandID]
+	if !cmd.Started || !cmd.Completed {
+		t.Fatalf("completed command lifecycle started/completed = %v/%v, want true/true", cmd.Started, cmd.Completed)
+	}
+	if cmd.Status == nil || *cmd.Status != codex.CommandExecutionStatusCompleted {
+		t.Fatalf("completed command status = %v, want %v", cmd.Status, codex.CommandExecutionStatusCompleted)
+	}
+	if cmd.CompletedItem == nil || cmd.CompletedItem.Command != "pwd" {
+		t.Fatalf("completed command item = %#v, want pwd", cmd.CompletedItem)
+	}
+	if cmd.AggregatedOutput != "/tmp\n" {
+		t.Fatalf("completed command aggregated output = %q, want /tmp\\n", cmd.AggregatedOutput)
+	}
+
+	mcp = summary.McpToolCalls[mcpID]
+	if !mcp.Started || !mcp.Completed {
+		t.Fatalf("completed MCP lifecycle started/completed = %v/%v, want true/true", mcp.Started, mcp.Completed)
+	}
+	if mcp.Status == nil || *mcp.Status != codex.McpToolCallStatusCompleted {
+		t.Fatalf("completed MCP status = %v, want %v", mcp.Status, codex.McpToolCallStatusCompleted)
+	}
+	if mcp.CompletedItem == nil || mcp.CompletedItem.Tool != "lookup" {
+		t.Fatalf("completed MCP item = %#v, want lookup", mcp.CompletedItem)
+	}
+}
+
 func TestStreamCollectorScopesRepeatedItemIDsByThreadAndTurn(t *testing.T) {
 	collector := codex.NewStreamCollector()
 
