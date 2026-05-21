@@ -101,6 +101,20 @@ func applyTurnStartOptions(params *TurnStartParams, model *string, effort *Reaso
 	}
 }
 
+func validatePrompt(prompt string) error {
+	if prompt == "" {
+		return errors.New("prompt is required")
+	}
+	return nil
+}
+
+func validatePromptContext(ctx context.Context, prompt string) error {
+	if err := validateContext(ctx); err != nil {
+		return err
+	}
+	return validatePrompt(prompt)
+}
+
 // buildRunResult assembles a RunResult from collected items and turn data.
 func buildRunResult(thread Thread, turn Turn, items []ThreadItemWrapper) *RunResult {
 	resultThread := cloneThreadState(thread)
@@ -134,11 +148,8 @@ func turnWithItems(turn Turn, items []ThreadItemWrapper) Turn {
 // with the given prompt, collects items until the turn completes, and returns
 // the result. This is the simplest way to get a response from the Codex CLI.
 func (p *Process) Run(ctx context.Context, opts RunOptions) (*RunResult, error) {
-	if err := validateContext(ctx); err != nil {
+	if err := validatePromptContext(ctx, opts.Prompt); err != nil {
 		return nil, err
-	}
-	if opts.Prompt == "" {
-		return nil, errors.New("prompt is required")
 	}
 
 	if err := p.ensureInit(ctx); err != nil {

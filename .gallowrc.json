@@ -65,6 +65,14 @@
       "fingerprint": "00b9252da7316484"
     },
     {
+      "type": "duplicate-code",
+      "fingerprint": "09b7e04689903cc0"
+    },
+    {
+      "type": "duplicate-code",
+      "fingerprint": "8c19fa481d418d36"
+    },
+    {
       "type": "unused-package",
       "fingerprint": "97d53b34d5b4e768"
     }

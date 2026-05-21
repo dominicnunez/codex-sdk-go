@@ -248,11 +248,8 @@ func (p *Process) RunStreamedWithCollector(ctx context.Context, opts RunOptions,
 }
 
 func (p *Process) runStreamedWithCollector(ctx context.Context, opts RunOptions, collector *StreamCollector) *Stream {
-	if err := validateContext(ctx); err != nil {
+	if err := validatePromptContext(ctx, opts.Prompt); err != nil {
 		return newCollectedErrorStream(err, collector)
-	}
-	if opts.Prompt == "" {
-		return newCollectedErrorStream(errors.New("prompt is required"), collector)
 	}
 
 	g, s := newActiveStream(streamChannelBuffer)
@@ -328,24 +325,41 @@ func streamSendErr(g *guardedChan, err error) {
 	g.setTerminalError(err)
 }
 
+func decodeStreamNotification[N any](params json.RawMessage, method string, threadID string, reportErr func(string, error), threadIDOf func(N) string) (N, bool) {
+	var n N
+	if err := json.Unmarshal(params, &n); err != nil {
+		reportErr(method, fmt.Errorf("unmarshal %s: %w", method, err))
+		return n, false
+	}
+	if threadIDOf(n) != threadID {
+		return n, false
+	}
+	return n, true
+}
+
+func emitStreamEvent(g *guardedChan, onEvent func(Event), ev Event) {
+	if onEvent != nil {
+		onEvent(ev)
+	}
+	streamSendEvent(g, ev)
+}
+
+func streamListenDecoded[N any](on func(string, NotificationHandler), method string, threadID string, reportErr func(string, error), threadIDOf func(N) string, convert func(N) Event, handle func(N, Event)) {
+	on(method, func(_ context.Context, notif Notification) {
+		n, ok := decodeStreamNotification(notif.Params, method, threadID, reportErr, threadIDOf)
+		if !ok {
+			return
+		}
+		handle(n, convert(n))
+	})
+}
+
 // streamListen registers a notification listener that unmarshals the
 // notification params into N, filters by thread, converts it to an Event,
 // and sends it on g.
 func streamListen[N any](on func(string, NotificationHandler), method string, g *guardedChan, threadID string, reportErr func(string, error), onEvent func(Event), threadIDOf func(N) string, convert func(N) Event) {
-	on(method, func(_ context.Context, notif Notification) {
-		var n N
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
-			reportErr(method, fmt.Errorf("unmarshal %s: %w", method, err))
-			return
-		}
-		if threadIDOf(n) != threadID {
-			return
-		}
-		ev := convert(n)
-		if onEvent != nil {
-			onEvent(ev)
-		}
-		streamSendEvent(g, ev)
+	streamListenDecoded(on, method, threadID, reportErr, threadIDOf, convert, func(_ N, ev Event) {
+		emitStreamEvent(g, onEvent, ev)
 	})
 }
 

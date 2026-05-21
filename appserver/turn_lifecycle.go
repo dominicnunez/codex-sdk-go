@@ -661,22 +661,9 @@ func registerStreamDeltaListeners(p turnLifecycleParams, g *guardedChan, on func
 }
 
 func streamListenTurnScoped[N any](on func(string, NotificationHandler), method string, g *guardedChan, threadID string, reportErr func(string, error), onEvent func(Event), dispatchTurnScoped func(string, func()), threadIDOf func(N) string, turnIDOf func(N) string, convert func(N) Event) {
-	on(method, func(_ context.Context, notif Notification) {
-		var n N
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
-			reportErr(method, fmt.Errorf("unmarshal %s: %w", method, err))
-			return
-		}
-		if threadIDOf(n) != threadID {
-			return
-		}
-
-		ev := convert(n)
+	streamListenDecoded(on, method, threadID, reportErr, threadIDOf, convert, func(n N, ev Event) {
 		dispatchTurnScoped(turnIDOf(n), func() {
-			if onEvent != nil {
-				onEvent(ev)
-			}
-			streamSendEvent(g, ev)
+			emitStreamEvent(g, onEvent, ev)
 		})
 	})
 }

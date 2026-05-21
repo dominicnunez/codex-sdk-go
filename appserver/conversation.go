@@ -229,6 +229,8 @@ func cloneThreadItemWrapper(w ThreadItemWrapper) ThreadItemWrapper {
 	if w.Value == nil {
 		return w
 	}
+	// Keep these cases explicit: each schema variant has different pointer,
+	// slice, raw JSON, or nested-union fields that need deep-copy isolation.
 	switch v := w.Value.(type) {
 	case *UserMessageThreadItem:
 		cp := *v
@@ -490,6 +492,7 @@ func cloneDynamicToolCallOutputContentItems(in []DynamicToolCallOutputContentIte
 	return cloneSlice(in, cloneDynamicToolCallOutputContentItemWrapper)
 }
 
+// Keep this union clone explicit for schema-specific deep-copy isolation.
 func cloneDynamicToolCallOutputContentItemWrapper(w DynamicToolCallOutputContentItemWrapper) DynamicToolCallOutputContentItemWrapper {
 	switch v := w.Value.(type) {
 	case *InputTextDynamicToolCallOutputContentItem:
@@ -520,6 +523,7 @@ func cloneCollabAgentStates(in map[string]CollabAgentState) map[string]CollabAge
 	return out
 }
 
+// Keep this union clone explicit for schema-specific deep-copy isolation.
 func cloneWebSearchActionWrapper(w WebSearchActionWrapper) WebSearchActionWrapper {
 	switch v := w.Value.(type) {
 	case *SearchWebSearchAction:
@@ -729,15 +733,24 @@ func (c *Conversation) buildTurnParams(opts TurnOptions) TurnStartParams {
 	return params
 }
 
+func (c *Conversation) buildTurnLifecycleParams(opts TurnOptions, thread Thread, allowMissingInitialTurnID bool) turnLifecycleParams {
+	return turnLifecycleParams{
+		client:                    c.process.Client,
+		turnParams:                c.buildTurnParams(opts),
+		thread:                    thread,
+		threadID:                  c.threadID,
+		allowMissingInitialTurnID: allowMissingInitialTurnID,
+		onStart:                   c.state.markTurnStarted,
+		onComplete:                c.applyCompletedThread,
+	}
+}
+
 // Turn executes a blocking turn on the existing thread, like Run() but multi-turn.
 // Concurrent calls to Turn or TurnStreamed on the same Conversation are not
 // supported and return an error.
 func (c *Conversation) Turn(ctx context.Context, opts TurnOptions) (*RunResult, error) {
-	if err := validateContext(ctx); err != nil {
+	if err := validatePromptContext(ctx, opts.Prompt); err != nil {
 		return nil, err
-	}
-	if opts.Prompt == "" {
-		return nil, errors.New("prompt is required")
 	}
 	if err := c.ensureInitialized(); err != nil {
 		return nil, err
@@ -758,15 +771,7 @@ func (c *Conversation) Turn(ctx context.Context, opts TurnOptions) (*RunResult, 
 		c.state.finishTurn()
 	}()
 
-	return executeTurn(ctx, turnLifecycleParams{
-		client:                    c.process.Client,
-		turnParams:                c.buildTurnParams(opts),
-		thread:                    thread,
-		threadID:                  c.threadID,
-		allowMissingInitialTurnID: allowMissingInitialTurnID,
-		onStart:                   c.state.markTurnStarted,
-		onComplete:                c.applyCompletedThread,
-	})
+	return executeTurn(ctx, c.buildTurnLifecycleParams(opts, thread, allowMissingInitialTurnID))
 }
 
 // TurnStreamed executes a streaming turn on the existing thread.
@@ -791,8 +796,8 @@ func (c *Conversation) turnStreamedLifecycle(ctx context.Context, opts TurnOptio
 	defer g.closeOnce()
 	defer close(s.done)
 
-	if opts.Prompt == "" {
-		streamSendErr(g, errors.New("prompt is required"))
+	if err := validatePrompt(opts.Prompt); err != nil {
+		streamSendErr(g, err)
 		return
 	}
 
@@ -811,13 +816,5 @@ func (c *Conversation) turnStreamedLifecycle(ctx context.Context, opts TurnOptio
 		c.state.finishTurn()
 	}()
 
-	executeStreamedTurn(ctx, turnLifecycleParams{
-		client:                    c.process.Client,
-		turnParams:                c.buildTurnParams(opts),
-		thread:                    thread,
-		threadID:                  c.threadID,
-		allowMissingInitialTurnID: allowMissingInitialTurnID,
-		onStart:                   c.state.markTurnStarted,
-		onComplete:                c.applyCompletedThread,
-	}, g, s)
+	executeStreamedTurn(ctx, c.buildTurnLifecycleParams(opts, thread, allowMissingInitialTurnID), g, s)
 }
