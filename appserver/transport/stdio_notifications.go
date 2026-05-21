@@ -38,38 +38,24 @@ func (t *StdioTransport) wakeTurnScopedNotificationWorkers() {
 }
 
 func (t *StdioTransport) notificationWorker() {
-	for {
-		notif, ok := recvWhileRunning(t.ctx, t.notifQueue)
-		if !ok {
-			return
-		}
-		t.handleNotification(notif)
-	}
+	t.handleNotificationQueue(t.notifQueue)
 }
 
 func (t *StdioTransport) streamingNotificationWorker() {
-	for {
-		notif, ok := recvWhileRunning(t.ctx, t.streamingNotifQueue)
-		if !ok {
-			return
-		}
-		t.handleNotification(notif)
-	}
+	t.handleNotificationQueue(t.streamingNotifQueue)
 }
 
 func (t *StdioTransport) protectedNotificationWorker() {
-	for {
-		notif, ok := recvWhileRunning(t.ctx, t.protectedNotifQueue)
-		if !ok {
-			return
-		}
-		t.handleNotification(notif)
-	}
+	t.handleNotificationQueue(t.protectedNotifQueue)
 }
 
 func (t *StdioTransport) criticalNotificationWorker() {
+	t.handleNotificationQueue(t.criticalNotifQueue)
+}
+
+func (t *StdioTransport) handleNotificationQueue(queue <-chan Notification) {
 	for {
-		notif, ok := recvWhileRunning(t.ctx, t.criticalNotifQueue)
+		notif, ok := recvWhileRunning(t.ctx, queue)
 		if !ok {
 			return
 		}

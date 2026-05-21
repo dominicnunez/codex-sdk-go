@@ -483,11 +483,7 @@ func consumeRequestIDValue(data []byte, start int) (RequestID, int, bool) {
 		if !ok {
 			return RequestID{}, start, false
 		}
-		var id RequestID
-		if err := json.Unmarshal(data[start:end], &id); err != nil {
-			return RequestID{}, start, false
-		}
-		return id, end, true
+		return consumeRequestIDBytes(data, start, end)
 	case '{', '[':
 		return RequestID{}, start, false
 	default:
@@ -495,12 +491,16 @@ func consumeRequestIDValue(data []byte, start int) (RequestID, int, bool) {
 		if !ok {
 			return RequestID{}, start, false
 		}
-		var id RequestID
-		if err := json.Unmarshal(data[start:end], &id); err != nil {
-			return RequestID{}, start, false
-		}
-		return id, end, true
+		return consumeRequestIDBytes(data, start, end)
 	}
+}
+
+func consumeRequestIDBytes(data []byte, start int, end int) (RequestID, int, bool) {
+	var id RequestID
+	if err := json.Unmarshal(data[start:end], &id); err != nil {
+		return RequestID{}, start, false
+	}
+	return id, end, true
 }
 
 func consumeJSONValue(data []byte, start int) (int, bool) {
