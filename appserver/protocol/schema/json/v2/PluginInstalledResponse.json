@@ -5,51 +5,31 @@
       "description": "A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).\n\nIMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.",
       "type": "string"
     },
-    "AppSummary": {
-      "description": "EXPERIMENTAL - app metadata summary for plugin responses.",
+    "MarketplaceInterface": {
       "properties": {
-        "description": {
+        "displayName": {
           "type": [
             "string",
             "null"
           ]
+        }
+      },
+      "type": "object"
+    },
+    "MarketplaceLoadErrorInfo": {
+      "properties": {
+        "marketplacePath": {
+          "$ref": "#/definitions/AbsolutePathBuf"
         },
-        "id": {
+        "message": {
           "type": "string"
-        },
-        "installUrl": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "name": {
-          "type": "string"
-        },
-        "needsAuth": {
-          "type": "boolean"
         }
       },
       "required": [
-        "id",
-        "name",
-        "needsAuth"
+        "marketplacePath",
+        "message"
       ],
       "type": "object"
-    },
-    "HookEventName": {
-      "enum": [
-        "preToolUse",
-        "permissionRequest",
-        "postToolUse",
-        "preCompact",
-        "postCompact",
-        "sessionStart",
-        "userPromptSubmit",
-        "subagentStart",
-        "stop"
-      ],
-      "type": "string"
     },
     "PluginAuthPolicy": {
       "enum": [
@@ -74,80 +54,6 @@
           "type": "string"
         }
       ]
-    },
-    "PluginDetail": {
-      "properties": {
-        "apps": {
-          "items": {
-            "$ref": "#/definitions/AppSummary"
-          },
-          "type": "array"
-        },
-        "description": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "hooks": {
-          "items": {
-            "$ref": "#/definitions/PluginHookSummary"
-          },
-          "type": "array"
-        },
-        "marketplaceName": {
-          "type": "string"
-        },
-        "marketplacePath": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/AbsolutePathBuf"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "mcpServers": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "skills": {
-          "items": {
-            "$ref": "#/definitions/SkillSummary"
-          },
-          "type": "array"
-        },
-        "summary": {
-          "$ref": "#/definitions/PluginSummary"
-        }
-      },
-      "required": [
-        "apps",
-        "hooks",
-        "marketplaceName",
-        "mcpServers",
-        "skills",
-        "summary"
-      ],
-      "type": "object"
-    },
-    "PluginHookSummary": {
-      "properties": {
-        "eventName": {
-          "$ref": "#/definitions/HookEventName"
-        },
-        "key": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "eventName",
-        "key"
-      ],
-      "type": "object"
     },
     "PluginInstallPolicy": {
       "enum": [
@@ -284,6 +190,45 @@
         "capabilities",
         "screenshotUrls",
         "screenshots"
+      ],
+      "type": "object"
+    },
+    "PluginMarketplaceEntry": {
+      "properties": {
+        "interface": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/MarketplaceInterface"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AbsolutePathBuf"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Local marketplace file path when the marketplace is backed by a local file. Remote-only catalog marketplaces do not have a local path."
+        },
+        "plugins": {
+          "items": {
+            "$ref": "#/definitions/PluginSummary"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "plugins"
       ],
       "type": "object"
     },
@@ -555,110 +500,26 @@
         "source"
       ],
       "type": "object"
-    },
-    "SkillInterface": {
-      "properties": {
-        "brandColor": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "defaultPrompt": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "displayName": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "iconLarge": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/AbsolutePathBuf"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "iconSmall": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/AbsolutePathBuf"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "shortDescription": {
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      },
-      "type": "object"
-    },
-    "SkillSummary": {
-      "properties": {
-        "description": {
-          "type": "string"
-        },
-        "enabled": {
-          "type": "boolean"
-        },
-        "interface": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/SkillInterface"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "name": {
-          "type": "string"
-        },
-        "path": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/AbsolutePathBuf"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "shortDescription": {
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "description",
-        "enabled",
-        "name"
-      ],
-      "type": "object"
     }
   },
   "properties": {
-    "plugin": {
-      "$ref": "#/definitions/PluginDetail"
+    "marketplaceLoadErrors": {
+      "default": [],
+      "items": {
+        "$ref": "#/definitions/MarketplaceLoadErrorInfo"
+      },
+      "type": "array"
+    },
+    "marketplaces": {
+      "items": {
+        "$ref": "#/definitions/PluginMarketplaceEntry"
+      },
+      "type": "array"
     }
   },
   "required": [
-    "plugin"
+    "marketplaces"
   ],
-  "title": "PluginReadResponse",
+  "title": "PluginInstalledResponse",
   "type": "object"
 }

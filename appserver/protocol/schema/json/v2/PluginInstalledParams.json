@@ -4,20 +4,11 @@
     "AbsolutePathBuf": {
       "description": "A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).\n\nIMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.",
       "type": "string"
-    },
-    "PluginListMarketplaceKind": {
-      "enum": [
-        "local",
-        "vertical",
-        "workspace-directory",
-        "shared-with-me"
-      ],
-      "type": "string"
     }
   },
   "properties": {
     "cwds": {
-      "description": "Optional working directories used to discover repo marketplaces. When omitted, only home-scoped marketplaces and the official curated marketplace are considered.",
+      "description": "Optional working directories used to discover repo marketplaces.",
       "items": {
         "$ref": "#/definitions/AbsolutePathBuf"
       },
@@ -26,10 +17,10 @@
         "null"
       ]
     },
-    "marketplaceKinds": {
-      "description": "Optional marketplace kind filter. When omitted, only local marketplaces are queried, plus the default remote catalog when enabled by feature flag.",
+    "installSuggestionPluginNames": {
+      "description": "Additional uninstalled plugin names that should be returned when present locally. This is used by mention surfaces that intentionally expose install entrypoints.",
       "items": {
-        "$ref": "#/definitions/PluginListMarketplaceKind"
+        "type": "string"
       },
       "type": [
         "array",
@@ -37,6 +28,6 @@
       ]
     }
   },
-  "title": "PluginListParams",
+  "title": "PluginInstalledParams",
   "type": "object"
 }

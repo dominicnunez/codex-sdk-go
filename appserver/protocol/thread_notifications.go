@@ -328,6 +328,22 @@ func (c *Client) OnThreadNameUpdated(handler func(ThreadNameUpdatedNotification)
 	})
 }
 
+// OnThreadSettingsUpdated registers a listener for thread/settings/updated notifications.
+func (c *Client) OnThreadSettingsUpdated(handler func(ThreadSettingsUpdatedNotification)) {
+	if handler == nil {
+		c.OnNotification(notifyThreadSettingsUpdated, nil)
+		return
+	}
+	c.OnNotification(notifyThreadSettingsUpdated, func(ctx context.Context, notif Notification) {
+		var notification ThreadSettingsUpdatedNotification
+		if err := json.Unmarshal(notif.Params, &notification); err != nil {
+			c.reportHandlerError(notifyThreadSettingsUpdated, fmt.Errorf("unmarshal %s: %w", notifyThreadSettingsUpdated, err))
+			return
+		}
+		handler(notification)
+	})
+}
+
 // OnThreadStatusChanged registers a listener for thread/status/changed notifications
 func (c *Client) OnThreadStatusChanged(handler func(ThreadStatusChangedNotification)) {
 	if handler == nil {

@@ -12,6 +12,7 @@ type HookEventName string
 const (
 	HookEventNameSessionStart      HookEventName = "sessionStart"
 	HookEventNameUserPromptSubmit  HookEventName = "userPromptSubmit"
+	HookEventNameSubagentStart     HookEventName = "subagentStart"
 	HookEventNamePreToolUse        HookEventName = "preToolUse"
 	HookEventNamePermissionRequest HookEventName = "permissionRequest"
 	HookEventNamePostToolUse       HookEventName = "postToolUse"
@@ -23,6 +24,7 @@ const (
 var validHookEventNames = map[HookEventName]struct{}{
 	HookEventNameSessionStart:      {},
 	HookEventNameUserPromptSubmit:  {},
+	HookEventNameSubagentStart:     {},
 	HookEventNamePreToolUse:        {},
 	HookEventNamePermissionRequest: {},
 	HookEventNamePostToolUse:       {},

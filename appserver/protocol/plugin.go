@@ -346,12 +346,24 @@ type PluginListParams struct {
 	MarketplaceKinds []PluginListMarketplaceKind `json:"marketplaceKinds,omitempty"`
 }
 
+// PluginInstalledParams lists installed plugins across marketplaces.
+type PluginInstalledParams struct {
+	Cwds                         []string `json:"cwds,omitempty"`
+	InstallSuggestionPluginNames []string `json:"installSuggestionPluginNames,omitempty"`
+}
+
 // PluginListResponse contains marketplace plugin listings.
 type PluginListResponse struct {
 	FeaturedPluginIDs     []string                   `json:"featuredPluginIds,omitempty"`
 	MarketplaceLoadErrors []MarketplaceLoadErrorInfo `json:"marketplaceLoadErrors,omitempty"`
 	Marketplaces          []PluginMarketplaceEntry   `json:"marketplaces"`
 	RemoteSyncError       *string                    `json:"remoteSyncError,omitempty"`
+}
+
+// PluginInstalledResponse contains installed plugin listings.
+type PluginInstalledResponse struct {
+	MarketplaceLoadErrors []MarketplaceLoadErrorInfo `json:"marketplaceLoadErrors,omitempty"`
+	Marketplaces          []PluginMarketplaceEntry   `json:"marketplaces"`
 }
 
 // MarketplaceLoadErrorInfo describes a marketplace loading failure.
@@ -370,6 +382,19 @@ func (r *PluginListResponse) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*r = PluginListResponse(decoded)
+	return nil
+}
+
+func (r *PluginInstalledResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "marketplaces"); err != nil {
+		return err
+	}
+	type wire PluginInstalledResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = PluginInstalledResponse(decoded)
 	return nil
 }
 
@@ -610,6 +635,15 @@ func (s *PluginService) List(ctx context.Context, params PluginListParams) (Plug
 	var resp PluginListResponse
 	if err := s.client.sendRequest(ctx, methodPluginList, params, &resp); err != nil {
 		return PluginListResponse{}, err
+	}
+	return resp, nil
+}
+
+// Installed lists installed plugins across marketplaces.
+func (s *PluginService) Installed(ctx context.Context, params PluginInstalledParams) (PluginInstalledResponse, error) {
+	var resp PluginInstalledResponse
+	if err := s.client.sendRequest(ctx, methodPluginInstalled, params, &resp); err != nil {
+		return PluginInstalledResponse{}, err
 	}
 	return resp, nil
 }

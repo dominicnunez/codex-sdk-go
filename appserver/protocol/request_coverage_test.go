@@ -199,6 +199,9 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 	verified["plugin/list"] = verifyMethod(t, transport, "plugin/list", func() {
 		_, _ = client.Plugin.List(context.Background(), codex.PluginListParams{})
 	})
+	verified["plugin/installed"] = verifyMethod(t, transport, "plugin/installed", func() {
+		_, _ = client.Plugin.Installed(context.Background(), codex.PluginInstalledParams{})
+	})
 	verified["plugin/read"] = verifyMethod(t, transport, "plugin/read", func() {
 		_, _ = client.Plugin.Read(context.Background(), codex.PluginReadParams{MarketplacePath: "/tmp/market", PluginName: "plugin"})
 	})
@@ -240,6 +243,11 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 	})
 	verified["marketplace/upgrade"] = verifyMethod(t, transport, "marketplace/upgrade", func() {
 		_, _ = client.Marketplace.Upgrade(context.Background(), codex.MarketplaceUpgradeParams{})
+	})
+
+	// Verify Permission Profile service
+	verified["permissionProfile/list"] = verifyMethod(t, transport, "permissionProfile/list", func() {
+		_, _ = client.PermissionProfile.List(context.Background(), codex.PermissionProfileListParams{})
 	})
 
 	// Verify Skills service

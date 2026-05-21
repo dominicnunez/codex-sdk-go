@@ -665,6 +665,15 @@ func (p PluginListParams) prepareRequest() (interface{}, error) {
 	return p, nil
 }
 
+func (p PluginInstalledParams) prepareRequest() (interface{}, error) {
+	var err error
+	p.Cwds, err = normalizeAbsolutePathSliceField("cwds", p.Cwds)
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
 func (p PluginReadParams) prepareRequest() (interface{}, error) {
 	if p.MarketplacePath != "" {
 		var err error
