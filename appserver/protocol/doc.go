@@ -4,6 +4,11 @@
 // handler callbacks over a caller-provided Transport. The public protocol
 // types map to the Codex protocol schemas.
 //
+// Credential-bearing protocol types redact secrets in fmt output and JSON debug
+// representations, but raw JSON-RPC data is wire data. Do not log Request.Params,
+// Response.Result, Notification.Params, mock captured messages, or transport
+// frames unless they have been explicitly sanitized.
+//
 // Basic usage with an existing transport:
 //
 //	client := protocol.NewClient(transport)

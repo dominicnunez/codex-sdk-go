@@ -142,13 +142,14 @@ Use `login` and `login/auth` to obtain ChatGPT/Codex subscription-backed tokens 
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	codex "github.com/dominicnunez/codex-sdk-go/appserver/protocol"
 	"github.com/dominicnunez/codex-sdk-go/login"
 	"github.com/dominicnunez/codex-sdk-go/login/auth"
 )
 
-func loginWithAuthTokens(ctx context.Context, client *codex.Client) error {
+func loginWithAuthTokens(ctx context.Context, client *codex.Client, credentialPath string) error {
 	creds, err := login.Login(ctx, login.LoginOptions{
 		Config: login.Config{Originator: "my-codex-client"},
 		OnAuthURL: func(ctx context.Context, authURL string) error {
@@ -165,13 +166,46 @@ func loginWithAuthTokens(ctx context.Context, client *codex.Client) error {
 	if err != nil {
 		return err
 	}
+	if err := auth.SaveCredentials(credentialPath, creds); err != nil {
+		return err
+	}
 
+	var credsMu sync.Mutex
+	client.SetApprovalHandlers(codex.ApprovalHandlers{
+		OnChatgptAuthTokensRefresh: func(ctx context.Context, params codex.ChatgptAuthTokensRefreshParams) (codex.ChatgptAuthTokensRefreshResponse, error) {
+			credsMu.Lock()
+			defer credsMu.Unlock()
+
+			refreshed, err := login.Refresh(ctx, login.Config{Originator: "my-codex-client"}, creds.RefreshToken)
+			if err != nil {
+				return codex.ChatgptAuthTokensRefreshResponse{}, err
+			}
+			if err := auth.SaveCredentials(credentialPath, refreshed); err != nil {
+				return codex.ChatgptAuthTokensRefreshResponse{}, err
+			}
+			creds = refreshed
+
+			payload, err := auth.NewAuthTokensRefreshResponse(refreshed)
+			if err != nil {
+				return codex.ChatgptAuthTokensRefreshResponse{}, err
+			}
+			return codex.ChatgptAuthTokensRefreshResponse{
+				AccessToken:      payload.AccessToken,
+				ChatgptAccountID: payload.ChatGPTAccountID,
+				ChatgptPlanType:  payload.ChatGPTPlanType,
+			}, nil
+		},
+	})
+
+	credsMu.Lock()
 	payload, err := auth.NewAuthTokensLoginParams(creds)
+	credsMu.Unlock()
 	if err != nil {
 		return err
 	}
 
 	_, err = client.Account.Login(ctx, &codex.ChatgptAuthTokensLoginAccountParams{
+		Type:             payload.Type,
 		AccessToken:      payload.AccessToken,
 		ChatgptAccountId: payload.ChatGPTAccountID,
 		ChatgptPlanType:  payload.ChatGPTPlanType,
