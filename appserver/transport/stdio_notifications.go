@@ -116,27 +116,17 @@ func (t *StdioTransport) enqueueNotification(notif Notification) {
 		return
 	}
 
-	select {
-	case <-t.ctx.Done():
-		return
-	case t.notifQueue <- notif:
-	default:
-		// Unknown notifications remain best-effort to preserve read-loop
-		// liveness without changing known SDK-visible behavior.
-	}
+	// Unknown notifications remain best-effort to preserve read-loop liveness
+	// without changing known SDK-visible behavior.
+	t.enqueueBestEffortNotification(t.notifQueue, notif)
 }
 
 func (t *StdioTransport) enqueueTurnScopedNotification(notif Notification, threadKey string) {
 	t.initTurnScopedScheduler()
 
 	if threadKey == "" {
-		select {
-		case <-t.ctx.Done():
-			return
-		case t.notifQueue <- notif:
-		default:
-			// Non-attributable notifications remain best-effort.
-		}
+		// Non-attributable notifications remain best-effort.
+		t.enqueueBestEffortNotification(t.notifQueue, notif)
 		return
 	}
 
@@ -174,11 +164,7 @@ func (t *StdioTransport) enqueueTurnScopedNotification(notif Notification, threa
 	queue.mu.Unlock()
 
 	if t.ctx.Err() != nil {
-		queue.mu.Lock()
-		queue.queue = nil
-		queue.scheduled = false
-		queue.mu.Unlock()
-		t.removeTurnScopedNotificationQueue(queue.threadKey, queue)
+		t.clearTurnScopedNotificationQueue(queue)
 		return
 	}
 	t.scheduleTurnScopedNotificationQueue(queue)
@@ -186,24 +172,13 @@ func (t *StdioTransport) enqueueTurnScopedNotification(notif Notification, threa
 
 func (t *StdioTransport) handleTurnScopedNotificationQueue(queue *turnScopedNotificationQueue) {
 	for {
-		queue.mu.Lock()
-		if len(queue.queue) == 0 {
-			queue.scheduled = false
-			queue.mu.Unlock()
-			t.removeTurnScopedNotificationQueue(queue.threadKey, queue)
+		notif, ok := t.dequeueTurnScopedNotification(queue)
+		if !ok {
 			return
 		}
-		notif := queue.queue[0]
-		queue.queue[0] = Notification{}
-		queue.queue = queue.queue[1:]
-		queue.mu.Unlock()
 
 		if t.ctx.Err() != nil {
-			queue.mu.Lock()
-			queue.queue = nil
-			queue.scheduled = false
-			queue.mu.Unlock()
-			t.removeTurnScopedNotificationQueue(queue.threadKey, queue)
+			t.clearTurnScopedNotificationQueue(queue)
 			return
 		}
 		t.handleNotification(notif)
@@ -239,6 +214,15 @@ func (t *StdioTransport) enqueueLosslessNotification(
 	default:
 	}
 	t.closeWithFailure(errNotificationQueueOverflow, errNotificationQueueOverflow)
+}
+
+func (t *StdioTransport) enqueueBestEffortNotification(queue chan Notification, notif Notification) {
+	select {
+	case <-t.ctx.Done():
+		return
+	case queue <- notif:
+	default:
+	}
 }
 
 func (t *StdioTransport) enqueueStreamingNotification(notif Notification) {
@@ -314,6 +298,9 @@ func (t *StdioTransport) enqueueCriticalNotification(notif Notification) {
 	t.enqueueLosslessNotification(t.criticalNotifQueue, notif)
 }
 
+// Keep the notification bucket switches explicit. The lists define transport
+// delivery priority, and hiding them behind shared data structures would make
+// ordering changes harder to audit.
 func isCriticalNotificationMethod(method string) bool {
 	switch method {
 	case protocol.NotifyError, protocol.NotifyRealtimeError:
@@ -456,17 +443,10 @@ func (t *StdioTransport) drainTurnScopedNotificationQueues() bool {
 	drained := false
 	for _, queue := range queues {
 		for {
-			queue.mu.Lock()
-			if len(queue.queue) == 0 {
-				queue.scheduled = false
-				queue.mu.Unlock()
-				t.removeTurnScopedNotificationQueue(queue.threadKey, queue)
+			notif, ok := t.dequeueTurnScopedNotification(queue)
+			if !ok {
 				break
 			}
-			notif := queue.queue[0]
-			queue.queue[0] = Notification{}
-			queue.queue = queue.queue[1:]
-			queue.mu.Unlock()
 
 			t.handleNotification(notif)
 			drained = true
@@ -474,6 +454,29 @@ func (t *StdioTransport) drainTurnScopedNotificationQueues() bool {
 	}
 
 	return drained
+}
+
+func (t *StdioTransport) dequeueTurnScopedNotification(queue *turnScopedNotificationQueue) (Notification, bool) {
+	queue.mu.Lock()
+	if len(queue.queue) == 0 {
+		queue.scheduled = false
+		queue.mu.Unlock()
+		t.removeTurnScopedNotificationQueue(queue.threadKey, queue)
+		return Notification{}, false
+	}
+	notif := queue.queue[0]
+	queue.queue[0] = Notification{}
+	queue.queue = queue.queue[1:]
+	queue.mu.Unlock()
+	return notif, true
+}
+
+func (t *StdioTransport) clearTurnScopedNotificationQueue(queue *turnScopedNotificationQueue) {
+	queue.mu.Lock()
+	queue.queue = nil
+	queue.scheduled = false
+	queue.mu.Unlock()
+	t.removeTurnScopedNotificationQueue(queue.threadKey, queue)
 }
 
 // handleNotification dispatches an incoming server→client notification to the handler

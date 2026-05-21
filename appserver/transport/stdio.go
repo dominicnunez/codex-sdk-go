@@ -171,18 +171,16 @@ func NewStdioTransport(reader io.ReadCloser, writer io.Writer) *StdioTransport {
 // Send transmits a JSON-RPC request and waits for the response.
 // The response is matched to this request by ID.
 func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error) {
-	if ctx == nil {
-		return Response{}, NewTransportError("send failed", ErrNilContext)
+	ctx, cancel, err := t.prepareOutbound(ctx, "send failed")
+	if err != nil {
+		return Response{}, err
 	}
-	ctx, cancel := t.applyDefaultSendTimeout(ctx)
 	defer cancel()
 
-	t.ensureReadLoopStarted()
-
 	t.mu.Lock()
-	if t.closed {
+	if err := t.closedTransportErrorLocked("send failed"); err != nil {
 		t.mu.Unlock()
-		return Response{}, t.transportStopError("send failed")
+		return Response{}, err
 	}
 
 	// Create response channel and store with normalized ID for matching
@@ -212,10 +210,7 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 	// Wait for response or context cancellation
 	select {
 	case result := <-respChan:
-		if result.err != nil {
-			return Response{}, result.err
-		}
-		return result.resp, nil
+		return responseFromPendingResult(result)
 	case <-ctx.Done():
 		return Response{}, ctx.Err()
 	case <-t.readerStopped:
@@ -223,10 +218,7 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 		// reader-stopped error; both can become ready at nearly the same time.
 		select {
 		case result := <-respChan:
-			if result.err != nil {
-				return Response{}, result.err
-			}
-			return result.resp, nil
+			return responseFromPendingResult(result)
 		default:
 		}
 		return Response{}, t.transportStopError("send failed")
@@ -235,18 +227,16 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 
 // Notify transmits a JSON-RPC notification (fire-and-forget).
 func (t *StdioTransport) Notify(ctx context.Context, notif Notification) error {
-	if ctx == nil {
-		return NewTransportError("notify failed", ErrNilContext)
+	ctx, cancel, err := t.prepareOutbound(ctx, "notify failed")
+	if err != nil {
+		return err
 	}
-	ctx, cancel := t.applyDefaultSendTimeout(ctx)
 	defer cancel()
 
-	t.ensureReadLoopStarted()
-
 	t.mu.Lock()
-	if t.closed {
+	if err := t.closedTransportErrorLocked("notify failed"); err != nil {
 		t.mu.Unlock()
-		return t.transportStopError("notify failed")
+		return err
 	}
 	t.mu.Unlock()
 
@@ -255,28 +245,14 @@ func (t *StdioTransport) Notify(ctx context.Context, notif Notification) error {
 
 // OnRequest registers a handler for incoming JSON-RPC requests from the server.
 func (t *StdioTransport) OnRequest(handler RequestHandler) {
-	t.mu.Lock()
-	t.reqHandler = handler
-	pending := t.pendingReqHandler
-	t.pendingReqHandler = nil
-	t.mu.Unlock()
-
-	for _, req := range pending {
-		t.enqueueRequest(req)
-	}
+	pending := swapPendingHandler(t, func() { t.reqHandler = handler }, &t.pendingReqHandler)
+	replayPending(pending, t.enqueueRequest)
 }
 
 // OnNotify registers a handler for incoming JSON-RPC notifications from the server.
 func (t *StdioTransport) OnNotify(handler NotificationHandler) {
-	t.mu.Lock()
-	t.notifHandler = handler
-	pending := t.pendingNotifHandle
-	t.pendingNotifHandle = nil
-	t.mu.Unlock()
-
-	for _, notif := range pending {
-		t.enqueueNotification(notif)
-	}
+	pending := swapPendingHandler(t, func() { t.notifHandler = handler }, &t.pendingNotifHandle)
+	replayPending(pending, t.enqueueNotification)
 }
 
 // OnPanic registers a handler called when a request handler or notification
@@ -328,6 +304,44 @@ func applyDefaultSendTimeout(ctx context.Context, timeout time.Duration) (contex
 	return context.WithTimeout(ctx, timeout)
 }
 
+func (t *StdioTransport) prepareOutbound(ctx context.Context, op string) (context.Context, context.CancelFunc, error) {
+	if ctx == nil {
+		return nil, nil, NewTransportError(op, ErrNilContext)
+	}
+	ctx, cancel := t.applyDefaultSendTimeout(ctx)
+	t.ensureReadLoopStarted()
+	return ctx, cancel, nil
+}
+
+func (t *StdioTransport) closedTransportErrorLocked(op string) error {
+	if !t.closed {
+		return nil
+	}
+	return NewTransportError(op, t.transportStopCauseLocked())
+}
+
+func responseFromPendingResult(result pendingReqResult) (Response, error) {
+	if result.err != nil {
+		return Response{}, result.err
+	}
+	return result.resp, nil
+}
+
+func swapPendingHandler[T any](t *StdioTransport, setHandler func(), pendingStore *[]T) []T {
+	t.mu.Lock()
+	setHandler()
+	pending := *pendingStore
+	*pendingStore = nil
+	t.mu.Unlock()
+	return pending
+}
+
+func replayPending[T any](pending []T, enqueue func(T)) {
+	for _, item := range pending {
+		enqueue(item)
+	}
+}
+
 func (t *StdioTransport) ensureReadLoopStarted() {
 	t.startReadLoopOnce.Do(func() {
 		go t.readLoop()
@@ -365,17 +379,10 @@ func (t *StdioTransport) closeWithFailure(scanErr error, cause error) {
 	}
 	t.closed = true
 	t.readerEOF = false
-	pending := t.pendingReqs
-	t.pendingReqs = make(map[string]pendingReq)
-	cancel := t.cancelCtx
-	readerCloser := t.readerCloser
+	pending, cancel, readerCloser := t.takeStopResourcesLocked()
 	t.mu.Unlock()
 
-	cancel()
-	t.wakeTurnScopedNotificationWorkers()
-	if readerCloser != nil {
-		_ = readerCloser.Close()
-	}
+	t.finishTransportStop(cancel, readerCloser)
 
 	pendingErr := pendingRequestTransportError("send failed", cause)
 	for _, pendingReq := range pending {
@@ -721,17 +728,25 @@ func (t *StdioTransport) stopAfterReaderTermination(scanErr error) {
 	}
 	t.closed = true
 	t.readerEOF = true
-	t.pendingReqs = make(map[string]pendingReq)
-	cancel := t.cancelCtx
-	readerCloser := t.readerCloser
+	_, cancel, readerCloser := t.takeStopResourcesLocked()
 	t.mu.Unlock()
 
+	t.finishTransportStop(cancel, readerCloser)
+	go t.drainPendingNotificationsAfterStop()
+}
+
+func (t *StdioTransport) takeStopResourcesLocked() (map[string]pendingReq, context.CancelFunc, io.Closer) {
+	pending := t.pendingReqs
+	t.pendingReqs = make(map[string]pendingReq)
+	return pending, t.cancelCtx, t.readerCloser
+}
+
+func (t *StdioTransport) finishTransportStop(cancel context.CancelFunc, readerCloser io.Closer) {
 	cancel()
 	t.wakeTurnScopedNotificationWorkers()
 	if readerCloser != nil {
 		_ = readerCloser.Close()
 	}
-	go t.drainPendingNotificationsAfterStop()
 }
 
 // handleRequest dispatches an incoming server→client request to the handler

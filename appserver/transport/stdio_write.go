@@ -54,6 +54,9 @@ func (t *StdioTransport) enqueueWrite(ctx context.Context, msg interface{}, op s
 		done:    make(chan error, 1),
 	}
 
+	// Keep the reader-stopped aware branches explicit. Request/notification
+	// writes must preserve reader-stopped error precedence, while internal
+	// response writes only need transport-closed semantics.
 	if watchReaderStop {
 		select {
 		case <-ctx.Done():

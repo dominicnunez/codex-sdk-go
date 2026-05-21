@@ -73,6 +73,14 @@
       "fingerprint": "8c19fa481d418d36"
     },
     {
+      "type": "duplicate-code",
+      "fingerprint": "726cbf00fce9903c"
+    },
+    {
+      "type": "duplicate-code",
+      "fingerprint": "2eefb8a157002f2d"
+    },
+    {
       "type": "unused-package",
       "fingerprint": "97d53b34d5b4e768"
     }
