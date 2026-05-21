@@ -1,4 +1,4 @@
-package exec
+package appserver
 
 import "github.com/dominicnunez/codex-sdk-go/appserver/protocol"
 

@@ -1,6 +1,6 @@
 # codex-sdk-go
 
-Idiomatic Go SDK for the [OpenAI Codex](https://github.com/openai/codex) JSON-RPC 2.0 protocol, app-server runtime helpers, exec helpers, and Codex login helpers. Stdlib only, zero external dependencies.
+Idiomatic Go SDK for the [OpenAI Codex](https://github.com/openai/codex) JSON-RPC 2.0 protocol, app-server runtime helpers, and Codex login helpers. Stdlib only, zero external dependencies.
 
 Built against the [Codex app-server protocol schemas](appserver/protocol/schema/json/) — full coverage of all current request methods, 40+ notification types, and 9 server→client approval flows.
 
@@ -19,7 +19,7 @@ import codex "github.com/dominicnunez/codex-sdk-go/appserver/protocol"
 ## Requirements
 
 - Go 1.25+
-- A Codex CLI binary for `appserver` and `exec` process helpers
+- A Codex CLI binary for `appserver` process helpers
 - An absolute `ProcessOptions.BinaryPath` when spawning Codex from this SDK
 
 ## Packages
@@ -28,10 +28,21 @@ import codex "github.com/dominicnunez/codex-sdk-go/appserver/protocol"
 | --- | --- | --- |
 | `appserver/protocol` | Typed JSON-RPC requests, responses, notifications, approval handlers, and schema coverage | `codex-rs/app-server-protocol` |
 | `appserver/transport` | Newline-delimited JSON-RPC stdio transport and notification ordering | `codex-rs/app-server-transport/src/transport` |
-| `appserver` | `codex app-server --listen stdio://` process startup and client lifecycle | `codex-rs/app-server`, `codex-rs/app-server-client` |
-| `exec` | Single-turn `Run`, streamed turns, persistent conversations, and Codex CLI process lifecycle | `codex-rs/exec`, `codex-rs/app-server-client` |
+| `appserver` | `codex app-server --listen stdio://` process startup, client lifecycle, single-turn `Run`, streamed turns, and persistent conversations | `codex-rs/app-server`, `codex-rs/app-server-client` |
 | `login` | Codex OAuth authorization-code flow with PKCE and local/manual callback handling | `codex-rs/login` |
 | `login/auth` | Credential storage, JWT claim extraction, redaction, and `chatgptAuthTokens` payload helpers | `codex-rs/login`, `codex-rs/app-server-protocol` |
+
+## Runtime Choice
+
+Use `appserver` as the default SDK runtime when you need typed protocol access,
+persistent threads, streaming notifications, approvals, account/login methods, or
+multi-turn helper flows. It starts `codex app-server --listen stdio://` and keeps
+that process alive for the client lifecycle.
+
+Direct Codex CLI exec-mode JSONL support (`codex exec --json`) is intentionally
+not exposed by this app-server-first API. If needed later, it should live behind
+a separate `exec` package with JSONL event parsing rather than sharing the
+app-server `Process` type.
 
 ## Quick Start
 
@@ -76,9 +87,11 @@ func run(ctx context.Context, transport codex.Transport) error {
 }
 ```
 
-## Exec Helper
+## App-Server Runtime Helpers
 
-Use `exec` when you want this SDK to spawn the Codex CLI and execute a single turn.
+The `appserver` package starts `codex app-server --listen stdio://`, initializes
+the app-server lifecycle, and exposes ergonomic helpers for `Run`, `RunStreamed`,
+and `StartConversation`.
 
 ```go
 import (
@@ -86,7 +99,7 @@ import (
 	"fmt"
 	osexec "os/exec"
 
-	codexexec "github.com/dominicnunez/codex-sdk-go/exec"
+	"github.com/dominicnunez/codex-sdk-go/appserver"
 )
 
 func runCodex(ctx context.Context) error {
@@ -95,16 +108,19 @@ func runCodex(ctx context.Context) error {
 		return err
 	}
 
-	process, err := codexexec.StartProcess(ctx, &codexexec.ProcessOptions{
+	server, err := appserver.StartProcess(ctx, &appserver.ProcessOptions{
 		BinaryPath: binary,
-		Sandbox:    codexexec.SandboxModeWorkspaceWrite,
 	})
 	if err != nil {
 		return err
 	}
-	defer process.Close()
+	defer server.Close()
 
-	result, err := process.Run(ctx, codexexec.RunOptions{
+	if _, err := server.Initialize(ctx); err != nil {
+		return err
+	}
+
+	result, err := server.Run(ctx, appserver.RunOptions{
 		Prompt: "Summarize this repository.",
 	})
 	if err != nil {
@@ -197,7 +213,7 @@ Services: `client.Thread`, `client.Turn`, `client.Account`, `client.Config`, `cl
 Runtime helpers import the protocol package instead of redefining schema-owned
 types, so `appserver/protocol/schema/json/` remains the source of truth for the app-server contract.
 
-Process helpers reject relative binary paths and secret-bearing CLI config keys. Pass credentials through supported environment variables or `login/auth` payloads instead of command-line arguments.
+Process helpers reject relative binary paths. Pass credentials through supported environment variables or `login/auth` payloads instead of command-line arguments.
 
 ## Origin
 

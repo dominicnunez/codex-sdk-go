@@ -1,4 +1,4 @@
-package exec_test
+package appserver_test
 
 import (
 	"bufio"
@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
+	codex "github.com/dominicnunez/codex-sdk-go/appserver"
 	codextransport "github.com/dominicnunez/codex-sdk-go/appserver/transport"
-	codex "github.com/dominicnunez/codex-sdk-go/exec"
 )
 
 const (

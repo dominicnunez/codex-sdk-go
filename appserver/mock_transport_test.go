@@ -1,4 +1,4 @@
-package exec_test
+package appserver_test
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	codex "github.com/dominicnunez/codex-sdk-go/exec"
+	codex "github.com/dominicnunez/codex-sdk-go/appserver"
 )
 
 func validInitializeResponseData(userAgent string) map[string]interface{} {

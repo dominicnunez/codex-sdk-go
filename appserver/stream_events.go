@@ -1,4 +1,4 @@
-package exec
+package appserver
 
 // Event is a sealed interface for streaming events yielded by Stream.Events.
 // Concrete types: TurnStarted, TextDelta, ReasoningDelta, ReasoningSummaryDelta,

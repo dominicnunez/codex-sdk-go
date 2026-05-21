@@ -45,7 +45,7 @@ Server→client requests for user approval (command exec, file write, etc.) flow
 - `TestSpecCoverage`: ensures every spec schema has a Go type
 
 ### Runtime Packages
-Protocol types and generated schema coverage stay in `appserver/protocol/`. Process management, stdio framing, single-turn `Run`, streamed run helpers, and conversation helpers live in `appserver/`, `appserver/transport/`, and `exec/`.
+Protocol types and generated schema coverage stay in `appserver/protocol/`. Process management, single-turn `Run`, streamed run helpers, and conversation helpers live in `appserver/`. Stdio framing lives in `appserver/transport/`.
 
 ### Login Packages
 Codex OAuth login flow lives in `login/`. Credential persistence, token claims, redaction, and `chatgptAuthTokens` payload helpers live in `login/auth/`.

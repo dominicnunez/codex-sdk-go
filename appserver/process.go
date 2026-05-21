@@ -35,13 +35,11 @@ type processShutdownMode = processctl.ShutdownMode
 const (
 	processShutdownModeUnset    = processctl.ShutdownModeUnset
 	processShutdownModeGraceful = processctl.ShutdownModeGraceful
-	processShutdownModeNoSignal = processctl.ShutdownModeNoSignal
 )
 
 type processShutdownAttempt = processctl.ShutdownAttempt
 
 const (
-	processShutdownAttemptNone      = processctl.ShutdownAttemptNone
 	processShutdownAttemptInterrupt = processctl.ShutdownAttemptInterrupt
 	processShutdownAttemptKill      = processctl.ShutdownAttemptKill
 )
@@ -97,6 +95,23 @@ type Process struct {
 	initNotifyWait chan struct{}
 }
 
+// NewProcessFromClient wraps an existing app-server Client in a Process. This
+// is useful for tests or for callers that manage the runtime process lifecycle
+// outside this package. Close on the returned Process is a no-op because there
+// is no child process owned by the wrapper.
+func NewProcessFromClient(client *Client) *Process {
+	if client == nil {
+		panic(errNilProcessClient)
+	}
+	done := make(chan struct{})
+	close(done)
+	return &Process{
+		Client:           client,
+		waitDone:         done,
+		initializeParams: defaultInitializeParams(),
+	}
+}
+
 var commonChildEnvKeys = []string{
 	"HOME",
 	"LANG",
@@ -124,9 +139,10 @@ var windowsChildEnvKeys = []string{
 	"USERNAME",
 }
 
-// StartProcess spawns "codex app-server --listen stdio://" as a child process,
-// connects a StdioTransport to its stdin/stdout, and returns a ready client.
-// Call Initialize before using v2 app-server methods.
+// StartProcess spawns "codex app-server --listen stdio://" as a child process
+// and connects a StdioTransport to its stdin/stdout. High-level helper methods
+// initialize lazily; direct Client users should call Initialize before using v2
+// app-server methods.
 func StartProcess(ctx context.Context, opts *ProcessOptions) (*Process, error) {
 	if err := validateContext(ctx); err != nil {
 		return nil, err
@@ -227,14 +243,6 @@ func cloneInitializeParams(params InitializeParams) InitializeParams {
 	return cp
 }
 
-func cloneStringPtr(s *string) *string {
-	if s == nil {
-		return nil
-	}
-	v := *s
-	return &v
-}
-
 func resolveBinaryPath(binaryPath string) (string, error) {
 	if binaryPath == "" {
 		return "", fmt.Errorf("BinaryPath is required and must be an absolute path to %q", defaultBinaryName)
@@ -312,6 +320,11 @@ func (p *Process) Initialize(ctx context.Context) (InitializeResponse, error) {
 		return InitializeResponse{}, fmt.Errorf("initialized notification: %w", err)
 	}
 	return resp, nil
+}
+
+func (p *Process) ensureInit(ctx context.Context) error {
+	_, err := p.Initialize(ctx)
+	return err
 }
 
 func (p *Process) notifyInitialized(ctx context.Context) error {
@@ -519,7 +532,7 @@ func (p *Process) Wait() error {
 
 func validateContext(ctx context.Context) error {
 	if ctx == nil {
-		return fmt.Errorf("context must not be nil")
+		return ErrNilContext
 	}
 	return nil
 }

@@ -1,10 +1,10 @@
-package exec_test
+package appserver_test
 
 import (
 	"encoding/json"
 	"testing"
 
-	codex "github.com/dominicnunez/codex-sdk-go/exec"
+	codex "github.com/dominicnunez/codex-sdk-go/appserver"
 )
 
 func ptr[T any](v T) *T {
