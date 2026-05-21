@@ -1013,10 +1013,8 @@ func TestStdioApprovalInvalidParamsReturnsErrorCode(t *testing.T) {
 	client := codex.NewClient(transport)
 
 	client.SetApprovalHandlers(codex.ApprovalHandlers{
-		OnApplyPatchApproval: func(ctx context.Context, p codex.ApplyPatchApprovalParams) (codex.ApplyPatchApprovalResponse, error) {
-			return codex.ApplyPatchApprovalResponse{
-				Decision: codex.ReviewDecisionWrapper{Value: "approved"},
-			}, nil
+		OnFileChangeRequestApproval: func(ctx context.Context, p codex.FileChangeRequestApprovalParams) (codex.FileChangeRequestApprovalResponse, error) {
+			return codex.FileChangeRequestApprovalResponse{Decision: "accept"}, nil
 		},
 	})
 
@@ -1032,8 +1030,7 @@ func TestStdioApprovalInvalidParamsReturnsErrorCode(t *testing.T) {
 		}
 	}()
 
-	// Send a request with invalid JSON params (not valid for ApplyPatchApprovalParams)
-	req := `{"jsonrpc":"2.0","id":"bad-params","method":"applyPatchApproval","params":"not-an-object"}` + "\n"
+	req := `{"jsonrpc":"2.0","id":"bad-params","method":"item/fileChange/requestApproval","params":"not-an-object"}` + "\n"
 	_, _ = serverWriter.Write([]byte(req))
 
 	select {
@@ -1127,8 +1124,8 @@ func TestStdioApprovalHandlerErrorReturnsErrorCode(t *testing.T) {
 	client := codex.NewClient(transport)
 
 	client.SetApprovalHandlers(codex.ApprovalHandlers{
-		OnApplyPatchApproval: func(ctx context.Context, p codex.ApplyPatchApprovalParams) (codex.ApplyPatchApprovalResponse, error) {
-			return codex.ApplyPatchApprovalResponse{}, fmt.Errorf("handler refused")
+		OnFileChangeRequestApproval: func(ctx context.Context, p codex.FileChangeRequestApprovalParams) (codex.FileChangeRequestApprovalResponse, error) {
+			return codex.FileChangeRequestApprovalResponse{}, fmt.Errorf("handler refused")
 		},
 	})
 
@@ -1144,8 +1141,7 @@ func TestStdioApprovalHandlerErrorReturnsErrorCode(t *testing.T) {
 		}
 	}()
 
-	// Send a valid request with proper params
-	req := `{"jsonrpc":"2.0","id":"handler-err","method":"applyPatchApproval","params":{"callId":"c1","conversationId":"t1","fileChanges":{}}}` + "\n"
+	req := `{"jsonrpc":"2.0","id":"handler-err","method":"item/fileChange/requestApproval","params":{"itemId":"item-1","startedAtMs":1,"threadId":"t1","turnId":"u1"}}` + "\n"
 	_, _ = serverWriter.Write([]byte(req))
 
 	select {

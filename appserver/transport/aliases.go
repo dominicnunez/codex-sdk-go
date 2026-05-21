@@ -1,10 +1,6 @@
 package transport
 
-import (
-	"time"
-
-	protocol "github.com/dominicnunez/codex-sdk-go/appserver/protocol"
-)
+import protocol "github.com/dominicnunez/codex-sdk-go/appserver/protocol"
 
 const jsonrpcVersion = "2.0"
 
@@ -36,18 +32,11 @@ type (
 	Response            = protocol.Response
 	TransportError      = protocol.TransportError
 
-	ApplyPatchApprovalParams          = protocol.ApplyPatchApprovalParams
-	ApplyPatchApprovalResponse        = protocol.ApplyPatchApprovalResponse
 	ApprovalHandlers                  = protocol.ApprovalHandlers
 	FileChangeRequestApprovalParams   = protocol.FileChangeRequestApprovalParams
 	FileChangeRequestApprovalResponse = protocol.FileChangeRequestApprovalResponse
-	ReviewDecisionWrapper             = protocol.ReviewDecisionWrapper
 )
 
 func NewClient(transport protocol.Transport, opts ...ClientOption) *Client {
 	return protocol.NewClient(transport, opts...)
-}
-
-func WithRequestTimeout(timeout time.Duration) ClientOption {
-	return protocol.WithRequestTimeout(timeout)
 }

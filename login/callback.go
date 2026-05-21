@@ -26,10 +26,10 @@ type callbackResult struct {
 	err  error
 }
 
-func StartCallbackServer(_ context.Context, cfg Config, state string) (*CallbackServer, error) {
+func StartCallbackServer(ctx context.Context, cfg Config, state string) (*CallbackServer, error) {
 	cfg = cfg.withDefaults()
 	address := net.JoinHostPort(cfg.CallbackHost, strconv.Itoa(cfg.CallbackPort))
-	listener, err := net.Listen("tcp", address)
+	listener, err := (&net.ListenConfig{}).Listen(ctx, "tcp", address)
 	if err != nil {
 		return nil, fmt.Errorf("listen for OAuth callback: %w", err)
 	}
