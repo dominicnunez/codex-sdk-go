@@ -211,14 +211,7 @@ func cloneTurn(turn Turn) Turn {
 }
 
 func cloneThreadItems(items []ThreadItemWrapper) []ThreadItemWrapper {
-	if items == nil {
-		return nil
-	}
-	out := make([]ThreadItemWrapper, len(items))
-	for i, item := range items {
-		out[i] = cloneThreadItemWrapper(item)
-	}
-	return out
+	return cloneSlice(items, cloneThreadItemWrapper)
 }
 
 func cloneTurnError(err *TurnError) *TurnError {
@@ -379,14 +372,7 @@ func cloneSubAgentSource(src SubAgentSource) SubAgentSource {
 }
 
 func cloneUserInputs(in []UserInput) []UserInput {
-	if in == nil {
-		return nil
-	}
-	out := make([]UserInput, len(in))
-	for i, input := range in {
-		out[i] = cloneUserInput(input)
-	}
-	return out
+	return cloneSlice(in, cloneUserInput)
 }
 
 func cloneUserInput(in UserInput) UserInput {
@@ -420,26 +406,14 @@ func cloneUserInput(in UserInput) UserInput {
 }
 
 func cloneTextElements(in []TextElement) []TextElement {
-	if in == nil {
-		return nil
-	}
-	out := make([]TextElement, len(in))
-	for i, element := range in {
-		out[i] = element
-		out[i].Placeholder = cloneStringPtr(element.Placeholder)
-	}
-	return out
+	return cloneSlice(in, func(element TextElement) TextElement {
+		element.Placeholder = cloneStringPtr(element.Placeholder)
+		return element
+	})
 }
 
 func cloneCommandActions(in []CommandActionWrapper) []CommandActionWrapper {
-	if in == nil {
-		return nil
-	}
-	out := make([]CommandActionWrapper, len(in))
-	for i, action := range in {
-		out[i] = cloneCommandActionWrapper(action)
-	}
-	return out
+	return cloneSlice(in, cloneCommandActionWrapper)
 }
 
 func cloneCommandActionWrapper(w CommandActionWrapper) CommandActionWrapper {
@@ -465,15 +439,10 @@ func cloneCommandActionWrapper(w CommandActionWrapper) CommandActionWrapper {
 }
 
 func cloneFileUpdateChanges(in []FileUpdateChange) []FileUpdateChange {
-	if in == nil {
-		return nil
-	}
-	out := make([]FileUpdateChange, len(in))
-	for i, change := range in {
-		out[i] = change
-		out[i].Kind = clonePatchChangeKindWrapper(change.Kind)
-	}
-	return out
+	return cloneSlice(in, func(change FileUpdateChange) FileUpdateChange {
+		change.Kind = clonePatchChangeKindWrapper(change.Kind)
+		return change
+	})
 }
 
 func clonePatchChangeKindWrapper(w PatchChangeKindWrapper) PatchChangeKindWrapper {
@@ -518,14 +487,7 @@ func cloneMcpToolCallError(in *McpToolCallError) *McpToolCallError {
 }
 
 func cloneDynamicToolCallOutputContentItems(in []DynamicToolCallOutputContentItemWrapper) []DynamicToolCallOutputContentItemWrapper {
-	if in == nil {
-		return nil
-	}
-	out := make([]DynamicToolCallOutputContentItemWrapper, len(in))
-	for i, item := range in {
-		out[i] = cloneDynamicToolCallOutputContentItemWrapper(item)
-	}
-	return out
+	return cloneSlice(in, cloneDynamicToolCallOutputContentItemWrapper)
 }
 
 func cloneDynamicToolCallOutputContentItemWrapper(w DynamicToolCallOutputContentItemWrapper) DynamicToolCallOutputContentItemWrapper {
@@ -676,6 +638,17 @@ func cloneArbitraryValue[T any](in T) T {
 	return deepcopy.Value(in)
 }
 
+func cloneSlice[T any](in []T, clone func(T) T) []T {
+	if in == nil {
+		return nil
+	}
+	out := make([]T, len(in))
+	for i, value := range in {
+		out[i] = clone(value)
+	}
+	return out
+}
+
 func cloneMessagePhasePtr(in *MessagePhase) *MessagePhase {
 	return clonePtr(in)
 }
@@ -722,18 +695,7 @@ func (p *Process) StartConversation(ctx context.Context, opts ConversationOption
 	params := ThreadStartParams{
 		Ephemeral: Ptr(false),
 	}
-	if opts.Instructions != nil {
-		params.DeveloperInstructions = opts.Instructions
-	}
-	if opts.Model != nil {
-		params.Model = opts.Model
-	}
-	if opts.Personality != nil {
-		params.Personality = opts.Personality
-	}
-	if opts.ApprovalPolicy != nil {
-		params.ApprovalPolicy = opts.ApprovalPolicy
-	}
+	applyThreadStartOptions(&params, opts.Instructions, opts.Model, opts.Personality, opts.ApprovalPolicy)
 
 	resp, err := p.Client.Thread.Start(ctx, params)
 	if err != nil {
@@ -762,22 +724,8 @@ func (p *Process) StartConversation(ctx context.Context, opts ConversationOption
 }
 
 func (c *Conversation) buildTurnParams(opts TurnOptions) TurnStartParams {
-	params := TurnStartParams{
-		ThreadID: c.threadID,
-		Input:    []UserInput{&TextUserInput{Text: opts.Prompt}},
-	}
-	if opts.Effort != nil {
-		params.Effort = opts.Effort
-	}
-	if opts.Model != nil {
-		params.Model = opts.Model
-	}
-	if opts.CollaborationMode != nil {
-		params.CollaborationMode = opts.CollaborationMode
-	}
-	if opts.OutputSchema != nil {
-		params.OutputSchema = opts.OutputSchema
-	}
+	params := newTurnStartParams(c.threadID, opts.Prompt)
+	applyTurnStartOptions(&params, opts.Model, opts.Effort, opts.CollaborationMode, opts.OutputSchema)
 	return params
 }
 
@@ -832,13 +780,7 @@ func (c *Conversation) TurnStreamed(ctx context.Context, opts TurnOptions) *Stre
 	if err := c.state.ensureOpen(); err != nil {
 		return newErrorStream(err)
 	}
-	g := newGuardedChan(streamChannelBuffer)
-	s := &Stream{
-		done:  make(chan struct{}),
-		queue: g,
-	}
-
-	s.events = streamIterator(g)
+	g, s := newActiveStream(streamChannelBuffer)
 
 	go c.turnStreamedLifecycle(ctx, opts, g, s)
 

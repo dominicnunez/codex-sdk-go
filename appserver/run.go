@@ -53,40 +53,52 @@ func buildThreadParams(opts RunOptions) ThreadStartParams {
 	params := ThreadStartParams{
 		Ephemeral: Ptr(true),
 	}
-	if opts.Instructions != nil {
-		params.DeveloperInstructions = opts.Instructions
-	}
-	if opts.Model != nil {
-		params.Model = opts.Model
-	}
-	if opts.Personality != nil {
-		params.Personality = opts.Personality
-	}
-	if opts.ApprovalPolicy != nil {
-		params.ApprovalPolicy = opts.ApprovalPolicy
-	}
+	applyThreadStartOptions(&params, opts.Instructions, opts.Model, opts.Personality, opts.ApprovalPolicy)
 	return params
 }
 
 // buildTurnParams converts RunOptions and a thread ID into TurnStartParams.
 func buildTurnParams(opts RunOptions, threadID string) TurnStartParams {
-	params := TurnStartParams{
-		ThreadID: threadID,
-		Input:    []UserInput{&TextUserInput{Text: opts.Prompt}},
-	}
-	if opts.Model != nil {
-		params.Model = opts.Model
-	}
-	if opts.Effort != nil {
-		params.Effort = opts.Effort
-	}
-	if opts.CollaborationMode != nil {
-		params.CollaborationMode = opts.CollaborationMode
-	}
-	if opts.OutputSchema != nil {
-		params.OutputSchema = opts.OutputSchema
-	}
+	params := newTurnStartParams(threadID, opts.Prompt)
+	applyTurnStartOptions(&params, opts.Model, opts.Effort, opts.CollaborationMode, opts.OutputSchema)
 	return params
+}
+
+func applyThreadStartOptions(params *ThreadStartParams, instructions *string, model *string, personality *Personality, approvalPolicy *AskForApproval) {
+	if instructions != nil {
+		params.DeveloperInstructions = instructions
+	}
+	if model != nil {
+		params.Model = model
+	}
+	if personality != nil {
+		params.Personality = personality
+	}
+	if approvalPolicy != nil {
+		params.ApprovalPolicy = approvalPolicy
+	}
+}
+
+func newTurnStartParams(threadID string, prompt string) TurnStartParams {
+	return TurnStartParams{
+		ThreadID: threadID,
+		Input:    []UserInput{&TextUserInput{Text: prompt}},
+	}
+}
+
+func applyTurnStartOptions(params *TurnStartParams, model *string, effort *ReasoningEffort, collaborationMode *CollaborationMode, outputSchema interface{}) {
+	if model != nil {
+		params.Model = model
+	}
+	if effort != nil {
+		params.Effort = effort
+	}
+	if collaborationMode != nil {
+		params.CollaborationMode = collaborationMode
+	}
+	if outputSchema != nil {
+		params.OutputSchema = outputSchema
+	}
 }
 
 // buildRunResult assembles a RunResult from collected items and turn data.

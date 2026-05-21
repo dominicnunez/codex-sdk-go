@@ -255,18 +255,12 @@ func (p *Process) runStreamedWithCollector(ctx context.Context, opts RunOptions,
 		return newCollectedErrorStream(errors.New("prompt is required"), collector)
 	}
 
-	g := newGuardedChan(streamChannelBuffer)
-	s := &Stream{
-		done:  make(chan struct{}),
-		queue: g,
-	}
+	g, s := newActiveStream(streamChannelBuffer)
 	if collector != nil {
 		g.setOverflowHandler(func(err error) {
 			collector.Process(nil, err)
 		})
 	}
-
-	s.events = streamIterator(g)
 
 	go p.runStreamedLifecycle(ctx, opts, g, s, collector)
 
@@ -278,6 +272,16 @@ func newCollectedErrorStream(err error, collector *StreamCollector) *Stream {
 		collector.Process(nil, err)
 	}
 	return newErrorStream(err)
+}
+
+func newActiveStream(buffer int) (*guardedChan, *Stream) {
+	g := newGuardedChan(buffer)
+	s := &Stream{
+		done:   make(chan struct{}),
+		events: streamIterator(g),
+		queue:  g,
+	}
+	return g, s
 }
 
 // newErrorStream returns a Stream that yields a single error and completes
