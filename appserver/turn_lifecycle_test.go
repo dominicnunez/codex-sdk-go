@@ -205,8 +205,9 @@ func blockFirstItemCompleted(client *codex.Client) (<-chan struct{}, chan struct
 // at that point.
 type notifyDuringSendTransport struct {
 	*MockTransport
-	notifHandler codex.NotificationHandler
-	threadID     string
+	notifHandler                      codex.NotificationHandler
+	threadID                          string
+	includeStalePreStartNotifications bool
 }
 
 type staleMalformedTurnCompletedTransport struct {
@@ -249,6 +250,18 @@ func (t *notifyDuringSendTransport) Send(ctx context.Context, req codex.Request)
 	// The caller (executeTurn) has already registered listeners before calling
 	// Send, so these notifications must be handled correctly.
 	if req.Method == "turn/start" && t.notifHandler != nil {
+		if t.includeStalePreStartNotifications {
+			t.notifHandler(ctx, codex.Notification{
+				JSONRPC: "2.0",
+				Method:  "item/completed",
+				Params:  json.RawMessage(`{"completedAtMs":1,"threadId":"` + t.threadID + `","turnId":"turn-stale","item":{"type":"agentMessage","id":"item-stale","text":"stale bird"}}`),
+			})
+			t.notifHandler(ctx, codex.Notification{
+				JSONRPC: "2.0",
+				Method:  "turn/completed",
+				Params:  json.RawMessage(`{"threadId":"` + t.threadID + `","turn":{"id":"turn-stale","status":"completed","items":[]}}`),
+			})
+		}
 		t.notifHandler(ctx, codex.Notification{
 			JSONRPC: "2.0",
 			Method:  "item/completed",
@@ -411,6 +424,51 @@ func TestRunNotificationBeforeTurnStartResponse(t *testing.T) {
 	}
 }
 
+func TestRunIgnoresStaleNotificationBeforeTurnStartResponse(t *testing.T) {
+	base := NewMockTransport()
+
+	_ = base.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
+	_ = base.SetResponseData("thread/start", validProcessThreadStartResponse(validProcessThreadPayload("thread-1")))
+	_ = base.SetResponseData("turn/start", map[string]interface{}{
+		"turn": map[string]interface{}{
+			"id":     "turn-1",
+			"status": "inProgress",
+			"items":  []interface{}{},
+		},
+	})
+
+	transport := &notifyDuringSendTransport{
+		MockTransport:                     base,
+		threadID:                          "thread-1",
+		includeStalePreStartNotifications: true,
+	}
+
+	client := codex.NewClient(transport, codex.WithRequestTimeout(5*time.Second))
+	proc := codex.NewProcessFromClient(client)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result, err := proc.Run(ctx, codex.RunOptions{Prompt: "early stale notification"})
+	if err != nil {
+		t.Fatalf("Run() error: %v", err)
+	}
+
+	if result.Response != "early bird" {
+		t.Fatalf("Response = %q, want %q", result.Response, "early bird")
+	}
+	if got := len(result.Items); got != 1 {
+		t.Fatalf("len(Items) = %d, want 1", got)
+	}
+	item, ok := result.Items[0].Value.(*codex.AgentMessageThreadItem)
+	if !ok || item.ID != "item-early" {
+		t.Fatalf("result item = %#v, want item-early", result.Items[0].Value)
+	}
+	if result.Turn.ID != "turn-1" {
+		t.Fatalf("Turn.ID = %q, want turn-1", result.Turn.ID)
+	}
+}
+
 func TestRunFailsWhenPreStartNotificationQueueOverflows(t *testing.T) {
 	reportedErrs := make(chan error, preStartOverflowFloodCount)
 	proc, _ := newFloodDuringTurnStartProcess(t, func(_ string, err error) {
@@ -503,6 +561,69 @@ func TestRunStreamedNotificationBeforeTurnStartResponse(t *testing.T) {
 	}
 	if len(result.Items) != 1 {
 		t.Errorf("len(Items) = %d, want 1", len(result.Items))
+	}
+}
+
+func TestRunStreamedIgnoresStaleNotificationBeforeTurnStartResponse(t *testing.T) {
+	base := NewMockTransport()
+
+	_ = base.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
+	_ = base.SetResponseData("thread/start", validProcessThreadStartResponse(validProcessThreadPayload("thread-1")))
+	_ = base.SetResponseData("turn/start", map[string]interface{}{
+		"turn": map[string]interface{}{
+			"id":     "turn-1",
+			"status": "inProgress",
+			"items":  []interface{}{},
+		},
+	})
+
+	transport := &notifyDuringSendTransport{
+		MockTransport:                     base,
+		threadID:                          "thread-1",
+		includeStalePreStartNotifications: true,
+	}
+
+	client := codex.NewClient(transport, codex.WithRequestTimeout(5*time.Second))
+	proc := codex.NewProcessFromClient(client)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	stream := proc.RunStreamed(ctx, codex.RunOptions{Prompt: "early stale notification"})
+
+	var events []codex.Event
+	for event, err := range stream.Events() {
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		events = append(events, event)
+	}
+
+	var completedItems []string
+	for _, event := range events {
+		completed, ok := event.(*codex.ItemCompleted)
+		if !ok {
+			continue
+		}
+		item, ok := completed.Item.Value.(*codex.AgentMessageThreadItem)
+		if ok {
+			completedItems = append(completedItems, item.ID)
+		}
+	}
+	if len(completedItems) != 1 || completedItems[0] != "item-early" {
+		t.Fatalf("completed item IDs = %#v, want [item-early]", completedItems)
+	}
+
+	result := stream.Result()
+	if result == nil {
+		t.Fatal("Result() returned nil")
+		return
+	}
+	if result.Response != "early bird" {
+		t.Fatalf("Response = %q, want %q", result.Response, "early bird")
+	}
+	if got := len(result.Items); got != 1 {
+		t.Fatalf("len(Items) = %d, want 1", got)
 	}
 }
 
