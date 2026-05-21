@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -40,8 +41,11 @@ func TestCredentialsStoragePermissions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stat credentials: %v", err)
 	}
-	if got := info.Mode().Perm(); got != credentialFileMode {
-		t.Fatalf("credential mode = %v, want %v", got, credentialFileMode)
+	if runtime.GOOS != "windows" {
+		// Windows only maps os.Chmod to the read-only attribute; Unix bits are synthetic.
+		if got := info.Mode().Perm(); got != credentialFileMode {
+			t.Fatalf("credential mode = %v, want %v", got, credentialFileMode)
+		}
 	}
 	loaded, err := LoadCredentials(path)
 	if err != nil {
