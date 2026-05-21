@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"sync"
 	"testing"
@@ -139,6 +140,81 @@ func TestHandleNotificationInternalListenerPanicReportsErrorAndContinues(t *test
 	}
 	if !publicRan {
 		t.Fatal("public handler did not execute after internal listener panicked")
+	}
+}
+
+func TestTypedNotificationAddListenerAppendUnsubscribeNilAndPanicIsolation(t *testing.T) {
+	const (
+		method       = notifyAgentMessageDelta
+		delta        = "hello"
+		panicMessage = "typed listener panics"
+	)
+
+	var (
+		gotMethod string
+		gotErr    error
+		errCount  int
+	)
+
+	transport := &mockInternalTransport{}
+	c := NewClient(transport, WithHandlerErrorCallback(func(method string, err error) {
+		gotMethod = method
+		gotErr = err
+		errCount++
+	}))
+
+	unsubNil := c.AddAgentMessageDeltaListener(nil)
+	unsubNil()
+	unsubNil()
+
+	firstCalls := 0
+	panicCalls := 0
+	remainingCalls := 0
+
+	unsubFirst := c.AddAgentMessageDeltaListener(func(n AgentMessageDeltaNotification) {
+		firstCalls++
+		if n.Delta != delta {
+			t.Errorf("delta = %q; want %q", n.Delta, delta)
+		}
+	})
+	c.AddAgentMessageDeltaListener(func(AgentMessageDeltaNotification) {
+		panicCalls++
+		panic(panicMessage)
+	})
+	c.AddAgentMessageDeltaListener(func(AgentMessageDeltaNotification) {
+		remainingCalls++
+	})
+
+	notif := Notification{
+		JSONRPC: "2.0",
+		Method:  method,
+		Params:  json.RawMessage(`{"delta":"hello","itemId":"item","threadId":"thread","turnId":"turn"}`),
+	}
+
+	c.handleNotification(context.Background(), notif)
+
+	if firstCalls != 1 || panicCalls != 1 || remainingCalls != 1 {
+		t.Fatalf("listener calls = %d, %d, %d; want 1, 1, 1", firstCalls, panicCalls, remainingCalls)
+	}
+	if errCount != 1 {
+		t.Fatalf("handler error count = %d; want 1", errCount)
+	}
+	if gotMethod != method {
+		t.Fatalf("handler error method = %q; want %q", gotMethod, method)
+	}
+	if gotErr == nil || !strings.Contains(gotErr.Error(), panicMessage) {
+		t.Fatalf("handler error = %v; want panic message %q", gotErr, panicMessage)
+	}
+
+	unsubFirst()
+	unsubFirst()
+	c.handleNotification(context.Background(), notif)
+
+	if firstCalls != 1 || panicCalls != 2 || remainingCalls != 2 {
+		t.Fatalf("listener calls after unsubscribe = %d, %d, %d; want 1, 2, 2", firstCalls, panicCalls, remainingCalls)
+	}
+	if errCount != 2 {
+		t.Fatalf("handler error count after second dispatch = %d; want 2", errCount)
 	}
 }
 

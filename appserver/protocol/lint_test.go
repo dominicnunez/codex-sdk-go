@@ -55,6 +55,77 @@ func TestTypedNotificationListenersDispatchSpecMethods(t *testing.T) {
 	}
 }
 
+func TestTypedNotificationAddListenersDispatchSpecMethods(t *testing.T) {
+	var handlerErrors []error
+	client := NewClient(&mockInternalTransport{}, WithHandlerErrorCallback(func(_ string, err error) {
+		handlerErrors = append(handlerErrors, err)
+	}))
+	methodByType := loadServerNotificationMethodsByType(t)
+
+	methods := reflect.TypeOf(client)
+
+	for i := 0; i < methods.NumMethod(); i++ {
+		method := methods.Method(i)
+		if !isTypedAppendNotificationMethod(method) {
+			continue
+		}
+
+		handlerType := method.Type.In(1)
+		notificationType := handlerType.In(0)
+		notificationTypeName := notificationType.Name()
+		notificationMethod, ok := methodByType[notificationTypeName]
+		if !ok {
+			t.Fatalf("%s handler type %s has no server notification spec method", method.Name, notificationTypeName)
+		}
+
+		called := 0
+		handler := reflect.MakeFunc(handlerType, func(_ []reflect.Value) []reflect.Value {
+			called++
+			return nil
+		})
+		unsub := method.Func.Call([]reflect.Value{reflect.ValueOf(client), handler})[0]
+
+		params := sampleServerNotificationParams(t, notificationTypeName)
+		handlerErrors = nil
+		client.handleNotification(context.Background(), Notification{
+			Method: notificationMethod,
+			Params: params,
+		})
+
+		if called != 1 {
+			if len(handlerErrors) > 0 {
+				t.Fatalf("%s failed to decode %s sample params for %s: %v", method.Name, notificationMethod, notificationTypeName, handlerErrors[0])
+			}
+			t.Fatalf("%s did not dispatch %s notification to %s handler", method.Name, notificationMethod, notificationTypeName)
+		}
+
+		unsub.Call(nil)
+	}
+}
+
+func TestTypedNotificationAddListenersCoverTypedOnMethods(t *testing.T) {
+	methods := reflect.TypeOf(NewClient(&mockInternalTransport{}))
+
+	for i := 0; i < methods.NumMethod(); i++ {
+		method := methods.Method(i)
+		if !isTypedNotificationMethod(method) {
+			continue
+		}
+
+		addName := "Add" + strings.TrimPrefix(method.Name, "On") + "Listener"
+		addMethod, ok := methods.MethodByName(addName)
+		if !ok {
+			t.Fatalf("%s has no typed append listener %s", method.Name, addName)
+		}
+		if !isTypedAppendNotificationMethod(addMethod) {
+			t.Fatalf("%s exists but does not match typed append listener signature", addName)
+		}
+		if addMethod.Type.In(1) != method.Type.In(1) {
+			t.Fatalf("%s handler type = %s; want %s", addName, addMethod.Type.In(1), method.Type.In(1))
+		}
+	}
+}
+
 func isTypedNotificationMethod(method reflect.Method) bool {
 	if !strings.HasPrefix(method.Name, "On") {
 		return false
@@ -63,6 +134,26 @@ func isTypedNotificationMethod(method reflect.Method) bool {
 		return false
 	}
 	if method.Type.NumIn() != 2 || method.Type.NumOut() != 0 {
+		return false
+	}
+
+	handlerType := method.Type.In(1)
+	return handlerType.Kind() == reflect.Func && handlerType.NumIn() == 1 && handlerType.NumOut() == 0
+}
+
+func isTypedAppendNotificationMethod(method reflect.Method) bool {
+	if !strings.HasPrefix(method.Name, "Add") || !strings.HasSuffix(method.Name, "Listener") {
+		return false
+	}
+	if method.Name == "AddNotificationListener" {
+		return false
+	}
+	if method.Type.NumIn() != 2 || method.Type.NumOut() != 1 {
+		return false
+	}
+
+	unsubType := method.Type.Out(0)
+	if unsubType.Kind() != reflect.Func || unsubType.NumIn() != 0 || unsubType.NumOut() != 0 {
 		return false
 	}
 

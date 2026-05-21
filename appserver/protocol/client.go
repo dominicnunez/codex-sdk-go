@@ -472,6 +472,20 @@ func (c *Client) AddNotificationListener(method string, handler NotificationHand
 	return c.addNotificationListener(method, handler)
 }
 
+func addTypedNotificationListener[T any](c *Client, method string, handler func(T)) func() {
+	if handler == nil {
+		return func() {}
+	}
+	return c.addNotificationListener(method, func(_ context.Context, notif Notification) {
+		var typed T
+		if err := json.Unmarshal(notif.Params, &typed); err != nil {
+			c.reportHandlerError(method, fmt.Errorf("unmarshal %s: %w", method, err))
+			return
+		}
+		handler(typed)
+	})
+}
+
 // handleRequest is the internal handler for server→client requests (approval flows).
 // It routes incoming requests to the appropriate approval handler.
 // Panics in approval handlers are recovered and reported via the handler error
