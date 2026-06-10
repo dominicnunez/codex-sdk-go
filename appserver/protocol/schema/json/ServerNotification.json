@@ -29,6 +29,7 @@
       "type": "object"
     },
     "AccountRateLimitsUpdatedNotification": {
+      "description": "Sparse rolling rate-limit update.\n\nClients should merge available values into the most recent `account/rateLimits/read` response or refetch that snapshot. Nullable account metadata may be unavailable in a rolling update and does not clear a previously observed value.",
       "properties": {
         "rateLimits": {
           "$ref": "#/definitions/RateLimitSnapshot"
@@ -68,7 +69,7 @@
       "properties": {
         "extends": {
           "default": null,
-          "description": "Parent profile identifier once permissions profiles support inheritance. This is currently always `null`.",
+          "description": "Parent profile identifier from the selected permissions profile's `extends` setting, when present.",
           "type": [
             "string",
             "null"
@@ -522,6 +523,13 @@
           "description": "Programmatic Codex auth backed by a registered Agent Identity.",
           "enum": [
             "agentIdentity"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Programmatic Codex auth backed by a personal access token.",
+          "enum": [
+            "personalAccessToken"
           ],
           "type": "string"
         }
@@ -1836,6 +1844,7 @@
         "sessionStart",
         "userPromptSubmit",
         "subagentStart",
+        "subagentStop",
         "stop"
       ],
       "type": "string"
@@ -2001,6 +2010,7 @@
         "sessionFlags",
         "plugin",
         "cloudRequirements",
+        "cloudManagedConfig",
         "legacyManagedConfigFile",
         "legacyManagedConfigMdm",
         "unknown"
@@ -2030,6 +2040,8 @@
     },
     "ImageDetail": {
       "enum": [
+        "auto",
+        "low",
         "high",
         "original"
       ],
@@ -2222,6 +2234,12 @@
         },
         "status": {
           "$ref": "#/definitions/McpServerStartupState"
+        },
+        "threadId": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
       "required": [
@@ -2673,6 +2691,16 @@
             }
           ]
         },
+        "individualLimit": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/SpendControlLimitSnapshot"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "limitId": {
           "type": [
             "string",
@@ -2762,15 +2790,8 @@
       "type": "string"
     },
     "ReasoningEffort": {
-      "description": "See https://platform.openai.com/docs/guides/reasoning?api-mode=responses#get-started-with-reasoning",
-      "enum": [
-        "none",
-        "minimal",
-        "low",
-        "medium",
-        "high",
-        "xhigh"
-      ],
+      "description": "A non-empty reasoning effort value advertised by the model.",
+      "minLength": 1,
       "type": "string"
     },
     "ReasoningSummary": {
@@ -3131,6 +3152,39 @@
       "description": "Notification emitted when watched local skill files change.\n\nTreat this as an invalidation signal and re-run `skills/list` with the client's current parameters when refreshed skill metadata is needed.",
       "type": "object"
     },
+    "SpendControlLimitSnapshot": {
+      "properties": {
+        "limit": {
+          "type": "string"
+        },
+        "remainingPercent": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "resetsAt": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "used": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "limit",
+        "remainingPercent",
+        "resetsAt",
+        "used"
+      ],
+      "type": "object"
+    },
+    "SubAgentActivityKind": {
+      "enum": [
+        "started",
+        "interacted",
+        "interrupted"
+      ],
+      "type": "string"
+    },
     "SubAgentSource": {
       "oneOf": [
         {
@@ -3362,6 +3416,13 @@
             "null"
           ]
         },
+        "parentThreadId": {
+          "description": "The ID of the parent thread. This will only be set if this thread is a subagent.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "path": {
           "description": "[UNSTABLE] Path to the thread on disk.",
           "type": [
@@ -3558,6 +3619,12 @@
       "oneOf": [
         {
           "properties": {
+            "clientId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "content": {
               "items": {
                 "$ref": "#/definitions/UserInput"
@@ -3860,6 +3927,12 @@
                 "null"
               ]
             },
+            "pluginId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "result": {
               "anyOf": [
                 {
@@ -4040,6 +4113,38 @@
             "type"
           ],
           "title": "CollabAgentToolCallThreadItem",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "agentPath": {
+              "type": "string"
+            },
+            "agentThreadId": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "kind": {
+              "$ref": "#/definitions/SubAgentActivityKind"
+            },
+            "type": {
+              "enum": [
+                "subAgentActivity"
+              ],
+              "title": "SubAgentActivityThreadItemType",
+              "type": "string"
+            }
+          },
+          "required": [
+            "agentPath",
+            "agentThreadId",
+            "id",
+            "kind",
+            "type"
+          ],
+          "title": "SubAgentActivityThreadItem",
           "type": "object"
         },
         {
@@ -4510,11 +4615,6 @@
       "type": "object"
     },
     "ThreadSource": {
-      "enum": [
-        "user",
-        "subagent",
-        "memory_consolidation"
-      ],
       "type": "string"
     },
     "ThreadStartedNotification": {
@@ -4856,6 +4956,23 @@
           "type": "string"
         }
       ]
+    },
+    "TurnModerationMetadataNotification": {
+      "properties": {
+        "metadata": true,
+        "threadId": {
+          "type": "string"
+        },
+        "turnId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "metadata",
+        "threadId",
+        "turnId"
+      ],
+      "type": "object"
     },
     "TurnPlanStep": {
       "properties": {
@@ -6194,6 +6311,26 @@
         "params"
       ],
       "title": "Model/verificationNotification",
+      "type": "object"
+    },
+    {
+      "properties": {
+        "method": {
+          "enum": [
+            "turn/moderationMetadata"
+          ],
+          "title": "Turn/moderationMetadataNotificationMethod",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/definitions/TurnModerationMetadataNotification"
+        }
+      },
+      "required": [
+        "method",
+        "params"
+      ],
+      "title": "Turn/moderationMetadataNotification",
       "type": "object"
     },
     {
