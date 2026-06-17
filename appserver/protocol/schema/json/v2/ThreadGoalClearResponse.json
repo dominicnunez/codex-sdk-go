@@ -1,13 +1,13 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "properties": {
-    "importId": {
-      "type": "string"
+    "cleared": {
+      "type": "boolean"
     }
   },
   "required": [
-    "importId"
+    "cleared"
   ],
-  "title": "ExternalAgentConfigImportResponse",
+  "title": "ThreadGoalClearResponse",
   "type": "object"
 }
