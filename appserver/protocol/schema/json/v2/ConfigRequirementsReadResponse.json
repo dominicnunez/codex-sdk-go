@@ -15,7 +15,6 @@
         {
           "enum": [
             "untrusted",
-            "on-failure",
             "on-request",
             "never"
           ],
@@ -73,7 +72,19 @@
     },
     "ConfigRequirements": {
       "properties": {
+        "allowAppshots": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "allowManagedHooksOnly": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "allowRemoteControl": {
           "type": [
             "boolean",
             "null"
@@ -85,6 +96,15 @@
           },
           "type": [
             "array",
+            "null"
+          ]
+        },
+        "allowedPermissionProfiles": {
+          "additionalProperties": {
+            "type": "boolean"
+          },
+          "type": [
+            "object",
             "null"
           ]
         },
@@ -106,6 +126,15 @@
             "null"
           ]
         },
+        "allowedWindowsSandboxImplementations": {
+          "items": {
+            "$ref": "#/definitions/WindowsSandboxSetupMode"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
         "computerUse": {
           "anyOf": [
             {
@@ -114,6 +143,12 @@
             {
               "type": "null"
             }
+          ]
+        },
+        "defaultPermissions": {
+          "type": [
+            "string",
+            "null"
           ]
         },
         "enforceResidency": {
@@ -288,6 +323,12 @@
           },
           "type": "array"
         },
+        "SubagentStop": {
+          "items": {
+            "$ref": "#/definitions/ConfiguredHookMatcherGroup"
+          },
+          "type": "array"
+        },
         "UserPromptSubmit": {
           "items": {
             "$ref": "#/definitions/ConfiguredHookMatcherGroup"
@@ -316,6 +357,7 @@
         "SessionStart",
         "Stop",
         "SubagentStart",
+        "SubagentStop",
         "UserPromptSubmit"
       ],
       "type": "object"
@@ -438,7 +480,7 @@
     "NetworkUnixSocketPermission": {
       "enum": [
         "allow",
-        "none"
+        "deny"
       ],
       "type": "string"
     },
@@ -460,7 +502,15 @@
       "enum": [
         "disabled",
         "cached",
+        "indexed",
         "live"
+      ],
+      "type": "string"
+    },
+    "WindowsSandboxSetupMode": {
+      "enum": [
+        "elevated",
+        "unelevated"
       ],
       "type": "string"
     }
