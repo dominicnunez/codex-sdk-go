@@ -442,6 +442,13 @@ func TestRunWithAllOptions(t *testing.T) {
 	effort := codex.ReasoningEffortHigh
 	personality := codex.PersonalityFriendly
 	var approvalPolicy codex.AskForApproval = codex.ApprovalPolicyNever
+	cwd := t.TempDir()
+	sandbox := codex.SandboxModeReadOnly
+	access := codex.ReadOnlyAccessWrapper{Value: codex.ReadOnlyAccessRestricted{
+		IncludePlatformDefaults: codex.Ptr(false),
+		ReadableRoots:           []string{cwd},
+	}}
+	var sandboxPolicy codex.SandboxPolicy = codex.SandboxPolicyReadOnly{Access: &access}
 
 	go func() {
 		r, err := proc.Run(ctx, codex.RunOptions{
@@ -451,6 +458,10 @@ func TestRunWithAllOptions(t *testing.T) {
 			Effort:         &effort,
 			Personality:    &personality,
 			ApprovalPolicy: &approvalPolicy,
+			Cwd:            &cwd,
+			Config:         json.RawMessage(`{"web_search":"disabled","tools":{"web_search":false}}`),
+			Sandbox:        &sandbox,
+			SandboxPolicy:  sandboxPolicy,
 		})
 		ch <- runResult{r, err}
 	}()
@@ -488,6 +499,26 @@ func TestRunWithAllOptions(t *testing.T) {
 	if threadParams["approvalPolicy"] != "never" {
 		t.Errorf("approvalPolicy = %v, want 'never'", threadParams["approvalPolicy"])
 	}
+	if threadParams["cwd"] != cwd {
+		t.Errorf("cwd = %v, want %q", threadParams["cwd"], cwd)
+	}
+	if threadParams["sandbox"] != "read-only" {
+		t.Errorf("sandbox = %v, want 'read-only'", threadParams["sandbox"])
+	}
+	config, ok := threadParams["config"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("config = %T, want object", threadParams["config"])
+	}
+	if config["web_search"] != "disabled" {
+		t.Errorf("config.web_search = %v, want 'disabled'", config["web_search"])
+	}
+	tools, ok := config["tools"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("config.tools = %T, want object", config["tools"])
+	}
+	if tools["web_search"] != false {
+		t.Errorf("config.tools.web_search = %v, want false", tools["web_search"])
+	}
 
 	// Verify turn/start params contain effort.
 	var turnReq *codex.Request
@@ -510,6 +541,30 @@ func TestRunWithAllOptions(t *testing.T) {
 
 	if turnParams["effort"] != "high" {
 		t.Errorf("effort = %v, want 'high'", turnParams["effort"])
+	}
+	if turnParams["cwd"] != cwd {
+		t.Errorf("turn cwd = %v, want %q", turnParams["cwd"], cwd)
+	}
+	policy, ok := turnParams["sandboxPolicy"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("sandboxPolicy = %T, want object", turnParams["sandboxPolicy"])
+	}
+	if policy["type"] != "readOnly" {
+		t.Errorf("sandboxPolicy.type = %v, want 'readOnly'", policy["type"])
+	}
+	accessParams, ok := policy["access"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("sandboxPolicy.access = %T, want object", policy["access"])
+	}
+	if accessParams["type"] != "restricted" {
+		t.Errorf("sandboxPolicy.access.type = %v, want 'restricted'", accessParams["type"])
+	}
+	if accessParams["includePlatformDefaults"] != false {
+		t.Errorf("sandboxPolicy.access.includePlatformDefaults = %v, want false", accessParams["includePlatformDefaults"])
+	}
+	roots, ok := accessParams["readableRoots"].([]interface{})
+	if !ok || len(roots) != 1 || roots[0] != cwd {
+		t.Errorf("sandboxPolicy.access.readableRoots = %v, want [%q]", accessParams["readableRoots"], cwd)
 	}
 
 	// Complete the turn so Run() returns.

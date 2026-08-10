@@ -106,6 +106,16 @@ type (
 	ReadCommandAction                          = protocol.ReadCommandAction
 	ReviewDecisionWrapper                      = protocol.ReviewDecisionWrapper
 	SandboxMode                                = protocol.SandboxMode
+	SandboxPolicy                              = protocol.SandboxPolicy
+	SandboxPolicyDangerFullAccess              = protocol.SandboxPolicyDangerFullAccess
+	SandboxPolicyExternalSandbox               = protocol.SandboxPolicyExternalSandbox
+	SandboxPolicyReadOnly                      = protocol.SandboxPolicyReadOnly
+	SandboxPolicyWorkspaceWrite                = protocol.SandboxPolicyWorkspaceWrite
+	ReadOnlyAccess                             = protocol.ReadOnlyAccess
+	ReadOnlyAccessFullAccess                   = protocol.ReadOnlyAccessFullAccess
+	ReadOnlyAccessRestricted                   = protocol.ReadOnlyAccessRestricted
+	ReadOnlyAccessWrapper                      = protocol.ReadOnlyAccessWrapper
+	NetworkAccess                              = protocol.NetworkAccess
 	SearchCommandAction                        = protocol.SearchCommandAction
 	SearchWebSearchAction                      = protocol.SearchWebSearchAction
 	SkillUserInput                             = protocol.SkillUserInput
@@ -182,6 +192,8 @@ const (
 	PatchApplyStatusInProgress          = protocol.PatchApplyStatusInProgress
 	PersonalityFriendly                 = protocol.PersonalityFriendly
 	ReasoningEffortHigh                 = protocol.ReasoningEffortHigh
+	NetworkAccessEnabled                = protocol.NetworkAccessEnabled
+	NetworkAccessRestricted             = protocol.NetworkAccessRestricted
 	SandboxModeDangerFullAccess         = protocol.SandboxModeDangerFullAccess
 	SandboxModeReadOnly                 = protocol.SandboxModeReadOnly
 	SandboxModeWorkspaceWrite           = protocol.SandboxModeWorkspaceWrite

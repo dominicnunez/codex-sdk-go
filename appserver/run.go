@@ -2,6 +2,7 @@ package appserver
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 )
@@ -14,6 +15,12 @@ type RunOptions struct {
 	// Instructions optionally sets developer instructions for the thread.
 	Instructions *string
 
+	// Cwd optionally pins both the thread and turn to an absolute working directory.
+	Cwd *string
+
+	// Config optionally provides thread-scoped configuration overrides.
+	Config json.RawMessage
+
 	// Model optionally overrides the model for this turn.
 	Model *string
 
@@ -25,6 +32,12 @@ type RunOptions struct {
 
 	// ApprovalPolicy optionally sets the approval policy for the thread.
 	ApprovalPolicy *AskForApproval
+
+	// Sandbox optionally sets the thread sandbox mode.
+	Sandbox *SandboxMode
+
+	// SandboxPolicy optionally applies a more granular sandbox policy to the turn.
+	SandboxPolicy SandboxPolicy
 
 	// CollaborationMode optionally configures multi-agent collaboration for this turn.
 	CollaborationMode *CollaborationMode
@@ -51,9 +64,16 @@ type RunResult struct {
 // buildThreadParams converts RunOptions into ThreadStartParams.
 func buildThreadParams(opts RunOptions) ThreadStartParams {
 	params := ThreadStartParams{
+		Cwd:       opts.Cwd,
 		Ephemeral: Ptr(true),
 	}
+	if len(opts.Config) > 0 {
+		params.Config = append(json.RawMessage(nil), opts.Config...)
+	}
 	applyThreadStartOptions(&params, opts.Instructions, opts.Model, opts.Personality, opts.ApprovalPolicy)
+	if opts.Sandbox != nil {
+		params.Sandbox = opts.Sandbox
+	}
 	return params
 }
 
@@ -61,6 +81,12 @@ func buildThreadParams(opts RunOptions) ThreadStartParams {
 func buildTurnParams(opts RunOptions, threadID string) TurnStartParams {
 	params := newTurnStartParams(threadID, opts.Prompt)
 	applyTurnStartOptions(&params, opts.Model, opts.Effort, opts.CollaborationMode, opts.OutputSchema)
+	if opts.Cwd != nil {
+		params.Cwd = opts.Cwd
+	}
+	if opts.SandboxPolicy != nil {
+		params.SandboxPolicy = &opts.SandboxPolicy
+	}
 	return params
 }
 

@@ -416,6 +416,7 @@ func TestOutboundAbsolutePathRequestsNormalizeBeforeSend(t *testing.T) {
 		_, err := client.Turn.Start(context.Background(), codex.TurnStartParams{
 			ThreadID:      "thread-1",
 			Input:         []codex.UserInput{&codex.TextUserInput{Text: "hi"}},
+			Cwd:           ptr("/tmp/../workspace//repo"),
 			SandboxPolicy: &sandboxPolicy,
 		})
 		if err != nil {
@@ -425,6 +426,9 @@ func TestOutboundAbsolutePathRequestsNormalizeBeforeSend(t *testing.T) {
 		var params codex.TurnStartParams
 		if err := json.Unmarshal(transport.GetSentRequest(0).Params, &params); err != nil {
 			t.Fatalf("unmarshal params: %v", err)
+		}
+		if params.Cwd == nil || *params.Cwd != "/workspace/repo" {
+			t.Fatalf("Cwd = %v, want /workspace/repo", params.Cwd)
 		}
 		policy, ok := (*params.SandboxPolicy).(codex.SandboxPolicyReadOnly)
 		if !ok {
@@ -570,6 +574,17 @@ func TestOutboundAbsolutePathRequestsRejectRelativePaths(t *testing.T) {
 			call: func(client *codex.Client) error {
 				_, err := client.ExternalAgent.ConfigDetect(context.Background(), codex.ExternalAgentConfigDetectParams{
 					Cwds: ptr([]string{"repo"}),
+				})
+				return err
+			},
+		},
+		{
+			name: "turn start cwd",
+			call: func(client *codex.Client) error {
+				_, err := client.Turn.Start(context.Background(), codex.TurnStartParams{
+					ThreadID: "thread-1",
+					Input:    []codex.UserInput{&codex.TextUserInput{Text: "hi"}},
+					Cwd:      ptr("repo"),
 				})
 				return err
 			},
