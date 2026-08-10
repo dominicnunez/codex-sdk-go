@@ -847,6 +847,10 @@ func (p TurnStartParams) prepareRequest() (interface{}, error) {
 	}
 
 	var err error
+	p.Cwd, err = normalizeOptionalAbsolutePathField("cwd", p.Cwd)
+	if err != nil {
+		return nil, err
+	}
 	p.SandboxPolicy, err = normalizeSandboxPolicyPointerField("sandboxPolicy", p.SandboxPolicy)
 	if err != nil {
 		return nil, err
