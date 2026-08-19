@@ -29,11 +29,27 @@
         }
       ]
     },
+    "PluginDisabledReason": {
+      "enum": [
+        "disabled_by_admin",
+        "plan_not_eligible",
+        "required_app_unavailable",
+        "unknown"
+      ],
+      "type": "string"
+    },
     "PluginInstallPolicy": {
       "enum": [
         "NOT_AVAILABLE",
         "AVAILABLE",
         "INSTALLED_BY_DEFAULT"
+      ],
+      "type": "string"
+    },
+    "PluginInstallPolicySource": {
+      "enum": [
+        "WORKSPACE_SETTING",
+        "IMPLICIT_CANONICAL_APP"
       ],
       "type": "string"
     },
@@ -108,8 +124,26 @@
           ],
           "description": "Local logo path, resolved from the installed plugin package."
         },
+        "logoDark": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AbsolutePathBuf"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Local dark-mode logo path, resolved from the installed plugin package."
+        },
         "logoUrl": {
           "description": "Remote logo URL from the plugin catalog.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "logoUrlDark": {
+          "description": "Remote dark-mode logo URL from the plugin catalog.",
           "type": [
             "string",
             "null"
@@ -169,6 +203,13 @@
     },
     "PluginShareContext": {
       "properties": {
+        "canPublishToWorkspace": {
+          "default": null,
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "creatorAccountUserId": {
           "type": [
             "string",
@@ -352,6 +393,40 @@
           "type": "object"
         },
         {
+          "properties": {
+            "package": {
+              "type": "string"
+            },
+            "registry": {
+              "description": "Optional HTTPS registry URL. Authentication stays in the user's npm config.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "enum": [
+                "npm"
+              ],
+              "title": "NpmPluginSourceType",
+              "type": "string"
+            },
+            "version": {
+              "description": "Optional npm version or version range.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "package",
+            "type"
+          ],
+          "title": "NpmPluginSource",
+          "type": "object"
+        },
+        {
           "description": "The plugin is available in the remote catalog. Download metadata is kept server-side and is not exposed through the app-server API.",
           "properties": {
             "type": {
@@ -384,6 +459,29 @@
           "default": "AVAILABLE",
           "description": "Availability state for installing and using the plugin."
         },
+        "disabledReason": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PluginDisabledReason"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Why the remote plugin is unavailable, when provided by plugin-service."
+        },
+        "eligiblePlanTypes": {
+          "default": null,
+          "description": "Raw plugin-service plan identifiers eligible to install the plugin.",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
         "enabled": {
           "type": "boolean"
         },
@@ -393,8 +491,27 @@
         "installPolicy": {
           "$ref": "#/definitions/PluginInstallPolicy"
         },
+        "installPolicySource": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PluginInstallPolicySource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "installed": {
           "type": "boolean"
+        },
+        "installedAt": {
+          "default": null,
+          "description": "Unix timestamp in seconds when the remote plugin was installed, when available.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
         },
         "interface": {
           "anyOf": [
@@ -421,6 +538,13 @@
             "null"
           ]
         },
+        "mustShowInstallationInterstitial": {
+          "default": null,
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "name": {
           "type": "string"
         },
@@ -444,6 +568,14 @@
         },
         "source": {
           "$ref": "#/definitions/PluginSource"
+        },
+        "version": {
+          "default": null,
+          "description": "Version advertised by the remote marketplace backend when available.",
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
       "required": [
