@@ -165,18 +165,21 @@ type GetWorkspaceMessagesResponse struct {
 	Messages       []WorkspaceMessage `json:"messages"`
 }
 
+// ConsumeRateLimitResetCredit consumes an available account rate-limit reset credit.
 func (s *AccountService) ConsumeRateLimitResetCredit(ctx context.Context, params ConsumeAccountRateLimitResetCreditParams) (ConsumeAccountRateLimitResetCreditResponse, error) {
 	var resp ConsumeAccountRateLimitResetCreditResponse
 	err := s.client.sendRequest(ctx, methodAccountRateLimitResetCreditConsume, params, &resp)
 	return resp, err
 }
 
+// GetTokenUsage returns account token usage and optional per-thread estimates.
 func (s *AccountService) GetTokenUsage(ctx context.Context, params *GetAccountTokenUsageParams) (GetAccountTokenUsageResponse, error) {
 	var resp GetAccountTokenUsageResponse
 	err := s.client.sendRequest(ctx, methodAccountUsageRead, params, &resp)
 	return resp, err
 }
 
+// GetWorkspaceMessages returns active messages for the current workspace.
 func (s *AccountService) GetWorkspaceMessages(ctx context.Context) (GetWorkspaceMessagesResponse, error) {
 	var resp GetWorkspaceMessagesResponse
 	err := s.client.sendRequest(ctx, methodAccountWorkspaceMessagesRead, nil, &resp)
@@ -258,44 +261,61 @@ type ThreadSectionMoveParams struct {
 }
 type ThreadSectionMoveResponse struct{}
 
+// Delete permanently deletes a thread.
 func (s *ThreadService) Delete(ctx context.Context, params ThreadDeleteParams) (ThreadDeleteResponse, error) {
 	err := s.client.sendEmptyObjectRequest(ctx, methodThreadDelete, params)
 	return ThreadDeleteResponse{}, err
 }
+
+// GoalGet returns the current goal for a thread.
 func (s *ThreadService) GoalGet(ctx context.Context, params ThreadGoalGetParams) (ThreadGoalGetResponse, error) {
 	var resp ThreadGoalGetResponse
 	err := s.client.sendRequest(ctx, methodThreadGoalGet, params, &resp)
 	return resp, err
 }
+
+// GoalSet creates or updates the goal for a thread.
 func (s *ThreadService) GoalSet(ctx context.Context, params ThreadGoalSetParams) (ThreadGoalSetResponse, error) {
 	var resp ThreadGoalSetResponse
 	err := s.client.sendRequest(ctx, methodThreadGoalSet, params, &resp)
 	return resp, err
 }
+
+// GoalClear clears the current goal for a thread.
 func (s *ThreadService) GoalClear(ctx context.Context, params ThreadGoalClearParams) (ThreadGoalClearResponse, error) {
 	var resp ThreadGoalClearResponse
 	err := s.client.sendRequest(ctx, methodThreadGoalClear, params, &resp)
 	return resp, err
 }
+
+// SectionCreate creates a thread section.
 func (s *ThreadService) SectionCreate(ctx context.Context, params ThreadSectionCreateParams) (ThreadSectionCreateResponse, error) {
 	var resp ThreadSectionCreateResponse
 	err := s.client.sendRequest(ctx, methodThreadSectionCreate, params, &resp)
 	return resp, err
 }
+
+// SectionDelete deletes a thread section.
 func (s *ThreadService) SectionDelete(ctx context.Context, params ThreadSectionDeleteParams) (ThreadSectionDeleteResponse, error) {
 	err := s.client.sendEmptyObjectRequest(ctx, methodThreadSectionDelete, params)
 	return ThreadSectionDeleteResponse{}, err
 }
+
+// SectionList lists thread sections.
 func (s *ThreadService) SectionList(ctx context.Context, params ThreadSectionListParams) (ThreadSectionListResponse, error) {
 	var resp ThreadSectionListResponse
 	err := s.client.sendRequest(ctx, methodThreadSectionList, params, &resp)
 	return resp, err
 }
+
+// SectionUpdate updates a thread section.
 func (s *ThreadService) SectionUpdate(ctx context.Context, params ThreadSectionUpdateParams) (ThreadSectionUpdateResponse, error) {
 	var resp ThreadSectionUpdateResponse
 	err := s.client.sendRequest(ctx, methodThreadSectionUpdate, params, &resp)
 	return resp, err
 }
+
+// SectionMove moves a thread into or between sections.
 func (s *ThreadService) SectionMove(ctx context.Context, params ThreadSectionMoveParams) (ThreadSectionMoveResponse, error) {
 	err := s.client.sendEmptyObjectRequest(ctx, methodThreadSectionMove, params)
 	return ThreadSectionMoveResponse{}, err
@@ -316,6 +336,7 @@ func (p SkillsExtraRootsSetParams) prepareRequest() (interface{}, error) {
 	return p, nil
 }
 
+// SetExtraRoots replaces the global extra skill roots.
 func (s *SkillsService) SetExtraRoots(ctx context.Context, params SkillsExtraRootsSetParams) (SkillsExtraRootsSetResponse, error) {
 	err := s.client.sendEmptyObjectRequest(ctx, methodSkillsExtraRootsSet, params)
 	return SkillsExtraRootsSetResponse{}, err
@@ -380,11 +401,14 @@ type ExternalAgentConfigImportHistoriesReadResponse struct {
 	Data       []ExternalAgentConfigImportHistory        `json:"data"`
 }
 
+// ImportHistories returns recorded external-agent import histories.
 func (s *ExternalAgentService) ImportHistories(ctx context.Context) (ExternalAgentConfigImportHistoriesReadResponse, error) {
 	var resp ExternalAgentConfigImportHistoriesReadResponse
 	err := s.client.sendRequest(ctx, methodExternalAgentConfigImportReadHistories, nil, &resp)
 	return resp, err
 }
+
+// RecordImportHistory records the result of an external-agent configuration import.
 func (s *ExternalAgentService) RecordImportHistory(ctx context.Context, params ExternalAgentConfigImportHistoryRecordParams) (ExternalAgentConfigImportHistoryRecordResponse, error) {
 	var resp ExternalAgentConfigImportHistoryRecordResponse
 	err := s.client.sendRequest(ctx, methodExternalAgentConfigImportRecordHistory, params, &resp)
@@ -474,70 +498,112 @@ func setTypedNotificationHandler[T any](c *Client, method string, handler func(T
 	})
 }
 
+// OnThreadDeleted sets the handler for thread/deleted notifications.
 func (c *Client) OnThreadDeleted(h func(ThreadDeletedNotification)) {
 	setTypedNotificationHandler(c, notifyThreadDeleted, h)
 }
+
+// OnThreadReverted sets the handler for thread/reverted notifications.
 func (c *Client) OnThreadReverted(h func(ThreadRevertedNotification)) {
 	setTypedNotificationHandler(c, notifyThreadReverted, h)
 }
+
+// OnThreadQueueChanged sets the handler for thread/queue/changed notifications.
 func (c *Client) OnThreadQueueChanged(h func(ThreadQueueChangedNotification)) {
 	setTypedNotificationHandler(c, notifyThreadQueueChanged, h)
 }
+
+// OnThreadProjectUpdated sets the handler for thread/project/updated notifications.
 func (c *Client) OnThreadProjectUpdated(h func(ThreadProjectUpdatedNotification)) {
 	setTypedNotificationHandler(c, notifyThreadProjectUpdated, h)
 }
+
+// OnEnvironmentConnected sets the handler for thread/environment/connected notifications.
 func (c *Client) OnEnvironmentConnected(h func(EnvironmentConnectionNotification)) {
 	setTypedNotificationHandler(c, notifyEnvironmentConnected, h)
 }
+
+// OnEnvironmentDisconnected sets the handler for thread/environment/disconnected notifications.
 func (c *Client) OnEnvironmentDisconnected(h func(EnvironmentConnectionNotification)) {
 	setTypedNotificationHandler(c, notifyEnvironmentDisconnected, h)
 }
+
+// OnStrictReviewRequired sets the handler for autoApprovalReview/strictReviewRequired notifications.
 func (c *Client) OnStrictReviewRequired(h func(StrictReviewRequiredNotification)) {
 	setTypedNotificationHandler(c, notifyStrictReviewRequired, h)
 }
+
+// OnExternalAgentConfigImportProgress sets the handler for externalAgentConfig/import/progress notifications.
 func (c *Client) OnExternalAgentConfigImportProgress(h func(ExternalAgentConfigImportProgressNotification)) {
 	setTypedNotificationHandler(c, notifyExternalAgentConfigImportProgress, h)
 }
+
+// OnTurnModerationMetadata sets the handler for turn/moderationMetadata notifications.
 func (c *Client) OnTurnModerationMetadata(h func(TurnModerationMetadataNotification)) {
 	setTypedNotificationHandler(c, notifyTurnModerationMetadata, h)
 }
+
+// OnProjectChanged sets the handler for project/changed notifications.
 func (c *Client) OnProjectChanged(h func(ProjectChangedNotification)) {
 	setTypedNotificationHandler(c, notifyProjectChanged, h)
 }
+
+// OnModelSafetyBufferingUpdated sets the handler for model/safetyBuffering/updated notifications.
 func (c *Client) OnModelSafetyBufferingUpdated(h func(ModelSafetyBufferingUpdatedNotification)) {
 	setTypedNotificationHandler(c, notifyModelSafetyBufferingUpdated, h)
 }
 
+// AddThreadDeletedListener appends a listener for thread/deleted notifications.
 func (c *Client) AddThreadDeletedListener(h func(ThreadDeletedNotification)) func() {
 	return addTypedNotificationListener(c, notifyThreadDeleted, h)
 }
+
+// AddThreadRevertedListener appends a listener for thread/reverted notifications.
 func (c *Client) AddThreadRevertedListener(h func(ThreadRevertedNotification)) func() {
 	return addTypedNotificationListener(c, notifyThreadReverted, h)
 }
+
+// AddThreadQueueChangedListener appends a listener for thread/queue/changed notifications.
 func (c *Client) AddThreadQueueChangedListener(h func(ThreadQueueChangedNotification)) func() {
 	return addTypedNotificationListener(c, notifyThreadQueueChanged, h)
 }
+
+// AddThreadProjectUpdatedListener appends a listener for thread/project/updated notifications.
 func (c *Client) AddThreadProjectUpdatedListener(h func(ThreadProjectUpdatedNotification)) func() {
 	return addTypedNotificationListener(c, notifyThreadProjectUpdated, h)
 }
+
+// AddEnvironmentConnectedListener appends a listener for thread/environment/connected notifications.
 func (c *Client) AddEnvironmentConnectedListener(h func(EnvironmentConnectionNotification)) func() {
 	return addTypedNotificationListener(c, notifyEnvironmentConnected, h)
 }
+
+// AddEnvironmentDisconnectedListener appends a listener for thread/environment/disconnected notifications.
 func (c *Client) AddEnvironmentDisconnectedListener(h func(EnvironmentConnectionNotification)) func() {
 	return addTypedNotificationListener(c, notifyEnvironmentDisconnected, h)
 }
+
+// AddStrictReviewRequiredListener appends a listener for autoApprovalReview/strictReviewRequired notifications.
 func (c *Client) AddStrictReviewRequiredListener(h func(StrictReviewRequiredNotification)) func() {
 	return addTypedNotificationListener(c, notifyStrictReviewRequired, h)
 }
+
+// AddExternalAgentConfigImportProgressListener appends an externalAgentConfig/import/progress listener.
 func (c *Client) AddExternalAgentConfigImportProgressListener(h func(ExternalAgentConfigImportProgressNotification)) func() {
 	return addTypedNotificationListener(c, notifyExternalAgentConfigImportProgress, h)
 }
+
+// AddTurnModerationMetadataListener appends a turn moderation-metadata listener.
 func (c *Client) AddTurnModerationMetadataListener(h func(TurnModerationMetadataNotification)) func() {
 	return addTypedNotificationListener(c, notifyTurnModerationMetadata, h)
 }
+
+// AddProjectChangedListener appends a listener for project/changed notifications.
 func (c *Client) AddProjectChangedListener(h func(ProjectChangedNotification)) func() {
 	return addTypedNotificationListener(c, notifyProjectChanged, h)
 }
+
+// AddModelSafetyBufferingUpdatedListener appends a model/safetyBuffering/updated listener.
 func (c *Client) AddModelSafetyBufferingUpdatedListener(h func(ModelSafetyBufferingUpdatedNotification)) func() {
 	return addTypedNotificationListener(c, notifyModelSafetyBufferingUpdated, h)
 }
