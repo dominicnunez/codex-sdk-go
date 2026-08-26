@@ -448,6 +448,7 @@ type RawResponseCompletedNotification struct {
 }
 
 type AgentMessageDelivery string
+
 const AgentMessageDeliveryAsync AgentMessageDelivery = "async"
 
 type McpToolCallAppContext struct {

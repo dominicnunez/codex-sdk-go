@@ -518,15 +518,6 @@ const (
 	ReasoningEffortXHigh   ReasoningEffort = "xhigh"
 )
 
-var validReasoningEfforts = map[ReasoningEffort]struct{}{
-	ReasoningEffortNone:    {},
-	ReasoningEffortMinimal: {},
-	ReasoningEffortLow:     {},
-	ReasoningEffortMedium:  {},
-	ReasoningEffortHigh:    {},
-	ReasoningEffortXHigh:   {},
-}
-
 func (r ReasoningEffort) MarshalJSON() ([]byte, error) {
 	if r == "" {
 		return nil, fmt.Errorf("reasoningEffort must not be empty")
