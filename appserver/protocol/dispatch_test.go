@@ -320,7 +320,8 @@ func TestKnownApprovalHandlerDispatch(t *testing.T) {
 			name:   "item/tool/requestUserInput",
 			method: "item/tool/requestUserInput",
 			params: map[string]interface{}{
-				"itemId": "item-1",
+				"isBlocking": true,
+				"itemId":     "item-1",
 				"questions": []interface{}{
 					map[string]interface{}{
 						"header":   "Header",
@@ -598,6 +599,7 @@ func TestMalformedApprovalRequestReturnsInvalidParams(t *testing.T) {
 			name:   "item/tool/requestUserInput missing item id",
 			method: "item/tool/requestUserInput",
 			params: map[string]interface{}{
+				"isBlocking": true,
 				"questions": []interface{}{
 					map[string]interface{}{"header": "Header", "id": "q1", "question": "Prompt"},
 				},
@@ -631,28 +633,6 @@ func TestMalformedApprovalRequestReturnsInvalidParams(t *testing.T) {
 				"startedAtMs": int64(1),
 				"threadId":    "thread-1",
 				"turnId":      "turn-1",
-			},
-			handler: func(ah *codex.ApprovalHandlers, called *bool) {
-				ah.OnPermissionsRequestApproval = func(context.Context, codex.PermissionsRequestApprovalParams) (codex.PermissionsRequestApprovalResponse, error) {
-					*called = true
-					return codex.PermissionsRequestApprovalResponse{}, nil
-				}
-			},
-		},
-		{
-			name:   "item/permissions/requestApproval relative filesystem root",
-			method: "item/permissions/requestApproval",
-			params: map[string]interface{}{
-				"cwd":         "/tmp",
-				"itemId":      "item-1",
-				"startedAtMs": int64(1),
-				"threadId":    "thread-1",
-				"turnId":      "turn-1",
-				"permissions": map[string]interface{}{
-					"fileSystem": map[string]interface{}{
-						"read": []interface{}{"relative/path"},
-					},
-				},
 			},
 			handler: func(ah *codex.ApprovalHandlers, called *bool) {
 				ah.OnPermissionsRequestApproval = func(context.Context, codex.PermissionsRequestApprovalParams) (codex.PermissionsRequestApprovalResponse, error) {
@@ -952,25 +932,6 @@ func TestApprovalHandlerRejectsInvalidResponsePayloads(t *testing.T) {
 			wantErrPart: `invalid scope "forever"`,
 		},
 		{
-			name:   "permissions approval relative granted filesystem root",
-			method: "item/permissions/requestApproval",
-			params: `{"cwd":"/tmp","itemId":"item-1","permissions":{},"startedAtMs":1000,"threadId":"thread-1","turnId":"turn-1"}`,
-			register: func(client *codex.Client) {
-				client.SetApprovalHandlers(codex.ApprovalHandlers{
-					OnPermissionsRequestApproval: func(context.Context, codex.PermissionsRequestApprovalParams) (codex.PermissionsRequestApprovalResponse, error) {
-						return codex.PermissionsRequestApprovalResponse{
-							Permissions: codex.GrantedPermissionProfile{
-								FileSystem: &codex.AdditionalFileSystemPermissions{
-									Read: []string{"relative/path"},
-								},
-							},
-						}, nil
-					},
-				})
-			},
-			wantErrPart: `permissions.fileSystem.read[0]`,
-		},
-		{
 			name:   "chatgpt auth refresh missing access token",
 			method: "account/chatgptAuthTokens/refresh",
 			params: `{"reason":"unauthorized"}`,
@@ -1012,7 +973,7 @@ func TestApprovalHandlerRejectsInvalidResponsePayloads(t *testing.T) {
 		{
 			name:   "tool request user input missing answers map",
 			method: "item/tool/requestUserInput",
-			params: `{"itemId":"item-1","threadId":"thread-1","turnId":"turn-1","questions":[{"id":"q1","header":"Header","question":"Prompt"}]}`,
+			params: `{"isBlocking":true,"itemId":"item-1","threadId":"thread-1","turnId":"turn-1","questions":[{"id":"q1","header":"Header","question":"Prompt"}]}`,
 			register: func(client *codex.Client) {
 				client.SetApprovalHandlers(codex.ApprovalHandlers{
 					OnToolRequestUserInput: func(context.Context, codex.ToolRequestUserInputParams) (codex.ToolRequestUserInputResponse, error) {
@@ -1025,7 +986,7 @@ func TestApprovalHandlerRejectsInvalidResponsePayloads(t *testing.T) {
 		{
 			name:   "tool request user input missing nested answers array",
 			method: "item/tool/requestUserInput",
-			params: `{"itemId":"item-1","threadId":"thread-1","turnId":"turn-1","questions":[{"id":"q1","header":"Header","question":"Prompt"}]}`,
+			params: `{"isBlocking":true,"itemId":"item-1","threadId":"thread-1","turnId":"turn-1","questions":[{"id":"q1","header":"Header","question":"Prompt"}]}`,
 			register: func(client *codex.Client) {
 				client.SetApprovalHandlers(codex.ApprovalHandlers{
 					OnToolRequestUserInput: func(context.Context, codex.ToolRequestUserInputParams) (codex.ToolRequestUserInputResponse, error) {

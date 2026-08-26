@@ -27,7 +27,7 @@ func TestTypedNotificationListenersDispatchSpecMethods(t *testing.T) {
 		handlerType := method.Type.In(1)
 		notificationType := handlerType.In(0)
 		notificationTypeName := notificationType.Name()
-		notificationMethod, ok := methodByType[notificationTypeName]
+		notificationMethods, ok := methodByType[notificationTypeName]
 		if !ok {
 			t.Fatalf("%s handler type %s has no server notification spec method", method.Name, notificationTypeName)
 		}
@@ -41,16 +41,15 @@ func TestTypedNotificationListenersDispatchSpecMethods(t *testing.T) {
 
 		params := sampleServerNotificationParams(t, notificationTypeName)
 		handlerErrors = nil
-		client.handleNotification(context.Background(), Notification{
-			Method: notificationMethod,
-			Params: params,
-		})
+		for _, notificationMethod := range notificationMethods {
+			client.handleNotification(context.Background(), Notification{Method: notificationMethod, Params: params})
+		}
 
 		if called != 1 {
 			if len(handlerErrors) > 0 {
-				t.Fatalf("%s failed to decode %s sample params for %s: %v", method.Name, notificationMethod, notificationTypeName, handlerErrors[0])
+				t.Fatalf("%s failed to decode sample params for %s: %v", method.Name, notificationTypeName, handlerErrors[0])
 			}
-			t.Fatalf("%s did not dispatch %s notification to %s handler", method.Name, notificationMethod, notificationTypeName)
+			t.Fatalf("%s dispatched %d of %v notifications to %s handler; want 1", method.Name, called, notificationMethods, notificationTypeName)
 		}
 	}
 }
@@ -73,7 +72,7 @@ func TestTypedNotificationAddListenersDispatchSpecMethods(t *testing.T) {
 		handlerType := method.Type.In(1)
 		notificationType := handlerType.In(0)
 		notificationTypeName := notificationType.Name()
-		notificationMethod, ok := methodByType[notificationTypeName]
+		notificationMethods, ok := methodByType[notificationTypeName]
 		if !ok {
 			t.Fatalf("%s handler type %s has no server notification spec method", method.Name, notificationTypeName)
 		}
@@ -87,16 +86,15 @@ func TestTypedNotificationAddListenersDispatchSpecMethods(t *testing.T) {
 
 		params := sampleServerNotificationParams(t, notificationTypeName)
 		handlerErrors = nil
-		client.handleNotification(context.Background(), Notification{
-			Method: notificationMethod,
-			Params: params,
-		})
+		for _, notificationMethod := range notificationMethods {
+			client.handleNotification(context.Background(), Notification{Method: notificationMethod, Params: params})
+		}
 
 		if called != 1 {
 			if len(handlerErrors) > 0 {
-				t.Fatalf("%s failed to decode %s sample params for %s: %v", method.Name, notificationMethod, notificationTypeName, handlerErrors[0])
+				t.Fatalf("%s failed to decode sample params for %s: %v", method.Name, notificationTypeName, handlerErrors[0])
 			}
-			t.Fatalf("%s did not dispatch %s notification to %s handler", method.Name, notificationMethod, notificationTypeName)
+			t.Fatalf("%s dispatched %d of %v notifications to %s handler; want 1", method.Name, called, notificationMethods, notificationTypeName)
 		}
 
 		unsub.Call(nil)
@@ -188,15 +186,16 @@ func loadServerNotificationSpec(t *testing.T) serverNotificationSpec {
 	return spec
 }
 
-func loadServerNotificationMethodsByType(t *testing.T) map[string]string {
+func loadServerNotificationMethodsByType(t *testing.T) map[string][]string {
 	t.Helper()
 	spec := loadServerNotificationSpec(t)
-	methods := make(map[string]string, len(spec.OneOf))
+	methods := make(map[string][]string, len(spec.OneOf))
 	for _, variant := range spec.OneOf {
 		if len(variant.Properties.Method.Enum) == 0 || variant.Properties.Params.Ref == "" {
 			continue
 		}
-		methods[refName(variant.Properties.Params.Ref)] = variant.Properties.Method.Enum[0]
+		name := refName(variant.Properties.Params.Ref)
+		methods[name] = append(methods[name], variant.Properties.Method.Enum[0])
 	}
 	return methods
 }

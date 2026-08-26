@@ -372,7 +372,9 @@ func (w *RateLimitWindow) UnmarshalJSON(data []byte) error {
 const (
 	loginTypeApiKey            = "apiKey"
 	loginTypeChatgpt           = "chatgpt"
+	loginTypeChatgptDeviceCode = "chatgptDeviceCode"
 	loginTypeChatgptAuthTokens = "chatgptAuthTokens"
+	loginTypeAmazonBedrock     = "amazonBedrock"
 )
 
 const (
@@ -440,8 +442,19 @@ func (p *ApiKeyLoginAccountParams) Format(f fmt.State, verb rune) {
 
 // ChatgptLoginAccountParams represents ChatGPT OAuth login parameters
 type ChatgptLoginAccountParams struct {
-	Type string `json:"type"`
+	Type                      string         `json:"type"`
+	AppBrand                  *LoginAppBrand `json:"appBrand,omitempty"`
+	CodexStreamlinedLogin     *bool          `json:"codexStreamlinedLogin,omitempty"`
+	UseHostedLoginSuccessPage *bool          `json:"useHostedLoginSuccessPage,omitempty"`
 }
+
+// LoginAppBrand selects the branding used by the hosted login flow.
+type LoginAppBrand string
+
+const (
+	LoginAppBrandCodex   LoginAppBrand = "codex"
+	LoginAppBrandChatGPT LoginAppBrand = "chatgpt"
+)
 
 func (*ChatgptLoginAccountParams) isLoginAccountParams() {}
 
@@ -449,10 +462,34 @@ func (p *ChatgptLoginAccountParams) marshalWire() ([]byte, error) {
 	if p == nil {
 		return nil, errNilLoginAccountParams
 	}
+	if p.AppBrand != nil {
+		switch *p.AppBrand {
+		case LoginAppBrandCodex, LoginAppBrandChatGPT:
+		default:
+			return nil, fmt.Errorf("invalid appBrand %q", *p.AppBrand)
+		}
+	}
 	w := ChatgptLoginAccountParams{
-		Type: loginTypeChatgpt,
+		Type:                      loginTypeChatgpt,
+		AppBrand:                  p.AppBrand,
+		CodexStreamlinedLogin:     p.CodexStreamlinedLogin,
+		UseHostedLoginSuccessPage: p.UseHostedLoginSuccessPage,
 	}
 	return json.Marshal(w)
+}
+
+// ChatgptDeviceCodeLoginAccountParams requests device-code authentication.
+type ChatgptDeviceCodeLoginAccountParams struct {
+	Type string `json:"type"`
+}
+
+func (*ChatgptDeviceCodeLoginAccountParams) isLoginAccountParams() {}
+
+func (p *ChatgptDeviceCodeLoginAccountParams) marshalWire() ([]byte, error) {
+	if p == nil {
+		return nil, errNilLoginAccountParams
+	}
+	return json.Marshal(ChatgptDeviceCodeLoginAccountParams{Type: loginTypeChatgptDeviceCode})
 }
 
 // ChatgptAuthTokensLoginAccountParams represents external auth token login parameters
@@ -514,6 +551,48 @@ func (p *ChatgptAuthTokensLoginAccountParams) Format(f fmt.State, verb rune) {
 	_, _ = fmt.Fprint(f, p.String())
 }
 
+// AmazonBedrockLoginAccountParams represents managed Amazon Bedrock login parameters.
+type AmazonBedrockLoginAccountParams struct {
+	Type   string `json:"type"`
+	ApiKey string `json:"apiKey"`
+	Region string `json:"region"`
+}
+
+func (*AmazonBedrockLoginAccountParams) isLoginAccountParams() {}
+
+// MarshalJSON redacts the API key from logs and debug serializers.
+func (p *AmazonBedrockLoginAccountParams) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Type   string `json:"type"`
+		ApiKey string `json:"apiKey"`
+		Region string `json:"region"`
+	}{Type: loginTypeAmazonBedrock, ApiKey: "[REDACTED]", Region: p.Region})
+}
+
+func (p *AmazonBedrockLoginAccountParams) marshalWire() ([]byte, error) {
+	if p == nil {
+		return nil, errNilLoginAccountParams
+	}
+	if err := validateRequiredNonEmptyStringField(loginFieldApiKey, p.ApiKey); err != nil {
+		return nil, err
+	}
+	if err := validateRequiredNonEmptyStringField("region", p.Region); err != nil {
+		return nil, err
+	}
+	type wire AmazonBedrockLoginAccountParams
+	return json.Marshal(wire{Type: loginTypeAmazonBedrock, ApiKey: p.ApiKey, Region: p.Region})
+}
+
+func (p *AmazonBedrockLoginAccountParams) String() string {
+	return fmt.Sprintf("AmazonBedrockLoginAccountParams{Type:%s, ApiKey:[REDACTED], Region:%s}", loginTypeAmazonBedrock, p.Region)
+}
+
+func (p *AmazonBedrockLoginAccountParams) GoString() string { return p.String() }
+
+func (p *AmazonBedrockLoginAccountParams) Format(f fmt.State, verb rune) {
+	_, _ = fmt.Fprint(f, p.String())
+}
+
 // LoginAccountResponse is an interface for login response variants
 type LoginAccountResponse interface {
 	isLoginAccountResponse()
@@ -561,6 +640,29 @@ func (r *ChatgptLoginAccountResponse) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// ChatgptDeviceCodeLoginAccountResponse contains the device authorization details.
+type ChatgptDeviceCodeLoginAccountResponse struct {
+	Type            string `json:"type"`
+	LoginID         string `json:"loginId"`
+	UserCode        string `json:"userCode"`
+	VerificationURL string `json:"verificationUrl"`
+}
+
+func (*ChatgptDeviceCodeLoginAccountResponse) isLoginAccountResponse() {}
+
+func (r *ChatgptDeviceCodeLoginAccountResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "loginId", "type", "userCode", "verificationUrl"); err != nil {
+		return err
+	}
+	type wire ChatgptDeviceCodeLoginAccountResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = ChatgptDeviceCodeLoginAccountResponse(decoded)
+	return nil
+}
+
 // ChatgptAuthTokensLoginAccountResponse represents external auth token login response
 type ChatgptAuthTokensLoginAccountResponse struct {
 	Type string `json:"type"`
@@ -578,6 +680,26 @@ func (r *ChatgptAuthTokensLoginAccountResponse) UnmarshalJSON(data []byte) error
 		return err
 	}
 	*r = ChatgptAuthTokensLoginAccountResponse(decoded)
+	return nil
+}
+
+// AmazonBedrockLoginAccountResponse acknowledges managed Bedrock authentication.
+type AmazonBedrockLoginAccountResponse struct {
+	Type string `json:"type"`
+}
+
+func (*AmazonBedrockLoginAccountResponse) isLoginAccountResponse() {}
+
+func (r *AmazonBedrockLoginAccountResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "type"); err != nil {
+		return err
+	}
+	type wire AmazonBedrockLoginAccountResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = AmazonBedrockLoginAccountResponse(decoded)
 	return nil
 }
 
@@ -630,8 +752,20 @@ func UnmarshalLoginAccountResponse(data []byte) (LoginAccountResponse, error) {
 			return nil, err
 		}
 		return &resp, nil
+	case loginTypeChatgptDeviceCode:
+		var resp ChatgptDeviceCodeLoginAccountResponse
+		if err := json.Unmarshal(trimmed, &resp); err != nil {
+			return nil, err
+		}
+		return &resp, nil
 	case "chatgptAuthTokens":
 		var resp ChatgptAuthTokensLoginAccountResponse
+		if err := json.Unmarshal(trimmed, &resp); err != nil {
+			return nil, err
+		}
+		return &resp, nil
+	case loginTypeAmazonBedrock:
+		var resp AmazonBedrockLoginAccountResponse
 		if err := json.Unmarshal(trimmed, &resp); err != nil {
 			return nil, err
 		}

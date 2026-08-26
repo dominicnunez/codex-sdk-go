@@ -18,7 +18,7 @@ type ToolRequestUserInputParams struct {
 func (p *ToolRequestUserInputParams) UnmarshalJSON(data []byte) error {
 	type wire ToolRequestUserInputParams
 	var decoded wire
-	required := []string{"itemId", "questions", "threadId", "turnId"}
+	required := []string{"isBlocking", "itemId", "questions", "threadId", "turnId"}
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}

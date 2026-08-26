@@ -235,6 +235,49 @@ func (c *CollabAgentToolCallThreadItem) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// SubAgentActivityKind identifies the activity performed by a sub-agent.
+type SubAgentActivityKind string
+
+const (
+	SubAgentActivityKindStarted     SubAgentActivityKind = "started"
+	SubAgentActivityKindInteracted  SubAgentActivityKind = "interacted"
+	SubAgentActivityKindInterrupted SubAgentActivityKind = "interrupted"
+)
+
+// SubAgentActivityThreadItem represents activity from a sub-agent thread.
+type SubAgentActivityThreadItem struct {
+	AgentPath     string               `json:"agentPath"`
+	AgentThreadID string               `json:"agentThreadId"`
+	ID            string               `json:"id"`
+	Kind          SubAgentActivityKind `json:"kind"`
+}
+
+func (SubAgentActivityThreadItem) threadItem() {}
+
+func (s *SubAgentActivityThreadItem) MarshalJSON() ([]byte, error) {
+	type Alias SubAgentActivityThreadItem
+	return json.Marshal(&struct {
+		Type string `json:"type"`
+		*Alias
+	}{Type: "subAgentActivity", Alias: (*Alias)(s)})
+}
+
+// SleepThreadItem represents an interruptible clock.sleep display item.
+type SleepThreadItem struct {
+	DurationMs uint64 `json:"durationMs"`
+	ID         string `json:"id"`
+}
+
+func (SleepThreadItem) threadItem() {}
+
+func (s *SleepThreadItem) MarshalJSON() ([]byte, error) {
+	type Alias SleepThreadItem
+	return json.Marshal(&struct {
+		Type string `json:"type"`
+		*Alias
+	}{Type: "sleep", Alias: (*Alias)(s)})
+}
+
 // WebSearchThreadItem represents a web search in a thread.
 type WebSearchThreadItem struct {
 	ID      string                  `json:"id"`
@@ -376,6 +419,8 @@ var threadItemDecoders = map[string]threadItemDecoder{
 	"mcpToolCall":         decodeMcpToolCallThreadItem,
 	"dynamicToolCall":     decodeDynamicToolCallThreadItem,
 	"collabAgentToolCall": decodeCollabAgentToolCallThreadItem,
+	"subAgentActivity":    decodeSubAgentActivityThreadItem,
+	"sleep":               decodeSleepThreadItem,
 	"webSearch":           decodeWebSearchThreadItem,
 	"imageView":           decodeImageViewThreadItem,
 	"enteredReviewMode":   decodeEnteredReviewModeThreadItem,
@@ -404,8 +449,9 @@ func decodeThreadItemIntoWithValidation(
 
 func decodeUserMessageThreadItem(data []byte) (ThreadItem, error) {
 	var raw struct {
-		ID      string            `json:"id"`
-		Content []json.RawMessage `json:"content"`
+		ID       string            `json:"id"`
+		Content  []json.RawMessage `json:"content"`
+		ClientID *string           `json:"clientId,omitempty"`
 	}
 	if err := validateRequiredTaggedObjectFields(data, "id", "content"); err != nil {
 		return nil, err
@@ -417,7 +463,7 @@ func decodeUserMessageThreadItem(data []byte) (ThreadItem, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &UserMessageThreadItem{ID: raw.ID, Content: inputs}, nil
+	return &UserMessageThreadItem{ID: raw.ID, Content: inputs, ClientID: raw.ClientID}, nil
 }
 
 func decodeAgentMessageThreadItem(data []byte) (ThreadItem, error) {
@@ -460,6 +506,14 @@ func decodeDynamicToolCallThreadItem(data []byte) (ThreadItem, error) {
 
 func decodeCollabAgentToolCallThreadItem(data []byte) (ThreadItem, error) {
 	return decodeThreadItemInto(data, &CollabAgentToolCallThreadItem{}, "agentsStates", "id", "receiverThreadIds", "senderThreadId", "status", "tool")
+}
+
+func decodeSubAgentActivityThreadItem(data []byte) (ThreadItem, error) {
+	return decodeThreadItemInto(data, &SubAgentActivityThreadItem{}, "agentPath", "agentThreadId", "id", "kind")
+}
+
+func decodeSleepThreadItem(data []byte) (ThreadItem, error) {
+	return decodeThreadItemInto(data, &SleepThreadItem{}, "durationMs", "id")
 }
 
 func decodeWebSearchThreadItem(data []byte) (ThreadItem, error) {

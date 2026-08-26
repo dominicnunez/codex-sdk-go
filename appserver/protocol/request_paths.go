@@ -249,23 +249,19 @@ func joinWindowsPathRest(baseRest, value string) string {
 }
 
 func normalizeAdditionalFileSystemPermissionsField(
-	field string,
+	_ string,
 	value *AdditionalFileSystemPermissions,
 ) (*AdditionalFileSystemPermissions, error) {
 	if value == nil {
 		return value, nil
 	}
 
+	// LegacyAppPathString permits relative as well as absolute paths. Preserve
+	// these strings verbatim; newer AbsolutePathBuf fields are normalized at
+	// their individual request boundaries.
 	normalized := *value
-	var err error
-	normalized.Read, err = normalizeAbsolutePathSliceField(field+".read", value.Read)
-	if err != nil {
-		return nil, err
-	}
-	normalized.Write, err = normalizeAbsolutePathSliceField(field+".write", value.Write)
-	if err != nil {
-		return nil, err
-	}
+	normalized.Read = append([]string(nil), value.Read...)
+	normalized.Write = append([]string(nil), value.Write...)
 	return &normalized, nil
 }
 

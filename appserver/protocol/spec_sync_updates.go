@@ -486,6 +486,12 @@ func (c *Client) OnThreadQueueChanged(h func(ThreadQueueChangedNotification)) {
 func (c *Client) OnThreadProjectUpdated(h func(ThreadProjectUpdatedNotification)) {
 	setTypedNotificationHandler(c, notifyThreadProjectUpdated, h)
 }
+func (c *Client) OnEnvironmentConnected(h func(EnvironmentConnectionNotification)) {
+	setTypedNotificationHandler(c, notifyEnvironmentConnected, h)
+}
+func (c *Client) OnEnvironmentDisconnected(h func(EnvironmentConnectionNotification)) {
+	setTypedNotificationHandler(c, notifyEnvironmentDisconnected, h)
+}
 func (c *Client) OnStrictReviewRequired(h func(StrictReviewRequiredNotification)) {
 	setTypedNotificationHandler(c, notifyStrictReviewRequired, h)
 }
@@ -513,6 +519,12 @@ func (c *Client) AddThreadQueueChangedListener(h func(ThreadQueueChangedNotifica
 }
 func (c *Client) AddThreadProjectUpdatedListener(h func(ThreadProjectUpdatedNotification)) func() {
 	return addTypedNotificationListener(c, notifyThreadProjectUpdated, h)
+}
+func (c *Client) AddEnvironmentConnectedListener(h func(EnvironmentConnectionNotification)) func() {
+	return addTypedNotificationListener(c, notifyEnvironmentConnected, h)
+}
+func (c *Client) AddEnvironmentDisconnectedListener(h func(EnvironmentConnectionNotification)) func() {
+	return addTypedNotificationListener(c, notifyEnvironmentDisconnected, h)
 }
 func (c *Client) AddStrictReviewRequiredListener(h func(StrictReviewRequiredNotification)) func() {
 	return addTypedNotificationListener(c, notifyStrictReviewRequired, h)

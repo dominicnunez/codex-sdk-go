@@ -78,6 +78,8 @@ const (
 	ThreadGoalStatusPaused        ThreadGoalStatus = "paused"
 	ThreadGoalStatusBudgetLimited ThreadGoalStatus = "budgetLimited"
 	ThreadGoalStatusComplete      ThreadGoalStatus = "complete"
+	ThreadGoalStatusBlocked       ThreadGoalStatus = "blocked"
+	ThreadGoalStatusUsageLimited  ThreadGoalStatus = "usageLimited"
 )
 
 // ThreadGoal describes goal-tracking state for a thread.

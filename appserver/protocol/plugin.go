@@ -66,12 +66,14 @@ const (
 	PluginListMarketplaceKindLocal              PluginListMarketplaceKind = "local"
 	PluginListMarketplaceKindWorkspaceDirectory PluginListMarketplaceKind = "workspace-directory"
 	PluginListMarketplaceKindSharedWithMe       PluginListMarketplaceKind = "shared-with-me"
+	PluginListMarketplaceKindCreatedByMeRemote  PluginListMarketplaceKind = "created-by-me-remote"
 )
 
 var validPluginListMarketplaceKinds = map[PluginListMarketplaceKind]struct{}{
 	PluginListMarketplaceKindLocal:              {},
 	PluginListMarketplaceKindWorkspaceDirectory: {},
 	PluginListMarketplaceKindSharedWithMe:       {},
+	PluginListMarketplaceKindCreatedByMeRemote:  {},
 }
 
 const (

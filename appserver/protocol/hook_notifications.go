@@ -212,6 +212,7 @@ const (
 	HookSourceSessionFlags            HookSource = "sessionFlags"
 	HookSourcePlugin                  HookSource = "plugin"
 	HookSourceCloudRequirements       HookSource = "cloudRequirements"
+	HookSourceCloudManagedConfig      HookSource = "cloudManagedConfig"
 	HookSourceLegacyManagedConfigFile HookSource = "legacyManagedConfigFile"
 	HookSourceLegacyManagedConfigMDM  HookSource = "legacyManagedConfigMdm"
 	HookSourceUnknown                 HookSource = "unknown"
