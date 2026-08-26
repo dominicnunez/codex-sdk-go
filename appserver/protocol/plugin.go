@@ -66,12 +66,14 @@ const (
 	PluginListMarketplaceKindLocal              PluginListMarketplaceKind = "local"
 	PluginListMarketplaceKindWorkspaceDirectory PluginListMarketplaceKind = "workspace-directory"
 	PluginListMarketplaceKindSharedWithMe       PluginListMarketplaceKind = "shared-with-me"
+	PluginListMarketplaceKindCreatedByMeRemote  PluginListMarketplaceKind = "created-by-me-remote"
 )
 
 var validPluginListMarketplaceKinds = map[PluginListMarketplaceKind]struct{}{
 	PluginListMarketplaceKindLocal:              {},
 	PluginListMarketplaceKindWorkspaceDirectory: {},
 	PluginListMarketplaceKindSharedWithMe:       {},
+	PluginListMarketplaceKindCreatedByMeRemote:  {},
 }
 
 const (
@@ -344,6 +346,7 @@ func (p *PluginMarketplaceEntry) UnmarshalJSON(data []byte) error {
 type PluginListParams struct {
 	Cwds             []string                    `json:"cwds,omitempty"`
 	MarketplaceKinds []PluginListMarketplaceKind `json:"marketplaceKinds,omitempty"`
+	ForceRefetch     bool                        `json:"forceRefetch,omitempty"`
 }
 
 // PluginInstalledParams lists installed plugins across marketplaces.
@@ -579,6 +582,7 @@ type PluginInstallParams struct {
 	MarketplacePath       string  `json:"marketplacePath,omitempty"`
 	PluginName            string  `json:"pluginName"`
 	RemoteMarketplaceName *string `json:"remoteMarketplaceName,omitempty"`
+	InstallAttemptID      *string `json:"installAttemptId,omitempty"`
 }
 
 // PluginInstallResponse contains plugin auth follow-up requirements.

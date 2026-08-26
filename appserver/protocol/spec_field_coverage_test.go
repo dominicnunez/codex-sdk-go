@@ -825,7 +825,9 @@ func testEnumValues(t *testing.T) {
 				PlanTypeFree, PlanTypeGo, PlanTypePlus, PlanTypePro, PlanTypeProLite,
 				PlanTypeTeam, PlanTypeBusiness, PlanTypeEnterprise,
 				PlanTypeEdu, PlanTypeSelfServeBusinessUsageBased,
-				PlanTypeEnterpriseCBPUsageBased, PlanTypeUnknown,
+				PlanTypeEnterpriseCBPUsageBased, PlanTypeSelfServeBusinessProLite,
+				PlanTypeEnt26, PlanTypeEnterpriseCBPAutomation, PlanTypeEduPlus,
+				PlanTypeEduPro, PlanTypeUnknown,
 			),
 		},
 		{
@@ -835,7 +837,9 @@ func testEnumValues(t *testing.T) {
 				PlanTypeFree, PlanTypeGo, PlanTypePlus, PlanTypePro, PlanTypeProLite,
 				PlanTypeTeam, PlanTypeBusiness, PlanTypeEnterprise,
 				PlanTypeEdu, PlanTypeSelfServeBusinessUsageBased,
-				PlanTypeEnterpriseCBPUsageBased, PlanTypeUnknown,
+				PlanTypeEnterpriseCBPUsageBased, PlanTypeSelfServeBusinessProLite,
+				PlanTypeEnt26, PlanTypeEnterpriseCBPAutomation, PlanTypeEduPlus,
+				PlanTypeEduPro, PlanTypeUnknown,
 			),
 		},
 		{
@@ -843,7 +847,8 @@ func testEnumValues(t *testing.T) {
 			defName:  "AuthMode",
 			goValues: enumStrings(
 				AuthModeAPIKey, AuthModeChatGPT, AuthModeChatGPTAuthTokens,
-				AuthModeAgentIdentity,
+				AuthModeAgentIdentity, AuthModeHeaders, AuthModePersonalAccessToken,
+				AuthModeBedrockAPIKey,
 			),
 		},
 		{
@@ -861,7 +866,8 @@ func testEnumValues(t *testing.T) {
 				HookEventNameSubagentStart,
 				HookEventNamePreToolUse, HookEventNamePermissionRequest,
 				HookEventNamePostToolUse, HookEventNamePreCompact,
-				HookEventNamePostCompact, HookEventNameStop,
+				HookEventNamePostCompact, HookEventNameStop, HookEventNameSessionEnd,
+				HookEventNameSubagentStop,
 			),
 		},
 		{
@@ -876,6 +882,7 @@ func testEnumValues(t *testing.T) {
 			defName:  "HookHandlerType",
 			goValues: enumStrings(
 				HookHandlerTypeCommand, HookHandlerTypePrompt, HookHandlerTypeAgent,
+				HookHandlerTypeMcpTool,
 			),
 		},
 		{
@@ -969,6 +976,7 @@ func testEnumValues(t *testing.T) {
 			defName:  "WebSearchMode",
 			goValues: enumStrings(
 				WebSearchModeDisabled, WebSearchModeCached, WebSearchModeLive,
+				WebSearchModeIndexed,
 			),
 		},
 		{
@@ -994,18 +1002,10 @@ func testEnumValues(t *testing.T) {
 			),
 		},
 		{
-			specPath: "schema/json/v2/TurnStartParams.json",
-			defName:  "ReasoningEffort",
-			goValues: enumStrings(
-				ReasoningEffortNone, ReasoningEffortMinimal, ReasoningEffortLow,
-				ReasoningEffortMedium, ReasoningEffortHigh, ReasoningEffortXHigh,
-			),
-		},
-		{
 			specPath: "schema/json/v2/ModelListResponse.json",
 			defName:  "InputModality",
 			goValues: enumStrings(
-				InputModalityText, InputModalityImage,
+				InputModalityText, InputModalityImage, InputModalityAudio,
 			),
 		},
 		{
@@ -1038,6 +1038,7 @@ func testEnumValues(t *testing.T) {
 			defName:  "AppToolApproval",
 			goValues: enumStrings(
 				AppToolApprovalAuto, AppToolApprovalPrompt, AppToolApprovalApprove,
+				AppToolApprovalWrites,
 			),
 		},
 		{
@@ -1136,7 +1137,7 @@ func testEnumValues(t *testing.T) {
 			defName:  "McpAuthStatus",
 			goValues: enumStrings(
 				McpAuthStatusUnsupported, McpAuthStatusNotLoggedIn,
-				McpAuthStatusBearerToken, McpAuthStatusOAuth,
+				McpAuthStatusBearerToken, McpAuthStatusOAuth, McpAuthStatusUnknown,
 			),
 		},
 		{
@@ -1171,7 +1172,7 @@ func testEnumValues(t *testing.T) {
 				MigrationItemTypeSkills, MigrationItemTypeMcpServerConfig,
 				MigrationItemTypePlugins, MigrationItemTypeSubagents,
 				MigrationItemTypeHooks, MigrationItemTypeCommands,
-				MigrationItemTypeSessions,
+				MigrationItemTypeSessions, MigrationItemTypeMemory,
 			),
 		},
 		{
@@ -1208,7 +1209,8 @@ func testEnumValues(t *testing.T) {
 			specPath: "schema/json/v2/ThreadListParams.json",
 			defName:  "ThreadSortKey",
 			goValues: enumStrings(
-				ThreadSortKeyCreatedAt, ThreadSortKeyUpdatedAt,
+				ThreadSortKeyCreatedAt, ThreadSortKeyUpdatedAt, ThreadSortKeyRecencyAt,
+				ThreadSortKeySectionPosition,
 			),
 		},
 		{

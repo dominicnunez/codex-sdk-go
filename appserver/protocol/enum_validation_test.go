@@ -170,17 +170,6 @@ func TestProtocolEnumsRejectInvalidMarshalAndUnmarshal(t *testing.T) {
 			wantErr: `invalid forcedLoginMethod "totally-invalid"`,
 		},
 		{
-			name: "reasoning effort",
-			marshal: func() ([]byte, error) {
-				return json.Marshal(codex.ReasoningEffort("totally-invalid"))
-			},
-			unmarshal: func(data []byte) error {
-				var value codex.ReasoningEffort
-				return json.Unmarshal(data, &value)
-			},
-			wantErr: `invalid reasoningEffort "totally-invalid"`,
-		},
-		{
 			name: "reasoning summary mode",
 			marshal: func() ([]byte, error) {
 				return json.Marshal(codex.ReasoningSummaryMode("totally-invalid"))

@@ -10,17 +10,23 @@ import (
 type AuthMode string
 
 const (
-	AuthModeAPIKey            AuthMode = "apikey"
-	AuthModeChatGPT           AuthMode = "chatgpt"
-	AuthModeChatGPTAuthTokens AuthMode = "chatgptAuthTokens"
-	AuthModeAgentIdentity     AuthMode = "agentIdentity"
+	AuthModeAPIKey              AuthMode = "apikey"
+	AuthModeChatGPT             AuthMode = "chatgpt"
+	AuthModeChatGPTAuthTokens   AuthMode = "chatgptAuthTokens"
+	AuthModeAgentIdentity       AuthMode = "agentIdentity"
+	AuthModeHeaders             AuthMode = "headers"
+	AuthModePersonalAccessToken AuthMode = "personalAccessToken"
+	AuthModeBedrockAPIKey       AuthMode = "bedrockApiKey"
 )
 
 var validAuthModes = map[AuthMode]struct{}{
-	AuthModeAPIKey:            {},
-	AuthModeChatGPT:           {},
-	AuthModeChatGPTAuthTokens: {},
-	AuthModeAgentIdentity:     {},
+	AuthModeAPIKey:              {},
+	AuthModeChatGPT:             {},
+	AuthModeChatGPTAuthTokens:   {},
+	AuthModeAgentIdentity:       {},
+	AuthModeHeaders:             {},
+	AuthModePersonalAccessToken: {},
+	AuthModeBedrockAPIKey:       {},
 }
 
 func validateOptionalAuthModeField(field string, value *AuthMode) error {
@@ -51,9 +57,10 @@ func (n *AccountUpdatedNotification) UnmarshalJSON(data []byte) error {
 
 // AccountLoginCompletedNotification is sent when a login attempt completes
 type AccountLoginCompletedNotification struct {
-	Success bool    `json:"success"`
-	LoginId *string `json:"loginId,omitempty"`
-	Error   *string `json:"error,omitempty"`
+	Success              bool    `json:"success"`
+	LoginId              *string `json:"loginId,omitempty"`
+	Error                *string `json:"error,omitempty"`
+	OnboardingEntrypoint *string `json:"onboardingEntrypoint,omitempty"`
 }
 
 func (n *AccountLoginCompletedNotification) UnmarshalJSON(data []byte) error {

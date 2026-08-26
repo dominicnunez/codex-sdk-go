@@ -253,7 +253,7 @@ func TestModelReroutedNotificationMissingRequiredFieldReportsHandlerError(t *tes
 	}
 }
 
-func TestModelRejectsInvalidDefaultReasoningEffort(t *testing.T) {
+func TestModelAcceptsAdvertisedDefaultReasoningEffort(t *testing.T) {
 	var model codex.Model
 	err := json.Unmarshal([]byte(`{
 		"id":"model-1",
@@ -266,12 +266,12 @@ func TestModelRejectsInvalidDefaultReasoningEffort(t *testing.T) {
 		"supportedReasoningEfforts":[],
 		"inputModalities":["text"]
 	}`), &model)
-	if err == nil || !strings.Contains(err.Error(), `invalid reasoningEffort "turbo"`) {
-		t.Fatalf("json.Unmarshal error = %v; want invalid reasoningEffort failure", err)
+	if err != nil {
+		t.Fatalf("json.Unmarshal error = %v; want open reasoning effort accepted", err)
 	}
 }
 
-func TestModelRejectsInvalidSupportedReasoningEffort(t *testing.T) {
+func TestModelAcceptsAdvertisedSupportedReasoningEffort(t *testing.T) {
 	var model codex.Model
 	err := json.Unmarshal([]byte(`{
 		"id":"model-1",
@@ -284,12 +284,12 @@ func TestModelRejectsInvalidSupportedReasoningEffort(t *testing.T) {
 		"supportedReasoningEfforts":[{"reasoningEffort":"turbo","description":"too much"}],
 		"inputModalities":["text"]
 	}`), &model)
-	if err == nil || !strings.Contains(err.Error(), `invalid reasoningEffort "turbo"`) {
-		t.Fatalf("json.Unmarshal error = %v; want invalid reasoningEffort failure", err)
+	if err != nil {
+		t.Fatalf("json.Unmarshal error = %v; want open reasoning effort accepted", err)
 	}
 }
 
-func TestModelRejectsInvalidInputModality(t *testing.T) {
+func TestModelAcceptsAudioInputModality(t *testing.T) {
 	var model codex.Model
 	err := json.Unmarshal([]byte(`{
 		"id":"model-1",
@@ -302,8 +302,8 @@ func TestModelRejectsInvalidInputModality(t *testing.T) {
 		"supportedReasoningEfforts":[],
 		"inputModalities":["audio"]
 	}`), &model)
-	if err == nil || !strings.Contains(err.Error(), `invalid inputModality "audio"`) {
-		t.Fatalf("json.Unmarshal error = %v; want invalid inputModality failure", err)
+	if err != nil {
+		t.Fatalf("json.Unmarshal error = %v; want audio input modality accepted", err)
 	}
 }
 

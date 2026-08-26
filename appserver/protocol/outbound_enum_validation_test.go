@@ -70,19 +70,6 @@ func TestClientRejectsInvalidOutboundEnumsBeforeSending(t *testing.T) {
 			},
 		},
 		{
-			name:    "turn start reasoning effort",
-			wantErr: `invalid reasoningEffort "turbo"`,
-			call: func(client *codex.Client) error {
-				effort := codex.ReasoningEffort("turbo")
-				_, err := client.Turn.Start(context.Background(), codex.TurnStartParams{
-					ThreadID: "thread-1",
-					Input:    []codex.UserInput{&codex.TextUserInput{Text: "hello"}},
-					Effort:   &effort,
-				})
-				return err
-			},
-		},
-		{
 			name:    "turn start personality",
 			wantErr: `invalid personality "chaotic"`,
 			call: func(client *codex.Client) error {
@@ -119,25 +106,6 @@ func TestClientRejectsInvalidOutboundEnumsBeforeSending(t *testing.T) {
 						Mode: codex.ModeKind("pair"),
 						Settings: codex.CollaborationModeSettings{
 							Model: "o3",
-						},
-					},
-				})
-				return err
-			},
-		},
-		{
-			name:    "turn start collaboration reasoning effort",
-			wantErr: `invalid reasoningEffort "turbo"`,
-			call: func(client *codex.Client) error {
-				effort := codex.ReasoningEffort("turbo")
-				_, err := client.Turn.Start(context.Background(), codex.TurnStartParams{
-					ThreadID: "thread-1",
-					Input:    []codex.UserInput{&codex.TextUserInput{Text: "hello"}},
-					CollaborationMode: &codex.CollaborationMode{
-						Mode: codex.ModeKindPlan,
-						Settings: codex.CollaborationModeSettings{
-							Model:           "o3",
-							ReasoningEffort: &effort,
 						},
 					},
 				})

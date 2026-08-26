@@ -9,6 +9,10 @@ permissions:
   contents: write
   pull-requests: write
 
+concurrency:
+  group: upstream-spec-sync
+  cancel-in-progress: false
+
 jobs:
   check-upstream:
     runs-on: ubuntu-latest
@@ -174,8 +178,21 @@ jobs:
           # --- 8. Ensure the label exists ---
           gh label create "${label}" --description "Upstream spec schema changes" --color "D93F0B" 2>/dev/null || true
 
-          # --- 9. Close stale workflow spec-sync PRs and delete their branches ---
-          gh pr list --label "${label}" --state open --json number,author,headRefName,isCrossRepository --jq '.[] | [.number, .author.login, .headRefName, .isCrossRepository] | @tsv' | while IFS=$'\t' read -r num author head_ref cross_repo; do
+          # --- 9. Open the current PR before pruning older ones ---
+          pr_url="$(gh pr create \
+            --title "spec-sync: upstream schemas changed (${short_upstream})" \
+            --body "${body}" \
+            --label "${label}" \
+            --head "${branch}")"
+          current_num="$(gh pr view "${pr_url}" --json number --jq '.number')"
+          echo "Created PR #${current_num}: ${pr_url}"
+
+          # --- 10. Close every other bot-owned workflow spec-sync PR ---
+          # Do not rely on labels: an interrupted or racing run may have opened a
+          # valid spec-sync PR before its label was applied. Concurrency above
+          # serializes future runs, while creating first makes this cleanup safe
+          # even for PRs left behind by older workflow revisions.
+          gh pr list --state open --limit 100 --json number,author,headRefName,isCrossRepository --jq '.[] | [.number, .author.login, .headRefName, .isCrossRepository] | @tsv' | while IFS=$'\t' read -r num author head_ref cross_repo; do
             [ -z "${num}" ] && continue
 
             if [ "${author}" != "github-actions[bot]" ]; then
@@ -193,19 +210,12 @@ jobs:
                 continue
                 ;;
             esac
-            if [ "${head_ref}" = "${branch}" ]; then
-              echo "Skipping PR #${num}: head branch is the current sync branch."
+            if [ "${num}" = "${current_num}" ]; then
+              echo "Skipping PR #${num}: this is the current sync PR."
               continue
             fi
 
             gh pr close "${num}" --delete-branch --comment "Superseded by newer spec-sync PR for ${short_upstream}."
           done
 
-          # --- 10. Open PR ---
-          gh pr create \
-            --title "spec-sync: upstream schemas changed (${short_upstream})" \
-            --body "${body}" \
-            --label "${label}" \
-            --head "${branch}"
-
-          echo "PR created."
+          echo "PR created and stale spec-sync PRs pruned."

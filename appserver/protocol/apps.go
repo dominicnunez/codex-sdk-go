@@ -45,6 +45,8 @@ type AppInfo struct {
 	Labels              map[string]string `json:"labels,omitempty"`
 	LogoURL             *string           `json:"logoUrl,omitempty"`
 	LogoURLDark         *string           `json:"logoUrlDark,omitempty"`
+	IconAssets          map[string]string `json:"iconAssets,omitempty"`
+	IconDarkAssets      map[string]string `json:"iconDarkAssets,omitempty"`
 	PluginDisplayNames  []string          `json:"pluginDisplayNames,omitempty"`
 	Branding            *AppBranding      `json:"branding,omitempty"`
 	AppMetadata         *AppMetadata      `json:"appMetadata,omitempty"`

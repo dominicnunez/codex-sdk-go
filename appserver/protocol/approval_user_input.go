@@ -7,16 +7,18 @@ import (
 
 // ToolRequestUserInputParams represents parameters for requesting user input for a tool.
 type ToolRequestUserInputParams struct {
-	ItemID    string                         `json:"itemId"`
-	ThreadID  string                         `json:"threadId"`
-	TurnID    string                         `json:"turnId"`
-	Questions []ToolRequestUserInputQuestion `json:"questions"`
+	AutoResolutionMs *int64                         `json:"autoResolutionMs,omitempty"`
+	IsBlocking       bool                           `json:"isBlocking"`
+	ItemID           string                         `json:"itemId"`
+	ThreadID         string                         `json:"threadId"`
+	TurnID           string                         `json:"turnId"`
+	Questions        []ToolRequestUserInputQuestion `json:"questions"`
 }
 
 func (p *ToolRequestUserInputParams) UnmarshalJSON(data []byte) error {
 	type wire ToolRequestUserInputParams
 	var decoded wire
-	required := []string{"itemId", "questions", "threadId", "turnId"}
+	required := []string{"isBlocking", "itemId", "questions", "threadId", "turnId"}
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}

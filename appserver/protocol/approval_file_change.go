@@ -196,6 +196,13 @@ type ReviewDecisionWrapper struct {
 	Value interface{} // string or object
 }
 
+const (
+	ReviewDecisionApproved                   = "approved"
+	ReviewDecisionApprovedForSession         = "approved_for_session"
+	ReviewDecisionApprovedMCPPolicyAmendment = "approved_mcp_policy_amendment"
+	ReviewDecisionAbort                      = "abort"
+)
+
 // ApprovedExecpolicyAmendmentDecision represents approval with execpolicy amendment.
 type ApprovedExecpolicyAmendmentDecision struct {
 	ProposedExecpolicyAmendment []string `json:"proposed_execpolicy_amendment"`
@@ -204,6 +211,11 @@ type ApprovedExecpolicyAmendmentDecision struct {
 // NetworkPolicyAmendmentDecision represents approval with network policy amendment.
 type NetworkPolicyAmendmentDecision struct {
 	NetworkPolicyAmendment NetworkPolicyAmendment `json:"network_policy_amendment"`
+}
+
+// DeniedReviewDecision represents a denial and its user-facing rejection reason.
+type DeniedReviewDecision struct {
+	Rejection string `json:"rejection"`
 }
 
 // NetworkPolicyAmendment defines a network policy rule.
@@ -262,6 +274,18 @@ func (w *ReviewDecisionWrapper) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
+	if raw, ok := keys["denied"]; ok {
+		var inner DeniedReviewDecision
+		if err := json.Unmarshal(raw, &inner); err != nil {
+			return fmt.Errorf("unable to unmarshal denied: %w", err)
+		}
+		if err := validateRequiredObjectFields(raw, "rejection"); err != nil {
+			return err
+		}
+		w.Value = inner
+		return nil
+	}
+
 	w.Value = UnknownReviewDecision{Raw: append(json.RawMessage(nil), data...)}
 	return nil
 }
@@ -276,6 +300,9 @@ func (w ReviewDecisionWrapper) MarshalJSON() ([]byte, error) {
 	case nil:
 		return []byte("null"), nil
 	case string:
+		if v == "denied" {
+			return nil, errors.New("denied decision requires a rejection reason")
+		}
 		return json.Marshal(v)
 	case ApprovedExecpolicyAmendmentDecision:
 		return json.Marshal(struct {
@@ -301,6 +328,10 @@ func (w ReviewDecisionWrapper) MarshalJSON() ([]byte, error) {
 				NetworkPolicyAmendment: v.NetworkPolicyAmendment,
 			},
 		})
+	case DeniedReviewDecision:
+		return json.Marshal(struct {
+			Denied DeniedReviewDecision `json:"denied"`
+		}{Denied: v})
 	case UnknownReviewDecision:
 		return v.MarshalJSON()
 	default:
@@ -327,6 +358,11 @@ func normalizeReviewDecisionValue(value interface{}) interface{} {
 			return nil
 		}
 		return *v
+	case *DeniedReviewDecision:
+		if v == nil {
+			return nil
+		}
+		return *v
 	case *UnknownReviewDecision:
 		if v == nil {
 			return nil
@@ -343,7 +379,7 @@ func validateReviewDecisionWrapper(decision ReviewDecisionWrapper) error {
 		return errors.New("missing decision")
 	case string:
 		switch value {
-		case "approved", "approved_for_session", "denied", "abort":
+		case ReviewDecisionApproved, ReviewDecisionApprovedForSession, ReviewDecisionApprovedMCPPolicyAmendment, ReviewDecisionAbort:
 			return nil
 		default:
 			return fmt.Errorf("invalid decision %q", value)
@@ -355,6 +391,8 @@ func validateReviewDecisionWrapper(decision ReviewDecisionWrapper) error {
 		return nil
 	case NetworkPolicyAmendmentDecision:
 		return validateNetworkPolicyAmendment(value.NetworkPolicyAmendment)
+	case DeniedReviewDecision:
+		return nil
 	case UnknownReviewDecision:
 		return errors.New("missing decision")
 	default:

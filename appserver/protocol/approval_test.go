@@ -61,9 +61,10 @@ func TestApplyPatchApprovalRoundTrip(t *testing.T) {
 		},
 		{
 			name:         "denied",
-			responseJSON: `{"decision":"denied"}`,
+			responseJSON: `{"decision":{"denied":{"rejection":"not allowed"}}}`,
 			checkFunc: func(r codex.ApplyPatchApprovalResponse) bool {
-				return r.Decision.Value == "denied"
+				obj, ok := r.Decision.Value.(codex.DeniedReviewDecision)
+				return ok && obj.Rejection == "not allowed"
 			},
 		},
 		{
@@ -262,15 +263,15 @@ func TestPermissionsRequestApprovalParamsNormalizeFileSystemRoots(t *testing.T) 
 		t.Fatalf("Unmarshal permissions request: %v", err)
 	}
 
-	if got := params.Permissions.FileSystem.Read[0]; got != "/project" {
-		t.Fatalf("Read[0] = %q, want /project", got)
+	if got := params.Permissions.FileSystem.Read[0]; got != "/tmp/../project" {
+		t.Fatalf("Read[0] = %q, want preserved legacy path", got)
 	}
-	if got := params.Permissions.FileSystem.Write[0]; got != `C:\repo` {
-		t.Fatalf("Write[0] = %q, want %q", got, `C:\repo`)
+	if got := params.Permissions.FileSystem.Write[0]; got != `C:\\workspace\\..\\repo` {
+		t.Fatalf("Write[0] = %q, want preserved legacy path", got)
 	}
 }
 
-func TestPermissionsRequestApprovalParamsRejectRelativeFileSystemRoots(t *testing.T) {
+func TestPermissionsRequestApprovalParamsAcceptRelativeFileSystemRoots(t *testing.T) {
 	var params codex.PermissionsRequestApprovalParams
 	err := json.Unmarshal([]byte(`{
 		"cwd":"/tmp",
@@ -280,11 +281,11 @@ func TestPermissionsRequestApprovalParamsRejectRelativeFileSystemRoots(t *testin
 		"turnId":"turn-1",
 		"permissions":{"fileSystem":{"read":["relative/path"]}}
 	}`), &params)
-	if err == nil {
-		t.Fatal("expected invalid path error")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if !strings.Contains(err.Error(), `permissions.fileSystem.read[0]`) {
-		t.Fatalf("error = %v; want permissions.fileSystem.read[0] context", err)
+	if got := params.Permissions.FileSystem.Read[0]; got != "relative/path" {
+		t.Fatalf("read = %q", got)
 	}
 }
 
@@ -959,7 +960,7 @@ func TestApprovalHandlerDispatch(t *testing.T) {
 		JSONRPC: "2.0",
 		ID:      codex.RequestID{Value: 6},
 		Method:  "item/tool/requestUserInput",
-		Params:  json.RawMessage(`{"itemId":"i1","threadId":"t1","turnId":"tu1","questions":[{"id":"q1","header":"H","question":"Q"}]}`),
+		Params:  json.RawMessage(`{"isBlocking":true,"itemId":"i1","threadId":"t1","turnId":"tu1","questions":[{"id":"q1","header":"H","question":"Q"}]}`),
 	})
 
 	// 7. PermissionsRequestApproval
@@ -1117,8 +1118,8 @@ func TestAdditionalApprovalEndToEnd(t *testing.T) {
 				if params.ItemID != "item-abc" {
 					t.Fatalf("Expected itemId=item-abc, got %s", params.ItemID)
 				}
-				if params.Permissions.FileSystem == nil || len(params.Permissions.FileSystem.Read) != 1 || params.Permissions.FileSystem.Read[0] != "/sandbox" {
-					t.Fatalf("Expected normalized read permission, got %#v", params.Permissions.FileSystem)
+				if params.Permissions.FileSystem == nil || len(params.Permissions.FileSystem.Read) != 1 || params.Permissions.FileSystem.Read[0] != "/tmp/../sandbox" {
+					t.Fatalf("Expected preserved legacy read permission, got %#v", params.Permissions.FileSystem)
 				}
 				if params.Permissions.Network == nil || params.Permissions.Network.Enabled == nil || !*params.Permissions.Network.Enabled {
 					t.Fatalf("Expected requested network permission to be enabled, got %#v", params.Permissions.Network)
@@ -1156,8 +1157,8 @@ func TestAdditionalApprovalEndToEnd(t *testing.T) {
 		if result.Scope == nil || *result.Scope != codex.PermissionGrantScopeTurn {
 			t.Fatalf("Scope = %#v; want %q", result.Scope, codex.PermissionGrantScopeTurn)
 		}
-		if result.Permissions.FileSystem == nil || len(result.Permissions.FileSystem.Read) != 1 || result.Permissions.FileSystem.Read[0] != "/project" {
-			t.Fatalf("Permissions = %#v; want normalized granted read path", result.Permissions)
+		if result.Permissions.FileSystem == nil || len(result.Permissions.FileSystem.Read) != 1 || result.Permissions.FileSystem.Read[0] != "/tmp/../project" {
+			t.Fatalf("Permissions = %#v; want preserved granted read path", result.Permissions)
 		}
 	})
 

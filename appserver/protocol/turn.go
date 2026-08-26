@@ -18,13 +18,14 @@ func newTurnService(client *Client) *TurnService {
 
 // TurnStartParams are the parameters for turn/start.
 type TurnStartParams struct {
-	ThreadID          string             `json:"threadId"`
-	Input             []UserInput        `json:"input"`
-	ApprovalPolicy    *AskForApproval    `json:"approvalPolicy,omitempty"`
-	ApprovalsReviewer *ApprovalsReviewer `json:"approvalsReviewer,omitempty"`
-	Cwd               *string            `json:"cwd,omitempty"`
-	Effort            *ReasoningEffort   `json:"effort,omitempty"`
-	Model             *string            `json:"model,omitempty"`
+	ThreadID            string             `json:"threadId"`
+	Input               []UserInput        `json:"input"`
+	ClientUserMessageID *string            `json:"clientUserMessageId,omitempty"`
+	ApprovalPolicy      *AskForApproval    `json:"approvalPolicy,omitempty"`
+	ApprovalsReviewer   *ApprovalsReviewer `json:"approvalsReviewer,omitempty"`
+	Cwd                 *string            `json:"cwd,omitempty"`
+	Effort              *ReasoningEffort   `json:"effort,omitempty"`
+	Model               *string            `json:"model,omitempty"`
 	// OutputSchema optionally constrains the model's structured output to conform to a JSON Schema.
 	OutputSchema      interface{}              `json:"outputSchema,omitempty"`
 	Personality       *Personality             `json:"personality,omitempty"`
@@ -38,33 +39,35 @@ type TurnStartParams struct {
 // include required discriminator fields (for example sandboxPolicy.type).
 func (p TurnStartParams) MarshalJSON() ([]byte, error) {
 	type wireTurnStartParams struct {
-		ThreadID          string                   `json:"threadId"`
-		Input             []UserInput              `json:"input"`
-		ApprovalPolicy    *AskForApprovalWrapper   `json:"approvalPolicy,omitempty"`
-		ApprovalsReviewer *ApprovalsReviewer       `json:"approvalsReviewer,omitempty"`
-		Cwd               *string                  `json:"cwd,omitempty"`
-		Effort            *ReasoningEffort         `json:"effort,omitempty"`
-		Model             *string                  `json:"model,omitempty"`
-		OutputSchema      interface{}              `json:"outputSchema,omitempty"`
-		Personality       *Personality             `json:"personality,omitempty"`
-		SandboxPolicy     *SandboxPolicyWrapper    `json:"sandboxPolicy,omitempty"`
-		ServiceTier       *ServiceTier             `json:"serviceTier,omitempty"`
-		Summary           *ReasoningSummaryWrapper `json:"summary,omitempty"`
-		CollaborationMode *CollaborationMode       `json:"collaborationMode,omitempty"`
+		ThreadID            string                   `json:"threadId"`
+		Input               []UserInput              `json:"input"`
+		ClientUserMessageID *string                  `json:"clientUserMessageId,omitempty"`
+		ApprovalPolicy      *AskForApprovalWrapper   `json:"approvalPolicy,omitempty"`
+		ApprovalsReviewer   *ApprovalsReviewer       `json:"approvalsReviewer,omitempty"`
+		Cwd                 *string                  `json:"cwd,omitempty"`
+		Effort              *ReasoningEffort         `json:"effort,omitempty"`
+		Model               *string                  `json:"model,omitempty"`
+		OutputSchema        interface{}              `json:"outputSchema,omitempty"`
+		Personality         *Personality             `json:"personality,omitempty"`
+		SandboxPolicy       *SandboxPolicyWrapper    `json:"sandboxPolicy,omitempty"`
+		ServiceTier         *ServiceTier             `json:"serviceTier,omitempty"`
+		Summary             *ReasoningSummaryWrapper `json:"summary,omitempty"`
+		CollaborationMode   *CollaborationMode       `json:"collaborationMode,omitempty"`
 	}
 
 	wire := wireTurnStartParams{
-		ThreadID:          p.ThreadID,
-		Input:             p.Input,
-		ApprovalsReviewer: p.ApprovalsReviewer,
-		Cwd:               p.Cwd,
-		Effort:            p.Effort,
-		Model:             p.Model,
-		OutputSchema:      p.OutputSchema,
-		Personality:       p.Personality,
-		ServiceTier:       p.ServiceTier,
-		Summary:           p.Summary,
-		CollaborationMode: p.CollaborationMode,
+		ThreadID:            p.ThreadID,
+		Input:               p.Input,
+		ClientUserMessageID: p.ClientUserMessageID,
+		ApprovalsReviewer:   p.ApprovalsReviewer,
+		Cwd:                 p.Cwd,
+		Effort:              p.Effort,
+		Model:               p.Model,
+		OutputSchema:        p.OutputSchema,
+		Personality:         p.Personality,
+		ServiceTier:         p.ServiceTier,
+		Summary:             p.Summary,
+		CollaborationMode:   p.CollaborationMode,
 	}
 	if p.ApprovalPolicy != nil {
 		wire.ApprovalPolicy = &AskForApprovalWrapper{Value: *p.ApprovalPolicy}
@@ -91,19 +94,20 @@ func unmarshalUserInputSlice(raw []json.RawMessage) ([]UserInput, error) {
 // UnmarshalJSON implements custom unmarshaling for TurnStartParams
 func (p *TurnStartParams) UnmarshalJSON(data []byte) error {
 	type wireTurnStartParams struct {
-		ThreadID          string                   `json:"threadId"`
-		Input             []json.RawMessage        `json:"input"`
-		ApprovalPolicy    *AskForApprovalWrapper   `json:"approvalPolicy,omitempty"`
-		ApprovalsReviewer *ApprovalsReviewer       `json:"approvalsReviewer,omitempty"`
-		Cwd               *string                  `json:"cwd,omitempty"`
-		Effort            *ReasoningEffort         `json:"effort,omitempty"`
-		Model             *string                  `json:"model,omitempty"`
-		OutputSchema      interface{}              `json:"outputSchema,omitempty"`
-		Personality       *Personality             `json:"personality,omitempty"`
-		SandboxPolicy     *SandboxPolicyWrapper    `json:"sandboxPolicy,omitempty"`
-		ServiceTier       *ServiceTier             `json:"serviceTier,omitempty"`
-		Summary           *ReasoningSummaryWrapper `json:"summary,omitempty"`
-		CollaborationMode *CollaborationMode       `json:"collaborationMode,omitempty"`
+		ThreadID            string                   `json:"threadId"`
+		Input               []json.RawMessage        `json:"input"`
+		ClientUserMessageID *string                  `json:"clientUserMessageId,omitempty"`
+		ApprovalPolicy      *AskForApprovalWrapper   `json:"approvalPolicy,omitempty"`
+		ApprovalsReviewer   *ApprovalsReviewer       `json:"approvalsReviewer,omitempty"`
+		Cwd                 *string                  `json:"cwd,omitempty"`
+		Effort              *ReasoningEffort         `json:"effort,omitempty"`
+		Model               *string                  `json:"model,omitempty"`
+		OutputSchema        interface{}              `json:"outputSchema,omitempty"`
+		Personality         *Personality             `json:"personality,omitempty"`
+		SandboxPolicy       *SandboxPolicyWrapper    `json:"sandboxPolicy,omitempty"`
+		ServiceTier         *ServiceTier             `json:"serviceTier,omitempty"`
+		Summary             *ReasoningSummaryWrapper `json:"summary,omitempty"`
+		CollaborationMode   *CollaborationMode       `json:"collaborationMode,omitempty"`
 	}
 
 	wire := &wireTurnStartParams{}
@@ -130,19 +134,20 @@ func (p *TurnStartParams) UnmarshalJSON(data []byte) error {
 	}
 
 	*p = TurnStartParams{
-		ThreadID:          wire.ThreadID,
-		Input:             inputs,
-		ApprovalPolicy:    approvalPolicy,
-		ApprovalsReviewer: wire.ApprovalsReviewer,
-		Cwd:               wire.Cwd,
-		Effort:            wire.Effort,
-		Model:             wire.Model,
-		OutputSchema:      wire.OutputSchema,
-		Personality:       wire.Personality,
-		SandboxPolicy:     sandboxPolicy,
-		ServiceTier:       wire.ServiceTier,
-		Summary:           wire.Summary,
-		CollaborationMode: wire.CollaborationMode,
+		ThreadID:            wire.ThreadID,
+		Input:               inputs,
+		ClientUserMessageID: wire.ClientUserMessageID,
+		ApprovalPolicy:      approvalPolicy,
+		ApprovalsReviewer:   wire.ApprovalsReviewer,
+		Cwd:                 wire.Cwd,
+		Effort:              wire.Effort,
+		Model:               wire.Model,
+		OutputSchema:        wire.OutputSchema,
+		Personality:         wire.Personality,
+		SandboxPolicy:       sandboxPolicy,
+		ServiceTier:         wire.ServiceTier,
+		Summary:             wire.Summary,
+		CollaborationMode:   wire.CollaborationMode,
 	}
 	return nil
 }
@@ -197,9 +202,10 @@ func (s *TurnService) Interrupt(ctx context.Context, params TurnInterruptParams)
 
 // TurnSteerParams are the parameters for turn/steer
 type TurnSteerParams struct {
-	ThreadID       string      `json:"threadId"`
-	ExpectedTurnID string      `json:"expectedTurnId"`
-	Input          []UserInput `json:"input"`
+	ThreadID            string      `json:"threadId"`
+	ExpectedTurnID      string      `json:"expectedTurnId"`
+	Input               []UserInput `json:"input"`
+	ClientUserMessageID *string     `json:"clientUserMessageId,omitempty"`
 }
 
 // UnmarshalJSON implements custom unmarshaling for TurnSteerParams
@@ -316,6 +322,36 @@ func (l *LocalImageUserInput) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// AudioUserInput represents remote audio input.
+type AudioUserInput struct {
+	URL string `json:"url"`
+}
+
+func (a *AudioUserInput) userInput() {}
+
+func (a *AudioUserInput) MarshalJSON() ([]byte, error) {
+	type Alias AudioUserInput
+	return json.Marshal(&struct {
+		Type string `json:"type"`
+		*Alias
+	}{Type: "audio", Alias: (*Alias)(a)})
+}
+
+// LocalAudioUserInput represents local audio input.
+type LocalAudioUserInput struct {
+	Path string `json:"path"`
+}
+
+func (l *LocalAudioUserInput) userInput() {}
+
+func (l *LocalAudioUserInput) MarshalJSON() ([]byte, error) {
+	type Alias LocalAudioUserInput
+	return json.Marshal(&struct {
+		Type string `json:"type"`
+		*Alias
+	}{Type: "localAudio", Alias: (*Alias)(l)})
+}
+
 // SkillUserInput represents skill input
 type SkillUserInput struct {
 	Name string `json:"name"`
@@ -397,6 +433,24 @@ func UnmarshalUserInput(data []byte) (UserInput, error) {
 		return &input, nil
 	case "localImage":
 		var input LocalImageUserInput
+		if err := validateRequiredTaggedObjectFields(data, "path"); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(data, &input); err != nil {
+			return nil, err
+		}
+		return &input, nil
+	case "audio":
+		var input AudioUserInput
+		if err := validateRequiredTaggedObjectFields(data, "url"); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(data, &input); err != nil {
+			return nil, err
+		}
+		return &input, nil
+	case "localAudio":
+		var input LocalAudioUserInput
 		if err := validateRequiredTaggedObjectFields(data, "path"); err != nil {
 			return nil, err
 		}

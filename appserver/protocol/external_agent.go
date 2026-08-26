@@ -19,6 +19,7 @@ const (
 	MigrationItemTypeHooks           ExternalAgentConfigMigrationItemType = "HOOKS"
 	MigrationItemTypeCommands        ExternalAgentConfigMigrationItemType = "COMMANDS"
 	MigrationItemTypeSessions        ExternalAgentConfigMigrationItemType = "SESSIONS"
+	MigrationItemTypeMemory          ExternalAgentConfigMigrationItemType = "MEMORY"
 )
 
 var validExternalAgentConfigMigrationItemTypes = map[ExternalAgentConfigMigrationItemType]struct{}{
@@ -31,6 +32,7 @@ var validExternalAgentConfigMigrationItemTypes = map[ExternalAgentConfigMigratio
 	MigrationItemTypeHooks:           {},
 	MigrationItemTypeCommands:        {},
 	MigrationItemTypeSessions:        {},
+	MigrationItemTypeMemory:          {},
 }
 
 func (t *ExternalAgentConfigMigrationItemType) UnmarshalJSON(data []byte) error {
@@ -67,8 +69,12 @@ func (i *ExternalAgentConfigMigrationItem) UnmarshalJSON(data []byte) error {
 
 // ExternalAgentConfigDetectParams contains parameters for detecting external agent configurations.
 type ExternalAgentConfigDetectParams struct {
-	Cwds        *[]string `json:"cwds,omitempty"`
-	IncludeHome *bool     `json:"includeHome,omitempty"`
+	Cwds              *[]string `json:"cwds,omitempty"`
+	IncludeHome       *bool     `json:"includeHome,omitempty"`
+	MaxSessionAgeDays *uint32   `json:"maxSessionAgeDays,omitempty"`
+	MaxSessions       *uint32   `json:"maxSessions,omitempty"`
+	MigrationSource   *string   `json:"migrationSource,omitempty"`
+	Source            *string   `json:"source,omitempty"`
 }
 
 func (p ExternalAgentConfigDetectParams) prepareRequest() (interface{}, error) {
@@ -86,7 +92,8 @@ func (p ExternalAgentConfigDetectParams) prepareRequest() (interface{}, error) {
 
 // ExternalAgentConfigDetectResponse contains the result of config detection.
 type ExternalAgentConfigDetectResponse struct {
-	Items []ExternalAgentConfigMigrationItem `json:"items"`
+	Items      []ExternalAgentConfigMigrationItem        `json:"items"`
+	Connectors []ExternalAgentImportedConnectorCandidate `json:"connectors,omitempty"`
 }
 
 func (r *ExternalAgentConfigDetectResponse) UnmarshalJSON(data []byte) error {
@@ -104,7 +111,10 @@ func (r *ExternalAgentConfigDetectResponse) UnmarshalJSON(data []byte) error {
 
 // ExternalAgentConfigImportParams contains parameters for importing external agent configurations.
 type ExternalAgentConfigImportParams struct {
-	MigrationItems []ExternalAgentConfigMigrationItem `json:"migrationItems"`
+	MigrationItems  []ExternalAgentConfigMigrationItem `json:"migrationItems"`
+	MigrationSource *string                            `json:"migrationSource,omitempty"`
+	ProviderID      *string                            `json:"providerId,omitempty"`
+	Source          *string                            `json:"source,omitempty"`
 }
 
 func (p ExternalAgentConfigImportParams) prepareRequest() (interface{}, error) {
@@ -143,7 +153,10 @@ func (p ExternalAgentConfigImportParams) prepareRequest() (interface{}, error) {
 type ExternalAgentConfigImportResponse struct{}
 
 // ExternalAgentConfigImportCompletedNotification is sent when config import completes.
-type ExternalAgentConfigImportCompletedNotification struct{}
+type ExternalAgentConfigImportCompletedNotification struct {
+	ImportID        string                                `json:"importId"`
+	ItemTypeResults []ExternalAgentConfigImportTypeResult `json:"itemTypeResults"`
+}
 
 // ExternalAgentService handles external agent configuration detection and import.
 type ExternalAgentService struct {

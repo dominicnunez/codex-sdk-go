@@ -145,6 +145,36 @@ func (i *InputImageDynamicToolCallOutputContentItem) UnmarshalJSON(data []byte) 
 	return nil
 }
 
+// InputAudioDynamicToolCallOutputContentItem represents audio output.
+type InputAudioDynamicToolCallOutputContentItem struct {
+	AudioURL string `json:"audioUrl"`
+}
+
+func (i *InputAudioDynamicToolCallOutputContentItem) dynamicToolCallOutputContentItem() {}
+
+func (i *InputAudioDynamicToolCallOutputContentItem) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Type     string `json:"type"`
+		AudioURL string `json:"audioUrl"`
+	}{Type: "inputAudio", AudioURL: i.AudioURL})
+}
+
+func (i *InputAudioDynamicToolCallOutputContentItem) UnmarshalJSON(data []byte) error {
+	type wire struct {
+		Type     string `json:"type"`
+		AudioURL string `json:"audioUrl"`
+	}
+	var decoded wire
+	if err := unmarshalInboundObject(data, &decoded, []string{"audioUrl", "type"}, []string{"audioUrl", "type"}); err != nil {
+		return err
+	}
+	if decoded.Type != "inputAudio" {
+		return fmt.Errorf("invalid dynamic tool output content item type %q", decoded.Type)
+	}
+	i.AudioURL = decoded.AudioURL
+	return nil
+}
+
 // UnmarshalJSON implements custom unmarshaling for DynamicToolCallOutputContentItemWrapper.
 func (w *DynamicToolCallOutputContentItemWrapper) UnmarshalJSON(data []byte) error {
 	itemType, err := decodeRequiredObjectTypeField(data, "dynamic tool output content item")
@@ -165,6 +195,12 @@ func (w *DynamicToolCallOutputContentItemWrapper) UnmarshalJSON(data []byte) err
 			return err
 		}
 		w.Value = &image
+	case "inputAudio":
+		var audio InputAudioDynamicToolCallOutputContentItem
+		if err := json.Unmarshal(data, &audio); err != nil {
+			return err
+		}
+		w.Value = &audio
 	default:
 		w.Value = &UnknownDynamicToolCallOutputContentItem{Type: itemType, Raw: append(json.RawMessage(nil), data...)}
 	}
@@ -187,6 +223,11 @@ func (w DynamicToolCallOutputContentItemWrapper) validateForResponse() error {
 		}
 		return nil
 	case *InputImageDynamicToolCallOutputContentItem:
+		if value == nil {
+			return errors.New("missing content item")
+		}
+		return nil
+	case *InputAudioDynamicToolCallOutputContentItem:
 		if value == nil {
 			return errors.New("missing content item")
 		}

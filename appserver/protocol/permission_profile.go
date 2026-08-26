@@ -16,6 +16,7 @@ type PermissionProfileListParams struct {
 type PermissionProfileSummary struct {
 	Description *string `json:"description,omitempty"`
 	ID          string  `json:"id"`
+	Allowed     bool    `json:"allowed"`
 }
 
 func (s *PermissionProfileSummary) UnmarshalJSON(data []byte) error {

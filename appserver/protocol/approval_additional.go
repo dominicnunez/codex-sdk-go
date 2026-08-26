@@ -24,13 +24,14 @@ type RequestPermissionProfile struct {
 
 // PermissionsRequestApprovalParams represents an item/permissions/requestApproval request.
 type PermissionsRequestApprovalParams struct {
-	Cwd         string                   `json:"cwd"`
-	ItemID      string                   `json:"itemId"`
-	Permissions RequestPermissionProfile `json:"permissions"`
-	Reason      *string                  `json:"reason,omitempty"`
-	StartedAtMs int64                    `json:"startedAtMs"`
-	ThreadID    string                   `json:"threadId"`
-	TurnID      string                   `json:"turnId"`
+	Cwd           string                   `json:"cwd"`
+	EnvironmentID *string                  `json:"environmentId,omitempty"`
+	ItemID        string                   `json:"itemId"`
+	Permissions   RequestPermissionProfile `json:"permissions"`
+	Reason        *string                  `json:"reason,omitempty"`
+	StartedAtMs   int64                    `json:"startedAtMs"`
+	ThreadID      string                   `json:"threadId"`
+	TurnID        string                   `json:"turnId"`
 }
 
 func (p *PermissionsRequestApprovalParams) UnmarshalJSON(data []byte) error {
@@ -52,10 +53,7 @@ func (p *PermissionsRequestApprovalParams) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	decoded.Permissions, err = normalizeRequestPermissionProfileField("permissions", decoded.Permissions)
-	if err != nil {
-		return err
-	}
+	decoded.Permissions = normalizeRequestPermissionProfileField(decoded.Permissions)
 	*p = PermissionsRequestApprovalParams(decoded)
 	return nil
 }
@@ -82,9 +80,6 @@ type PermissionsRequestApprovalResponse struct {
 }
 
 func (r PermissionsRequestApprovalResponse) validate() error {
-	if _, err := normalizeGrantedPermissionProfileField("permissions", r.Permissions); err != nil {
-		return err
-	}
 	if r.Scope == nil {
 		return nil
 	}
@@ -97,10 +92,7 @@ func (r PermissionsRequestApprovalResponse) validate() error {
 }
 
 func (r PermissionsRequestApprovalResponse) marshalWire() ([]byte, error) {
-	normalized, err := normalizeGrantedPermissionProfileField("permissions", r.Permissions)
-	if err != nil {
-		return nil, err
-	}
+	normalized := normalizeGrantedPermissionProfileField(r.Permissions)
 
 	type wire PermissionsRequestApprovalResponse
 	payload := wire(r)

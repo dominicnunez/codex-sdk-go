@@ -23,6 +23,32 @@
     "ConfigLayerSource": {
       "oneOf": [
         {
+          "description": "Default configuration supplied with the installed Codex package.",
+          "properties": {
+            "file": {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/AbsolutePathBuf"
+                }
+              ],
+              "description": "Path to the packaged default configuration file."
+            },
+            "type": {
+              "enum": [
+                "packagedDefaults"
+              ],
+              "title": "PackagedDefaultsConfigLayerSourceType",
+              "type": "string"
+            }
+          },
+          "required": [
+            "file",
+            "type"
+          ],
+          "title": "PackagedDefaultsConfigLayerSource",
+          "type": "object"
+        },
+        {
           "description": "Managed preferences layer delivered by MDM (macOS only).",
           "properties": {
             "domain": {
@@ -71,6 +97,33 @@
             "type"
           ],
           "title": "SystemConfigLayerSource",
+          "type": "object"
+        },
+        {
+          "description": "Enterprise-managed config layer delivered by the cloud config bundle.",
+          "properties": {
+            "id": {
+              "description": "Stable identifier for the delivered layer.",
+              "type": "string"
+            },
+            "name": {
+              "description": "Admin-facing name for the delivered layer. This is surfaced in diagnostics so users know which cloud layer needs administrator attention.",
+              "type": "string"
+            },
+            "type": {
+              "enum": [
+                "enterpriseManaged"
+              ],
+              "title": "EnterpriseManagedConfigLayerSourceType",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "type"
+          ],
+          "title": "EnterpriseManagedConfigLayerSource",
           "type": "object"
         },
         {

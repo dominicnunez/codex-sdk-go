@@ -19,6 +19,8 @@ const (
 	HookEventNamePreCompact        HookEventName = "preCompact"
 	HookEventNamePostCompact       HookEventName = "postCompact"
 	HookEventNameStop              HookEventName = "stop"
+	HookEventNameSessionEnd        HookEventName = "sessionEnd"
+	HookEventNameSubagentStop      HookEventName = "subagentStop"
 )
 
 var validHookEventNames = map[HookEventName]struct{}{
@@ -31,6 +33,8 @@ var validHookEventNames = map[HookEventName]struct{}{
 	HookEventNamePreCompact:        {},
 	HookEventNamePostCompact:       {},
 	HookEventNameStop:              {},
+	HookEventNameSessionEnd:        {},
+	HookEventNameSubagentStop:      {},
 }
 
 func (n HookEventName) MarshalJSON() ([]byte, error) {
@@ -69,12 +73,14 @@ const (
 	HookHandlerTypeCommand HookHandlerType = "command"
 	HookHandlerTypePrompt  HookHandlerType = "prompt"
 	HookHandlerTypeAgent   HookHandlerType = "agent"
+	HookHandlerTypeMcpTool HookHandlerType = "mcpTool"
 )
 
 var validHookHandlerTypes = map[HookHandlerType]struct{}{
 	HookHandlerTypeCommand: {},
 	HookHandlerTypePrompt:  {},
 	HookHandlerTypeAgent:   {},
+	HookHandlerTypeMcpTool: {},
 }
 
 func (t HookHandlerType) MarshalJSON() ([]byte, error) {
@@ -206,6 +212,7 @@ const (
 	HookSourceSessionFlags            HookSource = "sessionFlags"
 	HookSourcePlugin                  HookSource = "plugin"
 	HookSourceCloudRequirements       HookSource = "cloudRequirements"
+	HookSourceCloudManagedConfig      HookSource = "cloudManagedConfig"
 	HookSourceLegacyManagedConfigFile HookSource = "legacyManagedConfigFile"
 	HookSourceLegacyManagedConfigMDM  HookSource = "legacyManagedConfigMdm"
 	HookSourceUnknown                 HookSource = "unknown"
