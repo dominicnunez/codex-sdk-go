@@ -2,7 +2,7 @@
 
 Idiomatic Go SDK for the [OpenAI Codex](https://github.com/openai/codex) JSON-RPC 2.0 protocol, app-server runtime helpers, and Codex login helpers. Stdlib only, zero external dependencies.
 
-Built against the [Codex app-server protocol schemas](appserver/protocol/schema/json/) — full coverage of all current request methods, 40+ notification types, and 9 server→client approval flows.
+Built against the [Codex app-server protocol schemas](appserver/protocol/schema/json/). Schema-derived coverage tests keep the typed request, notification, and server-request surfaces aligned with the checked-in protocol.
 
 ## Installation
 
@@ -31,6 +31,11 @@ import codex "github.com/dominicnunez/codex-sdk-go/appserver/protocol"
 | `appserver` | `codex app-server --listen stdio://` process startup, client lifecycle, single-turn `Run`, streamed turns, and persistent conversations | `codex-rs/app-server`, `codex-rs/app-server-client` |
 | `login` | Codex OAuth authorization-code flow with PKCE and local/manual callback handling | `codex-rs/login` |
 | `login/auth` | Credential storage, JWT claim extraction, redaction, and `chatgptAuthTokens` payload helpers | `codex-rs/login`, `codex-rs/app-server-protocol` |
+
+## Documentation
+
+- [Protocol guide](docs/protocol.md) — service methods, inputs, notifications, approvals, and login variants
+- [Spec-sync maintenance](docs/spec-sync.md) — automated schema updates and superseded-PR handling
 
 ## Runtime Choice
 
@@ -235,6 +240,8 @@ client.SetApprovalHandlers(codex.ApprovalHandlers{
 
 Unhandled approval types return JSON-RPC method-not-found (`-32601`).
 
+See the [protocol guide](docs/protocol.md#approvals) for structured denial decisions and other approval-specific details.
+
 ## Architecture
 
 JSON-RPC 2.0 over a pluggable transport layer. The protocol is bidirectional:
@@ -251,7 +258,7 @@ Process helpers reject relative binary paths. Pass credentials through supported
 
 ## Origin
 
-Built from 150+ JSON schemas in the [OpenAI Codex](https://github.com/openai/codex) app-server protocol and selected upstream login/runtime behavior. Local package structure follows the upstream `codex-rs/` owner paths where practical while preserving Go package boundaries. This is an unofficial community SDK.
+Built from the JSON schemas in the [OpenAI Codex](https://github.com/openai/codex) app-server protocol and selected upstream login/runtime behavior. Local package structure follows the upstream `codex-rs/` owner paths where practical while preserving Go package boundaries. This is an unofficial community SDK.
 
 ## Contributing
 
