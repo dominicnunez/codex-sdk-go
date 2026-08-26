@@ -53,10 +53,7 @@ func (p *PermissionsRequestApprovalParams) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	decoded.Permissions, err = normalizeRequestPermissionProfileField("permissions", decoded.Permissions)
-	if err != nil {
-		return err
-	}
+	decoded.Permissions = normalizeRequestPermissionProfileField(decoded.Permissions)
 	*p = PermissionsRequestApprovalParams(decoded)
 	return nil
 }
@@ -83,9 +80,6 @@ type PermissionsRequestApprovalResponse struct {
 }
 
 func (r PermissionsRequestApprovalResponse) validate() error {
-	if _, err := normalizeGrantedPermissionProfileField("permissions", r.Permissions); err != nil {
-		return err
-	}
 	if r.Scope == nil {
 		return nil
 	}
@@ -98,10 +92,7 @@ func (r PermissionsRequestApprovalResponse) validate() error {
 }
 
 func (r PermissionsRequestApprovalResponse) marshalWire() ([]byte, error) {
-	normalized, err := normalizeGrantedPermissionProfileField("permissions", r.Permissions)
-	if err != nil {
-		return nil, err
-	}
+	normalized := normalizeGrantedPermissionProfileField(r.Permissions)
 
 	type wire PermissionsRequestApprovalResponse
 	payload := wire(r)

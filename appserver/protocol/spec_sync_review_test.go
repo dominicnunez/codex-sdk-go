@@ -145,10 +145,7 @@ func TestSpecSyncReviewLoginVariants(t *testing.T) {
 }
 
 func TestSpecSyncReviewLegacyPermissionPaths(t *testing.T) {
-	got, err := normalizeAdditionalFileSystemPermissionsField("permissions", &AdditionalFileSystemPermissions{Read: []string{"relative/path"}})
-	if err != nil {
-		t.Fatal(err)
-	}
+	got := normalizeAdditionalFileSystemPermissionsField(&AdditionalFileSystemPermissions{Read: []string{"relative/path"}})
 	if got.Read[0] != "relative/path" {
 		t.Fatalf("read = %v", got.Read)
 	}

@@ -248,12 +248,9 @@ func joinWindowsPathRest(baseRest, value string) string {
 	return strings.ReplaceAll(pathpkg.Clean(pathpkg.Join(base, relative)), "/", `\`)
 }
 
-func normalizeAdditionalFileSystemPermissionsField(
-	_ string,
-	value *AdditionalFileSystemPermissions,
-) (*AdditionalFileSystemPermissions, error) {
+func normalizeAdditionalFileSystemPermissionsField(value *AdditionalFileSystemPermissions) *AdditionalFileSystemPermissions {
 	if value == nil {
-		return value, nil
+		return value
 	}
 
 	// LegacyAppPathString permits relative as well as absolute paths. Preserve
@@ -262,31 +259,17 @@ func normalizeAdditionalFileSystemPermissionsField(
 	normalized := *value
 	normalized.Read = append([]string(nil), value.Read...)
 	normalized.Write = append([]string(nil), value.Write...)
-	return &normalized, nil
+	return &normalized
 }
 
-func normalizeRequestPermissionProfileField(
-	field string,
-	value RequestPermissionProfile,
-) (RequestPermissionProfile, error) {
-	var err error
-	value.FileSystem, err = normalizeAdditionalFileSystemPermissionsField(field+".fileSystem", value.FileSystem)
-	if err != nil {
-		return RequestPermissionProfile{}, err
-	}
-	return value, nil
+func normalizeRequestPermissionProfileField(value RequestPermissionProfile) RequestPermissionProfile {
+	value.FileSystem = normalizeAdditionalFileSystemPermissionsField(value.FileSystem)
+	return value
 }
 
-func normalizeGrantedPermissionProfileField(
-	field string,
-	value GrantedPermissionProfile,
-) (GrantedPermissionProfile, error) {
-	var err error
-	value.FileSystem, err = normalizeAdditionalFileSystemPermissionsField(field+".fileSystem", value.FileSystem)
-	if err != nil {
-		return GrantedPermissionProfile{}, err
-	}
-	return value, nil
+func normalizeGrantedPermissionProfileField(value GrantedPermissionProfile) GrantedPermissionProfile {
+	value.FileSystem = normalizeAdditionalFileSystemPermissionsField(value.FileSystem)
+	return value
 }
 
 func normalizeAbsolutePath(value string) (string, error) {
