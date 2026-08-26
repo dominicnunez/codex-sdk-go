@@ -198,6 +198,7 @@ type ThreadListParams struct {
 	Limit          *uint32            `json:"limit,omitempty"`
 	ModelProviders []string           `json:"modelProviders,omitempty"`
 	SearchTerm     *string            `json:"searchTerm,omitempty"`
+	SectionID      *string            `json:"sectionId,omitempty"`
 	SortDirection  *SortDirection     `json:"sortDirection,omitempty"`
 	SortKey        *ThreadSortKey     `json:"sortKey,omitempty"`
 	SourceKinds    []ThreadSourceKind `json:"sourceKinds,omitempty"`
@@ -425,6 +426,7 @@ type ThreadForkParams struct {
 	DeveloperInstructions *string            `json:"developerInstructions,omitempty"`
 	Ephemeral             *bool              `json:"ephemeral,omitempty"`
 	ExcludeTurns          *bool              `json:"excludeTurns,omitempty"`
+	LastTurnID            *string            `json:"lastTurnId,omitempty"`
 	Model                 *string            `json:"model,omitempty"`
 	ModelProvider         *string            `json:"modelProvider,omitempty"`
 	Sandbox               *SandboxMode       `json:"sandbox,omitempty"`

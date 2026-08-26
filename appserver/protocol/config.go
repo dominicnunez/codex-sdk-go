@@ -439,13 +439,30 @@ type ConfigRequirementsReadResponse struct {
 
 // ConfigRequirements represents configuration requirements
 type ConfigRequirements struct {
-	AllowedApprovalPolicies *[]AskForApprovalWrapper `json:"allowedApprovalPolicies,omitempty"`
-	AllowedSandboxModes     *[]SandboxMode           `json:"allowedSandboxModes,omitempty"`
-	AllowedWebSearchModes   *[]WebSearchMode         `json:"allowedWebSearchModes,omitempty"`
-	AllowManagedHooksOnly   *bool                    `json:"allowManagedHooksOnly,omitempty"`
-	ComputerUse             *ComputerUseRequirements `json:"computerUse,omitempty"`
-	EnforceResidency        *ResidencyRequirement    `json:"enforceResidency,omitempty"`
-	FeatureRequirements     map[string]bool          `json:"featureRequirements,omitempty"`
+	AllowedApprovalPolicies              *[]AskForApprovalWrapper `json:"allowedApprovalPolicies,omitempty"`
+	AllowedSandboxModes                  *[]SandboxMode           `json:"allowedSandboxModes,omitempty"`
+	AllowedWebSearchModes                *[]WebSearchMode         `json:"allowedWebSearchModes,omitempty"`
+	AllowManagedHooksOnly                *bool                    `json:"allowManagedHooksOnly,omitempty"`
+	ComputerUse                          *ComputerUseRequirements `json:"computerUse,omitempty"`
+	EnforceResidency                     *ResidencyRequirement    `json:"enforceResidency,omitempty"`
+	FeatureRequirements                  map[string]bool          `json:"featureRequirements,omitempty"`
+	AllowAppshots                        *bool                    `json:"allowAppshots,omitempty"`
+	AllowLoginShell                      *bool                    `json:"allowLoginShell,omitempty"`
+	AllowRemoteControl                   *bool                    `json:"allowRemoteControl,omitempty"`
+	AllowedPermissionProfiles            json.RawMessage          `json:"allowedPermissionProfiles,omitempty"`
+	AllowedWindowsSandboxImplementations json.RawMessage          `json:"allowedWindowsSandboxImplementations,omitempty"`
+	AutoReview                           json.RawMessage          `json:"autoReview,omitempty"`
+	BrowserUse                           json.RawMessage          `json:"browserUse,omitempty"`
+	ChatgptBaseURL                       *string                  `json:"chatgptBaseUrl,omitempty"`
+	CheckForUpdateOnStartup              *bool                    `json:"checkForUpdateOnStartup,omitempty"`
+	CliAuthCredentialsStore              json.RawMessage          `json:"cliAuthCredentialsStore,omitempty"`
+	DefaultPermissions                   *string                  `json:"defaultPermissions,omitempty"`
+	Feedback                             json.RawMessage          `json:"feedback,omitempty"`
+	LogDir                               *string                  `json:"logDir,omitempty"`
+	ModelCatalogJSON                     *string                  `json:"modelCatalogJson,omitempty"`
+	Models                               json.RawMessage          `json:"models,omitempty"`
+	SQLiteHome                           *string                  `json:"sqliteHome,omitempty"`
+	WindowsSandboxPrivateDesktop         *bool                    `json:"windowsSandboxPrivateDesktop,omitempty"`
 }
 
 // ComputerUseRequirements represents computer-use policy requirements.

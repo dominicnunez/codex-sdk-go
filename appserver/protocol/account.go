@@ -136,6 +136,11 @@ const (
 	PlanTypeEdu                         PlanType = "edu"
 	PlanTypeSelfServeBusinessUsageBased PlanType = "self_serve_business_usage_based"
 	PlanTypeEnterpriseCBPUsageBased     PlanType = "enterprise_cbp_usage_based"
+	PlanTypeSelfServeBusinessProLite    PlanType = "self_serve_business_prolite"
+	PlanTypeEnt26                       PlanType = "ent26"
+	PlanTypeEnterpriseCBPAutomation     PlanType = "enterprise_cbp_automation"
+	PlanTypeEduPlus                     PlanType = "edu_plus"
+	PlanTypeEduPro                      PlanType = "edu_pro"
 	PlanTypeUnknown                     PlanType = "unknown"
 )
 
@@ -151,6 +156,11 @@ var validPlanTypes = map[PlanType]struct{}{
 	PlanTypeEdu:                         {},
 	PlanTypeSelfServeBusinessUsageBased: {},
 	PlanTypeEnterpriseCBPUsageBased:     {},
+	PlanTypeSelfServeBusinessProLite:    {},
+	PlanTypeEnt26:                       {},
+	PlanTypeEnterpriseCBPAutomation:     {},
+	PlanTypeEduPlus:                     {},
+	PlanTypeEduPro:                      {},
 	PlanTypeUnknown:                     {},
 }
 
@@ -210,8 +220,9 @@ func (a *AccountWrapper) MarshalJSON() ([]byte, error) {
 
 // GetAccountRateLimitsResponse is the response from account/rateLimits/read.
 type GetAccountRateLimitsResponse struct {
-	RateLimits          RateLimitSnapshot             `json:"rateLimits"`
-	RateLimitsByLimitId map[string]*RateLimitSnapshot `json:"rateLimitsByLimitId,omitempty"`
+	RateLimits            RateLimitSnapshot             `json:"rateLimits"`
+	RateLimitsByLimitId   map[string]*RateLimitSnapshot `json:"rateLimitsByLimitId,omitempty"`
+	RateLimitResetCredits json.RawMessage               `json:"rateLimitResetCredits,omitempty"`
 }
 
 func (r *GetAccountRateLimitsResponse) UnmarshalJSON(data []byte) error {

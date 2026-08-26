@@ -256,8 +256,9 @@ type PluginShareSaveParams struct {
 
 // PluginShareSaveResponse contains the remote share identity.
 type PluginShareSaveResponse struct {
-	RemotePluginID string `json:"remotePluginId"`
-	ShareURL       string `json:"shareUrl"`
+	RemotePluginID        string `json:"remotePluginId"`
+	ShareURL              string `json:"shareUrl"`
+	CanPublishToWorkspace *bool  `json:"canPublishToWorkspace,omitempty"`
 }
 
 func (r *PluginShareSaveResponse) UnmarshalJSON(data []byte) error {

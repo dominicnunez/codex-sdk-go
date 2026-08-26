@@ -14,6 +14,7 @@ const (
 	McpAuthStatusNotLoggedIn McpAuthStatus = "notLoggedIn"
 	McpAuthStatusBearerToken McpAuthStatus = "bearerToken"
 	McpAuthStatusOAuth       McpAuthStatus = "oAuth"
+	McpAuthStatusUnknown     McpAuthStatus = "unknown"
 )
 
 var validMcpAuthStatuses = map[McpAuthStatus]struct{}{
@@ -21,6 +22,7 @@ var validMcpAuthStatuses = map[McpAuthStatus]struct{}{
 	McpAuthStatusNotLoggedIn: {},
 	McpAuthStatusBearerToken: {},
 	McpAuthStatusOAuth:       {},
+	McpAuthStatusUnknown:     {},
 }
 
 func (s *McpAuthStatus) UnmarshalJSON(data []byte) error {
@@ -142,9 +144,10 @@ func (s *McpServerStatus) UnmarshalJSON(data []byte) error {
 
 // ListMcpServerStatusParams are parameters for the mcpServerStatus/list request.
 type ListMcpServerStatusParams struct {
-	Cursor *string                `json:"cursor,omitempty"`
-	Detail *McpServerStatusDetail `json:"detail,omitempty"`
-	Limit  *uint32                `json:"limit,omitempty"`
+	Cursor   *string                `json:"cursor,omitempty"`
+	Detail   *McpServerStatusDetail `json:"detail,omitempty"`
+	Limit    *uint32                `json:"limit,omitempty"`
+	ThreadID *string                `json:"threadId,omitempty"`
 }
 
 func (p ListMcpServerStatusParams) prepareRequest() (interface{}, error) {
@@ -175,9 +178,11 @@ func (r *ListMcpServerStatusResponse) UnmarshalJSON(data []byte) error {
 
 // McpServerOauthLoginParams are parameters for the mcpServer/oauth/login request.
 type McpServerOauthLoginParams struct {
-	Name        string    `json:"name"`
-	Scopes      *[]string `json:"scopes,omitempty"`
-	TimeoutSecs *int64    `json:"timeoutSecs,omitempty"`
+	Name               string          `json:"name"`
+	Scopes             *[]string       `json:"scopes,omitempty"`
+	TimeoutSecs        *int64          `json:"timeoutSecs,omitempty"`
+	ClientRegistration json.RawMessage `json:"clientRegistration,omitempty"`
+	ThreadID           *string         `json:"threadId,omitempty"`
 }
 
 // McpServerOauthLoginResponse is the response from mcpServer/oauth/login.
@@ -203,9 +208,11 @@ type McpServerRefreshResponse struct{}
 
 // McpResourceReadParams reads a resource from an MCP server.
 type McpResourceReadParams struct {
-	Server   string  `json:"server"`
-	ThreadID *string `json:"threadId,omitempty"`
-	URI      string  `json:"uri"`
+	ConnectorID  *string `json:"connectorId,omitempty"`
+	OriginCallID *string `json:"originCallId,omitempty"`
+	Server       string  `json:"server"`
+	ThreadID     *string `json:"threadId,omitempty"`
+	URI          string  `json:"uri"`
 }
 
 // ResourceContent is one content item returned from an MCP resource read.
@@ -219,7 +226,8 @@ type ResourceContent struct {
 
 // McpResourceReadResponse is the response from mcpServer/resource/read.
 type McpResourceReadResponse struct {
-	Contents []ResourceContent `json:"contents"`
+	Contents     []ResourceContent `json:"contents"`
+	OriginCallID *string           `json:"originCallId,omitempty"`
 }
 
 func (r *McpResourceReadResponse) UnmarshalJSON(data []byte) error {
@@ -288,9 +296,11 @@ func (s *McpServerStartupState) UnmarshalJSON(data []byte) error {
 
 // McpServerStatusUpdatedNotification reports MCP server startup status updates.
 type McpServerStatusUpdatedNotification struct {
-	Error  *string               `json:"error,omitempty"`
-	Name   string                `json:"name"`
-	Status McpServerStartupState `json:"status"`
+	Error         *string               `json:"error,omitempty"`
+	FailureReason *string               `json:"failureReason,omitempty"`
+	Name          string                `json:"name"`
+	Status        McpServerStartupState `json:"status"`
+	ThreadID      *string               `json:"threadId,omitempty"`
 }
 
 func (n *McpServerStatusUpdatedNotification) UnmarshalJSON(data []byte) error {
@@ -306,9 +316,10 @@ func (n *McpServerStatusUpdatedNotification) UnmarshalJSON(data []byte) error {
 
 // McpServerOauthLoginCompletedNotification is sent when OAuth login completes.
 type McpServerOauthLoginCompletedNotification struct {
-	Name    string  `json:"name"`
-	Success bool    `json:"success"`
-	Error   *string `json:"error,omitempty"`
+	Name     string  `json:"name"`
+	Success  bool    `json:"success"`
+	Error    *string `json:"error,omitempty"`
+	ThreadID *string `json:"threadId,omitempty"`
 }
 
 func (n *McpServerOauthLoginCompletedNotification) UnmarshalJSON(data []byte) error {

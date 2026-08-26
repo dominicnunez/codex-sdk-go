@@ -15,6 +15,7 @@ type CommandExecutionRequestApprovalParams struct {
 	ApprovalID                      *string                   `json:"approvalId,omitempty"`
 	Command                         *string                   `json:"command,omitempty"`
 	Cwd                             *string                   `json:"cwd,omitempty"`
+	EnvironmentID                   *string                   `json:"environmentId,omitempty"`
 	CommandActions                  *[]CommandActionWrapper   `json:"commandActions,omitempty"`
 	NetworkApprovalContext          *NetworkApprovalContext   `json:"networkApprovalContext,omitempty"`
 	ProposedExecpolicyAmendment     *[]string                 `json:"proposedExecpolicyAmendment,omitempty"`

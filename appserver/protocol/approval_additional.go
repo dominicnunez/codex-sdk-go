@@ -24,13 +24,14 @@ type RequestPermissionProfile struct {
 
 // PermissionsRequestApprovalParams represents an item/permissions/requestApproval request.
 type PermissionsRequestApprovalParams struct {
-	Cwd         string                   `json:"cwd"`
-	ItemID      string                   `json:"itemId"`
-	Permissions RequestPermissionProfile `json:"permissions"`
-	Reason      *string                  `json:"reason,omitempty"`
-	StartedAtMs int64                    `json:"startedAtMs"`
-	ThreadID    string                   `json:"threadId"`
-	TurnID      string                   `json:"turnId"`
+	Cwd           string                   `json:"cwd"`
+	EnvironmentID *string                  `json:"environmentId,omitempty"`
+	ItemID        string                   `json:"itemId"`
+	Permissions   RequestPermissionProfile `json:"permissions"`
+	Reason        *string                  `json:"reason,omitempty"`
+	StartedAtMs   int64                    `json:"startedAtMs"`
+	ThreadID      string                   `json:"threadId"`
+	TurnID        string                   `json:"turnId"`
 }
 
 func (p *PermissionsRequestApprovalParams) UnmarshalJSON(data []byte) error {

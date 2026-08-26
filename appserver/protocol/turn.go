@@ -18,13 +18,14 @@ func newTurnService(client *Client) *TurnService {
 
 // TurnStartParams are the parameters for turn/start.
 type TurnStartParams struct {
-	ThreadID          string             `json:"threadId"`
-	Input             []UserInput        `json:"input"`
-	ApprovalPolicy    *AskForApproval    `json:"approvalPolicy,omitempty"`
-	ApprovalsReviewer *ApprovalsReviewer `json:"approvalsReviewer,omitempty"`
-	Cwd               *string            `json:"cwd,omitempty"`
-	Effort            *ReasoningEffort   `json:"effort,omitempty"`
-	Model             *string            `json:"model,omitempty"`
+	ThreadID            string             `json:"threadId"`
+	Input               []UserInput        `json:"input"`
+	ClientUserMessageID *string            `json:"clientUserMessageId,omitempty"`
+	ApprovalPolicy      *AskForApproval    `json:"approvalPolicy,omitempty"`
+	ApprovalsReviewer   *ApprovalsReviewer `json:"approvalsReviewer,omitempty"`
+	Cwd                 *string            `json:"cwd,omitempty"`
+	Effort              *ReasoningEffort   `json:"effort,omitempty"`
+	Model               *string            `json:"model,omitempty"`
 	// OutputSchema optionally constrains the model's structured output to conform to a JSON Schema.
 	OutputSchema      interface{}              `json:"outputSchema,omitempty"`
 	Personality       *Personality             `json:"personality,omitempty"`
@@ -38,33 +39,35 @@ type TurnStartParams struct {
 // include required discriminator fields (for example sandboxPolicy.type).
 func (p TurnStartParams) MarshalJSON() ([]byte, error) {
 	type wireTurnStartParams struct {
-		ThreadID          string                   `json:"threadId"`
-		Input             []UserInput              `json:"input"`
-		ApprovalPolicy    *AskForApprovalWrapper   `json:"approvalPolicy,omitempty"`
-		ApprovalsReviewer *ApprovalsReviewer       `json:"approvalsReviewer,omitempty"`
-		Cwd               *string                  `json:"cwd,omitempty"`
-		Effort            *ReasoningEffort         `json:"effort,omitempty"`
-		Model             *string                  `json:"model,omitempty"`
-		OutputSchema      interface{}              `json:"outputSchema,omitempty"`
-		Personality       *Personality             `json:"personality,omitempty"`
-		SandboxPolicy     *SandboxPolicyWrapper    `json:"sandboxPolicy,omitempty"`
-		ServiceTier       *ServiceTier             `json:"serviceTier,omitempty"`
-		Summary           *ReasoningSummaryWrapper `json:"summary,omitempty"`
-		CollaborationMode *CollaborationMode       `json:"collaborationMode,omitempty"`
+		ThreadID            string                   `json:"threadId"`
+		Input               []UserInput              `json:"input"`
+		ClientUserMessageID *string                  `json:"clientUserMessageId,omitempty"`
+		ApprovalPolicy      *AskForApprovalWrapper   `json:"approvalPolicy,omitempty"`
+		ApprovalsReviewer   *ApprovalsReviewer       `json:"approvalsReviewer,omitempty"`
+		Cwd                 *string                  `json:"cwd,omitempty"`
+		Effort              *ReasoningEffort         `json:"effort,omitempty"`
+		Model               *string                  `json:"model,omitempty"`
+		OutputSchema        interface{}              `json:"outputSchema,omitempty"`
+		Personality         *Personality             `json:"personality,omitempty"`
+		SandboxPolicy       *SandboxPolicyWrapper    `json:"sandboxPolicy,omitempty"`
+		ServiceTier         *ServiceTier             `json:"serviceTier,omitempty"`
+		Summary             *ReasoningSummaryWrapper `json:"summary,omitempty"`
+		CollaborationMode   *CollaborationMode       `json:"collaborationMode,omitempty"`
 	}
 
 	wire := wireTurnStartParams{
-		ThreadID:          p.ThreadID,
-		Input:             p.Input,
-		ApprovalsReviewer: p.ApprovalsReviewer,
-		Cwd:               p.Cwd,
-		Effort:            p.Effort,
-		Model:             p.Model,
-		OutputSchema:      p.OutputSchema,
-		Personality:       p.Personality,
-		ServiceTier:       p.ServiceTier,
-		Summary:           p.Summary,
-		CollaborationMode: p.CollaborationMode,
+		ThreadID:            p.ThreadID,
+		Input:               p.Input,
+		ClientUserMessageID: p.ClientUserMessageID,
+		ApprovalsReviewer:   p.ApprovalsReviewer,
+		Cwd:                 p.Cwd,
+		Effort:              p.Effort,
+		Model:               p.Model,
+		OutputSchema:        p.OutputSchema,
+		Personality:         p.Personality,
+		ServiceTier:         p.ServiceTier,
+		Summary:             p.Summary,
+		CollaborationMode:   p.CollaborationMode,
 	}
 	if p.ApprovalPolicy != nil {
 		wire.ApprovalPolicy = &AskForApprovalWrapper{Value: *p.ApprovalPolicy}
@@ -197,9 +200,10 @@ func (s *TurnService) Interrupt(ctx context.Context, params TurnInterruptParams)
 
 // TurnSteerParams are the parameters for turn/steer
 type TurnSteerParams struct {
-	ThreadID       string      `json:"threadId"`
-	ExpectedTurnID string      `json:"expectedTurnId"`
-	Input          []UserInput `json:"input"`
+	ThreadID            string      `json:"threadId"`
+	ExpectedTurnID      string      `json:"expectedTurnId"`
+	Input               []UserInput `json:"input"`
+	ClientUserMessageID *string     `json:"clientUserMessageId,omitempty"`
 }
 
 // UnmarshalJSON implements custom unmarshaling for TurnSteerParams

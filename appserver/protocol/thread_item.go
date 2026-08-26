@@ -12,8 +12,9 @@ type ThreadItem interface {
 
 // UserMessageThreadItem represents a user message in a thread.
 type UserMessageThreadItem struct {
-	ID      string      `json:"id"`
-	Content []UserInput `json:"content"`
+	ID       string      `json:"id"`
+	Content  []UserInput `json:"content"`
+	ClientID *string     `json:"clientId,omitempty"`
 }
 
 func (UserMessageThreadItem) threadItem() {}
@@ -32,22 +33,25 @@ func (u *UserMessageThreadItem) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	return json.Marshal(struct {
-		Type    string          `json:"type"`
-		ID      string          `json:"id"`
-		Content json.RawMessage `json:"content"`
+		Type     string          `json:"type"`
+		ID       string          `json:"id"`
+		Content  json.RawMessage `json:"content"`
+		ClientID *string         `json:"clientId,omitempty"`
 	}{
-		Type:    "userMessage",
-		ID:      u.ID,
-		Content: contentBytes,
+		Type:     "userMessage",
+		ID:       u.ID,
+		Content:  contentBytes,
+		ClientID: u.ClientID,
 	})
 }
 
 // AgentMessageThreadItem represents an agent message in a thread.
 type AgentMessageThreadItem struct {
-	ID             string          `json:"id"`
-	MemoryCitation *MemoryCitation `json:"memoryCitation,omitempty"`
-	Text           string          `json:"text"`
-	Phase          *MessagePhase   `json:"phase,omitempty"`
+	ID             string                `json:"id"`
+	MemoryCitation *MemoryCitation       `json:"memoryCitation,omitempty"`
+	Text           string                `json:"text"`
+	Phase          *MessagePhase         `json:"phase,omitempty"`
+	Delivery       *AgentMessageDelivery `json:"delivery,omitempty"`
 }
 
 func (AgentMessageThreadItem) threadItem() {}
@@ -114,6 +118,8 @@ type CommandExecutionThreadItem struct {
 	DurationMs       *int64                  `json:"durationMs,omitempty"`
 	ExitCode         *int32                  `json:"exitCode,omitempty"`
 	ProcessId        *string                 `json:"processId,omitempty"`
+	PluginID         *string                 `json:"pluginId,omitempty"`
+	ScriptPath       *string                 `json:"scriptPath,omitempty"`
 }
 
 func (CommandExecutionThreadItem) threadItem() {}
@@ -151,15 +157,18 @@ func (f *FileChangeThreadItem) MarshalJSON() ([]byte, error) {
 
 // McpToolCallThreadItem represents an MCP tool call in a thread.
 type McpToolCallThreadItem struct {
-	ID                string             `json:"id"`
-	Server            string             `json:"server"`
-	Tool              string             `json:"tool"`
-	Status            McpToolCallStatus  `json:"status"`
-	Arguments         interface{}        `json:"arguments"`
-	McpAppResourceURI *string            `json:"mcpAppResourceUri,omitempty"`
-	Result            *McpToolCallResult `json:"result,omitempty"`
-	Error             *McpToolCallError  `json:"error,omitempty"`
-	DurationMs        *int64             `json:"durationMs,omitempty"`
+	ID                string                 `json:"id"`
+	Server            string                 `json:"server"`
+	Tool              string                 `json:"tool"`
+	Status            McpToolCallStatus      `json:"status"`
+	Arguments         interface{}            `json:"arguments"`
+	McpAppResourceURI *string                `json:"mcpAppResourceUri,omitempty"`
+	Result            *McpToolCallResult     `json:"result,omitempty"`
+	Error             *McpToolCallError      `json:"error,omitempty"`
+	DurationMs        *int64                 `json:"durationMs,omitempty"`
+	AppContext        *McpToolCallAppContext `json:"appContext,omitempty"`
+	PluginID          *string                `json:"pluginId,omitempty"`
+	ReadOnlyHint      *bool                  `json:"readOnlyHint,omitempty"`
 }
 
 func (McpToolCallThreadItem) threadItem() {}
@@ -228,9 +237,10 @@ func (c *CollabAgentToolCallThreadItem) MarshalJSON() ([]byte, error) {
 
 // WebSearchThreadItem represents a web search in a thread.
 type WebSearchThreadItem struct {
-	ID     string                  `json:"id"`
-	Query  string                  `json:"query"`
-	Action *WebSearchActionWrapper `json:"action,omitempty"`
+	ID      string                  `json:"id"`
+	Query   string                  `json:"query"`
+	Action  *WebSearchActionWrapper `json:"action,omitempty"`
+	Results *[]json.RawMessage      `json:"results,omitempty"`
 }
 
 func (WebSearchThreadItem) threadItem() {}

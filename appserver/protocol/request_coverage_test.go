@@ -315,6 +315,57 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 	verified["thread/compact/start"] = verifyMethod(t, transport, "thread/compact/start", func() {
 		_, _ = client.Thread.CompactStart(context.Background(), codex.ThreadCompactStartParams{ThreadID: "thread-1"})
 	})
+	verified["thread/delete"] = verifyMethod(t, transport, "thread/delete", func() {
+		_, _ = client.Thread.Delete(context.Background(), codex.ThreadDeleteParams{ThreadID: "thread-1"})
+	})
+	verified["thread/goal/get"] = verifyMethod(t, transport, "thread/goal/get", func() {
+		_, _ = client.Thread.GoalGet(context.Background(), codex.ThreadGoalGetParams{ThreadID: "thread-1"})
+	})
+	verified["thread/goal/set"] = verifyMethod(t, transport, "thread/goal/set", func() {
+		_, _ = client.Thread.GoalSet(context.Background(), codex.ThreadGoalSetParams{ThreadID: "thread-1"})
+	})
+	verified["thread/goal/clear"] = verifyMethod(t, transport, "thread/goal/clear", func() {
+		_, _ = client.Thread.GoalClear(context.Background(), codex.ThreadGoalClearParams{ThreadID: "thread-1"})
+	})
+	verified["thread/section/move"] = verifyMethod(t, transport, "thread/section/move", func() {
+		_, _ = client.Thread.SectionMove(context.Background(), codex.ThreadSectionMoveParams{ThreadID: "thread-1"})
+	})
+	verified["threadSection/create"] = verifyMethod(t, transport, "threadSection/create", func() {
+		_, _ = client.Thread.SectionCreate(context.Background(), codex.ThreadSectionCreateParams{Name: "section"})
+	})
+	verified["threadSection/delete"] = verifyMethod(t, transport, "threadSection/delete", func() {
+		_, _ = client.Thread.SectionDelete(context.Background(), codex.ThreadSectionDeleteParams{SectionID: "section-1"})
+	})
+	verified["threadSection/list"] = verifyMethod(t, transport, "threadSection/list", func() {
+		_, _ = client.Thread.SectionList(context.Background(), codex.ThreadSectionListParams{})
+	})
+	verified["threadSection/update"] = verifyMethod(t, transport, "threadSection/update", func() {
+		_, _ = client.Thread.SectionUpdate(context.Background(), codex.ThreadSectionUpdateParams{SectionID: "section-1", Name: "section"})
+	})
+	verified["skills/extraRoots/set"] = verifyMethod(t, transport, "skills/extraRoots/set", func() {
+		_, _ = client.Skills.SetExtraRoots(context.Background(), codex.SkillsExtraRootsSetParams{ExtraRoots: []string{}})
+	})
+	verified["app/read"] = verifyMethod(t, transport, "app/read", func() {
+		_, _ = client.Apps.Read(context.Background(), codex.AppsReadParams{AppIDs: []string{}})
+	})
+	verified["app/installed"] = verifyMethod(t, transport, "app/installed", func() {
+		_, _ = client.Apps.Installed(context.Background(), codex.AppsInstalledParams{})
+	})
+	verified["account/rateLimitResetCredit/consume"] = verifyMethod(t, transport, "account/rateLimitResetCredit/consume", func() {
+		_, _ = client.Account.ConsumeRateLimitResetCredit(context.Background(), codex.ConsumeAccountRateLimitResetCreditParams{IdempotencyKey: "key"})
+	})
+	verified["account/usage/read"] = verifyMethod(t, transport, "account/usage/read", func() {
+		_, _ = client.Account.GetTokenUsage(context.Background(), nil)
+	})
+	verified["account/workspaceMessages/read"] = verifyMethod(t, transport, "account/workspaceMessages/read", func() {
+		_, _ = client.Account.GetWorkspaceMessages(context.Background())
+	})
+	verified["externalAgentConfig/import/readHistories"] = verifyMethod(t, transport, "externalAgentConfig/import/readHistories", func() {
+		_, _ = client.ExternalAgent.ImportHistories(context.Background())
+	})
+	verified["externalAgentConfig/import/recordHistory"] = verifyMethod(t, transport, "externalAgentConfig/import/recordHistory", func() {
+		_, _ = client.ExternalAgent.RecordImportHistory(context.Background(), codex.ExternalAgentConfigImportHistoryRecordParams{})
+	})
 
 	// Verify Turn service
 	verified["turn/start"] = verifyMethod(t, transport, "turn/start", func() {

@@ -1,6 +1,9 @@
 package protocol
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // This file contains typed string enums defined in the protocol spec that are
 // referenced by fields across multiple domain files.
@@ -197,12 +200,14 @@ const (
 	WebSearchModeDisabled WebSearchMode = "disabled"
 	WebSearchModeCached   WebSearchMode = "cached"
 	WebSearchModeLive     WebSearchMode = "live"
+	WebSearchModeIndexed  WebSearchMode = "indexed"
 )
 
 var validWebSearchModes = map[WebSearchMode]struct{}{
 	WebSearchModeDisabled: {},
 	WebSearchModeCached:   {},
 	WebSearchModeLive:     {},
+	WebSearchModeIndexed:  {},
 }
 
 func (m WebSearchMode) MarshalJSON() ([]byte, error) {
@@ -334,13 +339,17 @@ const (
 type ThreadSortKey string
 
 const (
-	ThreadSortKeyCreatedAt ThreadSortKey = "created_at"
-	ThreadSortKeyUpdatedAt ThreadSortKey = "updated_at"
+	ThreadSortKeyCreatedAt       ThreadSortKey = "created_at"
+	ThreadSortKeyUpdatedAt       ThreadSortKey = "updated_at"
+	ThreadSortKeyRecencyAt       ThreadSortKey = "recency_at"
+	ThreadSortKeySectionPosition ThreadSortKey = "section_position"
 )
 
 var validThreadSortKeys = map[ThreadSortKey]struct{}{
-	ThreadSortKeyCreatedAt: {},
-	ThreadSortKeyUpdatedAt: {},
+	ThreadSortKeyCreatedAt:       {},
+	ThreadSortKeyUpdatedAt:       {},
+	ThreadSortKeyRecencyAt:       {},
+	ThreadSortKeySectionPosition: {},
 }
 
 func (k ThreadSortKey) MarshalJSON() ([]byte, error) {
@@ -475,6 +484,7 @@ const (
 	AppToolApprovalAuto    AppToolApproval = "auto"
 	AppToolApprovalPrompt  AppToolApproval = "prompt"
 	AppToolApprovalApprove AppToolApproval = "approve"
+	AppToolApprovalWrites  AppToolApproval = "writes"
 )
 
 // ResidencyRequirement represents a data residency requirement.
@@ -518,11 +528,22 @@ var validReasoningEfforts = map[ReasoningEffort]struct{}{
 }
 
 func (r ReasoningEffort) MarshalJSON() ([]byte, error) {
-	return marshalEnumString("reasoningEffort", r, validReasoningEfforts)
+	if r == "" {
+		return nil, fmt.Errorf("reasoningEffort must not be empty")
+	}
+	return json.Marshal(string(r))
 }
 
 func (r *ReasoningEffort) UnmarshalJSON(data []byte) error {
-	return unmarshalEnumString(data, "reasoningEffort", validReasoningEfforts, r)
+	var value string
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	if value == "" {
+		return fmt.Errorf("reasoningEffort must not be empty")
+	}
+	*r = ReasoningEffort(value)
+	return nil
 }
 
 // InputModality represents a canonical user-input modality tag advertised by a model.
@@ -531,11 +552,13 @@ type InputModality string
 const (
 	InputModalityText  InputModality = "text"
 	InputModalityImage InputModality = "image"
+	InputModalityAudio InputModality = "audio"
 )
 
 var validInputModalities = map[InputModality]struct{}{
 	InputModalityText:  {},
 	InputModalityImage: {},
+	InputModalityAudio: {},
 }
 
 func (m *InputModality) UnmarshalJSON(data []byte) error {

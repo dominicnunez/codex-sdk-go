@@ -344,6 +344,7 @@ func (p *PluginMarketplaceEntry) UnmarshalJSON(data []byte) error {
 type PluginListParams struct {
 	Cwds             []string                    `json:"cwds,omitempty"`
 	MarketplaceKinds []PluginListMarketplaceKind `json:"marketplaceKinds,omitempty"`
+	ForceRefetch     bool                        `json:"forceRefetch,omitempty"`
 }
 
 // PluginInstalledParams lists installed plugins across marketplaces.
@@ -579,6 +580,7 @@ type PluginInstallParams struct {
 	MarketplacePath       string  `json:"marketplacePath,omitempty"`
 	PluginName            string  `json:"pluginName"`
 	RemoteMarketplaceName *string `json:"remoteMarketplaceName,omitempty"`
+	InstallAttemptID      *string `json:"installAttemptId,omitempty"`
 }
 
 // PluginInstallResponse contains plugin auth follow-up requirements.
