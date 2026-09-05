@@ -237,6 +237,16 @@ type ThreadSection struct {
 	Name       string                   `json:"name"`
 }
 
+func (s *ThreadSection) UnmarshalJSON(data []byte) error {
+	type wire ThreadSection
+	var decoded wire
+	if err := unmarshalInboundObject(data, &decoded, []string{"id", "name"}, []string{"id", "name"}); err != nil {
+		return err
+	}
+	*s = ThreadSection(decoded)
+	return nil
+}
+
 type ThreadSectionCreateParams struct {
 	Appearance *ThreadSectionAppearance `json:"appearance,omitempty"`
 	Name       string                   `json:"name"`

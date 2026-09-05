@@ -78,3 +78,32 @@ func TestMcpServerInfoRequiredFields(t *testing.T) {
 		})
 	}
 }
+
+func TestThreadSectionRequiredFields(t *testing.T) {
+	for _, tc := range []struct {
+		section string
+		valid   bool
+	}{
+		{`{}`, false},
+		{`{"id":"section"}`, false},
+		{`{"name":"name"}`, false},
+		{`{"id":null,"name":"name"}`, false},
+		{`{"id":"section","name":null}`, false},
+		{`{"id":"section","name":"name"}`, true},
+		{`null`, true},
+	} {
+		t.Run(tc.section, func(t *testing.T) {
+			payload := validProcessThreadPayload("thread-1")
+			payload["section"] = json.RawMessage(tc.section)
+			data, err := json.Marshal(payload)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var thread codex.Thread
+			err = json.Unmarshal(data, &thread)
+			if (err == nil) != tc.valid {
+				t.Fatalf("valid=%v, error=%v", tc.valid, err)
+			}
+		})
+	}
+}
