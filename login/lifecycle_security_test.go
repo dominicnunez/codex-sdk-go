@@ -92,3 +92,35 @@ func TestTokenHTTPErrorDoesNotEchoBody(t *testing.T) {
 		t.Fatal("HTTP error echoes credentials")
 	}
 }
+
+type countedTokenBody struct {
+	reader *strings.Reader
+	read   int
+	closed bool
+}
+
+func (b *countedTokenBody) Read(p []byte) (int, error) {
+	n, err := b.reader.Read(p)
+	b.read += n
+	return n, err
+}
+func (b *countedTokenBody) Close() error { b.closed = true; return nil }
+
+func TestTokenHTTPErrorDrainIsBounded(t *testing.T) {
+	for _, size := range []int{0, 128, 8192} {
+		body := &countedTokenBody{reader: strings.NewReader(strings.Repeat("x", size))}
+		cfg := Config{HTTPClient: &http.Client{Transport: auditTokenTransport(func(*http.Request) (*http.Response, error) {
+			return &http.Response{StatusCode: 400, Body: body, Header: make(http.Header)}, nil
+		})}}
+		_, err := Refresh(context.Background(), cfg, "secret")
+		if err == nil {
+			t.Fatal("expected HTTP error")
+		}
+		if body.read != min(size, int(maxErrorBodyBytes)) {
+			t.Fatalf("drained %d bytes from %d byte body", body.read, size)
+		}
+		if !body.closed {
+			t.Fatal("response body not closed")
+		}
+	}
+}

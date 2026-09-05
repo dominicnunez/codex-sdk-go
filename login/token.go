@@ -15,6 +15,7 @@ import (
 )
 
 const maxTokenResponseBytes int64 = 1 << 20
+const maxErrorBodyBytes int64 = 4096
 
 const (
 	grantTypeAuthorizationCode = "authorization_code"
@@ -82,6 +83,8 @@ func doTokenRequest(cfg Config, req *http.Request, operation string) (auth.Crede
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		// Error bodies may echo credentials. Keep only the operation and status.
+		// Drain small bodies to retain connection reuse without unbounded reads.
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, maxErrorBodyBytes))
 		return auth.Credentials{}, fmt.Errorf("OpenAI Codex token %s failed (%d)", operation, resp.StatusCode)
 	}
 
