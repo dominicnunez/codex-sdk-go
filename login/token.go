@@ -82,12 +82,10 @@ func doTokenRequest(cfg Config, req *http.Request, operation string) (auth.Crede
 	defer resp.Body.Close()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrorBodyBytes))
-		message := strings.TrimSpace(string(body))
-		if message == "" {
-			message = resp.Status
-		}
-		return auth.Credentials{}, fmt.Errorf("OpenAI Codex token %s failed (%d): %s", operation, resp.StatusCode, message)
+		// Error bodies may echo credentials. Keep only the operation and status.
+		// Drain small bodies to retain connection reuse without unbounded reads.
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, maxErrorBodyBytes))
+		return auth.Credentials{}, fmt.Errorf("OpenAI Codex token %s failed (%d)", operation, resp.StatusCode)
 	}
 
 	var decoded tokenResponse
@@ -95,7 +93,7 @@ func doTokenRequest(cfg Config, req *http.Request, operation string) (auth.Crede
 		return auth.Credentials{}, fmt.Errorf("decode OpenAI Codex token %s response: %w", operation, err)
 	}
 	if strings.TrimSpace(decoded.AccessToken) == "" || strings.TrimSpace(decoded.RefreshToken) == "" || decoded.ExpiresIn <= 0 {
-		return auth.Credentials{}, fmt.Errorf("%w: %+v", auth.ErrMissingTokenFields, decoded)
+		return auth.Credentials{}, fmt.Errorf("OpenAI Codex token %s response: %w", operation, auth.ErrMissingTokenFields)
 	}
 
 	claims, err := auth.ExtractTokenClaims(decoded.AccessToken)

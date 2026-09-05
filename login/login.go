@@ -60,6 +60,9 @@ func waitForAuthorizationCode(
 	authURL string,
 	state string,
 ) (AuthorizationCode, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	results := make(chan callbackResult, 2)
 	if callbackServer != nil {
 		go func() {
