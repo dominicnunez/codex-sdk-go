@@ -143,6 +143,16 @@ type GetAccountTokenUsageResponse struct {
 	ThreadUsage       *ThreadUsage                    `json:"threadUsage,omitempty"`
 }
 
+func (r *GetAccountTokenUsageResponse) UnmarshalJSON(data []byte) error {
+	type wire GetAccountTokenUsageResponse
+	var decoded wire
+	if err := unmarshalInboundObject(data, &decoded, []string{"summary"}, []string{"summary"}); err != nil {
+		return err
+	}
+	*r = GetAccountTokenUsageResponse(decoded)
+	return nil
+}
+
 type WorkspaceMessageType string
 
 const (
