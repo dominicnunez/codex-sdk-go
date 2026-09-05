@@ -243,6 +243,15 @@ func (c *Client) notifyThreadClosedListeners(listeners []threadStateListener) {
 }
 
 func (c *Client) installThreadStateCache() {
+	c.addNotificationListener(notifyThreadProjectUpdated, func(_ context.Context, notif Notification) {
+		var n ThreadProjectUpdatedNotification
+		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			c.reportHandlerError(notifyThreadProjectUpdated, fmt.Errorf("unmarshal %s: %w", notifyThreadProjectUpdated, err))
+			return
+		}
+		c.mutateThreadState(n.ThreadID, func(thread *Thread) { thread.ProjectID = cloneStringPtr(n.ProjectID) })
+	})
+
 	c.addNotificationListener(notifyThreadStarted, func(_ context.Context, notif Notification) {
 		var n ThreadStartedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {

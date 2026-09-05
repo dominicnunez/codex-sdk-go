@@ -404,7 +404,7 @@ func (*ApiKeyLoginAccountParams) isLoginAccountParams() {}
 
 // MarshalJSON redacts the API key to prevent accidental credential leaks
 // via structured logging, debug serializers, or error payloads.
-func (p *ApiKeyLoginAccountParams) MarshalJSON() ([]byte, error) {
+func (p ApiKeyLoginAccountParams) MarshalJSON() ([]byte, error) {
 	type redacted struct {
 		Type   string `json:"type"`
 		ApiKey string `json:"apiKey"`
@@ -422,7 +422,8 @@ func (p *ApiKeyLoginAccountParams) marshalWire() ([]byte, error) {
 	if err := validateRequiredNonEmptyStringField(loginFieldApiKey, p.ApiKey); err != nil {
 		return nil, err
 	}
-	w := ApiKeyLoginAccountParams{
+	type wire ApiKeyLoginAccountParams
+	w := wire{
 		Type:   loginTypeApiKey,
 		ApiKey: p.ApiKey,
 	}
@@ -430,15 +431,15 @@ func (p *ApiKeyLoginAccountParams) marshalWire() ([]byte, error) {
 }
 
 // String redacts the API key to prevent accidental credential leaks in logs.
-func (p *ApiKeyLoginAccountParams) String() string {
+func (p ApiKeyLoginAccountParams) String() string {
 	return fmt.Sprintf("ApiKeyLoginAccountParams{Type:%s, ApiKey:[REDACTED]}", loginTypeApiKey)
 }
 
 // GoString implements fmt.GoStringer to redact credentials from %#v.
-func (p *ApiKeyLoginAccountParams) GoString() string { return p.String() }
+func (p ApiKeyLoginAccountParams) GoString() string { return p.String() }
 
 // Format implements fmt.Formatter to redact credentials from all format verbs.
-func (p *ApiKeyLoginAccountParams) Format(f fmt.State, verb rune) {
+func (p ApiKeyLoginAccountParams) Format(f fmt.State, verb rune) {
 	_, _ = fmt.Fprint(f, p.String())
 }
 
@@ -506,7 +507,7 @@ func (*ChatgptAuthTokensLoginAccountParams) isLoginAccountParams() {}
 
 // MarshalJSON redacts the access token to prevent accidental credential leaks
 // via structured logging, debug serializers, or error payloads.
-func (p *ChatgptAuthTokensLoginAccountParams) MarshalJSON() ([]byte, error) {
+func (p ChatgptAuthTokensLoginAccountParams) MarshalJSON() ([]byte, error) {
 	type redacted struct {
 		Type             string  `json:"type"`
 		AccessToken      string  `json:"accessToken"`
@@ -531,7 +532,8 @@ func (p *ChatgptAuthTokensLoginAccountParams) marshalWire() ([]byte, error) {
 	if err := validateRequiredNonEmptyStringField(loginFieldChatgptAccountID, p.ChatgptAccountId); err != nil {
 		return nil, err
 	}
-	w := ChatgptAuthTokensLoginAccountParams{
+	type wire ChatgptAuthTokensLoginAccountParams
+	w := wire{
 		Type:             loginTypeChatgptAuthTokens,
 		AccessToken:      p.AccessToken,
 		ChatgptAccountId: p.ChatgptAccountId,
@@ -541,15 +543,15 @@ func (p *ChatgptAuthTokensLoginAccountParams) marshalWire() ([]byte, error) {
 }
 
 // String redacts the access token to prevent accidental credential leaks in logs.
-func (p *ChatgptAuthTokensLoginAccountParams) String() string {
+func (p ChatgptAuthTokensLoginAccountParams) String() string {
 	return fmt.Sprintf("ChatgptAuthTokensLoginAccountParams{Type:%s, AccessToken:[REDACTED], ChatgptAccountId:%s}", loginTypeChatgptAuthTokens, p.ChatgptAccountId)
 }
 
 // GoString implements fmt.GoStringer to redact credentials from %#v.
-func (p *ChatgptAuthTokensLoginAccountParams) GoString() string { return p.String() }
+func (p ChatgptAuthTokensLoginAccountParams) GoString() string { return p.String() }
 
 // Format implements fmt.Formatter to redact credentials from all format verbs.
-func (p *ChatgptAuthTokensLoginAccountParams) Format(f fmt.State, verb rune) {
+func (p ChatgptAuthTokensLoginAccountParams) Format(f fmt.State, verb rune) {
 	_, _ = fmt.Fprint(f, p.String())
 }
 
@@ -563,7 +565,7 @@ type AmazonBedrockLoginAccountParams struct {
 func (*AmazonBedrockLoginAccountParams) isLoginAccountParams() {}
 
 // MarshalJSON redacts the API key from logs and debug serializers.
-func (p *AmazonBedrockLoginAccountParams) MarshalJSON() ([]byte, error) {
+func (p AmazonBedrockLoginAccountParams) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Type   string `json:"type"`
 		ApiKey string `json:"apiKey"`
@@ -585,13 +587,13 @@ func (p *AmazonBedrockLoginAccountParams) marshalWire() ([]byte, error) {
 	return json.Marshal(wire{Type: loginTypeAmazonBedrock, ApiKey: p.ApiKey, Region: p.Region})
 }
 
-func (p *AmazonBedrockLoginAccountParams) String() string {
+func (p AmazonBedrockLoginAccountParams) String() string {
 	return fmt.Sprintf("AmazonBedrockLoginAccountParams{Type:%s, ApiKey:[REDACTED], Region:%s}", loginTypeAmazonBedrock, p.Region)
 }
 
-func (p *AmazonBedrockLoginAccountParams) GoString() string { return p.String() }
+func (p AmazonBedrockLoginAccountParams) GoString() string { return p.String() }
 
-func (p *AmazonBedrockLoginAccountParams) Format(f fmt.State, verb rune) {
+func (p AmazonBedrockLoginAccountParams) Format(f fmt.State, verb rune) {
 	_, _ = fmt.Fprint(f, p.String())
 }
 
