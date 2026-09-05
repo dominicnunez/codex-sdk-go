@@ -543,8 +543,8 @@ func TestClientMethodsRejectMalformedAbsolutePathResponses(t *testing.T) {
 			method: "thread/read",
 			payload: map[string]interface{}{
 				"thread": map[string]interface{}{
-					"id":            "thread-1",
-					"cliVersion":    "1.0.0",
+					"id":        "thread-1",
+					"projectId": nil, "sessionId": "session-1", "cliVersion": "1.0.0",
 					"createdAt":     int64(1700000000),
 					"cwd":           "relative/path",
 					"modelProvider": "openai",
@@ -567,8 +567,8 @@ func TestClientMethodsRejectMalformedAbsolutePathResponses(t *testing.T) {
 			method: "thread/read",
 			payload: map[string]interface{}{
 				"thread": map[string]interface{}{
-					"id":            "thread-1",
-					"cliVersion":    "1.0.0",
+					"id":        "thread-1",
+					"projectId": nil, "sessionId": "session-1", "cliVersion": "1.0.0",
 					"createdAt":     int64(1700000000),
 					"cwd":           "/tmp",
 					"modelProvider": "openai",

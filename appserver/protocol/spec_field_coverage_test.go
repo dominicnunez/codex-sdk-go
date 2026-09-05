@@ -356,6 +356,22 @@ func testStructFields(t *testing.T) {
 		{"schema/json/v1/InitializeParams.json", reflect.TypeOf(InitializeParams{})},
 		{"schema/json/v1/InitializeResponse.json", reflect.TypeOf(InitializeResponse{})},
 
+		{"schema/json/v2/AuthRecoveryNotification.json", reflect.TypeOf(AuthRecoveryNotification{})},
+		{"schema/json/v2/McpServerEventStreamNotification.json", reflect.TypeOf(McpServerEventStreamNotification{})},
+		{"schema/json/v2/ThreadRealtimeItemStartedNotification.json", reflect.TypeOf(ThreadRealtimeItemStartedNotification{})},
+		{"schema/json/v2/ThreadRealtimeItemCompletedNotification.json", reflect.TypeOf(ThreadRealtimeItemCompletedNotification{})},
+		{"schema/json/v2/ThreadRealtimeItemTranscriptDeltaNotification.json", reflect.TypeOf(ThreadRealtimeItemTranscriptDeltaNotification{})},
+
+		// Paginated history and plugin reconciliation
+		{"schema/json/v2/ThreadItemsListParams.json", reflect.TypeOf(ThreadItemsListParams{})},
+		{"schema/json/v2/ThreadItemsListResponse.json", reflect.TypeOf(ThreadItemsListResponse{})},
+		{"schema/json/v2/ThreadTurnsListParams.json", reflect.TypeOf(ThreadTurnsListParams{})},
+		{"schema/json/v2/ThreadTurnsListResponse.json", reflect.TypeOf(ThreadTurnsListResponse{})},
+		{"schema/json/v2/ThreadRevertParams.json", reflect.TypeOf(ThreadRevertParams{})},
+		{"schema/json/v2/ThreadRevertResponse.json", reflect.TypeOf(ThreadRevertResponse{})},
+		{"schema/json/v2/PluginReconcileParams.json", reflect.TypeOf(PluginReconcileParams{})},
+		{"schema/json/v2/PluginReconcileResponse.json", reflect.TypeOf(PluginReconcileResponse{})},
+
 		// v2 account
 		{"schema/json/v2/GetAccountParams.json", reflect.TypeOf(GetAccountParams{})},
 		{"schema/json/v2/GetAccountResponse.json", reflect.TypeOf(GetAccountResponse{})},
@@ -848,7 +864,7 @@ func testEnumValues(t *testing.T) {
 			goValues: enumStrings(
 				AuthModeAPIKey, AuthModeChatGPT, AuthModeChatGPTAuthTokens,
 				AuthModeAgentIdentity, AuthModeHeaders, AuthModePersonalAccessToken,
-				AuthModeBedrockAPIKey,
+				AuthModeBedrockAPIKey, AuthModeBedrockAccessKeys,
 			),
 		},
 		{
@@ -867,7 +883,7 @@ func testEnumValues(t *testing.T) {
 				HookEventNamePreToolUse, HookEventNamePermissionRequest,
 				HookEventNamePostToolUse, HookEventNamePreCompact,
 				HookEventNamePostCompact, HookEventNameStop, HookEventNameSessionEnd,
-				HookEventNameSubagentStop,
+				HookEventNameSubagentStop, HookEventNameInterrupt,
 			),
 		},
 		{
@@ -1119,7 +1135,7 @@ func testEnumValues(t *testing.T) {
 			goValues: enumStrings(
 				CollabAgentToolSpawnAgent, CollabAgentToolSendInput,
 				CollabAgentToolResumeAgent, CollabAgentToolWait,
-				CollabAgentToolCloseAgent,
+				CollabAgentToolCloseAgent, CollabAgentToolSendMessage, CollabAgentToolFollowupTask, CollabAgentToolInterruptAgent, CollabAgentToolListAgents,
 			),
 		},
 		{
@@ -1127,7 +1143,7 @@ func testEnumValues(t *testing.T) {
 			defName:  "CollabAgentToolCallStatus",
 			goValues: enumStrings(
 				CollabAgentToolCallStatusInProgress, CollabAgentToolCallStatusCompleted,
-				CollabAgentToolCallStatusFailed,
+				CollabAgentToolCallStatusFailed, CollabAgentToolCallStatusInterrupted,
 			),
 		},
 

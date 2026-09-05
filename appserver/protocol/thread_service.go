@@ -294,8 +294,9 @@ func (d *SortDirection) UnmarshalJSON(data []byte) error {
 
 // ThreadShellCommandParams runs a shell command in a thread context.
 type ThreadShellCommandParams struct {
-	Command  string `json:"command"`
-	ThreadID string `json:"threadId"`
+	TimeoutMs *int64 `json:"timeoutMs,omitempty"`
+	Command   string `json:"command"`
+	ThreadID  string `json:"threadId"`
 }
 
 // ThreadShellCommandResponse is the empty response from thread/shellCommand.
@@ -362,16 +363,18 @@ type ThreadResumeParams struct {
 
 // ThreadResumeResponse is the response from resuming a thread
 type ThreadResumeResponse struct {
-	ApprovalPolicy     AskForApprovalWrapper `json:"approvalPolicy"`
-	ApprovalsReviewer  ApprovalsReviewer     `json:"approvalsReviewer"`
-	Cwd                string                `json:"cwd"`
-	InstructionSources []string              `json:"instructionSources,omitempty"`
-	Model              string                `json:"model"`
-	ModelProvider      string                `json:"modelProvider"`
-	ReasoningEffort    *ReasoningEffort      `json:"reasoningEffort,omitempty"`
-	Sandbox            SandboxPolicyWrapper  `json:"sandbox"`
-	ServiceTier        *ServiceTier          `json:"serviceTier,omitempty"`
-	Thread             Thread                `json:"thread"`
+	ItemsBackwardsCursor *string               `json:"itemsBackwardsCursor,omitempty"`
+	TurnsBackwardsCursor *string               `json:"turnsBackwardsCursor,omitempty"`
+	ApprovalPolicy       AskForApprovalWrapper `json:"approvalPolicy"`
+	ApprovalsReviewer    ApprovalsReviewer     `json:"approvalsReviewer"`
+	Cwd                  string                `json:"cwd"`
+	InstructionSources   []string              `json:"instructionSources,omitempty"`
+	Model                string                `json:"model"`
+	ModelProvider        string                `json:"modelProvider"`
+	ReasoningEffort      *ReasoningEffort      `json:"reasoningEffort,omitempty"`
+	Sandbox              SandboxPolicyWrapper  `json:"sandbox"`
+	ServiceTier          *ServiceTier          `json:"serviceTier,omitempty"`
+	Thread               Thread                `json:"thread"`
 }
 
 func (r *ThreadResumeResponse) UnmarshalJSON(data []byte) error {

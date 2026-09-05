@@ -10,6 +10,10 @@ import (
 type AuthMode string
 
 const (
+	AuthModeBedrockAccessKeys AuthMode = "bedrockAccessKeys"
+)
+
+const (
 	AuthModeAPIKey              AuthMode = "apikey"
 	AuthModeChatGPT             AuthMode = "chatgpt"
 	AuthModeChatGPTAuthTokens   AuthMode = "chatgptAuthTokens"
@@ -20,6 +24,7 @@ const (
 )
 
 var validAuthModes = map[AuthMode]struct{}{
+	AuthModeBedrockAccessKeys:   {},
 	AuthModeAPIKey:              {},
 	AuthModeChatGPT:             {},
 	AuthModeChatGPTAuthTokens:   {},

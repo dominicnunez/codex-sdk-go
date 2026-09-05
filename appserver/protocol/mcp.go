@@ -121,12 +121,35 @@ func (t *Tool) UnmarshalJSON(data []byte) error {
 }
 
 // McpServerStatus represents the status of a single MCP server.
+// McpServerInfo is presentation metadata from an initialized MCP server.
+type McpServerInfo struct {
+	Name        string             `json:"name"`
+	Version     string             `json:"version"`
+	Title       *string            `json:"title,omitempty"`
+	Description *string            `json:"description,omitempty"`
+	Icons       *[]json.RawMessage `json:"icons,omitempty"`
+	WebsiteURL  *string            `json:"websiteUrl,omitempty"`
+}
+
+func (s *McpServerInfo) UnmarshalJSON(data []byte) error {
+	type wire McpServerInfo
+	var decoded wire
+	if err := unmarshalInboundObject(data, &decoded, []string{"name", "version"}, []string{"name", "version"}); err != nil {
+		return err
+	}
+	*s = McpServerInfo(decoded)
+	return nil
+}
+
 type McpServerStatus struct {
-	AuthStatus        McpAuthStatus      `json:"authStatus"`
-	Name              string             `json:"name"`
-	ResourceTemplates []ResourceTemplate `json:"resourceTemplates"`
-	Resources         []Resource         `json:"resources"`
-	Tools             map[string]Tool    `json:"tools"`
+	PluginID          *string                    `json:"pluginId,omitempty"`
+	ServerInfo        *McpServerInfo             `json:"serverInfo,omitempty"`
+	RuntimeStatus     *McpServerConnectionStatus `json:"runtimeStatus,omitempty"`
+	AuthStatus        McpAuthStatus              `json:"authStatus"`
+	Name              string                     `json:"name"`
+	ResourceTemplates []ResourceTemplate         `json:"resourceTemplates"`
+	Resources         []Resource                 `json:"resources"`
+	Tools             map[string]Tool            `json:"tools"`
 }
 
 func (s *McpServerStatus) UnmarshalJSON(data []byte) error {

@@ -183,6 +183,15 @@ func (c *Conversation) Close() error {
 
 func cloneThreadState(thread Thread) Thread {
 	t := thread
+	t.ForkedFromID = cloneStringPtr(thread.ForkedFromID)
+	t.ParentThreadID = cloneStringPtr(thread.ParentThreadID)
+	t.ProjectID = cloneStringPtr(thread.ProjectID)
+	t.RecencyAt = clonePtr(thread.RecencyAt)
+	t.Section = cloneArbitraryValue(thread.Section)
+	t.SectionEnteredAt = clonePtr(thread.SectionEnteredAt)
+	t.Model = cloneStringPtr(thread.Model)
+	t.ReasoningEffort = cloneReasoningEffortPtr(thread.ReasoningEffort)
+	t.ThreadSource = clonePtr(thread.ThreadSource)
 	t.Name = cloneStringPtr(thread.Name)
 	t.AgentNickname = cloneStringPtr(thread.AgentNickname)
 	t.AgentRole = cloneStringPtr(thread.AgentRole)
@@ -205,6 +214,9 @@ func cloneThreadState(thread Thread) Thread {
 
 func cloneTurn(turn Turn) Turn {
 	cp := turn
+	cp.StartedAt = clonePtr(turn.StartedAt)
+	cp.CompletedAt = clonePtr(turn.CompletedAt)
+	cp.DurationMs = clonePtr(turn.DurationMs)
 	cp.Items = cloneThreadItems(turn.Items)
 	cp.Error = cloneTurnError(turn.Error)
 	return cp
@@ -219,6 +231,7 @@ func cloneTurnError(err *TurnError) *TurnError {
 		return nil
 	}
 	cp := *err
+	cp.Misalignment = cloneArbitraryValue(err.Misalignment)
 	cp.CodexErrorInfo = append(json.RawMessage(nil), err.CodexErrorInfo...)
 	cp.AdditionalDetails = cloneStringPtr(err.AdditionalDetails)
 	cp.Raw = append(json.RawMessage(nil), err.Raw...)
@@ -238,6 +251,9 @@ func cloneThreadItemWrapper(w ThreadItemWrapper) ThreadItemWrapper {
 		return ThreadItemWrapper{Value: &cp}
 	case *AgentMessageThreadItem:
 		cp := *v
+		cp.Questions = cloneArbitraryValue(v.Questions)
+		cp.MemoryCitation = cloneArbitraryValue(v.MemoryCitation)
+		cp.Delivery = clonePtr(v.Delivery)
 		cp.Phase = cloneMessagePhasePtr(v.Phase)
 		return ThreadItemWrapper{Value: &cp}
 	case *PlanThreadItem:
@@ -262,6 +278,10 @@ func cloneThreadItemWrapper(w ThreadItemWrapper) ThreadItemWrapper {
 		return ThreadItemWrapper{Value: &cp}
 	case *McpToolCallThreadItem:
 		cp := *v
+		cp.McpAppResourceURI = cloneStringPtr(v.McpAppResourceURI)
+		cp.AppContext = cloneArbitraryValue(v.AppContext)
+		cp.PluginID = cloneStringPtr(v.PluginID)
+		cp.ReadOnlyHint = cloneBoolPtr(v.ReadOnlyHint)
 		cp.Arguments = cloneJSONValue(v.Arguments)
 		cp.Result = cloneMcpToolCallResult(v.Result)
 		cp.Error = cloneMcpToolCallError(v.Error)

@@ -143,6 +143,16 @@ type GetAccountTokenUsageResponse struct {
 	ThreadUsage       *ThreadUsage                    `json:"threadUsage,omitempty"`
 }
 
+func (r *GetAccountTokenUsageResponse) UnmarshalJSON(data []byte) error {
+	type wire GetAccountTokenUsageResponse
+	var decoded wire
+	if err := unmarshalInboundObject(data, &decoded, []string{"summary"}, []string{"summary"}); err != nil {
+		return err
+	}
+	*r = GetAccountTokenUsageResponse(decoded)
+	return nil
+}
+
 type WorkspaceMessageType string
 
 const (
@@ -225,6 +235,16 @@ type ThreadSection struct {
 	Appearance *ThreadSectionAppearance `json:"appearance,omitempty"`
 	ID         string                   `json:"id"`
 	Name       string                   `json:"name"`
+}
+
+func (s *ThreadSection) UnmarshalJSON(data []byte) error {
+	type wire ThreadSection
+	var decoded wire
+	if err := unmarshalInboundObject(data, &decoded, []string{"id", "name"}, []string{"id", "name"}); err != nil {
+		return err
+	}
+	*s = ThreadSection(decoded)
+	return nil
 }
 
 type ThreadSectionCreateParams struct {
@@ -465,10 +485,11 @@ type ModelSafetyBufferingUpdatedNotification struct {
 	UseCases        []string `json:"useCases"`
 }
 type RawResponseCompletedNotification struct {
-	ResponseID string               `json:"responseId"`
-	ThreadID   string               `json:"threadId"`
-	TurnID     string               `json:"turnId"`
-	Usage      *TokenUsageBreakdown `json:"usage"`
+	UsageMetadata *ResponseUsageMetadata `json:"usageMetadata,omitempty"`
+	ResponseID    string                 `json:"responseId"`
+	ThreadID      string                 `json:"threadId"`
+	TurnID        string                 `json:"turnId"`
+	Usage         *TokenUsageBreakdown   `json:"usage"`
 }
 
 type AgentMessageDelivery string

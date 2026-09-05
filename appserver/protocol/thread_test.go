@@ -20,8 +20,8 @@ func TestThreadStart(t *testing.T) {
 		client := codex.NewClient(transport)
 
 		_ = transport.SetResponseData("thread/start", validThreadLifecycleResponse(map[string]interface{}{
-			"id":            "thread-123",
-			"cliVersion":    "1.0.0",
+			"id":        "thread-123",
+			"projectId": nil, "sessionId": "session-1", "cliVersion": "1.0.0",
 			"createdAt":     int64(1234567890),
 			"cwd":           "/test/dir",
 			"ephemeral":     false,
@@ -68,8 +68,8 @@ func TestThreadStart(t *testing.T) {
 		client := codex.NewClient(transport)
 
 		fixture := validThreadLifecycleResponse(map[string]interface{}{
-			"id":            "thread-456",
-			"cliVersion":    "1.0.0",
+			"id":        "thread-456",
+			"projectId": nil, "sessionId": "session-1", "cliVersion": "1.0.0",
 			"createdAt":     int64(1234567890),
 			"cwd":           "/custom/dir",
 			"ephemeral":     true,
@@ -114,7 +114,7 @@ func TestThreadStart(t *testing.T) {
 
 		client := codex.NewClient(transport)
 		_ = transport.SetResponseData("thread/start", validThreadLifecycleResponse(map[string]interface{}{
-			"cliVersion":    "1.0.0",
+			"projectId": nil, "sessionId": "session-1", "cliVersion": "1.0.0",
 			"createdAt":     int64(1234567890),
 			"cwd":           "/test/dir",
 			"ephemeral":     false,
@@ -151,8 +151,8 @@ func TestThreadRead(t *testing.T) {
 			"modelProvider":  "openai",
 			"sandbox":        map[string]interface{}{"type": "dangerFullAccess"},
 			"thread": map[string]interface{}{
-				"id":            "thread-123",
-				"cliVersion":    "1.0.0",
+				"id":        "thread-123",
+				"projectId": nil, "sessionId": "session-1", "cliVersion": "1.0.0",
 				"createdAt":     int64(1234567890),
 				"cwd":           "/test/dir",
 				"ephemeral":     false,
@@ -1085,8 +1085,8 @@ func TestThreadList(t *testing.T) {
 		_ = transport.SetResponseData("thread/list", map[string]interface{}{
 			"data": []interface{}{
 				map[string]interface{}{
-					"id":            "thread-1",
-					"cliVersion":    "1.0.0",
+					"id":        "thread-1",
+					"projectId": nil, "sessionId": "session-1", "cliVersion": "1.0.0",
 					"createdAt":     int64(1234567890),
 					"cwd":           "/test/dir",
 					"ephemeral":     false,
@@ -1098,8 +1098,8 @@ func TestThreadList(t *testing.T) {
 					"updatedAt":     int64(1234567890),
 				},
 				map[string]interface{}{
-					"id":            "thread-2",
-					"cliVersion":    "1.0.0",
+					"id":        "thread-2",
+					"projectId": nil, "sessionId": "session-1", "cliVersion": "1.0.0",
 					"createdAt":     int64(1234567891),
 					"cwd":           "/test/dir2",
 					"ephemeral":     false,
@@ -1255,8 +1255,8 @@ func TestThreadResume(t *testing.T) {
 		"modelProvider":     "openai",
 		"sandbox":           map[string]interface{}{"type": "dangerFullAccess"},
 		"thread": map[string]interface{}{
-			"id":            "thread-resume",
-			"cliVersion":    "1.0.0",
+			"id":        "thread-resume",
+			"projectId": nil, "sessionId": "session-1", "cliVersion": "1.0.0",
 			"createdAt":     int64(1234567890),
 			"cwd":           "/test/dir",
 			"ephemeral":     false,
@@ -1306,8 +1306,8 @@ func TestThreadFork(t *testing.T) {
 		"modelProvider":     "openai",
 		"sandbox":           map[string]interface{}{"type": "dangerFullAccess"},
 		"thread": map[string]interface{}{
-			"id":            "thread-forked",
-			"cliVersion":    "1.0.0",
+			"id":        "thread-forked",
+			"projectId": nil, "sessionId": "session-1", "cliVersion": "1.0.0",
 			"createdAt":     int64(1234567890),
 			"cwd":           "/test/dir",
 			"ephemeral":     false,
@@ -1389,8 +1389,8 @@ func TestThreadLifecycleRejectsInvalidServiceTier(t *testing.T) {
 				"sandbox":           map[string]interface{}{"type": "dangerFullAccess"},
 				"serviceTier":       "totally-invalid",
 				"thread": map[string]interface{}{
-					"id":            "thread-123",
-					"cliVersion":    "1.0.0",
+					"id":        "thread-123",
+					"projectId": nil, "sessionId": "session-1", "cliVersion": "1.0.0",
 					"createdAt":     int64(1234567890),
 					"cwd":           "/test/dir",
 					"ephemeral":     false,
@@ -1428,8 +1428,8 @@ func TestThreadRollback(t *testing.T) {
 		"modelProvider":  "openai",
 		"sandbox":        map[string]interface{}{"type": "dangerFullAccess"},
 		"thread": map[string]interface{}{
-			"id":            "thread-rollback",
-			"cliVersion":    "1.0.0",
+			"id":        "thread-rollback",
+			"projectId": nil, "sessionId": "session-1", "cliVersion": "1.0.0",
 			"createdAt":     int64(1234567890),
 			"cwd":           "/test/dir",
 			"ephemeral":     false,
@@ -1535,8 +1535,8 @@ func TestThreadUnarchive(t *testing.T) {
 
 	_ = transport.SetResponseData("thread/unarchive", map[string]interface{}{
 		"thread": map[string]interface{}{
-			"id":            "thread-unarchived",
-			"cliVersion":    "1.0.0",
+			"id":        "thread-unarchived",
+			"projectId": nil, "sessionId": "session-1", "cliVersion": "1.0.0",
 			"createdAt":     int64(1234567890),
 			"cwd":           "/test/dir",
 			"ephemeral":     false,
@@ -1588,8 +1588,8 @@ func threadLifecycleResponseWithMissingField(threadID string, missingField strin
 
 func validThreadPayload(threadID string) map[string]interface{} {
 	return map[string]interface{}{
-		"id":            threadID,
-		"cliVersion":    "1.0.0",
+		"id":        threadID,
+		"projectId": nil, "sessionId": "session-1", "cliVersion": "1.0.0",
 		"createdAt":     int64(1234567890),
 		"cwd":           "/test/dir",
 		"ephemeral":     false,

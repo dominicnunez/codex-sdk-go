@@ -7,44 +7,64 @@ import (
 
 // Thread represents a conversation thread with all its metadata
 type Thread struct {
-	ID            string               `json:"id"`
-	CLIVersion    string               `json:"cliVersion"`
-	CreatedAt     int64                `json:"createdAt"`
-	Cwd           string               `json:"cwd"`
-	ModelProvider string               `json:"modelProvider"`
-	Preview       string               `json:"preview"`
-	Source        SessionSourceWrapper `json:"source"`
-	Status        ThreadStatusWrapper  `json:"status"`
-	ThreadSource  *ThreadSource        `json:"threadSource,omitempty"`
-	Turns         []Turn               `json:"turns"`
-	UpdatedAt     int64                `json:"updatedAt"`
-	Ephemeral     bool                 `json:"ephemeral"`
-	AgentNickname *string              `json:"agentNickname,omitempty"`
-	AgentRole     *string              `json:"agentRole,omitempty"`
-	GitInfo       *GitInfo             `json:"gitInfo,omitempty"`
-	Name          *string              `json:"name,omitempty"`
-	Path          *string              `json:"path,omitempty"`
+	ForkedFromID     *string              `json:"forkedFromId,omitempty"`
+	ParentThreadID   *string              `json:"parentThreadId,omitempty"`
+	ProjectID        *string              `json:"projectId"`
+	RecencyAt        *int64               `json:"recencyAt,omitempty"`
+	Section          *ThreadSection       `json:"section,omitempty"`
+	SectionEnteredAt *int64               `json:"sectionEnteredAt,omitempty"`
+	SessionID        string               `json:"sessionId"`
+	HistoryMode      ThreadHistoryMode    `json:"historyMode,omitempty"`
+	Model            *string              `json:"model,omitempty"`
+	ReasoningEffort  *ReasoningEffort     `json:"reasoningEffort,omitempty"`
+	ID               string               `json:"id"`
+	CLIVersion       string               `json:"cliVersion"`
+	CreatedAt        int64                `json:"createdAt"`
+	Cwd              string               `json:"cwd"`
+	ModelProvider    string               `json:"modelProvider"`
+	Preview          string               `json:"preview"`
+	Source           SessionSourceWrapper `json:"source"`
+	Status           ThreadStatusWrapper  `json:"status"`
+	ThreadSource     *ThreadSource        `json:"threadSource,omitempty"`
+	Turns            []Turn               `json:"turns"`
+	UpdatedAt        int64                `json:"updatedAt"`
+	Ephemeral        bool                 `json:"ephemeral"`
+	AgentNickname    *string              `json:"agentNickname,omitempty"`
+	AgentRole        *string              `json:"agentRole,omitempty"`
+	GitInfo          *GitInfo             `json:"gitInfo,omitempty"`
+	Name             *string              `json:"name,omitempty"`
+	Path             *string              `json:"path,omitempty"`
 }
 
 func (t *Thread) UnmarshalJSON(data []byte) error {
 	type threadWire struct {
-		ID            *string               `json:"id"`
-		CLIVersion    *string               `json:"cliVersion"`
-		CreatedAt     *int64                `json:"createdAt"`
-		Cwd           *string               `json:"cwd"`
-		ModelProvider *string               `json:"modelProvider"`
-		Preview       *string               `json:"preview"`
-		Source        *SessionSourceWrapper `json:"source"`
-		Status        *ThreadStatusWrapper  `json:"status"`
-		ThreadSource  *ThreadSource         `json:"threadSource"`
-		Turns         *[]Turn               `json:"turns"`
-		UpdatedAt     *int64                `json:"updatedAt"`
-		Ephemeral     *bool                 `json:"ephemeral"`
-		AgentNickname *string               `json:"agentNickname"`
-		AgentRole     *string               `json:"agentRole"`
-		GitInfo       *GitInfo              `json:"gitInfo"`
-		Name          *string               `json:"name"`
-		Path          *string               `json:"path"`
+		ForkedFromID     *string               `json:"forkedFromId,omitempty"`
+		ParentThreadID   *string               `json:"parentThreadId,omitempty"`
+		ProjectID        *string               `json:"projectId,omitempty"`
+		RecencyAt        *int64                `json:"recencyAt,omitempty"`
+		Section          *ThreadSection        `json:"section,omitempty"`
+		SectionEnteredAt *int64                `json:"sectionEnteredAt,omitempty"`
+		SessionID        string                `json:"sessionId"`
+		HistoryMode      ThreadHistoryMode     `json:"historyMode"`
+		Model            *string               `json:"model"`
+		ReasoningEffort  *ReasoningEffort      `json:"reasoningEffort"`
+		ID               *string               `json:"id"`
+		CLIVersion       *string               `json:"cliVersion"`
+		CreatedAt        *int64                `json:"createdAt"`
+		Cwd              *string               `json:"cwd"`
+		ModelProvider    *string               `json:"modelProvider"`
+		Preview          *string               `json:"preview"`
+		Source           *SessionSourceWrapper `json:"source"`
+		Status           *ThreadStatusWrapper  `json:"status"`
+		ThreadSource     *ThreadSource         `json:"threadSource"`
+		Turns            *[]Turn               `json:"turns"`
+		UpdatedAt        *int64                `json:"updatedAt"`
+		Ephemeral        *bool                 `json:"ephemeral"`
+		AgentNickname    *string               `json:"agentNickname"`
+		AgentRole        *string               `json:"agentRole"`
+		GitInfo          *GitInfo              `json:"gitInfo"`
+		Name             *string               `json:"name"`
+		Path             *string               `json:"path"`
 	}
 
 	var wire threadWire
@@ -76,8 +96,24 @@ func (t *Thread) UnmarshalJSON(data []byte) error {
 	case wire.Ephemeral == nil:
 		return errors.New("missing thread.ephemeral")
 	}
+	if err := validateInboundObjectFields(data, []string{"projectId", "sessionId"}, []string{"sessionId"}); err != nil {
+		return err
+	}
 
 	t.ID = *wire.ID
+	t.ForkedFromID = wire.ForkedFromID
+	t.ParentThreadID = wire.ParentThreadID
+	t.ProjectID = wire.ProjectID
+	t.RecencyAt = wire.RecencyAt
+	t.Section = wire.Section
+	t.SectionEnteredAt = wire.SectionEnteredAt
+	t.SessionID = wire.SessionID
+	t.HistoryMode = wire.HistoryMode
+	if t.HistoryMode == "" {
+		t.HistoryMode = ThreadHistoryModeLegacy
+	}
+	t.Model = wire.Model
+	t.ReasoningEffort = wire.ReasoningEffort
 	t.CLIVersion = *wire.CLIVersion
 	t.CreatedAt = *wire.CreatedAt
 	validatedCwd, err := validateInboundAbsolutePathField("thread.cwd", *wire.Cwd)
@@ -114,10 +150,14 @@ type GitInfo struct {
 
 // Turn represents a single turn in a conversation
 type Turn struct {
-	ID     string              `json:"id"`
-	Status TurnStatus          `json:"status"`
-	Items  []ThreadItemWrapper `json:"items"`
-	Error  *TurnError          `json:"error,omitempty"`
+	ItemsView   TurnItemsView       `json:"itemsView,omitempty"`
+	StartedAt   *int64              `json:"startedAt,omitempty"`
+	CompletedAt *int64              `json:"completedAt,omitempty"`
+	DurationMs  *int64              `json:"durationMs,omitempty"`
+	ID          string              `json:"id"`
+	Status      TurnStatus          `json:"status"`
+	Items       []ThreadItemWrapper `json:"items"`
+	Error       *TurnError          `json:"error,omitempty"`
 }
 
 func (t *Turn) UnmarshalJSON(data []byte) error {
@@ -126,6 +166,7 @@ func (t *Turn) UnmarshalJSON(data []byte) error {
 	}
 	type wire Turn
 	var decoded wire
+	decoded.ItemsView = TurnItemsViewFull
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
@@ -137,10 +178,11 @@ func (t *Turn) UnmarshalJSON(data []byte) error {
 // It implements the error interface so callers can use errors.As to inspect
 // structured fields (CodexErrorInfo, AdditionalDetails).
 type TurnError struct {
-	Message           string          `json:"message"`
-	CodexErrorInfo    json.RawMessage `json:"codexErrorInfo,omitempty"`
-	AdditionalDetails *string         `json:"additionalDetails,omitempty"`
-	Raw               json.RawMessage `json:"-"`
+	Misalignment      *MisalignmentErrorDetails `json:"misalignment,omitempty"`
+	Message           string                    `json:"message"`
+	CodexErrorInfo    json.RawMessage           `json:"codexErrorInfo,omitempty"`
+	AdditionalDetails *string                   `json:"additionalDetails,omitempty"`
+	Raw               json.RawMessage           `json:"-"`
 }
 
 func (e *TurnError) UnmarshalJSON(data []byte) error {

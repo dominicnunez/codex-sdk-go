@@ -10,6 +10,10 @@ import (
 type HookEventName string
 
 const (
+	HookEventNameInterrupt HookEventName = "interrupt"
+)
+
+const (
 	HookEventNameSessionStart      HookEventName = "sessionStart"
 	HookEventNameUserPromptSubmit  HookEventName = "userPromptSubmit"
 	HookEventNameSubagentStart     HookEventName = "subagentStart"
@@ -24,6 +28,7 @@ const (
 )
 
 var validHookEventNames = map[HookEventName]struct{}{
+	HookEventNameInterrupt:         {},
 	HookEventNameSessionStart:      {},
 	HookEventNameUserPromptSubmit:  {},
 	HookEventNameSubagentStart:     {},
