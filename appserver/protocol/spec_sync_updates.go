@@ -96,6 +96,21 @@ type ConsumeAccountRateLimitResetCreditResponse struct {
 	Outcome ConsumeAccountRateLimitResetCreditOutcome `json:"outcome"`
 }
 
+func (r *ConsumeAccountRateLimitResetCreditResponse) UnmarshalJSON(data []byte) error {
+	type wire ConsumeAccountRateLimitResetCreditResponse
+	var decoded wire
+	if err := unmarshalInboundObject(data, &decoded, []string{"outcome"}, []string{"outcome"}); err != nil {
+		return err
+	}
+	switch decoded.Outcome {
+	case ConsumeAccountRateLimitResetCreditOutcomeReset, ConsumeAccountRateLimitResetCreditOutcomeNothingToReset, ConsumeAccountRateLimitResetCreditOutcomeNoCredit, ConsumeAccountRateLimitResetCreditOutcomeAlreadyRedeemed:
+	default:
+		return fmt.Errorf("invalid reset credit outcome %q", decoded.Outcome)
+	}
+	*r = ConsumeAccountRateLimitResetCreditResponse(decoded)
+	return nil
+}
+
 // GetAccountTokenUsageParams selects optional thread-scoped token usage.
 type GetAccountTokenUsageParams struct {
 	ThreadID *string `json:"threadId,omitempty"`
@@ -449,6 +464,17 @@ type ThreadProjectUpdatedNotification struct {
 	ProjectID *string `json:"projectId"`
 	ThreadID  string  `json:"threadId"`
 }
+
+func (n *ThreadProjectUpdatedNotification) UnmarshalJSON(data []byte) error {
+	type wire ThreadProjectUpdatedNotification
+	var decoded wire
+	if err := unmarshalInboundObject(data, &decoded, []string{"projectId", "threadId"}, []string{"threadId"}); err != nil {
+		return err
+	}
+	*n = ThreadProjectUpdatedNotification(decoded)
+	return nil
+}
+
 type EnvironmentConnectionNotification struct {
 	EnvironmentID string `json:"environmentId"`
 	ThreadID      string `json:"threadId"`
