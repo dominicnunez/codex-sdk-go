@@ -4,8 +4,9 @@ package deepcopy
 import "reflect"
 
 type visitKey struct {
-	typ reflect.Type
-	ptr uintptr
+	typ    reflect.Type
+	ptr    uintptr
+	length int
 }
 
 // Value returns a best-effort deep copy of in.
@@ -139,6 +140,10 @@ func rememberNewClone(v reflect.Value, seen map[visitKey]reflect.Value, build fu
 
 func lookupSeen(v reflect.Value, seen map[visitKey]reflect.Value) (visitKey, reflect.Value, bool) {
 	key := visitKey{typ: v.Type(), ptr: v.Pointer()}
+	if v.Kind() == reflect.Slice {
+		// Views of the same backing array may have different visible elements.
+		key.length = v.Len()
+	}
 	if key.ptr == 0 {
 		return key, reflect.Value{}, false
 	}
