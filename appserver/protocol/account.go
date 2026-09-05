@@ -220,6 +220,8 @@ func (a *AccountWrapper) MarshalJSON() ([]byte, error) {
 
 // GetAccountRateLimitsResponse is the response from account/rateLimits/read.
 type GetAccountRateLimitsResponse struct {
+	AccountID             *string                       `json:"accountId,omitempty"`
+	RateLimitUpsell       json.RawMessage               `json:"rateLimitUpsell,omitempty"`
 	RateLimits            RateLimitSnapshot             `json:"rateLimits"`
 	RateLimitsByLimitId   map[string]*RateLimitSnapshot `json:"rateLimitsByLimitId,omitempty"`
 	RateLimitResetCredits json.RawMessage               `json:"rateLimitResetCredits,omitempty"`

@@ -68,8 +68,10 @@ type GrantedPermissionProfile struct {
 type PermissionGrantScope string
 
 const (
-	PermissionGrantScopeTurn    PermissionGrantScope = "turn"
-	PermissionGrantScopeSession PermissionGrantScope = "session"
+	McpServerElicitationModeOpenAIForm       McpServerElicitationMode = "openaiForm"
+	McpServerElicitationModeOpenAIFormLegacy McpServerElicitationMode = "openai/form"
+	PermissionGrantScopeTurn                 PermissionGrantScope     = "turn"
+	PermissionGrantScopeSession              PermissionGrantScope     = "session"
 )
 
 // PermissionsRequestApprovalResponse represents the approval response for additional permissions.
@@ -129,22 +131,30 @@ func (s *McpElicitationSchema) UnmarshalJSON(data []byte) error {
 
 // McpServerElicitationRequestParams represents a server request for MCP elicitation.
 type McpServerElicitationRequestParams struct {
-	ServerName      string                   `json:"serverName"`
-	ThreadID        string                   `json:"threadId"`
-	TurnID          *string                  `json:"turnId,omitempty"`
-	Meta            interface{}              `json:"_meta,omitempty"`
-	Message         string                   `json:"message"`
-	Mode            McpServerElicitationMode `json:"mode"`
-	RequestedSchema *McpElicitationSchema    `json:"requestedSchema,omitempty"`
-	ElicitationID   *string                  `json:"elicitationId,omitempty"`
-	URL             *string                  `json:"url,omitempty"`
+	// OpenAIRequestedSchema preserves the arbitrary JSON schema for either OpenAI form mode.
+	// RequestedSchema remains the typed schema for standard form mode.
+	OpenAIRequestedSchema json.RawMessage          `json:"-"`
+	ServerName            string                   `json:"serverName"`
+	ThreadID              string                   `json:"threadId"`
+	TurnID                *string                  `json:"turnId,omitempty"`
+	Meta                  interface{}              `json:"_meta,omitempty"`
+	Message               string                   `json:"message"`
+	Mode                  McpServerElicitationMode `json:"mode"`
+	RequestedSchema       *McpElicitationSchema    `json:"requestedSchema,omitempty"`
+	ElicitationID         *string                  `json:"elicitationId,omitempty"`
+	URL                   *string                  `json:"url,omitempty"`
 }
 
 func (p *McpServerElicitationRequestParams) UnmarshalJSON(data []byte) error {
 	type wire McpServerElicitationRequestParams
 	var decoded wire
+	var schema json.RawMessage
+	w := struct {
+		*wire
+		RequestedSchema *json.RawMessage `json:"requestedSchema"`
+	}{wire: &decoded, RequestedSchema: &schema}
 	required := []string{"serverName", "threadId"}
-	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+	if err := unmarshalInboundObject(data, &w, required, required); err != nil {
 		return err
 	}
 	if err := validateNonEmptyStringField("serverName", decoded.ServerName); err != nil {
@@ -159,12 +169,26 @@ func (p *McpServerElicitationRequestParams) UnmarshalJSON(data []byte) error {
 	if err := validateMcpServerElicitationVariant(data, decoded.Mode); err != nil {
 		return err
 	}
+	switch decoded.Mode {
+	case McpServerElicitationModeForm:
+		if err := json.Unmarshal(schema, &decoded.RequestedSchema); err != nil {
+			return err
+		}
+	case McpServerElicitationModeOpenAIForm, McpServerElicitationModeOpenAIFormLegacy:
+		// An explicitly null schema is valid arbitrary JSON.
+		if w.RequestedSchema == nil {
+			schema = json.RawMessage("null")
+		}
+		decoded.OpenAIRequestedSchema = schema
+	}
 	*p = McpServerElicitationRequestParams(decoded)
 	return nil
 }
 
 func validateMcpServerElicitationVariant(data []byte, mode McpServerElicitationMode) error {
 	switch mode {
+	case McpServerElicitationModeOpenAIForm, McpServerElicitationModeOpenAIFormLegacy:
+		return validateInboundObjectFields(data, []string{"message", "mode", "requestedSchema"}, []string{"message", "mode"})
 	case McpServerElicitationModeForm:
 		required := []string{"message", "mode", "requestedSchema"}
 		return validateInboundObjectFields(data, required, required)

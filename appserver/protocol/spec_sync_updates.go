@@ -465,10 +465,11 @@ type ModelSafetyBufferingUpdatedNotification struct {
 	UseCases        []string `json:"useCases"`
 }
 type RawResponseCompletedNotification struct {
-	ResponseID string               `json:"responseId"`
-	ThreadID   string               `json:"threadId"`
-	TurnID     string               `json:"turnId"`
-	Usage      *TokenUsageBreakdown `json:"usage"`
+	UsageMetadata *ResponseUsageMetadata `json:"usageMetadata,omitempty"`
+	ResponseID    string                 `json:"responseId"`
+	ThreadID      string                 `json:"threadId"`
+	TurnID        string                 `json:"turnId"`
+	Usage         *TokenUsageBreakdown   `json:"usage"`
 }
 
 type AgentMessageDelivery string

@@ -47,11 +47,12 @@ func (u *UserMessageThreadItem) MarshalJSON() ([]byte, error) {
 
 // AgentMessageThreadItem represents an agent message in a thread.
 type AgentMessageThreadItem struct {
-	ID             string                `json:"id"`
-	MemoryCitation *MemoryCitation       `json:"memoryCitation,omitempty"`
-	Text           string                `json:"text"`
-	Phase          *MessagePhase         `json:"phase,omitempty"`
-	Delivery       *AgentMessageDelivery `json:"delivery,omitempty"`
+	Questions      *[]AsyncUserInputQuestion `json:"questions,omitempty"`
+	ID             string                    `json:"id"`
+	MemoryCitation *MemoryCitation           `json:"memoryCitation,omitempty"`
+	Text           string                    `json:"text"`
+	Phase          *MessagePhase             `json:"phase,omitempty"`
+	Delivery       *AgentMessageDelivery     `json:"delivery,omitempty"`
 }
 
 func (AgentMessageThreadItem) threadItem() {}
@@ -239,6 +240,10 @@ func (c *CollabAgentToolCallThreadItem) MarshalJSON() ([]byte, error) {
 type SubAgentActivityKind string
 
 const (
+	SubAgentActivityKindCompleted SubAgentActivityKind = "completed"
+)
+
+const (
 	SubAgentActivityKindStarted     SubAgentActivityKind = "started"
 	SubAgentActivityKindInteracted  SubAgentActivityKind = "interacted"
 	SubAgentActivityKindInterrupted SubAgentActivityKind = "interrupted"
@@ -410,6 +415,7 @@ func (u *UnknownThreadItem) MarshalJSON() ([]byte, error) {
 type threadItemDecoder func([]byte) (ThreadItem, error)
 
 var threadItemDecoders = map[string]threadItemDecoder{
+	"functionCallOutput":  decodeFunctionCallOutputThreadItem,
 	"userMessage":         decodeUserMessageThreadItem,
 	"agentMessage":        decodeAgentMessageThreadItem,
 	"plan":                decodePlanThreadItem,

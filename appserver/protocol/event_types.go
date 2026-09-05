@@ -172,6 +172,13 @@ func (s *CollabAgentStatus) UnmarshalJSON(data []byte) error {
 type CollabAgentTool string
 
 const (
+	CollabAgentToolSendMessage    CollabAgentTool = "sendMessage"
+	CollabAgentToolFollowupTask   CollabAgentTool = "followupTask"
+	CollabAgentToolInterruptAgent CollabAgentTool = "interruptAgent"
+	CollabAgentToolListAgents     CollabAgentTool = "listAgents"
+)
+
+const (
 	CollabAgentToolSpawnAgent  CollabAgentTool = "spawnAgent"
 	CollabAgentToolSendInput   CollabAgentTool = "sendInput"
 	CollabAgentToolResumeAgent CollabAgentTool = "resumeAgent"
@@ -180,11 +187,15 @@ const (
 )
 
 var validCollabAgentTools = map[CollabAgentTool]struct{}{
-	CollabAgentToolSpawnAgent:  {},
-	CollabAgentToolSendInput:   {},
-	CollabAgentToolResumeAgent: {},
-	CollabAgentToolWait:        {},
-	CollabAgentToolCloseAgent:  {},
+	CollabAgentToolSendMessage:    {},
+	CollabAgentToolFollowupTask:   {},
+	CollabAgentToolInterruptAgent: {},
+	CollabAgentToolListAgents:     {},
+	CollabAgentToolSpawnAgent:     {},
+	CollabAgentToolSendInput:      {},
+	CollabAgentToolResumeAgent:    {},
+	CollabAgentToolWait:           {},
+	CollabAgentToolCloseAgent:     {},
 }
 
 func (t *CollabAgentTool) UnmarshalJSON(data []byte) error {
@@ -195,15 +206,20 @@ func (t *CollabAgentTool) UnmarshalJSON(data []byte) error {
 type CollabAgentToolCallStatus string
 
 const (
+	CollabAgentToolCallStatusInterrupted CollabAgentToolCallStatus = "interrupted"
+)
+
+const (
 	CollabAgentToolCallStatusInProgress CollabAgentToolCallStatus = "inProgress"
 	CollabAgentToolCallStatusCompleted  CollabAgentToolCallStatus = "completed"
 	CollabAgentToolCallStatusFailed     CollabAgentToolCallStatus = "failed"
 )
 
 var validCollabAgentToolCallStatuses = map[CollabAgentToolCallStatus]struct{}{
-	CollabAgentToolCallStatusInProgress: {},
-	CollabAgentToolCallStatusCompleted:  {},
-	CollabAgentToolCallStatusFailed:     {},
+	CollabAgentToolCallStatusInterrupted: {},
+	CollabAgentToolCallStatusInProgress:  {},
+	CollabAgentToolCallStatusCompleted:   {},
+	CollabAgentToolCallStatusFailed:      {},
 }
 
 func (s *CollabAgentToolCallStatus) UnmarshalJSON(data []byte) error {

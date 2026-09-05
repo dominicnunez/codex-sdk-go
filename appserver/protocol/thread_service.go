@@ -294,8 +294,9 @@ func (d *SortDirection) UnmarshalJSON(data []byte) error {
 
 // ThreadShellCommandParams runs a shell command in a thread context.
 type ThreadShellCommandParams struct {
-	Command  string `json:"command"`
-	ThreadID string `json:"threadId"`
+	TimeoutMs *int64 `json:"timeoutMs,omitempty"`
+	Command   string `json:"command"`
+	ThreadID  string `json:"threadId"`
 }
 
 // ThreadShellCommandResponse is the empty response from thread/shellCommand.

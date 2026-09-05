@@ -18,6 +18,9 @@ func newTurnService(client *Client) *TurnService {
 
 // TurnStartParams are the parameters for turn/start.
 type TurnStartParams struct {
+	ServiceTierForTurn  *string            `json:"serviceTierForTurn,omitempty"`
+	ToolOutput          *TurnToolOutput    `json:"toolOutput,omitempty"`
+	TurnTrigger         *string            `json:"turnTrigger,omitempty"`
 	ThreadID            string             `json:"threadId"`
 	Input               []UserInput        `json:"input"`
 	ClientUserMessageID *string            `json:"clientUserMessageId,omitempty"`
@@ -39,6 +42,9 @@ type TurnStartParams struct {
 // include required discriminator fields (for example sandboxPolicy.type).
 func (p TurnStartParams) MarshalJSON() ([]byte, error) {
 	type wireTurnStartParams struct {
+		ServiceTierForTurn  *string                  `json:"serviceTierForTurn,omitempty"`
+		ToolOutput          *TurnToolOutput          `json:"toolOutput,omitempty"`
+		TurnTrigger         *string                  `json:"turnTrigger,omitempty"`
 		ThreadID            string                   `json:"threadId"`
 		Input               []UserInput              `json:"input"`
 		ClientUserMessageID *string                  `json:"clientUserMessageId,omitempty"`
@@ -56,6 +62,7 @@ func (p TurnStartParams) MarshalJSON() ([]byte, error) {
 	}
 
 	wire := wireTurnStartParams{
+		ServiceTierForTurn: p.ServiceTierForTurn, ToolOutput: p.ToolOutput, TurnTrigger: p.TurnTrigger,
 		ThreadID:            p.ThreadID,
 		Input:               p.Input,
 		ClientUserMessageID: p.ClientUserMessageID,
@@ -94,6 +101,9 @@ func unmarshalUserInputSlice(raw []json.RawMessage) ([]UserInput, error) {
 // UnmarshalJSON implements custom unmarshaling for TurnStartParams
 func (p *TurnStartParams) UnmarshalJSON(data []byte) error {
 	type wireTurnStartParams struct {
+		ServiceTierForTurn  *string                  `json:"serviceTierForTurn,omitempty"`
+		ToolOutput          *TurnToolOutput          `json:"toolOutput,omitempty"`
+		TurnTrigger         *string                  `json:"turnTrigger,omitempty"`
 		ThreadID            string                   `json:"threadId"`
 		Input               []json.RawMessage        `json:"input"`
 		ClientUserMessageID *string                  `json:"clientUserMessageId,omitempty"`
@@ -134,6 +144,7 @@ func (p *TurnStartParams) UnmarshalJSON(data []byte) error {
 	}
 
 	*p = TurnStartParams{
+		ServiceTierForTurn: wire.ServiceTierForTurn, ToolOutput: wire.ToolOutput, TurnTrigger: wire.TurnTrigger,
 		ThreadID:            wire.ThreadID,
 		Input:               inputs,
 		ClientUserMessageID: wire.ClientUserMessageID,

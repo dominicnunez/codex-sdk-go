@@ -246,7 +246,14 @@ func sampleSchemaNode(t *testing.T, spec serverNotificationSpec, schema interfac
 		return sampleFirstNonNullVariant(t, spec, variants, stack)
 	}
 	if variants, ok := node["oneOf"].([]interface{}); ok {
-		return sampleFirstNonNullVariant(t, spec, variants, stack)
+		value := sampleFirstNonNullVariant(t, spec, variants, stack)
+		if object, ok := value.(map[string]interface{}); ok {
+			// Sibling properties also apply to every union variant.
+			for key, field := range sampleObjectNode(t, spec, node, stack) {
+				object[key] = field
+			}
+		}
+		return value
 	}
 	if variants, ok := node["allOf"].([]interface{}); ok {
 		merged := make(map[string]interface{})

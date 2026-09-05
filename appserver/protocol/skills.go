@@ -80,6 +80,7 @@ func (d *SkillDependencies) UnmarshalJSON(data []byte) error {
 
 // SkillMetadata represents metadata for a single skill
 type SkillMetadata struct {
+	PluginID         *string            `json:"pluginId,omitempty"`
 	Name             string             `json:"name"`
 	Description      string             `json:"description"`
 	Path             string             `json:"path"`

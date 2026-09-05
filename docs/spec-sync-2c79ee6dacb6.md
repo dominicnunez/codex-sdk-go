@@ -1,47 +1,42 @@
 # Spec sync to 2c79ee6dacb6
 
-This is an in-progress implementation of the schema snapshot in PR #54.
-The synced JSON files remain the source of truth. This PR is not ready to merge.
+PR #54 updates the SDK to the checked-in upstream snapshot at `2c79ee6dacb6`.
+The JSON schemas in `appserver/protocol/schema/json/` are the source of truth.
 
-## Implemented
+## Protocol changes
 
-- `thread/items/list`: typed entries, turn association, and both pagination cursors.
-- `thread/turns/list`: typed turns, item detail selection, timing metadata, and cursors.
-- `thread/revert`: request validation, retained-history cursors, and thread cache update.
-- `plugin/reconcile`: changed plugin capabilities and both failure lists.
-- Thread history mode, model, reasoning effort, and resume pagination cursors.
-- Legacy defaults for omitted `historyMode` (`legacy`) and `itemsView` (`full`).
-- Request routing coverage for all 99 client request methods and field coverage for
-  the eight new request/response schemas implemented above.
-- Tests for request serialization, response decoding, optional zero values,
-  required fields, invalid enums, and legacy payloads.
+- Added thread item/turn pagination, history revert, and plugin reconciliation.
+- Added thread history mode, model, reasoning effort, pagination cursors, and turn
+  detail/timing metadata. Legacy history defaults remain supported.
+- Added auth recovery, MCP event-stream, and realtime item notifications with
+  typed handlers and removable listeners. Realtime items and presentations use
+  discriminated unions with forward-compatible unknown-variant preservation.
+- Added tool-output turn inputs, function-call-output history items, asynchronous
+  user questions, and misalignment error details.
+- Added command approval kinds and both OpenAI MCP form spellings, preserving
+  arbitrary JSON schemas while retaining the existing typed standard form API.
+- Added Bedrock access-key login. Normal JSON and formatting redact credentials;
+  only the transport's wire serializer includes credentials.
+- Added browser/computer-use configuration, requirements, runtime status, usage
+  metadata, skill attribution, shell-command timeout, and new auth/hook/collaboration enums.
+- Expanded nested field coverage to catch metadata previously dropped from
+  thread and MCP-server responses.
 
-## Remaining
+Existing raw JSON and interface fields continue to preserve schema extensions,
+including guardian actions and raw Responses API items. Unreferenced definitions
+such as `ThreadRealtimeStartTransport`, `ManagedHooksRequirements`, and `AppConfig`
+do not add new client request methods in this snapshot.
 
-- Auth recovery started/completed and MCP event-stream notifications.
-- Realtime item started/completed/transcript-delta notifications and their nested
-  discriminated unions; existing-call realtime transport support.
-- New turn-start fields and tool output, function-call-output item support,
-  asynchronous user questions, and misalignment error details.
-- Command approval kind, guardian write-stdin review, and MCP `openaiForm` support.
-- Bedrock access-key login and auth mode; collaboration, hook, and activity enums.
-- Browser/computer-use config and requirements, app links, and interrupt hooks.
-- Account rate-limit metadata, MCP runtime status, skill plugin ID, shell-command
-  timeout, raw response usage metadata, and remaining nested schema differences.
-- Extend field, enum, union, notification, and round-trip coverage for these changes.
+## Validation
 
-## Validation of the initial implementation
+- `go test ./...`, `go build ./...`, `go vet ./appserver/protocol`, and
+  `go mod tidy -diff` pass on Windows with Go 1.25.11.
+- Protocol lint passes with the locally available golangci-lint 2.11.4;
+  CI verifies the repository's pinned 2.11.3 and Linux race tests.
+- Tests cover all 99 request methods, top-level and nested schema fields,
+  typed notification dispatch, realtime/tool-output round trips, malformed
+  payloads, legacy defaults, arbitrary MCP schemas, and credential redaction.
 
-- `go build ./...` and `go vet ./appserver/protocol` pass with Go 1.25.11 on Windows.
-- `go test ./appserver/protocol -run 'TestPaginatedHistory|TestPluginReconcile|TestAllRequestMethodsCovered' -count=1` passes.
-- `go test ./...` fails only in `TestSpecCoverage` and `TestSpecFieldCoverage`,
-  reflecting the unfinished notification types and existing-type updates above.
-  All other packages pass. Five top-level notification schema types remain missing.
-- The available golangci-lint 2.11.4 reports formatting issues in three unchanged
-  files: `account.go`, `account_notifications.go`, and `approval_additional.go`.
-  The repository's CI pins 2.11.3; changed Go files pass Go 1.25.11's formatter.
-
-The independent stale-PR cleanup fix is in PR #55. Its CI passes. The September 2
-run compared GraphQL's `app/github-actions` login with REST's `github-actions[bot]`
-login and skipped every sync PR. The fix uses the paginated REST endpoint while
-retaining the author, same-repository, branch-prefix, and current-PR safeguards.
+The stale-PR cleanup fix was merged separately as PR #55 after a clean Codex
+review and passing CI. It uses the paginated REST bot identity instead of
+comparing GraphQL's `app/github-actions` with REST's `github-actions[bot]`.

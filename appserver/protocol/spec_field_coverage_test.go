@@ -356,6 +356,12 @@ func testStructFields(t *testing.T) {
 		{"schema/json/v1/InitializeParams.json", reflect.TypeOf(InitializeParams{})},
 		{"schema/json/v1/InitializeResponse.json", reflect.TypeOf(InitializeResponse{})},
 
+		{"schema/json/v2/AuthRecoveryNotification.json", reflect.TypeOf(AuthRecoveryNotification{})},
+		{"schema/json/v2/McpServerEventStreamNotification.json", reflect.TypeOf(McpServerEventStreamNotification{})},
+		{"schema/json/v2/ThreadRealtimeItemStartedNotification.json", reflect.TypeOf(ThreadRealtimeItemStartedNotification{})},
+		{"schema/json/v2/ThreadRealtimeItemCompletedNotification.json", reflect.TypeOf(ThreadRealtimeItemCompletedNotification{})},
+		{"schema/json/v2/ThreadRealtimeItemTranscriptDeltaNotification.json", reflect.TypeOf(ThreadRealtimeItemTranscriptDeltaNotification{})},
+
 		// Paginated history and plugin reconciliation
 		{"schema/json/v2/ThreadItemsListParams.json", reflect.TypeOf(ThreadItemsListParams{})},
 		{"schema/json/v2/ThreadItemsListResponse.json", reflect.TypeOf(ThreadItemsListResponse{})},
@@ -858,7 +864,7 @@ func testEnumValues(t *testing.T) {
 			goValues: enumStrings(
 				AuthModeAPIKey, AuthModeChatGPT, AuthModeChatGPTAuthTokens,
 				AuthModeAgentIdentity, AuthModeHeaders, AuthModePersonalAccessToken,
-				AuthModeBedrockAPIKey,
+				AuthModeBedrockAPIKey, AuthModeBedrockAccessKeys,
 			),
 		},
 		{
@@ -877,7 +883,7 @@ func testEnumValues(t *testing.T) {
 				HookEventNamePreToolUse, HookEventNamePermissionRequest,
 				HookEventNamePostToolUse, HookEventNamePreCompact,
 				HookEventNamePostCompact, HookEventNameStop, HookEventNameSessionEnd,
-				HookEventNameSubagentStop,
+				HookEventNameSubagentStop, HookEventNameInterrupt,
 			),
 		},
 		{
@@ -1129,7 +1135,7 @@ func testEnumValues(t *testing.T) {
 			goValues: enumStrings(
 				CollabAgentToolSpawnAgent, CollabAgentToolSendInput,
 				CollabAgentToolResumeAgent, CollabAgentToolWait,
-				CollabAgentToolCloseAgent,
+				CollabAgentToolCloseAgent, CollabAgentToolSendMessage, CollabAgentToolFollowupTask, CollabAgentToolInterruptAgent, CollabAgentToolListAgents,
 			),
 		},
 		{
@@ -1137,7 +1143,7 @@ func testEnumValues(t *testing.T) {
 			defName:  "CollabAgentToolCallStatus",
 			goValues: enumStrings(
 				CollabAgentToolCallStatusInProgress, CollabAgentToolCallStatusCompleted,
-				CollabAgentToolCallStatusFailed,
+				CollabAgentToolCallStatusFailed, CollabAgentToolCallStatusInterrupted,
 			),
 		},
 
