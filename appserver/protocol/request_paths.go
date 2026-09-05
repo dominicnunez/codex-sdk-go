@@ -897,6 +897,9 @@ func (p ThreadReadParams) prepareRequest() (interface{}, error) {
 }
 
 func (p ThreadShellCommandParams) prepareRequest() (interface{}, error) {
+	if p.TimeoutMs != nil && *p.TimeoutMs < 0 {
+		return nil, invalidParamsError("timeoutMs must be non-negative")
+	}
 	if err := validateThreadScopedRequest(p.ThreadID); err != nil {
 		return nil, err
 	}

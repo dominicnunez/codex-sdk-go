@@ -32,12 +32,9 @@ func (p *AmazonBedrockAccessKeysLoginAccountParams) marshalWire() ([]byte, error
 	return json.Marshal(v)
 }
 
-func (p *AmazonBedrockAccessKeysLoginAccountParams) MarshalJSON() ([]byte, error) {
-	if p == nil {
-		return []byte("null"), nil
-	}
+func (p AmazonBedrockAccessKeysLoginAccountParams) MarshalJSON() ([]byte, error) {
 	type wire AmazonBedrockAccessKeysLoginAccountParams
-	v := wire(*p)
+	v := wire(p)
 	v.Type = "amazonBedrockAccessKeys"
 	v.AccessKeyID = "[REDACTED]"
 	v.SecretAccessKey = "[REDACTED]"
@@ -47,10 +44,10 @@ func (p *AmazonBedrockAccessKeysLoginAccountParams) MarshalJSON() ([]byte, error
 	return json.Marshal(v)
 }
 
-func (p *AmazonBedrockAccessKeysLoginAccountParams) String() string {
+func (p AmazonBedrockAccessKeysLoginAccountParams) String() string {
 	return "AmazonBedrockAccessKeysLoginAccountParams{credentials:[REDACTED]}"
 }
-func (p *AmazonBedrockAccessKeysLoginAccountParams) GoString() string { return p.String() }
-func (p *AmazonBedrockAccessKeysLoginAccountParams) Format(f fmt.State, verb rune) {
+func (p AmazonBedrockAccessKeysLoginAccountParams) GoString() string { return p.String() }
+func (p AmazonBedrockAccessKeysLoginAccountParams) Format(f fmt.State, verb rune) {
 	_, _ = fmt.Fprint(f, p.String())
 }

@@ -107,6 +107,15 @@ func TestSyncBedrockCredentialsOnlyOnWire(t *testing.T) {
 				t.Fatal("credential leaked in formatted output")
 			}
 		}
+		valueJSON, err := json.Marshal(*p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, redacted := range []string{string(valueJSON), fmt.Sprint(*p), fmt.Sprintf("%#v", *p), fmt.Sprintf("%+v", *p)} {
+			if strings.Contains(redacted, secret) {
+				t.Fatal("credential leaked from copied parameter value")
+			}
+		}
 	}
 	for _, p := range []*AmazonBedrockAccessKeysLoginAccountParams{nil, {}, {AccessKeyID: "key", Region: "region"}, {SecretAccessKey: "secret", Region: "region"}, {AccessKeyID: "key", SecretAccessKey: "secret"}} {
 		if _, err := marshalForWire(p); err == nil {
