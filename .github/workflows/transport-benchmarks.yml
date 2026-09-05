@@ -40,6 +40,19 @@ jobs:
             go env GOOS GOARCH GOAMD64
             echo "runner=${{ runner.os }}/${{ runner.arch }}"
           } | tee benchmark-results/environment.txt
+      - uses: actions/checkout@v5
+        if: github.event_name == 'pull_request'
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: benchmark-base
+      - name: Measure base pipeline on the same runner
+        if: github.event_name == 'pull_request'
+        shell: bash
+        working-directory: benchmark-base
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD | tee ../benchmark-results/base-commit.txt
+          go test ./appserver/transport -run '^$' -bench 'BenchmarkInboundPipeline' -benchmem -benchtime=500ms -count=5 | tee ../benchmark-results/base-pipeline.txt
       - name: Collect baseline
         shell: bash
         run: |

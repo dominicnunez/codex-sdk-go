@@ -231,6 +231,18 @@ func decodeInboundObjectField(
 	if !ok {
 		return validation.notObject(fmt.Errorf("expected object field name"))
 	}
+	if field, exists := fields[key]; exists && destValue.IsValid() {
+		value := destValue.FieldByIndex(field.index)
+		// Decode built-in strings directly to avoid copying and reparsing large
+		// text fields. Named types retain their custom unmarshaling path.
+		if value.Type() == reflect.TypeFor[string]() {
+			if _, exists := required.seen[key]; exists {
+				required.seen[key] = true
+			}
+			_, mustBeNonNull := nonNull[key]
+			return decodeInboundStringField(decoder, value, key, mustBeNonNull, validation)
+		}
+	}
 
 	var raw json.RawMessage
 	if err := decoder.Decode(&raw); err != nil {
@@ -252,6 +264,26 @@ func decodeInboundObjectField(
 		return nil
 	}
 	return json.Unmarshal(raw, destValue.FieldByIndex(field.index).Addr().Interface())
+}
+
+func decodeInboundStringField(decoder *json.Decoder, value reflect.Value, key string, nonNull bool, validation objectValidationErrors) error {
+	var decoded *string
+	if err := decoder.Decode(&decoded); err != nil {
+		var typeError *json.UnmarshalTypeError
+		if errors.As(err, &typeError) {
+			return err
+		}
+		return validation.notObject(err)
+	}
+	if decoded == nil {
+		if nonNull {
+			return validation.null(key)
+		}
+		// JSON null leaves an existing non-pointer string unchanged.
+		return nil
+	}
+	value.SetString(*decoded)
+	return nil
 }
 
 func expectInboundObjectEnd(decoder *json.Decoder) error {
