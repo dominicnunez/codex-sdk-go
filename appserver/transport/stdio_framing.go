@@ -205,7 +205,7 @@ func readLimitedLine(r *bufio.Reader, limit int) ([]byte, *oversizedFrameInfo, e
 	var line []byte
 	for {
 		frag, err := r.ReadSlice('\n')
-		line = append(line, frag...)
+		line = appendLineFragment(line, frag, limit, errors.Is(err, bufio.ErrBufferFull))
 		if lineExceedsLimit(line, limit) {
 			return handleOversizedLine(r, err, line)
 		}
@@ -223,6 +223,30 @@ func readLimitedLine(r *bufio.Reader, limit int) ([]byte, *oversizedFrameInfo, e
 			return nil, nil, err
 		}
 	}
+}
+
+// Grow geometrically instead of append's smaller growth steps for large slices.
+// Reserve no more than limit plus the newline unless the fragment itself is
+// already oversized. Each returned line owns its storage; no large buffers are
+// pooled or retained between messages.
+func appendLineFragment(line, fragment []byte, limit int, more bool) []byte {
+	needed := len(line) + len(fragment)
+	if needed > cap(line) {
+		capacity := needed
+		if more {
+			capacity = 2 * cap(line)
+			if capacity > limit {
+				capacity = limit + 1
+			}
+		}
+		if capacity < needed {
+			capacity = needed
+		}
+		grown := make([]byte, len(line), capacity)
+		copy(grown, line)
+		line = grown
+	}
+	return append(line, fragment...)
 }
 
 func lineExceedsLimit(line []byte, limit int) bool {

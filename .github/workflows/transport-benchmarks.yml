@@ -57,7 +57,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          go test ./appserver/transport -run '^$' -bench 'BenchmarkInbound(Large|Pipeline)' -benchmem -benchtime=500ms -count=5 -timeout=15m | tee benchmark-results/baseline.txt
+          go test ./appserver/transport -run '^$' -bench 'BenchmarkInbound(Large|Pipeline|ReadLine|EnvelopeDecoder)' -benchmem -benchtime=500ms -count=5 -timeout=15m | tee benchmark-results/baseline.txt
       - name: Profile real notification pipeline
         shell: bash
         run: |
