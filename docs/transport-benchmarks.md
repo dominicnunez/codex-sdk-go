@@ -6,7 +6,7 @@ Runtime behavior is unchanged by the benchmark harness.
 Run on Go 1.25.11:
 
 ```sh
-go test ./appserver/transport -run '^$' -bench 'BenchmarkInbound(Large|Pipeline)' -benchmem -benchtime=500ms -count=5
+go test ./appserver/transport -run '^$' -bench 'BenchmarkInbound(Large|Pipeline|ReadLine|EnvelopeDecoder)' -benchmem -benchtime=500ms -count=5
 ```
 
 The Transport benchmarks workflow collects this baseline on Linux and Windows,
@@ -89,3 +89,40 @@ decoding of built-in string fields in schema validation instead avoids one raw
 copy and validation scan; named/custom types keep their original path. Compare
 that change using the real pipeline baseline, since the simple parse benchmarks
 do not exercise schema validation.
+
+## Remaining alternatives and conclusion for issue #4
+
+`BenchmarkInboundReadLine` isolates bounded framing from JSON work, including
+small messages and multi-buffer frames. Geometric buffer growth reduces repeated
+copies for large messages. A terminal fragment allocates only the needed size;
+growth reserves at most the configured limit plus a newline unless an incoming
+fragment already crosses the limit. Oversize detection and routing use the same
+bytes as before. Buffers remain individually owned and are not pooled.
+
+`BenchmarkInboundEnvelopeDecoder` compares the production envelope unmarshal with
+`json.Decoder` plus an end-of-document check on the same 9 MiB response. The local
+five-sample experiment measured approximately 51 ms and 9 MiB allocated for
+Unmarshal versus 60 ms and 41 MiB for Decoder. Reproduce on the CI runners before
+drawing hardware-specific conclusions. A decoder still needs to scan the payload
+and introduces its own growing input buffer; switching APIs alone does not remove
+the routing cost.
+
+The original issue is a profiling investigation, not a requirement to eliminate
+all repeated parsing. Its conclusion is:
+
+- Overhead is material for multi-MiB messages; it is not established to be below
+  1% of whole-application latency. No such claim or won't-fix justification is made.
+- RawMessage routing already exists. Borrowing raw envelope bytes saved memory
+  without a measured local latency benefit and was not retained.
+- Direct decoding of built-in string fields removes a redundant copy/scan while
+  preserving schema checks. Bounded geometric line growth addresses the other
+  measured allocation hot spot without replacing JSON parsing.
+- Retain the standard JSON-RPC envelope decoder. The measured streaming decoder
+  alternative is worse locally. A custom tokenizer would need its own validated
+  implementation and workload justification; the concrete-parse reference alone
+  does not demonstrate a compatible replacement.
+
+The benchmark harness, profiles, reviewed changes, and documented decision provide
+the closure criteria for #4. Reopen or file a focused follow-up if an actual
+application trace shows envelope parsing is a remaining bottleneck after these
+changes. A custom tokenizer is not an outstanding requirement of this issue.
