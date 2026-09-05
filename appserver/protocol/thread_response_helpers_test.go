@@ -2,8 +2,8 @@ package protocol_test
 
 func validProcessThreadPayload(threadID string) map[string]interface{} {
 	return map[string]interface{}{
-		"id":            threadID,
-		"cliVersion":    "1.0.0",
+		"id":        threadID,
+		"projectId": nil, "sessionId": "session-1", "cliVersion": "1.0.0",
 		"createdAt":     1700000000,
 		"cwd":           "/tmp",
 		"modelProvider": "openai",

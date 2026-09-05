@@ -9,7 +9,7 @@ import (
 type Thread struct {
 	ForkedFromID     *string              `json:"forkedFromId,omitempty"`
 	ParentThreadID   *string              `json:"parentThreadId,omitempty"`
-	ProjectID        *string              `json:"projectId,omitempty"`
+	ProjectID        *string              `json:"projectId"`
 	RecencyAt        *int64               `json:"recencyAt,omitempty"`
 	Section          *ThreadSection       `json:"section,omitempty"`
 	SectionEnteredAt *int64               `json:"sectionEnteredAt,omitempty"`
@@ -95,6 +95,9 @@ func (t *Thread) UnmarshalJSON(data []byte) error {
 		return errors.New("missing thread.updatedAt")
 	case wire.Ephemeral == nil:
 		return errors.New("missing thread.ephemeral")
+	}
+	if err := validateInboundObjectFields(data, []string{"projectId", "sessionId"}, []string{"sessionId"}); err != nil {
+		return err
 	}
 
 	t.ID = *wire.ID

@@ -529,7 +529,7 @@ func TestRunStreamedThreadStartMissingThreadID(t *testing.T) {
 	mock := NewMockTransport()
 	_ = mock.SetResponseData("initialize", validInitializeResponseData("codex-test/1.0"))
 	_ = mock.SetResponseData("thread/start", validProcessThreadStartResponse(map[string]interface{}{
-		"cliVersion":    "1.0.0",
+		"projectId": nil, "sessionId": "session-1", "cliVersion": "1.0.0",
 		"createdAt":     1700000000,
 		"cwd":           "/tmp",
 		"modelProvider": "openai",

@@ -131,6 +131,16 @@ type McpServerInfo struct {
 	WebsiteURL  *string            `json:"websiteUrl,omitempty"`
 }
 
+func (s *McpServerInfo) UnmarshalJSON(data []byte) error {
+	type wire McpServerInfo
+	var decoded wire
+	if err := unmarshalInboundObject(data, &decoded, []string{"name", "version"}, []string{"name", "version"}); err != nil {
+		return err
+	}
+	*s = McpServerInfo(decoded)
+	return nil
+}
+
 type McpServerStatus struct {
 	PluginID          *string                    `json:"pluginId,omitempty"`
 	ServerInfo        *McpServerInfo             `json:"serverInfo,omitempty"`

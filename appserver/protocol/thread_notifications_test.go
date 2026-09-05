@@ -21,7 +21,7 @@ func TestThreadStartedNotification(t *testing.T) {
 			jsonData: `{
 				"thread": {
 					"id": "thread-123",
-					"cliVersion": "1.0.0",
+					"projectId": null, "sessionId": "session-1", "cliVersion": "1.0.0",
 					"createdAt": 1234567890,
 					"cwd": "/home/user/project",
 					"ephemeral": false,
@@ -47,7 +47,7 @@ func TestThreadStartedNotification(t *testing.T) {
 			jsonData: `{
 				"thread": {
 					"id": "thread-456",
-					"cliVersion": "1.0.0",
+					"projectId": null, "sessionId": "session-1", "cliVersion": "1.0.0",
 					"createdAt": 1234567890,
 					"cwd": "/home/user/project",
 					"ephemeral": true,
@@ -357,7 +357,7 @@ func TestThreadNotificationListenerRegistration(t *testing.T) {
 		notificationJSON := `{
 			"thread": {
 				"id": "thread-123",
-				"cliVersion": "1.0.0",
+				"projectId": null, "sessionId": "session-1", "cliVersion": "1.0.0",
 				"createdAt": 1234567890,
 				"cwd": "/home/user/project",
 				"ephemeral": false,
