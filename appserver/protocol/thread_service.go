@@ -362,16 +362,18 @@ type ThreadResumeParams struct {
 
 // ThreadResumeResponse is the response from resuming a thread
 type ThreadResumeResponse struct {
-	ApprovalPolicy     AskForApprovalWrapper `json:"approvalPolicy"`
-	ApprovalsReviewer  ApprovalsReviewer     `json:"approvalsReviewer"`
-	Cwd                string                `json:"cwd"`
-	InstructionSources []string              `json:"instructionSources,omitempty"`
-	Model              string                `json:"model"`
-	ModelProvider      string                `json:"modelProvider"`
-	ReasoningEffort    *ReasoningEffort      `json:"reasoningEffort,omitempty"`
-	Sandbox            SandboxPolicyWrapper  `json:"sandbox"`
-	ServiceTier        *ServiceTier          `json:"serviceTier,omitempty"`
-	Thread             Thread                `json:"thread"`
+	ItemsBackwardsCursor *string               `json:"itemsBackwardsCursor,omitempty"`
+	TurnsBackwardsCursor *string               `json:"turnsBackwardsCursor,omitempty"`
+	ApprovalPolicy       AskForApprovalWrapper `json:"approvalPolicy"`
+	ApprovalsReviewer    ApprovalsReviewer     `json:"approvalsReviewer"`
+	Cwd                  string                `json:"cwd"`
+	InstructionSources   []string              `json:"instructionSources,omitempty"`
+	Model                string                `json:"model"`
+	ModelProvider        string                `json:"modelProvider"`
+	ReasoningEffort      *ReasoningEffort      `json:"reasoningEffort,omitempty"`
+	Sandbox              SandboxPolicyWrapper  `json:"sandbox"`
+	ServiceTier          *ServiceTier          `json:"serviceTier,omitempty"`
+	Thread               Thread                `json:"thread"`
 }
 
 func (r *ThreadResumeResponse) UnmarshalJSON(data []byte) error {

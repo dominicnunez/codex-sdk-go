@@ -395,6 +395,19 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 		_, _ = client.System.WindowsSandboxReadiness(context.Background())
 	})
 
+	verified["thread/items/list"] = verifyMethod(t, transport, "thread/items/list", func() {
+		_, _ = client.Thread.ItemsList(context.Background(), codex.ThreadItemsListParams{ThreadID: "t1"})
+	})
+	verified["thread/turns/list"] = verifyMethod(t, transport, "thread/turns/list", func() {
+		_, _ = client.Thread.TurnsList(context.Background(), codex.ThreadTurnsListParams{ThreadID: "t1"})
+	})
+	verified["thread/revert"] = verifyMethod(t, transport, "thread/revert", func() {
+		_, _ = client.Thread.Revert(context.Background(), codex.ThreadRevertParams{ThreadID: "t1", BeforeTurnID: "tu1"})
+	})
+	verified["plugin/reconcile"] = verifyMethod(t, transport, "plugin/reconcile", func() {
+		_, _ = client.Plugin.Reconcile(context.Background(), codex.PluginReconcileParams{})
+	})
+
 	// Check that all methods were verified
 	var missing []string
 	for method := range requiredMethods {

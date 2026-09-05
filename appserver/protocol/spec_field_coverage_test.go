@@ -356,6 +356,16 @@ func testStructFields(t *testing.T) {
 		{"schema/json/v1/InitializeParams.json", reflect.TypeOf(InitializeParams{})},
 		{"schema/json/v1/InitializeResponse.json", reflect.TypeOf(InitializeResponse{})},
 
+		// Paginated history and plugin reconciliation
+		{"schema/json/v2/ThreadItemsListParams.json", reflect.TypeOf(ThreadItemsListParams{})},
+		{"schema/json/v2/ThreadItemsListResponse.json", reflect.TypeOf(ThreadItemsListResponse{})},
+		{"schema/json/v2/ThreadTurnsListParams.json", reflect.TypeOf(ThreadTurnsListParams{})},
+		{"schema/json/v2/ThreadTurnsListResponse.json", reflect.TypeOf(ThreadTurnsListResponse{})},
+		{"schema/json/v2/ThreadRevertParams.json", reflect.TypeOf(ThreadRevertParams{})},
+		{"schema/json/v2/ThreadRevertResponse.json", reflect.TypeOf(ThreadRevertResponse{})},
+		{"schema/json/v2/PluginReconcileParams.json", reflect.TypeOf(PluginReconcileParams{})},
+		{"schema/json/v2/PluginReconcileResponse.json", reflect.TypeOf(PluginReconcileResponse{})},
+
 		// v2 account
 		{"schema/json/v2/GetAccountParams.json", reflect.TypeOf(GetAccountParams{})},
 		{"schema/json/v2/GetAccountResponse.json", reflect.TypeOf(GetAccountResponse{})},
