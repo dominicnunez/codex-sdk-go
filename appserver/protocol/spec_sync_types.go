@@ -216,6 +216,7 @@ type BrowserUseOriginPolicy struct {
 
 // BrowserUseRequirements follows the upstream BrowserUseRequirements schema.
 type BrowserUseRequirements struct {
+	AllowWebmcp                   *bool                              `json:"allowWebmcp,omitempty"`
 	AllowGlobalPersistentApproval *bool                              `json:"allowGlobalPersistentApproval,omitempty"`
 	AllowHistoryAccess            *bool                              `json:"allowHistoryAccess,omitempty"`
 	DefaultOriginPolicy           *BrowserUseOriginPolicy            `json:"defaultOriginPolicy,omitempty"`

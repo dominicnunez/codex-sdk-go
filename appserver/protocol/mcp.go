@@ -142,6 +142,8 @@ func (s *McpServerInfo) UnmarshalJSON(data []byte) error {
 }
 
 type McpServerStatus struct {
+	// ToolsError reports discovery failure when no catalog was returned.
+	ToolsError        *string                    `json:"toolsError,omitempty"`
 	PluginID          *string                    `json:"pluginId,omitempty"`
 	ServerInfo        *McpServerInfo             `json:"serverInfo,omitempty"`
 	RuntimeStatus     *McpServerConnectionStatus `json:"runtimeStatus,omitempty"`

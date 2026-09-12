@@ -10,6 +10,7 @@ import (
 func TestConversationMetadataSnapshotIsolation(t *testing.T) {
 	makeThread := func() Thread {
 		return Thread{
+			Originator:   Ptr("desktop"),
 			ForkedFromID: Ptr("fork"), ParentThreadID: Ptr("parent"), ProjectID: Ptr("project"),
 			RecencyAt: Ptr(int64(1)), SectionEnteredAt: Ptr(int64(2)), Model: Ptr("model"),
 			ReasoningEffort: Ptr(ReasoningEffortHigh),
@@ -21,6 +22,7 @@ func TestConversationMetadataSnapshotIsolation(t *testing.T) {
 		}
 	}
 	mutate := func(thread Thread) {
+		*thread.Originator = "changed"
 		*thread.ForkedFromID = "changed"
 		*thread.ParentThreadID = "changed"
 		*thread.ProjectID = "changed"

@@ -48,11 +48,8 @@ func (p *PermissionsRequestApprovalParams) UnmarshalJSON(data []byte) error {
 	}); err != nil {
 		return err
 	}
-	var err error
-	decoded.Cwd, err = validateInboundAbsolutePathField("cwd", decoded.Cwd)
-	if err != nil {
-		return err
-	}
+	// LegacyAppPathString is an opaque string, not an AbsolutePathBuf. Keep
+	// relative and non-normalized paths exactly as supplied by the server.
 	decoded.Permissions = normalizeRequestPermissionProfileField(decoded.Permissions)
 	*p = PermissionsRequestApprovalParams(decoded)
 	return nil

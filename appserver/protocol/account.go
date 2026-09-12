@@ -218,8 +218,21 @@ func (a *AccountWrapper) MarshalJSON() ([]byte, error) {
 	return json.Marshal(a.Value)
 }
 
+// GetAccountRateLimitsParams declares the requesting client's usage-read capabilities.
+type GetAccountRateLimitsParams struct {
+	ExcludeResetCreditDetails *bool `json:"excludeResetCreditDetails,omitempty"`
+	SupportsLunaReserve       *bool `json:"supportsLunaReserve,omitempty"`
+}
+
+// NullableGetAccountRateLimitsParams is the account/rateLimits/read parameter shape.
+// Pass a nil pointer to GetRateLimitsWithParams to omit request parameters.
+type NullableGetAccountRateLimitsParams = GetAccountRateLimitsParams
+
 // GetAccountRateLimitsResponse is the response from account/rateLimits/read.
 type GetAccountRateLimitsResponse struct {
+	// OrdinaryUsageAllowed is backend permission for included usage. Nil means
+	// unavailable; do not infer permission from percentages or reset times.
+	OrdinaryUsageAllowed  *bool                         `json:"ordinaryUsageAllowed,omitempty"`
 	AccountID             *string                       `json:"accountId,omitempty"`
 	RateLimitUpsell       json.RawMessage               `json:"rateLimitUpsell,omitempty"`
 	RateLimits            RateLimitSnapshot             `json:"rateLimits"`
@@ -242,12 +255,48 @@ func (r *GetAccountRateLimitsResponse) UnmarshalJSON(data []byte) error {
 
 // RateLimitSnapshot represents rate limit information
 type RateLimitSnapshot struct {
-	Credits   *CreditsSnapshot `json:"credits,omitempty"`
-	LimitId   *string          `json:"limitId,omitempty"`
-	LimitName *string          `json:"limitName,omitempty"`
-	PlanType  *PlanType        `json:"planType,omitempty"`
-	Primary   *RateLimitWindow `json:"primary,omitempty"`
-	Secondary *RateLimitWindow `json:"secondary,omitempty"`
+	IndividualLimit      *SpendControlLimitSnapshot `json:"individualLimit,omitempty"`
+	RateLimitReachedType *RateLimitReachedType      `json:"rateLimitReachedType,omitempty"`
+	SpendControlReached  *bool                      `json:"spendControlReached,omitempty"`
+	NormalModelSlug      *string                    `json:"normalModelSlug,omitempty"`
+	Credits              *CreditsSnapshot           `json:"credits,omitempty"`
+	LimitId              *string                    `json:"limitId,omitempty"`
+	LimitName            *string                    `json:"limitName,omitempty"`
+	PlanType             *PlanType                  `json:"planType,omitempty"`
+	Primary              *RateLimitWindow           `json:"primary,omitempty"`
+	Secondary            *RateLimitWindow           `json:"secondary,omitempty"`
+}
+
+// RateLimitReachedType identifies the backend-reported reason usage is blocked.
+type RateLimitReachedType string
+
+const (
+	RateLimitReachedTypeRateLimitReached                 RateLimitReachedType = "rate_limit_reached"
+	RateLimitReachedTypeWorkspaceOwnerCreditsDepleted    RateLimitReachedType = "workspace_owner_credits_depleted"
+	RateLimitReachedTypeWorkspaceMemberCreditsDepleted   RateLimitReachedType = "workspace_member_credits_depleted"
+	RateLimitReachedTypeWorkspaceOwnerUsageLimitReached  RateLimitReachedType = "workspace_owner_usage_limit_reached"
+	RateLimitReachedTypeWorkspaceMemberUsageLimitReached RateLimitReachedType = "workspace_member_usage_limit_reached"
+)
+
+// SpendControlLimitSnapshot describes an individual spend-control limit.
+type SpendControlLimitSnapshot struct {
+	Limit            string `json:"limit"`
+	RemainingPercent int32  `json:"remainingPercent"`
+	ResetsAt         int64  `json:"resetsAt"`
+	Used             string `json:"used"`
+}
+
+func (s *SpendControlLimitSnapshot) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "limit", "remainingPercent", "resetsAt", "used"); err != nil {
+		return err
+	}
+	type wire SpendControlLimitSnapshot
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*s = SpendControlLimitSnapshot(decoded)
+	return nil
 }
 
 func (r *RateLimitSnapshot) UnmarshalJSON(data []byte) error {
@@ -258,6 +307,17 @@ func (r *RateLimitSnapshot) UnmarshalJSON(data []byte) error {
 	}
 	if err := validateOptionalPlanTypeField("rateLimits.planType", decoded.PlanType); err != nil {
 		return err
+	}
+	if decoded.RateLimitReachedType != nil {
+		switch *decoded.RateLimitReachedType {
+		case RateLimitReachedTypeRateLimitReached,
+			RateLimitReachedTypeWorkspaceOwnerCreditsDepleted,
+			RateLimitReachedTypeWorkspaceMemberCreditsDepleted,
+			RateLimitReachedTypeWorkspaceOwnerUsageLimitReached,
+			RateLimitReachedTypeWorkspaceMemberUsageLimitReached:
+		default:
+			return fmt.Errorf("invalid rateLimits.rateLimitReachedType %q", *decoded.RateLimitReachedType)
+		}
 	}
 	*r = RateLimitSnapshot(decoded)
 	return nil
@@ -840,8 +900,19 @@ func (s *AccountService) Get(ctx context.Context, params GetAccountParams) (GetA
 
 // GetRateLimits retrieves the current rate limit information
 func (s *AccountService) GetRateLimits(ctx context.Context) (GetAccountRateLimitsResponse, error) {
+	return s.GetRateLimitsWithParams(ctx, nil)
+}
+
+// GetRateLimitsWithParams retrieves rate limits with explicit client capabilities.
+// Nil preserves the legacy request with omitted params; omitted or false options preserve
+// detailed reads and do not opt the client into Luna Reserve support.
+func (s *AccountService) GetRateLimitsWithParams(ctx context.Context, params *GetAccountRateLimitsParams) (GetAccountRateLimitsResponse, error) {
+	var requestParams interface{}
+	if params != nil {
+		requestParams = params
+	}
 	var resp GetAccountRateLimitsResponse
-	if err := s.client.sendRequest(ctx, methodAccountRateLimitsRead, nil, &resp); err != nil {
+	if err := s.client.sendRequest(ctx, methodAccountRateLimitsRead, requestParams, &resp); err != nil {
 		return GetAccountRateLimitsResponse{}, err
 	}
 	return resp, nil
