@@ -308,6 +308,17 @@ func (r *RateLimitSnapshot) UnmarshalJSON(data []byte) error {
 	if err := validateOptionalPlanTypeField("rateLimits.planType", decoded.PlanType); err != nil {
 		return err
 	}
+	if decoded.RateLimitReachedType != nil {
+		switch *decoded.RateLimitReachedType {
+		case RateLimitReachedTypeRateLimitReached,
+			RateLimitReachedTypeWorkspaceOwnerCreditsDepleted,
+			RateLimitReachedTypeWorkspaceMemberCreditsDepleted,
+			RateLimitReachedTypeWorkspaceOwnerUsageLimitReached,
+			RateLimitReachedTypeWorkspaceMemberUsageLimitReached:
+		default:
+			return fmt.Errorf("invalid rateLimits.rateLimitReachedType %q", *decoded.RateLimitReachedType)
+		}
+	}
 	*r = RateLimitSnapshot(decoded)
 	return nil
 }

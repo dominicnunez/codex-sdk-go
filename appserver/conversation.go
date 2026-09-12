@@ -183,6 +183,7 @@ func (c *Conversation) Close() error {
 
 func cloneThreadState(thread Thread) Thread {
 	t := thread
+	t.Originator = cloneStringPtr(thread.Originator)
 	t.ForkedFromID = cloneStringPtr(thread.ForkedFromID)
 	t.ParentThreadID = cloneStringPtr(thread.ParentThreadID)
 	t.ProjectID = cloneStringPtr(thread.ProjectID)
