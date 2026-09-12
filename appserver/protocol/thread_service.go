@@ -192,6 +192,9 @@ func (s *ThreadService) Read(ctx context.Context, params ThreadReadParams) (Thre
 
 // ThreadListParams are parameters for listing threads
 type ThreadListParams struct {
+	// Originators filters exact originator values on hosted backends. The local
+	// app-server rejects nonempty lists; omitted or empty lists are unrestricted.
+	Originators    []string           `json:"originators,omitempty"`
 	Archived       *bool              `json:"archived,omitempty"`
 	Cursor         *string            `json:"cursor,omitempty"`
 	Cwd            *string            `json:"cwd,omitempty"`

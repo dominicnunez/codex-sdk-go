@@ -7,6 +7,7 @@ import (
 
 // Thread represents a conversation thread with all its metadata
 type Thread struct {
+	Originator       *string              `json:"originator,omitempty"`
 	ForkedFromID     *string              `json:"forkedFromId,omitempty"`
 	ParentThreadID   *string              `json:"parentThreadId,omitempty"`
 	ProjectID        *string              `json:"projectId"`
@@ -38,6 +39,7 @@ type Thread struct {
 
 func (t *Thread) UnmarshalJSON(data []byte) error {
 	type threadWire struct {
+		Originator       *string               `json:"originator,omitempty"`
 		ForkedFromID     *string               `json:"forkedFromId,omitempty"`
 		ParentThreadID   *string               `json:"parentThreadId,omitempty"`
 		ProjectID        *string               `json:"projectId,omitempty"`
@@ -101,6 +103,7 @@ func (t *Thread) UnmarshalJSON(data []byte) error {
 	}
 
 	t.ID = *wire.ID
+	t.Originator = wire.Originator
 	t.ForkedFromID = wire.ForkedFromID
 	t.ParentThreadID = wire.ParentThreadID
 	t.ProjectID = wire.ProjectID

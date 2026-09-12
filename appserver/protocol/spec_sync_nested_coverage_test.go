@@ -11,6 +11,8 @@ func TestSyncNestedFieldCoverage(t *testing.T) {
 		path  string
 		types []interface{}
 	}{
+		{"schema/json/v2/NullableGetAccountRateLimitsParams.json", []interface{}{GetAccountRateLimitsParams{}}},
+		{"schema/json/v2/GetAccountRateLimitsResponse.json", []interface{}{RateLimitSnapshot{}, SpendControlLimitSnapshot{}}},
 		{"schema/json/v2/ConfigReadResponse.json", []interface{}{BrowserUseConfig{}, BrowserUseOriginPolicyConfig{}, ComputerUseConfig{}, ComputerUseMacosConfig{}, ComputerUseWindowsConfig{}, ComputerUseWindowsExeConfig{}}},
 		{"schema/json/v2/ConfigRequirementsReadResponse.json", []interface{}{BrowserUseRequirements{}, BrowserUseOriginPolicy{}, ComputerUseRequirements{}, ComputerUseMacosRequirements{}, ComputerUseWindowsRequirements{}, ComputerUseWindowsExeRequirement{}, InAppBrowserRequirements{}}},
 		{"schema/json/v2/ThreadReadResponse.json", []interface{}{Thread{}, Turn{}, TurnError{}, MisalignmentErrorDetails{}, MisalignmentSteer{}, AsyncUserInputQuestion{}}},

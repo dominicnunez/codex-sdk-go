@@ -289,13 +289,14 @@ func TestPermissionsRequestApprovalParamsAcceptRelativeFileSystemRoots(t *testin
 	}
 }
 
-func TestPermissionsRequestApprovalParamsRejectInvalidCwd(t *testing.T) {
+func TestPermissionsRequestApprovalParamsPreserveLegacyCwd(t *testing.T) {
 	tests := []struct {
 		name string
 		cwd  string
 	}{
 		{name: "relative", cwd: "../repo"},
 		{name: "non-normalized", cwd: "/tmp/../repo"},
+		{name: "empty", cwd: ""},
 	}
 
 	for _, tt := range tests {
@@ -310,11 +311,11 @@ func TestPermissionsRequestApprovalParamsRejectInvalidCwd(t *testing.T) {
 				"permissions":{"fileSystem":{"read":["/tmp"]}}
 			}`, tt.cwd)
 			err := json.Unmarshal([]byte(data), &params)
-			if err == nil {
-				t.Fatal("expected invalid cwd error")
+			if err != nil {
+				t.Fatal(err)
 			}
-			if !strings.Contains(err.Error(), `cwd`) {
-				t.Fatalf("error = %v; want cwd context", err)
+			if params.Cwd != tt.cwd {
+				t.Fatalf("cwd = %q; want %q", params.Cwd, tt.cwd)
 			}
 		})
 	}
