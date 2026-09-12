@@ -113,11 +113,21 @@ func TestThreadOriginatorRoundTrip(t *testing.T) {
 func TestRateLimitSpendControlSnapshot(t *testing.T) {
 	var snapshot codex.RateLimitSnapshot
 	data := `{"individualLimit":{"limit":"100.00","used":"100.00","remainingPercent":0,"resetsAt":123},"spendControlReached":false,"rateLimitReachedType":"workspace_member_usage_limit_reached"}`
-	if err := json.Unmarshal([]byte(data), &snapshot); err != nil { t.Fatal(err) }
-	if snapshot.IndividualLimit == nil || snapshot.IndividualLimit.Limit != "100.00" || snapshot.IndividualLimit.RemainingPercent != 0 { t.Fatal("individual limit was lost") }
-	if snapshot.SpendControlReached == nil || *snapshot.SpendControlReached { t.Fatal("explicit spend control state was lost") }
-	if snapshot.RateLimitReachedType == nil || *snapshot.RateLimitReachedType != codex.RateLimitReachedTypeWorkspaceMemberUsageLimitReached { t.Fatal("limit reason was lost") }
-	if err := json.Unmarshal([]byte(`{"individualLimit":{"limit":"100.00"}}`), &snapshot); err == nil { t.Fatal("accepted incomplete spend limit") }
+	if err := json.Unmarshal([]byte(data), &snapshot); err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.IndividualLimit == nil || snapshot.IndividualLimit.Limit != "100.00" || snapshot.IndividualLimit.RemainingPercent != 0 {
+		t.Fatal("individual limit was lost")
+	}
+	if snapshot.SpendControlReached == nil || *snapshot.SpendControlReached {
+		t.Fatal("explicit spend control state was lost")
+	}
+	if snapshot.RateLimitReachedType == nil || *snapshot.RateLimitReachedType != codex.RateLimitReachedTypeWorkspaceMemberUsageLimitReached {
+		t.Fatal("limit reason was lost")
+	}
+	if err := json.Unmarshal([]byte(`{"individualLimit":{"limit":"100.00"}}`), &snapshot); err == nil {
+		t.Fatal("accepted incomplete spend limit")
+	}
 }
 
 func TestThreadOriginatorFilterRequest(t *testing.T) {
