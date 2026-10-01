@@ -99,6 +99,11 @@ func TestConversationMultiTurn(t *testing.T) {
 
 func TestConversationThreadReflectsLatestCachedThreadState(t *testing.T) {
 	proc, mock := mockProcess(t)
+	start := validProcessThreadStartResponse(validProcessThreadPayload("thread-1"))
+	start["disabledPluginIds"] = []string{"plugin-1", "plugin-2"}
+	if err := mock.SetResponseData("thread/start", start); err != nil {
+		t.Fatal(err)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -124,13 +129,12 @@ func TestConversationThreadReflectsLatestCachedThreadState(t *testing.T) {
 		"thread": map[string]interface{}{
 			"id":        "thread-1",
 			"projectId": nil, "sessionId": "session-1", "cliVersion": "1.0.0",
-			"createdAt":         1700000000,
-			"cwd":               "/tmp",
-			"modelProvider":     "openai",
-			"path":              "/workspace/project",
-			"preview":           "",
-			"disabledPluginIds": []string{"plugin-1", "plugin-2"},
-			"source":            "exec",
+			"createdAt":     1700000000,
+			"cwd":           "/tmp",
+			"modelProvider": "openai",
+			"path":          "/workspace/project",
+			"preview":       "",
+			"source":        "exec",
 			"status": map[string]interface{}{
 				"type":        "active",
 				"activeFlags": []interface{}{"waitingOnApproval"},

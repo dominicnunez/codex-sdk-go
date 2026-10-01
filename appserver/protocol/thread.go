@@ -35,40 +35,39 @@ type Thread struct {
 	GitInfo           *GitInfo             `json:"gitInfo,omitempty"`
 	Name              *string              `json:"name,omitempty"`
 	Path              *string              `json:"path,omitempty"`
-	DisabledPluginIDs []string             `json:"disabledPluginIds,omitempty"`
+	DisabledPluginIDs []string             `json:"-"` // Cached lifecycle settings; not a Thread wire field.
 }
 
 func (t *Thread) UnmarshalJSON(data []byte) error {
 	type threadWire struct {
-		Originator        *string               `json:"originator,omitempty"`
-		ForkedFromID      *string               `json:"forkedFromId,omitempty"`
-		ParentThreadID    *string               `json:"parentThreadId,omitempty"`
-		ProjectID         *string               `json:"projectId,omitempty"`
-		RecencyAt         *int64                `json:"recencyAt,omitempty"`
-		Section           *ThreadSection        `json:"section,omitempty"`
-		SectionEnteredAt  *int64                `json:"sectionEnteredAt,omitempty"`
-		SessionID         string                `json:"sessionId"`
-		HistoryMode       ThreadHistoryMode     `json:"historyMode"`
-		Model             *string               `json:"model"`
-		ReasoningEffort   *ReasoningEffort      `json:"reasoningEffort"`
-		ID                *string               `json:"id"`
-		CLIVersion        *string               `json:"cliVersion"`
-		CreatedAt         *int64                `json:"createdAt"`
-		Cwd               *string               `json:"cwd"`
-		ModelProvider     *string               `json:"modelProvider"`
-		Preview           *string               `json:"preview"`
-		Source            *SessionSourceWrapper `json:"source"`
-		Status            *ThreadStatusWrapper  `json:"status"`
-		ThreadSource      *ThreadSource         `json:"threadSource"`
-		Turns             *[]Turn               `json:"turns"`
-		UpdatedAt         *int64                `json:"updatedAt"`
-		Ephemeral         *bool                 `json:"ephemeral"`
-		AgentNickname     *string               `json:"agentNickname"`
-		AgentRole         *string               `json:"agentRole"`
-		GitInfo           *GitInfo              `json:"gitInfo"`
-		Name              *string               `json:"name"`
-		Path              *string               `json:"path"`
-		DisabledPluginIDs []string              `json:"disabledPluginIds"`
+		Originator       *string               `json:"originator,omitempty"`
+		ForkedFromID     *string               `json:"forkedFromId,omitempty"`
+		ParentThreadID   *string               `json:"parentThreadId,omitempty"`
+		ProjectID        *string               `json:"projectId,omitempty"`
+		RecencyAt        *int64                `json:"recencyAt,omitempty"`
+		Section          *ThreadSection        `json:"section,omitempty"`
+		SectionEnteredAt *int64                `json:"sectionEnteredAt,omitempty"`
+		SessionID        string                `json:"sessionId"`
+		HistoryMode      ThreadHistoryMode     `json:"historyMode"`
+		Model            *string               `json:"model"`
+		ReasoningEffort  *ReasoningEffort      `json:"reasoningEffort"`
+		ID               *string               `json:"id"`
+		CLIVersion       *string               `json:"cliVersion"`
+		CreatedAt        *int64                `json:"createdAt"`
+		Cwd              *string               `json:"cwd"`
+		ModelProvider    *string               `json:"modelProvider"`
+		Preview          *string               `json:"preview"`
+		Source           *SessionSourceWrapper `json:"source"`
+		Status           *ThreadStatusWrapper  `json:"status"`
+		ThreadSource     *ThreadSource         `json:"threadSource"`
+		Turns            *[]Turn               `json:"turns"`
+		UpdatedAt        *int64                `json:"updatedAt"`
+		Ephemeral        *bool                 `json:"ephemeral"`
+		AgentNickname    *string               `json:"agentNickname"`
+		AgentRole        *string               `json:"agentRole"`
+		GitInfo          *GitInfo              `json:"gitInfo"`
+		Name             *string               `json:"name"`
+		Path             *string               `json:"path"`
 	}
 
 	var wire threadWire
@@ -142,7 +141,7 @@ func (t *Thread) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	t.DisabledPluginIDs = append([]string(nil), wire.DisabledPluginIDs...)
+	t.DisabledPluginIDs = nil
 
 	return nil
 }
