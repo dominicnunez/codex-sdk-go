@@ -594,6 +594,7 @@ func TestTurnScopedNotificationWorkerSkipsBufferedNotificationsAfterCancellation
 	}
 	queue.scheduled = true
 	transport.turnNotifQueues["thread-1"] = queue
+	transport.orderedNotifCount = 1
 
 	cancel()
 	transport.handleTurnScopedNotificationQueue(queue)

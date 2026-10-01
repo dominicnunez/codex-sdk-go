@@ -37,6 +37,23 @@ func (t *StdioTransport) wakeTurnScopedNotificationWorkers() {
 	t.turnNotifReadyMu.Unlock()
 }
 
+func (t *StdioTransport) stopTurnScopedNotificationWorkers() {
+	t.initTurnScopedScheduler()
+	t.turnNotifReadyMu.Lock()
+	t.turnNotifStopped.Store(true)
+	t.turnNotifReadyCond.Broadcast()
+	t.turnNotifReadyMu.Unlock()
+}
+
+func (t *StdioTransport) canDrainOrderedNotifications() bool {
+	if t.turnNotifStopped.Load() {
+		return false
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.ctx.Err() == nil || t.readerEOF
+}
+
 func (t *StdioTransport) notificationWorker() {
 	t.handleNotificationQueue(t.notifQueue)
 }
@@ -78,11 +95,20 @@ func (t *StdioTransport) nextTurnScopedNotificationQueue() (*turnScopedNotificat
 	t.turnNotifReadyMu.Lock()
 	defer t.turnNotifReadyMu.Unlock()
 
-	for len(t.turnNotifReady) == 0 && t.ctx.Err() == nil {
+	for {
+		if !t.canDrainOrderedNotifications() {
+			return nil, false
+		}
+		t.mu.Lock()
+		hasHandler := t.notifHandler != nil
+		t.mu.Unlock()
+		if len(t.turnNotifReady) > 0 && hasHandler {
+			break
+		}
+		if len(t.turnNotifReady) == 0 && t.ctx.Err() != nil {
+			return nil, false
+		}
 		t.turnNotifReadyCond.Wait()
-	}
-	if len(t.turnNotifReady) == 0 {
-		return nil, false
 	}
 
 	queue := t.turnNotifReady[0]
@@ -99,7 +125,7 @@ func (t *StdioTransport) scheduleTurnScopedNotificationQueue(queue *turnScopedNo
 }
 
 func (t *StdioTransport) enqueueNotification(notif Notification) {
-	if threadKey := turnScopedNotificationKey(notif); threadKey != "" {
+	if threadKey := orderedNotificationKey(notif); threadKey != "" {
 		t.enqueueTurnScopedNotification(notif, threadKey)
 		return
 	}
@@ -144,11 +170,10 @@ func (t *StdioTransport) enqueueTurnScopedNotification(notif Notification, threa
 		queue = &turnScopedNotificationQueue{threadKey: threadKey}
 		t.turnNotifQueues[threadKey] = queue
 	}
-	t.turnNotifQueuesMu.Unlock()
-
 	queue.mu.Lock()
-	if len(queue.queue) >= maxTurnScopedNotificationQueueSize {
+	if len(queue.queue) >= maxTurnScopedNotificationQueueSize || t.orderedNotifCount >= maxOrderedNotificationBacklog {
 		queue.mu.Unlock()
+		t.turnNotifQueuesMu.Unlock()
 		t.closeWithFailure(
 			errTurnScopedNotificationQueueOverflow,
 			errTurnScopedNotificationQueueOverflow,
@@ -156,14 +181,17 @@ func (t *StdioTransport) enqueueTurnScopedNotification(notif Notification, threa
 		return
 	}
 	queue.queue = append(queue.queue, notif)
+	t.orderedNotifCount++
 	if queue.scheduled {
 		queue.mu.Unlock()
+		t.turnNotifQueuesMu.Unlock()
 		return
 	}
 	queue.scheduled = true
 	queue.mu.Unlock()
+	t.turnNotifQueuesMu.Unlock()
 
-	if t.ctx.Err() != nil {
+	if !t.canDrainOrderedNotifications() {
 		t.clearTurnScopedNotificationQueue(queue)
 		return
 	}
@@ -171,35 +199,40 @@ func (t *StdioTransport) enqueueTurnScopedNotification(notif Notification, threa
 }
 
 func (t *StdioTransport) handleTurnScopedNotificationQueue(queue *turnScopedNotificationQueue) {
-	for {
-		notif, ok := t.dequeueTurnScopedNotification(queue)
-		if !ok {
-			return
-		}
-
-		if t.ctx.Err() != nil {
-			t.clearTurnScopedNotificationQueue(queue)
-			return
-		}
-		t.handleNotification(notif)
-	}
-}
-
-func (t *StdioTransport) removeTurnScopedNotificationQueue(threadKey string, queue *turnScopedNotificationQueue) {
-	t.turnNotifQueuesMu.Lock()
-	defer t.turnNotifQueuesMu.Unlock()
-
-	current, ok := t.turnNotifQueues[threadKey]
-	if !ok || current != queue {
+	if !t.canDrainOrderedNotifications() {
+		t.clearTurnScopedNotificationQueue(queue)
 		return
 	}
-
-	queue.mu.Lock()
-	empty := len(queue.queue) == 0 && !queue.scheduled
-	queue.mu.Unlock()
-	if empty {
-		delete(t.turnNotifQueues, threadKey)
+	// Capture the handler before taking an event. If registration changes to
+	// nil, retain the event in its scope queue rather than moving it into a
+	// replay buffer where it could be overtaken.
+	t.mu.Lock()
+	handler, panicFn := t.notifHandler, t.panicHandler
+	t.mu.Unlock()
+	if handler != nil {
+		if notif, ok := t.dequeueTurnScopedNotification(queue); ok {
+			t.invokeNotificationHandler(notif, handler, panicFn)
+		}
 	}
+	// Yield after each callback so a busy scope cannot monopolize a worker.
+	t.finishTurnScopedNotification(queue)
+}
+
+func (t *StdioTransport) finishTurnScopedNotification(queue *turnScopedNotificationQueue) {
+	t.turnNotifQueuesMu.Lock()
+	queue.mu.Lock()
+	if len(queue.queue) == 0 {
+		queue.scheduled = false
+		if t.turnNotifQueues[queue.threadKey] == queue {
+			delete(t.turnNotifQueues, queue.threadKey)
+		}
+		queue.mu.Unlock()
+		t.turnNotifQueuesMu.Unlock()
+		return
+	}
+	queue.mu.Unlock()
+	t.turnNotifQueuesMu.Unlock()
+	t.scheduleTurnScopedNotificationQueue(queue)
 }
 
 func (t *StdioTransport) enqueueLosslessNotification(
@@ -376,18 +409,6 @@ func isProtectedNotificationMethod(method string) bool {
 	}
 }
 
-func turnScopedNotificationKey(notif Notification) string {
-	switch notif.Method {
-	case protocol.NotifyItemCompleted, protocol.NotifyTurnCompleted:
-		if notif.Method == protocol.NotifyItemCompleted {
-			return itemCompletedThreadKey(notif.Params)
-		}
-		return turnCompletedThreadKey(notif.Params)
-	default:
-		return ""
-	}
-}
-
 func (t *StdioTransport) drainPendingNotificationsAfterStop() {
 	for {
 		drained := false
@@ -397,7 +418,7 @@ func (t *StdioTransport) drainPendingNotificationsAfterStop() {
 		drained = t.drainNotificationQueue(t.streamingNotifQueue) || drained
 		drained = t.drainStreamingNotificationBacklog() || drained
 		drained = t.drainNotificationQueue(t.notifQueue) || drained
-		drained = t.drainTurnScopedNotificationQueues() || drained
+		// Ordered queues stay with their owning workers, including at EOF.
 
 		if !drained {
 			return
@@ -436,51 +457,33 @@ func (t *StdioTransport) drainStreamingNotificationBacklog() bool {
 	return true
 }
 
-func (t *StdioTransport) drainTurnScopedNotificationQueues() bool {
-	t.turnNotifQueuesMu.Lock()
-	queues := make([]*turnScopedNotificationQueue, 0, len(t.turnNotifQueues))
-	for _, queue := range t.turnNotifQueues {
-		queues = append(queues, queue)
-	}
-	t.turnNotifQueuesMu.Unlock()
-
-	drained := false
-	for _, queue := range queues {
-		for {
-			notif, ok := t.dequeueTurnScopedNotification(queue)
-			if !ok {
-				break
-			}
-
-			t.handleNotification(notif)
-			drained = true
-		}
-	}
-
-	return drained
-}
-
 func (t *StdioTransport) dequeueTurnScopedNotification(queue *turnScopedNotificationQueue) (Notification, bool) {
+	t.turnNotifQueuesMu.Lock()
+	defer t.turnNotifQueuesMu.Unlock()
 	queue.mu.Lock()
 	if len(queue.queue) == 0 {
-		queue.scheduled = false
 		queue.mu.Unlock()
-		t.removeTurnScopedNotificationQueue(queue.threadKey, queue)
 		return Notification{}, false
 	}
 	notif := queue.queue[0]
 	queue.queue[0] = Notification{}
 	queue.queue = queue.queue[1:]
+	t.orderedNotifCount--
 	queue.mu.Unlock()
 	return notif, true
 }
 
 func (t *StdioTransport) clearTurnScopedNotificationQueue(queue *turnScopedNotificationQueue) {
+	t.turnNotifQueuesMu.Lock()
+	defer t.turnNotifQueuesMu.Unlock()
 	queue.mu.Lock()
+	if t.turnNotifQueues[queue.threadKey] == queue {
+		t.orderedNotifCount -= len(queue.queue)
+		delete(t.turnNotifQueues, queue.threadKey)
+	}
 	queue.queue = nil
 	queue.scheduled = false
 	queue.mu.Unlock()
-	t.removeTurnScopedNotificationQueue(queue.threadKey, queue)
 }
 
 // handleNotification dispatches an incoming server→client notification to the handler
@@ -506,6 +509,10 @@ func (t *StdioTransport) handleNotification(notif Notification) {
 		t.mu.Unlock()
 	}
 
+	t.invokeNotificationHandler(notif, handler, panicFn)
+}
+
+func (t *StdioTransport) invokeNotificationHandler(notif Notification, handler NotificationHandler, panicFn func(any)) {
 	defer func() {
 		if r := recover(); r != nil {
 			if panicFn != nil {

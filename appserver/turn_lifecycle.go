@@ -33,7 +33,7 @@ type rawItemCompletedCarrier struct {
 
 func unmarshalThreadIDCarrier(params json.RawMessage) (threadIDCarrier, bool) {
 	var carrier threadIDCarrier
-	if err := json.Unmarshal(params, &carrier); err != nil {
+	if !decodeExactCarrier(params, map[string]any{"threadId": &carrier.ThreadID, "turnId": &carrier.TurnID}) {
 		return threadIDCarrier{}, false
 	}
 	return carrier, true
@@ -41,7 +41,7 @@ func unmarshalThreadIDCarrier(params json.RawMessage) (threadIDCarrier, bool) {
 
 func unmarshalItemCompletedCarrier(params json.RawMessage) (rawItemCompletedCarrier, bool) {
 	var carrier rawItemCompletedCarrier
-	if err := json.Unmarshal(params, &carrier); err != nil {
+	if !decodeExactCarrier(params, map[string]any{"threadId": &carrier.ThreadID, "turnId": &carrier.TurnID, "item": &carrier.Item}) {
 		return rawItemCompletedCarrier{}, false
 	}
 	return carrier, true
@@ -49,10 +49,27 @@ func unmarshalItemCompletedCarrier(params json.RawMessage) (rawItemCompletedCarr
 
 func unmarshalTurnCompletedCarrier(params json.RawMessage) (rawTurnCompletedCarrier, bool) {
 	var carrier rawTurnCompletedCarrier
-	if err := json.Unmarshal(params, &carrier); err != nil {
+	if !decodeExactCarrier(params, map[string]any{"threadId": &carrier.ThreadID, "turn": &carrier.Turn}) {
 		return rawTurnCompletedCarrier{}, false
 	}
 	return carrier, true
+}
+
+// Fallback attribution must use the same exact property names as typed
+// notifications. Extra fields must not select another thread or turn.
+func decodeExactCarrier(params json.RawMessage, dest map[string]any) bool {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(params, &fields); err != nil || fields == nil {
+		return false
+	}
+	for key, value := range dest {
+		if raw, ok := fields[key]; ok {
+			if err := json.Unmarshal(raw, value); err != nil {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func rawCarrierForThread[T any](params json.RawMessage, threadID string, unmarshal func(json.RawMessage) (T, bool), threadIDOf func(T) string) (T, bool) {
@@ -86,7 +103,7 @@ func extractRawTurnCompletedID(turn json.RawMessage) string {
 	var carrier struct {
 		ID string `json:"id"`
 	}
-	if err := json.Unmarshal(turn, &carrier); err != nil {
+	if !decodeExactCarrier(turn, map[string]any{"id": &carrier.ID}) {
 		return ""
 	}
 	return carrier.ID

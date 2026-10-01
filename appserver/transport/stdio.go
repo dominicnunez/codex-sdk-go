@@ -42,17 +42,19 @@ const (
 	protectedNotificationWorkers       = 8
 	criticalNotificationWorkers        = 2
 	turnScopedNotificationWorkers      = 8
-	maxTurnScopedNotificationQueueSize = 256
+	maxTurnScopedNotificationQueueSize = streamingNotifQueueSize + maxStreamingNotificationBacklog
 	maxTurnScopedNotificationQueues    = 128
-	maxStreamingNotificationBacklog    = 1024
-	inboundNotifQueueSize              = 128
-	streamingNotifQueueSize            = 256
-	protectedNotifQueueSize            = 128
-	criticalNotifQueueSize             = 64
-	outboundWriteQueueSize             = 256
-	readBufferSizeBytes                = 64 * 1024
-	maxInboundMessageSizeBytes         = 10 * 1024 * 1024
-	defaultSendTimeout                 = 5 * time.Minute
+	// Preserve the previous aggregate completion-plus-streaming queue budget.
+	maxOrderedNotificationBacklog   = maxTurnScopedNotificationQueues*256 + maxTurnScopedNotificationQueueSize
+	maxStreamingNotificationBacklog = 1024
+	inboundNotifQueueSize           = 128
+	streamingNotifQueueSize         = 256
+	protectedNotifQueueSize         = 128
+	criticalNotifQueueSize          = 64
+	outboundWriteQueueSize          = 256
+	readBufferSizeBytes             = 64 * 1024
+	maxInboundMessageSizeBytes      = 10 * 1024 * 1024
+	defaultSendTimeout              = 5 * time.Minute
 )
 
 const (
@@ -83,10 +85,12 @@ type StdioTransport struct {
 	requestQueue        chan Request
 	turnNotifQueuesMu   sync.Mutex
 	turnNotifQueues     map[string]*turnScopedNotificationQueue
+	orderedNotifCount   int // guarded by turnNotifQueuesMu
 	turnNotifReadyMu    sync.Mutex
 	turnNotifReady      []*turnScopedNotificationQueue
 	turnNotifReadyCond  *sync.Cond
 	turnNotifReadyOnce  sync.Once
+	turnNotifStopped    atomic.Bool
 	streamingNotifQueue chan Notification
 	streamingBacklog    streamingNotificationBacklog
 	protectedNotifQueue chan Notification
@@ -253,6 +257,7 @@ func (t *StdioTransport) OnRequest(handler RequestHandler) {
 func (t *StdioTransport) OnNotify(handler NotificationHandler) {
 	pending := swapPendingHandler(t, func() { t.notifHandler = handler }, &t.pendingNotifHandle)
 	replayPending(pending, t.enqueueNotification)
+	t.wakeTurnScopedNotificationWorkers()
 }
 
 // OnPanic registers a handler called when a request handler or notification
@@ -266,6 +271,7 @@ func (t *StdioTransport) OnPanic(handler func(v any)) {
 
 // Close shuts down the transport. Safe to call multiple times.
 func (t *StdioTransport) Close() error {
+	t.stopTurnScopedNotificationWorkers()
 	t.closeWithFailure(nil, errTransportClosed)
 	return nil
 }
@@ -382,6 +388,7 @@ func (t *StdioTransport) closeWithFailure(scanErr error, cause error) {
 	pending, cancel, readerCloser := t.takeStopResourcesLocked()
 	t.mu.Unlock()
 
+	t.stopTurnScopedNotificationWorkers()
 	t.finishTransportStop(cancel, readerCloser)
 
 	pendingErr := pendingRequestTransportError("send failed", cause)
