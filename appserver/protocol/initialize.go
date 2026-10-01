@@ -92,7 +92,7 @@ func normalizeInitializeParams(params InitializeParams) InitializeParams {
 	if cp.Capabilities != nil {
 		cp.Capabilities.OptOutNotificationMethods = normalizeNotificationMethodSet(cp.Capabilities.OptOutNotificationMethods)
 	}
-	if cp.Capabilities != nil && !cp.Capabilities.ExperimentalAPI && len(cp.Capabilities.OptOutNotificationMethods) == 0 {
+	if cp.Capabilities != nil && !cp.Capabilities.ExperimentalAPI && !cp.Capabilities.ExplicitGatewayOAuth && len(cp.Capabilities.OptOutNotificationMethods) == 0 {
 		cp.Capabilities = nil
 	}
 	return cp

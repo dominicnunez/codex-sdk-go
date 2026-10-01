@@ -53,3 +53,46 @@ func TestSyncNestedFieldCoverage(t *testing.T) {
 		}
 	}
 }
+
+func TestNewNestedSchemaFieldCoverage(t *testing.T) {
+	data, err := readSpecFile("schema/json/codex_app_server_protocol.v2.schemas.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var schema schemaTopLevel
+	if err := json.Unmarshal(data, &schema); err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range []struct {
+		definition string
+		value      interface{}
+	}{
+		{"ModelAccessPrograms", ModelAccessPrograms{}},
+		{"McpAppUi", McpAppUI{}},
+		{"McpResourceReadTarget", McpResourceReadTarget{}},
+		{"ThreadAttachment", ThreadAttachment{}},
+		{"WorkspaceRouting", WorkspaceRouting{}},
+	} {
+		t.Run(entry.definition, func(t *testing.T) {
+			raw, ok := schema.Definitions[entry.definition]
+			if !ok {
+				t.Fatalf("missing definition %s", entry.definition)
+			}
+			var definition schemaTopLevel
+			if err := json.Unmarshal(raw, &definition); err != nil {
+				t.Fatal(err)
+			}
+			fields := structJSONFields(reflect.TypeOf(entry.value))
+			for name := range definition.Properties {
+				if _, ok := fields[name]; !ok {
+					t.Errorf("missing schema field %s", name)
+				}
+			}
+			for _, name := range definition.Required {
+				if field, ok := fields[name]; ok && field.isOptional {
+					t.Errorf("required schema field %s has omitempty", name)
+				}
+			}
+		})
+	}
+}

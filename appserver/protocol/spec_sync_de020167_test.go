@@ -3,6 +3,7 @@ package protocol_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go/appserver/protocol"
@@ -102,13 +103,40 @@ func TestThreadPredictionResultVariants(t *testing.T) {
 }
 
 func TestInitializeExplicitGatewayOAuthAffectsIdentity(t *testing.T) {
-	a := codex.InitializeCapabilities{ExplicitGatewayOAuth: true}
-	b, err := json.Marshal(a)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !json.Valid(b) || !containsJSONField(t, b, "explicitGatewayOauth") {
-		t.Fatalf("capabilities = %s", b)
+	for _, explicit := range []bool{false, true} {
+		t.Run(map[bool]string{false: "automatic", true: "explicit"}[explicit], func(t *testing.T) {
+			transport := NewMockTransport()
+			client := codex.NewClient(transport)
+			t.Cleanup(func() { _ = client.Close() })
+			transport.SetResponse("initialize", codex.Response{Result: json.RawMessage(`{"codexHome":"/tmp","platformFamily":"unix","platformOs":"linux","userAgent":"test"}`)})
+			params := codex.InitializeParams{
+				ClientInfo:   codex.ClientInfo{Name: "test", Version: "1"},
+				Capabilities: &codex.InitializeCapabilities{ExplicitGatewayOAuth: explicit},
+			}
+			if _, err := client.Initialize(context.Background(), params); err != nil {
+				t.Fatal(err)
+			}
+			var sent codex.InitializeParams
+			if err := json.Unmarshal(transport.GetSentRequest(0).Params, &sent); err != nil {
+				t.Fatal(err)
+			}
+			if explicit && (sent.Capabilities == nil || !sent.Capabilities.ExplicitGatewayOAuth) {
+				t.Fatalf("explicit login capability lost on wire: %s", transport.GetSentRequest(0).Params)
+			}
+			latched, ok := client.InitializedParams()
+			if !ok || explicit && (latched.Capabilities == nil || !latched.Capabilities.ExplicitGatewayOAuth) {
+				t.Fatalf("explicit login capability lost in session: %+v", latched)
+			}
+			if _, err := client.Initialize(context.Background(), params); err != nil {
+				t.Fatalf("same handshake failed: %v", err)
+			}
+			params.Capabilities.ExplicitGatewayOAuth = !explicit
+			_, err := client.Initialize(context.Background(), params)
+			var mismatch *codex.InitializeParamsMismatchError
+			if !errors.As(err, &mismatch) {
+				t.Fatalf("changed login mode error = %v, want handshake mismatch", err)
+			}
+		})
 	}
 }
 
