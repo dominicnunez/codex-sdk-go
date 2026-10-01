@@ -181,10 +181,33 @@ const (
 	McpAppDisplayModeFullscreen McpAppDisplayMode = "fullscreen"
 )
 
+var validMcpAppDisplayModes = map[McpAppDisplayMode]struct{}{
+	McpAppDisplayModeInline: {}, McpAppDisplayModeFullscreen: {},
+}
+
+func (m McpAppDisplayMode) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("McpAppDisplayMode", m, validMcpAppDisplayModes)
+}
+
+func (m *McpAppDisplayMode) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "McpAppDisplayMode", validMcpAppDisplayModes, m)
+}
+
 // McpAppUI is UI metadata captured from an invoked MCP tool descriptor.
 type McpAppUI struct {
 	PreferredModelDisplayMode McpAppDisplayMode `json:"preferredModelDisplayMode"`
 	ResourceURI               string            `json:"resourceUri"`
+}
+
+func (m *McpAppUI) UnmarshalJSON(data []byte) error {
+	type wire McpAppUI
+	var decoded wire
+	required := []string{"preferredModelDisplayMode", "resourceUri"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*m = McpAppUI(decoded)
+	return nil
 }
 
 func (McpToolCallThreadItem) threadItem() {}

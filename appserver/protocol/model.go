@@ -77,8 +77,30 @@ const (
 	CyberAccessProgramDaybreakRed  CyberAccessProgram = "daybreakRed"
 )
 
+var validCyberAccessPrograms = map[CyberAccessProgram]struct{}{
+	CyberAccessProgramStandard: {}, CyberAccessProgramDaybreakBlue: {}, CyberAccessProgramDaybreakRed: {},
+}
+
+func (p CyberAccessProgram) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("CyberAccessProgram", p, validCyberAccessPrograms)
+}
+
+func (p *CyberAccessProgram) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "CyberAccessProgram", validCyberAccessPrograms, p)
+}
+
 type ModelAccessPrograms struct {
 	Cyber []CyberAccessProgram `json:"cyber"`
+}
+
+func (p *ModelAccessPrograms) UnmarshalJSON(data []byte) error {
+	type wire ModelAccessPrograms
+	var decoded wire
+	if err := unmarshalInboundObject(data, &decoded, []string{"cyber"}, []string{"cyber"}); err != nil {
+		return err
+	}
+	*p = ModelAccessPrograms(decoded)
+	return nil
 }
 
 func (m *Model) UnmarshalJSON(data []byte) error {
