@@ -124,12 +124,13 @@ func TestConversationThreadReflectsLatestCachedThreadState(t *testing.T) {
 		"thread": map[string]interface{}{
 			"id":        "thread-1",
 			"projectId": nil, "sessionId": "session-1", "cliVersion": "1.0.0",
-			"createdAt":     1700000000,
-			"cwd":           "/tmp",
-			"modelProvider": "openai",
-			"path":          "/workspace/project",
-			"preview":       "",
-			"source":        "exec",
+			"createdAt":         1700000000,
+			"cwd":               "/tmp",
+			"modelProvider":     "openai",
+			"path":              "/workspace/project",
+			"preview":           "",
+			"disabledPluginIds": []string{"plugin-1", "plugin-2"},
+			"source":            "exec",
 			"status": map[string]interface{}{
 				"type":        "active",
 				"activeFlags": []interface{}{"waitingOnApproval"},
@@ -172,8 +173,19 @@ func TestConversationThreadReflectsLatestCachedThreadState(t *testing.T) {
 	thread.Name = codex.Ptr("mutated")
 	thread.Path = codex.Ptr("/mutated")
 	thread.GitInfo.Branch = codex.Ptr("mutated")
+	if len(thread.DisabledPluginIDs) != 2 {
+		t.Fatalf("Thread().DisabledPluginIDs = %v, want two plugins", thread.DisabledPluginIDs)
+	}
+	thread.DisabledPluginIDs[0] = "mutated"
 
 	latest := conv.Thread()
+	if len(latest.DisabledPluginIDs) != 2 || latest.DisabledPluginIDs[0] != "plugin-1" || latest.DisabledPluginIDs[1] != "plugin-2" {
+		t.Fatalf("snapshot mutation changed disabled plugins: %v", latest.DisabledPluginIDs)
+	}
+	cached, ok := proc.Client.ThreadStateSnapshot(conv.ThreadID())
+	if !ok || len(cached.DisabledPluginIDs) != 2 || cached.DisabledPluginIDs[0] != "plugin-1" {
+		t.Fatalf("snapshot mutation changed client cache: %v", cached.DisabledPluginIDs)
+	}
 	if latest.Name == nil || *latest.Name != threadName {
 		t.Fatalf("latest Thread().Name = %v, want %q", latest.Name, threadName)
 	}
