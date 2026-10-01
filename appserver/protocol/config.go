@@ -41,6 +41,8 @@ func (r *ConfigReadResponse) UnmarshalJSON(data []byte) error {
 
 // Config represents the effective configuration
 type Config struct {
+	// Apps contains experimental connector configuration when provided by the server.
+	Apps                       *AppsConfig              `json:"apps,omitempty"`
 	BrowserUse                 *BrowserUseConfig        `json:"browser_use,omitempty"`
 	ComputerUse                *ComputerUseConfig       `json:"computer_use,omitempty"`
 	Analytics                  *AnalyticsConfig         `json:"analytics,omitempty"`
