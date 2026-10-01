@@ -17,6 +17,8 @@ type ClientInfo struct {
 type InitializeCapabilities struct {
 	// ExperimentalAPI opts into receiving experimental API methods and fields.
 	ExperimentalAPI bool `json:"experimentalApi"`
+	// ExplicitGatewayOAuth uses explicit gateway OAuth login instead of automatic browser authorization.
+	ExplicitGatewayOAuth bool `json:"explicitGatewayOauth,omitempty"`
 
 	// OptOutNotificationMethods are exact notification method names that should be suppressed
 	// for this connection (for example "codex/event/session_configured").
@@ -90,7 +92,7 @@ func normalizeInitializeParams(params InitializeParams) InitializeParams {
 	if cp.Capabilities != nil {
 		cp.Capabilities.OptOutNotificationMethods = normalizeNotificationMethodSet(cp.Capabilities.OptOutNotificationMethods)
 	}
-	if cp.Capabilities != nil && !cp.Capabilities.ExperimentalAPI && len(cp.Capabilities.OptOutNotificationMethods) == 0 {
+	if cp.Capabilities != nil && !cp.Capabilities.ExperimentalAPI && !cp.Capabilities.ExplicitGatewayOAuth && len(cp.Capabilities.OptOutNotificationMethods) == 0 {
 		cp.Capabilities = nil
 	}
 	return cp
@@ -121,6 +123,7 @@ func initializeParamsEqual(a, b InitializeParams) bool {
 		return a.Capabilities == nil && b.Capabilities == nil
 	default:
 		return a.Capabilities.ExperimentalAPI == b.Capabilities.ExperimentalAPI &&
+			a.Capabilities.ExplicitGatewayOAuth == b.Capabilities.ExplicitGatewayOAuth &&
 			slices.Equal(a.Capabilities.OptOutNotificationMethods, b.Capabilities.OptOutNotificationMethods)
 	}
 }

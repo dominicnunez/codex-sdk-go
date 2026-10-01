@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"encoding/json"
+	"errors"
 )
 
 const (
@@ -54,13 +55,98 @@ func (v *TurnItemsView) UnmarshalJSON(data []byte) error {
 
 // ThreadItemsListParams selects a page of items, optionally restricted to one turn.
 type ThreadItemsListParams struct {
-	ThreadID      string         `json:"threadId"`
-	TurnID        *string        `json:"turnId,omitempty"`
-	Cursor        *string        `json:"cursor,omitempty"`
-	Limit         *uint32        `json:"limit,omitempty"`
-	SortDirection *SortDirection `json:"sortDirection,omitempty"`
+	ThreadID string  `json:"threadId"`
+	TurnID   *string `json:"turnId,omitempty"`
+	Cursor   *string `json:"cursor,omitempty"`
+	// CursorAnchor selects an item-relative position. It is mutually exclusive with Cursor.
+	CursorAnchor  *ThreadItemsListAnchor `json:"-"`
+	Limit         *uint32                `json:"limit,omitempty"`
+	SortDirection *SortDirection         `json:"sortDirection,omitempty"`
 }
 
+func (p ThreadItemsListParams) MarshalJSON() ([]byte, error) {
+	if p.Cursor != nil && p.CursorAnchor != nil {
+		return nil, errors.New("cursor and cursor anchor are mutually exclusive")
+	}
+	type wire struct {
+		ThreadID      string         `json:"threadId"`
+		TurnID        *string        `json:"turnId,omitempty"`
+		Cursor        interface{}    `json:"cursor,omitempty"`
+		Limit         *uint32        `json:"limit,omitempty"`
+		SortDirection *SortDirection `json:"sortDirection,omitempty"`
+	}
+	var cursor interface{}
+	if p.Cursor != nil {
+		cursor = *p.Cursor
+	}
+	if p.CursorAnchor != nil {
+		cursor = p.CursorAnchor
+	}
+	return json.Marshal(wire{p.ThreadID, p.TurnID, cursor, p.Limit, p.SortDirection})
+}
+
+// UnmarshalJSON distinguishes the schema's string and item-anchor cursor variants.
+func (p *ThreadItemsListParams) UnmarshalJSON(data []byte) error {
+	type wire struct {
+		ThreadID      string          `json:"threadId"`
+		TurnID        *string         `json:"turnId,omitempty"`
+		Cursor        json.RawMessage `json:"cursor,omitempty"`
+		Limit         *uint32         `json:"limit,omitempty"`
+		SortDirection *SortDirection  `json:"sortDirection,omitempty"`
+	}
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*p = ThreadItemsListParams{ThreadID: decoded.ThreadID, TurnID: decoded.TurnID, Limit: decoded.Limit, SortDirection: decoded.SortDirection}
+	if len(decoded.Cursor) == 0 || string(decoded.Cursor) == "null" {
+		return nil
+	}
+	if decoded.Cursor[0] == '"' {
+		return json.Unmarshal(decoded.Cursor, &p.Cursor)
+	}
+	var anchor ThreadItemsListAnchor
+	if err := json.Unmarshal(decoded.Cursor, &anchor); err != nil {
+		return err
+	}
+	p.CursorAnchor = &anchor
+	return nil
+}
+
+// ThreadItemsListAnchor identifies an exclusive item position in a visible turn.
+type ThreadItemsListAnchor struct {
+	ItemID string `json:"itemId"`
+}
+
+func (a ThreadItemsListAnchor) MarshalJSON() ([]byte, error) {
+	if a.ItemID == "" {
+		return nil, errors.New("thread items anchor requires itemId")
+	}
+	return json.Marshal(struct {
+		Type   string `json:"type"`
+		ItemID string `json:"itemId"`
+	}{Type: "item", ItemID: a.ItemID})
+}
+
+func (a *ThreadItemsListAnchor) UnmarshalJSON(data []byte) error {
+	var wire struct {
+		Type   string `json:"type"`
+		ItemID string `json:"itemId"`
+	}
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+	if wire.Type != "item" {
+		return errors.New("thread items anchor requires type item")
+	}
+	if wire.ItemID == "" {
+		return errors.New("thread items anchor requires itemId")
+	}
+	*a = ThreadItemsListAnchor{ItemID: wire.ItemID}
+	return nil
+}
+
+// ThreadItemsListCursor supports either an opaque continuation token or an item anchor.
 func (p ThreadItemsListParams) prepareRequest() (interface{}, error) {
 	if err := validateThreadScopedRequest(p.ThreadID); err != nil {
 		return nil, err
@@ -68,13 +154,26 @@ func (p ThreadItemsListParams) prepareRequest() (interface{}, error) {
 	if err := validateOptionalEnumValue("sortDirection", p.SortDirection, validSortDirections); err != nil {
 		return nil, err
 	}
+	if p.Cursor != nil && p.CursorAnchor != nil {
+		return nil, invalidParamsError("cursor and cursor anchor are mutually exclusive")
+	}
+	if p.CursorAnchor != nil {
+		if p.TurnID == nil || *p.TurnID == "" {
+			return nil, invalidParamsError("cursor anchor requires turnId")
+		}
+		if p.CursorAnchor.ItemID == "" {
+			return nil, invalidParamsError("cursor anchor requires itemId")
+		}
+	}
 	return p, nil
 }
 
 // ThreadItemEntry associates a history item with its containing turn.
 type ThreadItemEntry struct {
-	Item   ThreadItemWrapper `json:"item"`
-	TurnID string            `json:"turnId"`
+	Item          ThreadItemWrapper `json:"item"`
+	TurnID        string            `json:"turnId"`
+	StartedAtMs   *int64            `json:"startedAtMs,omitempty"`
+	CompletedAtMs *int64            `json:"completedAtMs,omitempty"`
 }
 
 func (e *ThreadItemEntry) UnmarshalJSON(data []byte) error {

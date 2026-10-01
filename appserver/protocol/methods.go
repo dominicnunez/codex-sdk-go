@@ -14,6 +14,8 @@ const (
 	NotifyReasoningSummaryPartAdded = "item/reasoning/summaryPartAdded"
 	NotifyItemStarted               = "item/started"
 	NotifyItemCompleted             = "item/completed"
+	NotifyThreadAttachmentUpdated   = "thread/attachment/updated"
+	NotifyThreadPredictionUpdated   = "thread/prediction/updated"
 
 	NotifyThreadStarted           = "thread/started"
 	NotifyThreadClosed            = "thread/closed"
@@ -33,6 +35,7 @@ const (
 	NotifyAccountUpdated           = "account/updated"
 	NotifyAccountLoginCompleted    = "account/login/completed"
 	NotifyAccountRateLimitsUpdated = "account/rateLimits/updated"
+	NotifyGatewayOAuthChanged      = "account/gatewayOAuth/changed"
 
 	NotifyRealtimeStarted          = "thread/realtime/started"
 	NotifyRealtimeClosed           = "thread/realtime/closed"

@@ -25,6 +25,8 @@ const (
 	notifyReasoningSummaryPartAdded = "item/reasoning/summaryPartAdded"
 	notifyItemStarted               = "item/started"
 	notifyItemCompleted             = "item/completed"
+	notifyThreadAttachmentUpdated   = "thread/attachment/updated"
+	notifyThreadPredictionUpdated   = "thread/prediction/updated"
 
 	// Thread notifications
 	notifyThreadStarted           = "thread/started"
@@ -54,6 +56,7 @@ const (
 	notifyAccountUpdated           = "account/updated"
 	notifyAccountLoginCompleted    = "account/login/completed"
 	notifyAccountRateLimitsUpdated = "account/rateLimits/updated"
+	notifyGatewayOAuthChanged      = "account/gatewayOAuth/changed"
 
 	// Realtime notifications
 	notifyRealtimeStarted          = "thread/realtime/started"
@@ -141,6 +144,9 @@ const (
 	methodAccountLoginStart                      = "account/login/start"
 	methodAccountLoginCancel                     = "account/login/cancel"
 	methodAccountLogout                          = "account/logout"
+	methodGatewayOAuthRead                       = "account/gatewayOAuth/read"
+	methodGatewayOAuthLogin                      = "account/gatewayOAuth/login"
+	methodGatewayOAuthCancel                     = "account/gatewayOAuth/cancel"
 	methodThreadStart                            = "thread/start"
 	methodThreadRead                             = "thread/read"
 	methodThreadList                             = "thread/list"
@@ -160,6 +166,9 @@ const (
 	methodThreadGoalGet                          = "thread/goal/get"
 	methodThreadGoalSet                          = "thread/goal/set"
 	methodThreadGoalClear                        = "thread/goal/clear"
+	methodThreadAttachmentAdd                    = "thread/attachment/add"
+	methodThreadAttachmentList                   = "thread/attachment/list"
+	methodThreadAttachmentRemove                 = "thread/attachment/remove"
 	methodThreadSectionMove                      = "thread/section/move"
 	methodThreadSectionCreate                    = "threadSection/create"
 	methodThreadSectionDelete                    = "threadSection/delete"

@@ -504,6 +504,7 @@ type PluginDetail struct {
 	McpServers      []string            `json:"mcpServers"`
 	Skills          []SkillSummary      `json:"skills"`
 	Summary         PluginSummary       `json:"summary"`
+	OnboardingSkill *SkillSummary       `json:"onboardingSkill,omitempty"`
 }
 
 func (p *PluginDetail) UnmarshalJSON(data []byte) error {
@@ -516,6 +517,7 @@ func (p *PluginDetail) UnmarshalJSON(data []byte) error {
 		McpServers      *[]string            `json:"mcpServers"`
 		Skills          *[]SkillSummary      `json:"skills"`
 		Summary         *PluginSummary       `json:"summary"`
+		OnboardingSkill *SkillSummary        `json:"onboardingSkill"`
 	}
 
 	var wire pluginDetailWire
@@ -549,6 +551,7 @@ func (p *PluginDetail) UnmarshalJSON(data []byte) error {
 	p.McpServers = *wire.McpServers
 	p.Skills = *wire.Skills
 	p.Summary = *wire.Summary
+	p.OnboardingSkill = wire.OnboardingSkill
 	return nil
 }
 

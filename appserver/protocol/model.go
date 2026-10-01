@@ -65,7 +65,42 @@ type Model struct {
 	// Availability nux message for the model.
 	AvailabilityNux *ModelAvailabilityNux `json:"availabilityNux,omitempty"`
 	// Upgrade information for the model.
-	UpgradeInfo *ModelUpgradeInfo `json:"upgradeInfo,omitempty"`
+	UpgradeInfo             *ModelUpgradeInfo    `json:"upgradeInfo,omitempty"`
+	AvailableAccessPrograms *ModelAccessPrograms `json:"availableAccessPrograms,omitempty"`
+}
+
+type CyberAccessProgram string
+
+const (
+	CyberAccessProgramStandard     CyberAccessProgram = "standard"
+	CyberAccessProgramDaybreakBlue CyberAccessProgram = "daybreakBlue"
+	CyberAccessProgramDaybreakRed  CyberAccessProgram = "daybreakRed"
+)
+
+var validCyberAccessPrograms = map[CyberAccessProgram]struct{}{
+	CyberAccessProgramStandard: {}, CyberAccessProgramDaybreakBlue: {}, CyberAccessProgramDaybreakRed: {},
+}
+
+func (p CyberAccessProgram) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("CyberAccessProgram", p, validCyberAccessPrograms)
+}
+
+func (p *CyberAccessProgram) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "CyberAccessProgram", validCyberAccessPrograms, p)
+}
+
+type ModelAccessPrograms struct {
+	Cyber []CyberAccessProgram `json:"cyber"`
+}
+
+func (p *ModelAccessPrograms) UnmarshalJSON(data []byte) error {
+	type wire ModelAccessPrograms
+	var decoded wire
+	if err := unmarshalInboundObject(data, &decoded, []string{"cyber"}, []string{"cyber"}); err != nil {
+		return err
+	}
+	*p = ModelAccessPrograms(decoded)
+	return nil
 }
 
 func (m *Model) UnmarshalJSON(data []byte) error {

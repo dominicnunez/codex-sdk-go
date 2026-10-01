@@ -14,6 +14,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/dominicnunez/codex-sdk-go/appserver/protocol"
 )
 
 func TestReadLimitedLinePreservesBufferedBytesAfterNewline(t *testing.T) {
@@ -1180,6 +1182,22 @@ func TestStdioNotificationFloodStillDeliversItemCompleted(t *testing.T) {
 }
 
 func TestStdioBestEffortFloodStillDeliversProtectedNotification(t *testing.T) {
+	testProtectedNotificationFlood(t, notifyConfigWarning)
+}
+
+func TestStdioNewNotificationsSurviveFlood(t *testing.T) {
+	for _, method := range []string{
+		protocol.NotifyGatewayOAuthChanged,
+		protocol.NotifyThreadAttachmentUpdated,
+		protocol.NotifyThreadPredictionUpdated,
+		protocol.NotifyThreadSettingsUpdated,
+	} {
+		t.Run(method, func(t *testing.T) { testProtectedNotificationFlood(t, method) })
+	}
+}
+
+func testProtectedNotificationFlood(t *testing.T, method string) {
+	t.Helper()
 	clientReader, serverWriter := io.Pipe()
 	defer func() { _ = clientReader.Close() }()
 	defer func() { _ = serverWriter.Close() }()
@@ -1188,9 +1206,10 @@ func TestStdioBestEffortFloodStillDeliversProtectedNotification(t *testing.T) {
 	defer func() { _ = transport.Close() }()
 
 	release := make(chan struct{})
+	defer close(release)
 	protectedSeen := make(chan struct{}, 1)
 	transport.OnNotify(func(_ context.Context, notif Notification) {
-		if notif.Method == notifyConfigWarning {
+		if notif.Method == method {
 			select {
 			case protectedSeen <- struct{}{}:
 			default:
@@ -1219,7 +1238,7 @@ func TestStdioBestEffortFloodStillDeliversProtectedNotification(t *testing.T) {
 
 	protected := Notification{
 		JSONRPC: jsonrpcVersion,
-		Method:  notifyConfigWarning,
+		Method:  method,
 		Params:  json.RawMessage(`{"message":"warn","severity":"medium"}`),
 	}
 	protectedBytes, err := json.Marshal(protected)
@@ -1235,8 +1254,6 @@ func TestStdioBestEffortFloodStillDeliversProtectedNotification(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("protected notification was not delivered under best-effort queue pressure")
 	}
-
-	close(release)
 }
 
 func TestStdioStreamingFloodBackpressuresWithoutClosingTransport(t *testing.T) {

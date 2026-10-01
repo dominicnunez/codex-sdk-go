@@ -50,6 +50,14 @@ func (c *Client) AddThreadStartedListener(handler func(ThreadStartedNotification
 	return addTypedNotificationListener(c, notifyThreadStarted, handler)
 }
 
+func (c *Client) AddThreadAttachmentUpdatedListener(handler func(ThreadAttachmentUpdatedNotification)) func() {
+	return addTypedNotificationListener(c, notifyThreadAttachmentUpdated, handler)
+}
+
+func (c *Client) AddThreadPredictionUpdatedListener(handler func(ThreadPredictionUpdatedNotification)) func() {
+	return addTypedNotificationListener(c, notifyThreadPredictionUpdated, handler)
+}
+
 // AddThreadClosedListener appends a listener for thread/closed notifications.
 func (c *Client) AddThreadClosedListener(handler func(ThreadClosedNotification)) func() {
 	return addTypedNotificationListener(c, notifyThreadClosed, handler)
@@ -118,6 +126,10 @@ func (c *Client) AddTurnDiffUpdatedListener(handler func(TurnDiffUpdatedNotifica
 // AddAccountUpdatedListener appends a listener for account/updated notifications.
 func (c *Client) AddAccountUpdatedListener(handler func(AccountUpdatedNotification)) func() {
 	return addTypedNotificationListener(c, notifyAccountUpdated, handler)
+}
+
+func (c *Client) AddGatewayOAuthChangedListener(handler func(GatewayOAuthChangedNotification)) func() {
+	return addTypedNotificationListener(c, notifyGatewayOAuthChanged, handler)
 }
 
 // AddAccountLoginCompletedListener appends a listener for account/login/completed notifications.

@@ -32,6 +32,8 @@ func (p FeedbackUploadParams) prepareRequest() (interface{}, error) {
 type FeedbackUploadResponse struct {
 	// ThreadID is the ID of the thread created for this feedback.
 	ThreadID string `json:"threadId"`
+	// PromptHash is the normalized base-instructions hash associated with the upload.
+	PromptHash *string `json:"promptHash,omitempty"`
 }
 
 func (r *FeedbackUploadResponse) UnmarshalJSON(data []byte) error {

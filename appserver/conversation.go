@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"slices"
 	"sync"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/deepcopy"
@@ -183,6 +184,7 @@ func (c *Conversation) Close() error {
 
 func cloneThreadState(thread Thread) Thread {
 	t := thread
+	t.DisabledPluginIDs = slices.Clone(thread.DisabledPluginIDs)
 	t.Originator = cloneStringPtr(thread.Originator)
 	t.ForkedFromID = cloneStringPtr(thread.ForkedFromID)
 	t.ParentThreadID = cloneStringPtr(thread.ParentThreadID)
@@ -282,6 +284,7 @@ func cloneThreadItemWrapper(w ThreadItemWrapper) ThreadItemWrapper {
 		cp.McpAppResourceURI = cloneStringPtr(v.McpAppResourceURI)
 		cp.AppContext = cloneArbitraryValue(v.AppContext)
 		cp.PluginID = cloneStringPtr(v.PluginID)
+		cp.McpAppUI = clonePtr(v.McpAppUI)
 		cp.ReadOnlyHint = cloneBoolPtr(v.ReadOnlyHint)
 		cp.Arguments = cloneJSONValue(v.Arguments)
 		cp.Result = cloneMcpToolCallResult(v.Result)
@@ -409,6 +412,7 @@ func cloneUserInput(in UserInput) UserInput {
 		return &cp
 	case *ImageUserInput:
 		cp := *v
+		cp.FileID = cloneStringPtr(v.FileID)
 		return &cp
 	case *LocalImageUserInput:
 		cp := *v

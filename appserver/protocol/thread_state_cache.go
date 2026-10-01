@@ -16,6 +16,11 @@ func (c *Client) cacheThreadState(thread Thread) {
 	snapshot := cloneThreadState(thread)
 	c.threadStateMu.Lock()
 	c.ensureThreadStateCacheMapsLocked()
+	if snapshot.DisabledPluginIDs == nil {
+		// Thread-only reads and notifications do not carry lifecycle settings.
+		// Preserve the last settings without sharing ownership with the old entry.
+		snapshot.DisabledPluginIDs = cloneArbitraryValue(c.threadStates[thread.ID].thread.DisabledPluginIDs)
+	}
 	c.threadStates[thread.ID] = threadStateEntry{
 		thread:      snapshot,
 		hasSnapshot: true,
@@ -243,6 +248,17 @@ func (c *Client) notifyThreadClosedListeners(listeners []threadStateListener) {
 }
 
 func (c *Client) installThreadStateCache() {
+	c.addNotificationListener(notifyThreadSettingsUpdated, func(_ context.Context, notif Notification) {
+		var n ThreadSettingsUpdatedNotification
+		if err := json.Unmarshal(notif.Params, &n); err != nil {
+			c.reportHandlerError(notifyThreadSettingsUpdated, fmt.Errorf("unmarshal %s: %w", notifyThreadSettingsUpdated, err))
+			return
+		}
+		c.mutateThreadState(n.ThreadID, func(thread *Thread) {
+			*thread = threadWithDisabledPlugins(*thread, n.ThreadSettings.DisabledPluginIDs)
+		})
+	})
+
 	c.addNotificationListener(notifyThreadProjectUpdated, func(_ context.Context, notif Notification) {
 		var n ThreadProjectUpdatedNotification
 		if err := json.Unmarshal(notif.Params, &n); err != nil {

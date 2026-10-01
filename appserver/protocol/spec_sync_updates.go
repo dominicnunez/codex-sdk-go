@@ -219,17 +219,36 @@ type ThreadGoalGetResponse struct {
 	Goal *ThreadGoal `json:"goal,omitempty"`
 }
 type ThreadGoalSetParams struct {
-	Objective   *string           `json:"objective,omitempty"`
-	Status      *ThreadGoalStatus `json:"status,omitempty"`
-	ThreadID    string            `json:"threadId"`
-	TokenBudget *int64            `json:"tokenBudget,omitempty"`
+	Objective   *string                   `json:"objective,omitempty"`
+	Status      *ThreadGoalStatus         `json:"status,omitempty"`
+	ThreadID    string                    `json:"threadId"`
+	TokenBudget *int64                    `json:"tokenBudget,omitempty"`
+	Origin      *ThreadGoalMutationOrigin `json:"origin,omitempty"`
 }
 type ThreadGoalSetResponse struct {
 	Goal ThreadGoal `json:"goal"`
 }
 type ThreadGoalClearParams struct {
-	ThreadID string `json:"threadId"`
+	ThreadID string                    `json:"threadId"`
+	Origin   *ThreadGoalMutationOrigin `json:"origin,omitempty"`
 }
+
+type ThreadGoalMutationOrigin string
+
+const (
+	ThreadGoalMutationOriginUser      ThreadGoalMutationOrigin = "user"
+	ThreadGoalMutationOriginAutomatic ThreadGoalMutationOrigin = "automatic"
+)
+
+var validThreadGoalMutationOrigins = map[ThreadGoalMutationOrigin]struct{}{ThreadGoalMutationOriginUser: {}, ThreadGoalMutationOriginAutomatic: {}}
+
+func (v ThreadGoalMutationOrigin) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("ThreadGoalMutationOrigin", v, validThreadGoalMutationOrigins)
+}
+func (v *ThreadGoalMutationOrigin) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "ThreadGoalMutationOrigin", validThreadGoalMutationOrigins, v)
+}
+
 type ThreadGoalClearResponse struct {
 	Cleared bool `json:"cleared"`
 }

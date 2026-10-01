@@ -69,6 +69,7 @@ type ThreadStartResponse struct {
 	Sandbox            SandboxPolicyWrapper  `json:"sandbox"`
 	ServiceTier        *ServiceTier          `json:"serviceTier,omitempty"`
 	Thread             Thread                `json:"thread"`
+	DisabledPluginIDs  []string              `json:"disabledPluginIds,omitempty"`
 }
 
 func (r *ThreadStartResponse) UnmarshalJSON(data []byte) error {
@@ -158,8 +159,16 @@ func (s *ThreadService) Start(ctx context.Context, params ThreadStartParams) (Th
 	if err := s.client.sendRequest(ctx, methodThreadStart, params, &response); err != nil {
 		return ThreadStartResponse{}, err
 	}
+	response.Thread = threadWithDisabledPlugins(response.Thread, response.DisabledPluginIDs)
 	s.client.cacheThreadState(response.Thread)
 	return response, nil
+}
+
+func threadWithDisabledPlugins(thread Thread, pluginIDs []string) Thread {
+	// A lifecycle response is authoritative even when the list defaults to empty.
+	// Keep it non-nil to distinguish it from Thread-only responses without settings.
+	thread.DisabledPluginIDs = append([]string{}, pluginIDs...)
+	return thread
 }
 
 // ThreadReadParams are parameters for reading a thread
@@ -378,6 +387,8 @@ type ThreadResumeResponse struct {
 	Sandbox              SandboxPolicyWrapper  `json:"sandbox"`
 	ServiceTier          *ServiceTier          `json:"serviceTier,omitempty"`
 	Thread               Thread                `json:"thread"`
+	DisabledPluginIDs    []string              `json:"disabledPluginIds,omitempty"`
+	CollaborationMode    *CollaborationMode    `json:"collaborationMode,omitempty"`
 }
 
 func (r *ThreadResumeResponse) UnmarshalJSON(data []byte) error {
@@ -417,6 +428,7 @@ func (s *ThreadService) Resume(ctx context.Context, params ThreadResumeParams) (
 	if err := s.client.sendRequest(ctx, methodThreadResume, params, &response); err != nil {
 		return ThreadResumeResponse{}, err
 	}
+	response.Thread = threadWithDisabledPlugins(response.Thread, response.DisabledPluginIDs)
 	s.client.cacheThreadState(response.Thread)
 	return response, nil
 }
@@ -452,6 +464,7 @@ type ThreadForkResponse struct {
 	Sandbox            SandboxPolicyWrapper  `json:"sandbox"`
 	ServiceTier        *ServiceTier          `json:"serviceTier,omitempty"`
 	Thread             Thread                `json:"thread"`
+	DisabledPluginIDs  []string              `json:"disabledPluginIds,omitempty"`
 }
 
 func (r *ThreadForkResponse) UnmarshalJSON(data []byte) error {
@@ -491,6 +504,7 @@ func (s *ThreadService) Fork(ctx context.Context, params ThreadForkParams) (Thre
 	if err := s.client.sendRequest(ctx, methodThreadFork, params, &response); err != nil {
 		return ThreadForkResponse{}, err
 	}
+	response.Thread = threadWithDisabledPlugins(response.Thread, response.DisabledPluginIDs)
 	s.client.cacheThreadState(response.Thread)
 	return response, nil
 }

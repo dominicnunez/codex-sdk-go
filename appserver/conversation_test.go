@@ -99,6 +99,11 @@ func TestConversationMultiTurn(t *testing.T) {
 
 func TestConversationThreadReflectsLatestCachedThreadState(t *testing.T) {
 	proc, mock := mockProcess(t)
+	start := validProcessThreadStartResponse(validProcessThreadPayload("thread-1"))
+	start["disabledPluginIds"] = []string{"plugin-1", "plugin-2"}
+	if err := mock.SetResponseData("thread/start", start); err != nil {
+		t.Fatal(err)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -172,8 +177,19 @@ func TestConversationThreadReflectsLatestCachedThreadState(t *testing.T) {
 	thread.Name = codex.Ptr("mutated")
 	thread.Path = codex.Ptr("/mutated")
 	thread.GitInfo.Branch = codex.Ptr("mutated")
+	if len(thread.DisabledPluginIDs) != 2 {
+		t.Fatalf("Thread().DisabledPluginIDs = %v, want two plugins", thread.DisabledPluginIDs)
+	}
+	thread.DisabledPluginIDs[0] = "mutated"
 
 	latest := conv.Thread()
+	if len(latest.DisabledPluginIDs) != 2 || latest.DisabledPluginIDs[0] != "plugin-1" || latest.DisabledPluginIDs[1] != "plugin-2" {
+		t.Fatalf("snapshot mutation changed disabled plugins: %v", latest.DisabledPluginIDs)
+	}
+	cached, ok := proc.Client.ThreadStateSnapshot(conv.ThreadID())
+	if !ok || len(cached.DisabledPluginIDs) != 2 || cached.DisabledPluginIDs[0] != "plugin-1" {
+		t.Fatalf("snapshot mutation changed client cache: %v", cached.DisabledPluginIDs)
+	}
 	if latest.Name == nil || *latest.Name != threadName {
 		t.Fatalf("latest Thread().Name = %v, want %q", latest.Name, threadName)
 	}

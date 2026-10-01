@@ -143,15 +143,17 @@ func (s *McpServerInfo) UnmarshalJSON(data []byte) error {
 
 type McpServerStatus struct {
 	// ToolsError reports discovery failure when no catalog was returned.
-	ToolsError        *string                    `json:"toolsError,omitempty"`
-	PluginID          *string                    `json:"pluginId,omitempty"`
-	ServerInfo        *McpServerInfo             `json:"serverInfo,omitempty"`
-	RuntimeStatus     *McpServerConnectionStatus `json:"runtimeStatus,omitempty"`
-	AuthStatus        McpAuthStatus              `json:"authStatus"`
-	Name              string                     `json:"name"`
-	ResourceTemplates []ResourceTemplate         `json:"resourceTemplates"`
-	Resources         []Resource                 `json:"resources"`
-	Tools             map[string]Tool            `json:"tools"`
+	ToolsError         *string                    `json:"toolsError,omitempty"`
+	PluginID           *string                    `json:"pluginId,omitempty"`
+	ServerInfo         *McpServerInfo             `json:"serverInfo,omitempty"`
+	RuntimeStatus      *McpServerConnectionStatus `json:"runtimeStatus,omitempty"`
+	HTTPOrigin         *string                    `json:"httpOrigin,omitempty"`
+	ServerCapabilities json.RawMessage            `json:"serverCapabilities,omitempty"`
+	AuthStatus         McpAuthStatus              `json:"authStatus"`
+	Name               string                     `json:"name"`
+	ResourceTemplates  []ResourceTemplate         `json:"resourceTemplates"`
+	Resources          []Resource                 `json:"resources"`
+	Tools              map[string]Tool            `json:"tools"`
 }
 
 func (s *McpServerStatus) UnmarshalJSON(data []byte) error {
@@ -169,10 +171,11 @@ func (s *McpServerStatus) UnmarshalJSON(data []byte) error {
 
 // ListMcpServerStatusParams are parameters for the mcpServerStatus/list request.
 type ListMcpServerStatusParams struct {
-	Cursor   *string                `json:"cursor,omitempty"`
-	Detail   *McpServerStatusDetail `json:"detail,omitempty"`
-	Limit    *uint32                `json:"limit,omitempty"`
-	ThreadID *string                `json:"threadId,omitempty"`
+	Cursor     *string                `json:"cursor,omitempty"`
+	Detail     *McpServerStatusDetail `json:"detail,omitempty"`
+	Limit      *uint32                `json:"limit,omitempty"`
+	ThreadID   *string                `json:"threadId,omitempty"`
+	ServerName *string                `json:"serverName,omitempty"`
 }
 
 func (p ListMcpServerStatusParams) prepareRequest() (interface{}, error) {
@@ -212,7 +215,8 @@ type McpServerOauthLoginParams struct {
 
 // McpServerOauthLoginResponse is the response from mcpServer/oauth/login.
 type McpServerOauthLoginResponse struct {
-	AuthorizationUrl string `json:"authorizationUrl"`
+	AuthorizationUrl string  `json:"authorizationUrl"`
+	LoginID          *string `json:"loginId,omitempty"`
 }
 
 func (r *McpServerOauthLoginResponse) UnmarshalJSON(data []byte) error {
@@ -233,11 +237,18 @@ type McpServerRefreshResponse struct{}
 
 // McpResourceReadParams reads a resource from an MCP server.
 type McpResourceReadParams struct {
-	ConnectorID  *string `json:"connectorId,omitempty"`
-	OriginCallID *string `json:"originCallId,omitempty"`
-	Server       string  `json:"server"`
-	ThreadID     *string `json:"threadId,omitempty"`
-	URI          string  `json:"uri"`
+	ConnectorID  *string                `json:"connectorId,omitempty"`
+	OriginCallID *string                `json:"originCallId,omitempty"`
+	Server       string                 `json:"server"`
+	ThreadID     *string                `json:"threadId,omitempty"`
+	URI          string                 `json:"uri"`
+	Target       *McpResourceReadTarget `json:"target,omitempty"`
+}
+
+// McpResourceReadTarget selects a hosted connector account for a resource read.
+type McpResourceReadTarget struct {
+	ConnectorID string  `json:"connectorId"`
+	LinkID      *string `json:"linkId"`
 }
 
 // ResourceContent is one content item returned from an MCP resource read.
@@ -345,6 +356,7 @@ type McpServerOauthLoginCompletedNotification struct {
 	Success  bool    `json:"success"`
 	Error    *string `json:"error,omitempty"`
 	ThreadID *string `json:"threadId,omitempty"`
+	LoginID  *string `json:"loginId,omitempty"`
 }
 
 func (n *McpServerOauthLoginCompletedNotification) UnmarshalJSON(data []byte) error {
