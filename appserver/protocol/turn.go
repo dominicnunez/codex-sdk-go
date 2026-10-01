@@ -458,9 +458,7 @@ func UnmarshalUserInput(data []byte) (UserInput, error) {
 		return &input, nil
 	case "image":
 		var input ImageUserInput
-		if err := validateRequiredTaggedObjectFields(data, "url"); err != nil {
-			return nil, err
-		}
+		// ImageUserInput validates either a URL or a file ID.
 		if err := json.Unmarshal(data, &input); err != nil {
 			return nil, err
 		}
