@@ -112,6 +112,31 @@ func TestInitializeExplicitGatewayOAuthAffectsIdentity(t *testing.T) {
 	}
 }
 
+func TestThreadItemsAnchorInjectsDiscriminator(t *testing.T) {
+	transport := NewMockTransport()
+	client := codex.NewClient(transport)
+	t.Cleanup(func() { _ = client.Close() })
+	transport.SetResponse("thread/items/list", codex.Response{Result: json.RawMessage(`{"data":[]}`)})
+	turnID := "turn-1"
+	_, err := client.Thread.ItemsList(context.Background(), codex.ThreadItemsListParams{
+		ThreadID: "thread-1", TurnID: &turnID, CursorAnchor: &codex.ThreadItemsListAnchor{ItemID: "item-1"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var params map[string]json.RawMessage
+	if err := json.Unmarshal(transport.GetSentRequest(0).Params, &params); err != nil {
+		t.Fatal(err)
+	}
+	if string(params["cursor"]) != `{"type":"item","itemId":"item-1"}` {
+		t.Fatalf("cursor = %s", params["cursor"])
+	}
+	_, err = client.Thread.ItemsList(context.Background(), codex.ThreadItemsListParams{ThreadID: "thread-1", CursorAnchor: &codex.ThreadItemsListAnchor{ItemID: "item-1"}})
+	if err == nil {
+		t.Fatal("expected anchor without turnId to fail")
+	}
+}
+
 func containsJSONField(t *testing.T, data []byte, field string) bool {
 	t.Helper()
 	var object map[string]json.RawMessage

@@ -87,8 +87,17 @@ func (p ThreadItemsListParams) MarshalJSON() ([]byte, error) {
 
 // ThreadItemsListAnchor identifies an exclusive item position in a visible turn.
 type ThreadItemsListAnchor struct {
-	Type   string `json:"type"`
 	ItemID string `json:"itemId"`
+}
+
+func (a ThreadItemsListAnchor) MarshalJSON() ([]byte, error) {
+	if a.ItemID == "" {
+		return nil, errors.New("thread items anchor requires itemId")
+	}
+	return json.Marshal(struct {
+		Type   string `json:"type"`
+		ItemID string `json:"itemId"`
+	}{Type: "item", ItemID: a.ItemID})
 }
 
 // ThreadItemsListCursor supports either an opaque continuation token or an item anchor.
@@ -98,6 +107,17 @@ func (p ThreadItemsListParams) prepareRequest() (interface{}, error) {
 	}
 	if err := validateOptionalEnumValue("sortDirection", p.SortDirection, validSortDirections); err != nil {
 		return nil, err
+	}
+	if p.Cursor != nil && p.CursorAnchor != nil {
+		return nil, invalidParamsError("cursor and cursor anchor are mutually exclusive")
+	}
+	if p.CursorAnchor != nil {
+		if p.TurnID == nil || *p.TurnID == "" {
+			return nil, invalidParamsError("cursor anchor requires turnId")
+		}
+		if p.CursorAnchor.ItemID == "" {
+			return nil, invalidParamsError("cursor anchor requires itemId")
+		}
 	}
 	return p, nil
 }
