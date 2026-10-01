@@ -869,11 +869,11 @@ func TestEnqueueTurnScopedNotificationQueueLimitClosesTransport(t *testing.T) {
 	}
 	transport.enqueueTurnScopedNotification(Notification{Method: notifyTurnCompleted}, "thread-overflow")
 
-	if got := len(transport.turnNotifQueues); got != maxTurnScopedNotificationQueues {
-		t.Fatalf("tracked turn-scoped queues = %d, want %d", got, maxTurnScopedNotificationQueues)
+	if got := len(transport.turnNotifQueues); got != 0 {
+		t.Fatalf("stopped transport retained %d turn-scoped queues", got)
 	}
-	if got := len(transport.turnNotifReady); got != maxTurnScopedNotificationQueues {
-		t.Fatalf("ready turn-scoped queues = %d, want %d", got, maxTurnScopedNotificationQueues)
+	if got := len(transport.turnNotifReady); got != 0 {
+		t.Fatalf("stopped transport retained %d ready queues", got)
 	}
 
 	if !errors.Is(transport.ScanErr(), errTurnScopedNotificationQueueLimit) {

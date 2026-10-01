@@ -39,8 +39,19 @@ func (t *StdioTransport) wakeTurnScopedNotificationWorkers() {
 
 func (t *StdioTransport) stopTurnScopedNotificationWorkers() {
 	t.initTurnScopedScheduler()
-	t.turnNotifReadyMu.Lock()
 	t.turnNotifStopped.Store(true)
+	t.turnNotifQueuesMu.Lock()
+	for _, queue := range t.turnNotifQueues {
+		queue.mu.Lock()
+		queue.queue = nil
+		queue.scheduled = false
+		queue.mu.Unlock()
+	}
+	clear(t.turnNotifQueues)
+	t.orderedNotifCount = 0
+	t.turnNotifQueuesMu.Unlock()
+	t.turnNotifReadyMu.Lock()
+	t.turnNotifReady = nil
 	t.turnNotifReadyCond.Broadcast()
 	t.turnNotifReadyMu.Unlock()
 }
@@ -119,6 +130,10 @@ func (t *StdioTransport) nextTurnScopedNotificationQueue() (*turnScopedNotificat
 
 func (t *StdioTransport) scheduleTurnScopedNotificationQueue(queue *turnScopedNotificationQueue) {
 	t.turnNotifReadyMu.Lock()
+	if t.turnNotifStopped.Load() {
+		t.turnNotifReadyMu.Unlock()
+		return
+	}
 	t.turnNotifReady = append(t.turnNotifReady, queue)
 	t.turnNotifReadyMu.Unlock()
 	t.turnNotifReadyCond.Signal()
@@ -157,6 +172,10 @@ func (t *StdioTransport) enqueueTurnScopedNotification(notif Notification, threa
 	}
 
 	t.turnNotifQueuesMu.Lock()
+	if t.turnNotifStopped.Load() {
+		t.turnNotifQueuesMu.Unlock()
+		return
+	}
 	queue := t.turnNotifQueues[threadKey]
 	if queue == nil {
 		if len(t.turnNotifQueues) >= maxTurnScopedNotificationQueues {
@@ -356,6 +375,8 @@ func isStreamingNotificationMethod(method string) bool {
 		protocol.NotifyCommandExecOutputDelta,
 		protocol.NotifyProcessOutputDelta:
 		return true
+	case "thread/realtime/transcript/delta", "thread/realtime/item/transcript/delta":
+		return true
 	default:
 		return false
 	}
@@ -403,6 +424,17 @@ func isProtectedNotificationMethod(method string) bool {
 		protocol.NotifyProcessExited,
 		protocol.NotifyItemGuardianApprovalReviewStarted,
 		protocol.NotifyItemGuardianApprovalReviewCompleted:
+		return true
+	case protocol.NotifyFileChangePatchUpdated,
+		"thread/deleted", "thread/reverted", "thread/goal/updated", "thread/goal/cleared",
+		"thread/queue/changed", "thread/project/updated",
+		"thread/environment/connected", "thread/environment/disconnected",
+		"thread/realtime/sdp", "thread/realtime/transcript/done",
+		"thread/realtime/item/started", "thread/realtime/item/completed",
+		"autoApprovalReview/strictReviewRequired", "turn/moderationMetadata",
+		"model/verification", "model/safetyBuffering/updated",
+		"modelProvider/authRecoveryStarted", "modelProvider/authRecoveryCompleted",
+		"mcpServer/startupStatus/updated", "warning", "guardianWarning":
 		return true
 	default:
 		return false

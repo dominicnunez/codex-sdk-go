@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"reflect"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -62,6 +64,12 @@ func TestStdioOrdersNotificationsWithinScope(t *testing.T) {
 		}},
 		{"case-sensitive search identity", Notification{Method: protocol.NotifyFuzzyFileSearchSessionUpdated, Params: json.RawMessage(`{"sessionId":"a","SessionID":"other"}`)}, []Notification{
 			{Method: protocol.NotifyFuzzyFileSearchSessionCompleted, Params: json.RawMessage(`{"sessionId":"a"}`)},
+		}},
+		{"optional MCP global owner", Notification{Method: protocol.NotifyMcpServerOauthLoginCompleted, Params: json.RawMessage(`{"name":"server","success":true}`)}, []Notification{
+			{Method: protocol.NotifyMcpServerOauthLoginCompleted, Params: json.RawMessage(`{"name":"server","success":false,"threadId":null}`)},
+		}},
+		{"optional warning global owner", Notification{Method: "warning", Params: json.RawMessage(`{"message":"first","ThreadID":"other"}`)}, []Notification{
+			{Method: "warning", Params: json.RawMessage(`{"message":"second","threadId":null}`)},
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -335,8 +343,8 @@ func TestOrderedAggregateBacklogIsBounded(t *testing.T) {
 	if !errors.Is(tr.ScanErr(), errTurnScopedNotificationQueueOverflow) {
 		t.Fatalf("aggregate overflow = %v", tr.ScanErr())
 	}
-	if tr.orderedNotifCount != maxOrderedNotificationBacklog {
-		t.Fatalf("queued events = %d", tr.orderedNotifCount)
+	if tr.orderedNotifCount != 0 {
+		t.Fatalf("overflow retained %d queued events", tr.orderedNotifCount)
 	}
 }
 
@@ -420,6 +428,137 @@ func TestCloseRejectsOrderedQueueSelectedBeforeEOF(t *testing.T) {
 	tr.handleTurnScopedNotificationQueue(queue)
 	if handled.Load() != 0 {
 		t.Fatal("selected queued callback started after explicit Close")
+	}
+}
+
+func TestStdioCloseReleasesOrderedPayloads(t *testing.T) {
+	for _, active := range []bool{false, true} {
+		t.Run(fmt.Sprint(active), func(t *testing.T) {
+			r, w := io.Pipe()
+			tr := NewStdioTransport(r, io.Discard)
+			t.Cleanup(func() { _ = tr.Close(); _ = w.Close() })
+			entered, release := make(chan struct{}), make(chan struct{})
+			var releaseOnce sync.Once
+			unblock := func() { releaseOnce.Do(func() { close(release) }) }
+			t.Cleanup(unblock)
+			if active {
+				tr.OnNotify(func(context.Context, Notification) { close(entered); <-release })
+			}
+			writeAuditNotification(t, w, Notification{Method: protocol.NotifyAgentMessageDelta, Params: json.RawMessage(`{"threadId":"a","delta":"first"}`)})
+			if active {
+				waitAuditSignal(t, entered)
+			}
+			for range 10 {
+				writeAuditNotification(t, w, Notification{Method: protocol.NotifyTurnCompleted, Params: json.RawMessage(`{"threadId":"a","payload":"retained"}`)})
+			}
+			_ = w.Close()
+			waitAuditSignal(t, tr.ReaderStopped())
+			tr.turnNotifQueuesMu.Lock()
+			queue := tr.turnNotifQueues["thread:a"]
+			tr.turnNotifQueuesMu.Unlock()
+			_ = tr.Close()
+			tr.turnNotifQueuesMu.Lock()
+			if len(tr.turnNotifQueues) != 0 || tr.orderedNotifCount != 0 {
+				t.Errorf("Close retained %d queues and %d events", len(tr.turnNotifQueues), tr.orderedNotifCount)
+			}
+			tr.turnNotifQueuesMu.Unlock()
+			tr.turnNotifReadyMu.Lock()
+			if len(tr.turnNotifReady) != 0 {
+				t.Errorf("Close retained %d ready owners", len(tr.turnNotifReady))
+			}
+			tr.turnNotifReadyMu.Unlock()
+			queue.mu.Lock()
+			if queue.queue != nil || queue.scheduled {
+				t.Error("Close retained queued payload ownership")
+			}
+			queue.mu.Unlock()
+			unblock()
+		})
+	}
+}
+
+func TestStdioOrdersAllSchemaThreadNotifications(t *testing.T) {
+	data, err := os.ReadFile("../protocol/schema/json/ServerNotification.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var schema struct {
+		Definitions map[string]struct {
+			Properties map[string]json.RawMessage `json:"properties"`
+		} `json:"definitions"`
+		Events []struct {
+			Properties struct {
+				Method struct {
+					Values []string `json:"enum"`
+				} `json:"method"`
+				Params struct {
+					Ref string `json:"$ref"`
+				} `json:"params"`
+			} `json:"properties"`
+		} `json:"oneOf"`
+	}
+	if err := json.Unmarshal(data, &schema); err != nil {
+		t.Fatal(err)
+	}
+	if len(schema.Events) == 0 {
+		t.Fatal("schema notification inventory is empty")
+	}
+	for _, event := range schema.Events {
+		definition, exists := schema.Definitions[strings.TrimPrefix(event.Properties.Params.Ref, "#/definitions/")]
+		if !exists || len(event.Properties.Method.Values) != 1 {
+			t.Fatal("unsupported schema notification shape")
+		}
+		if _, owned := definition.Properties["threadId"]; !owned {
+			continue
+		}
+		method := event.Properties.Method.Values[0]
+		t.Run(method, func(t *testing.T) {
+			r, w := io.Pipe()
+			tr := NewStdioTransport(r, io.Discard)
+			t.Cleanup(func() { _ = tr.Close(); _ = w.Close() })
+			entered, release := make(chan struct{}), make(chan struct{})
+			var releaseOnce sync.Once
+			unblock := func() { releaseOnce.Do(func() { close(release) }) }
+			t.Cleanup(unblock)
+			seen := make(chan int, 2)
+			var first atomic.Bool
+			barrier := make(chan struct{})
+			tr.OnNotify(func(_ context.Context, n Notification) {
+				if n.Method == protocol.NotifyConfigWarning {
+					close(barrier)
+					return
+				}
+				var payload struct {
+					Sequence int `json:"sequence"`
+				}
+				if err := json.Unmarshal(n.Params, &payload); err != nil {
+					t.Error(err)
+				}
+				if first.CompareAndSwap(false, true) {
+					close(entered)
+					<-release
+				}
+				seen <- payload.Sequence
+			})
+			// The schema selects methods and their owned key independently of
+			// the dispatch lists. Payload validation remains the typed client's job.
+			writeAuditNotification(t, w, Notification{Method: method, Params: json.RawMessage(`{"threadId":"a","ThreadID":"other","sequence":1}`)})
+			waitAuditSignal(t, entered)
+			writeAuditNotification(t, w, Notification{Method: protocol.NotifyTurnCompleted, Params: json.RawMessage(`{"threadId":"a","sequence":2}`)})
+			writeAuditNotification(t, w, Notification{Method: protocol.NotifyConfigWarning, Params: json.RawMessage(`{}`)})
+			waitAuditSignal(t, barrier)
+			unblock()
+			for _, want := range []int{1, 2} {
+				select {
+				case got := <-seen:
+					if got != want {
+						t.Fatalf("schema-owned event = %d; want %d", got, want)
+					}
+				case <-time.After(2 * time.Second):
+					t.Fatal("schema-owned event lost")
+				}
+			}
+		})
 	}
 }
 

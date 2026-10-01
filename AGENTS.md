@@ -36,6 +36,12 @@ This SDK uses **stdlib only** — no external dependencies. Do NOT introduce any
 ### Notification Handlers
 Register via `client.On<EventName>(func(notif <Type>))`. Client dispatches incoming notifications to registered handlers by method name.
 
+For transport ordering or delivery changes, derive the affected inventory from
+`ServerNotification.json` and typed handlers, including methods outside existing
+priority switches. Check that transport, typed and malformed fallback decoders
+agree on owner identity. Verify that shutdown releases queued payloads as well
+as preventing further callback admission.
+
 ### Approval Flow
 Server→client requests for user approval (command exec, file write, etc.) flow through `Transport.OnRequest`. Each approval type has `*Params` and `*Response` types matching specs.
 

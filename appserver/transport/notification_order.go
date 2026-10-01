@@ -53,7 +53,17 @@ func orderedNotificationKey(notif Notification) string {
 		return ""
 	}
 	var id string
-	if err := json.Unmarshal(fields[field], &id); err != nil || id == "" {
+	raw, exists := fields[field]
+	if !exists && hasOptionalThreadOwner(notif.Method) {
+		return "method:" + notif.Method
+	}
+	if err := json.Unmarshal(raw, &id); err != nil {
+		return ""
+	}
+	if id == "" {
+		if hasOptionalThreadOwner(notif.Method) {
+			return "method:" + notif.Method
+		}
 		return ""
 	}
 	return kind + ":" + id
@@ -62,9 +72,21 @@ func orderedNotificationKey(notif Notification) string {
 func isThreadNotificationMethod(method string) bool {
 	switch method {
 	case protocol.NotifyError, protocol.NotifyServerRequestResolved, protocol.NotifyModelRerouted,
-		protocol.NotifyHookStarted, protocol.NotifyHookCompleted:
+		protocol.NotifyHookStarted, protocol.NotifyHookCompleted, protocol.NotifyMcpServerOauthLoginCompleted,
+		"mcpServer/startupStatus/updated", "warning", "guardianWarning",
+		"autoApprovalReview/strictReviewRequired", "model/verification", "model/safetyBuffering/updated",
+		"modelProvider/authRecoveryStarted", "modelProvider/authRecoveryCompleted":
 		return true
 	default:
 		return strings.HasPrefix(method, "thread/") || strings.HasPrefix(method, "turn/") || strings.HasPrefix(method, "item/")
+	}
+}
+
+func hasOptionalThreadOwner(method string) bool {
+	switch method {
+	case protocol.NotifyMcpServerOauthLoginCompleted, "mcpServer/startupStatus/updated", "warning":
+		return true
+	default:
+		return false
 	}
 }
