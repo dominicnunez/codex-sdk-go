@@ -404,6 +404,24 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 	verified["thread/revert"] = verifyMethod(t, transport, "thread/revert", func() {
 		_, _ = client.Thread.Revert(context.Background(), codex.ThreadRevertParams{ThreadID: "t1", BeforeTurnID: "tu1"})
 	})
+	verified["thread/attachment/add"] = verifyMethod(t, transport, "thread/attachment/add", func() {
+		_, _ = client.Thread.AttachmentAdd(context.Background(), codex.ThreadAttachmentAddParams{ThreadID: "t1", AttachmentType: "test", IdentityKey: "k", Payload: json.RawMessage(`null`)})
+	})
+	verified["thread/attachment/list"] = verifyMethod(t, transport, "thread/attachment/list", func() {
+		_, _ = client.Thread.AttachmentList(context.Background(), codex.ThreadAttachmentListParams{ThreadID: "t1"})
+	})
+	verified["thread/attachment/remove"] = verifyMethod(t, transport, "thread/attachment/remove", func() {
+		_, _ = client.Thread.AttachmentRemove(context.Background(), codex.ThreadAttachmentRemoveParams{ThreadID: "t1", AttachmentType: "test", IdentityKey: "k"})
+	})
+	verified["account/gatewayOAuth/read"] = verifyMethod(t, transport, "account/gatewayOAuth/read", func() {
+		_, _ = client.Account.GatewayOAuthRead(context.Background())
+	})
+	verified["account/gatewayOAuth/login"] = verifyMethod(t, transport, "account/gatewayOAuth/login", func() {
+		_, _ = client.Account.GatewayOAuthLogin(context.Background())
+	})
+	verified["account/gatewayOAuth/cancel"] = verifyMethod(t, transport, "account/gatewayOAuth/cancel", func() {
+		_, _ = client.Account.GatewayOAuthCancel(context.Background())
+	})
 	verified["plugin/reconcile"] = verifyMethod(t, transport, "plugin/reconcile", func() {
 		_, _ = client.Plugin.Reconcile(context.Background(), codex.PluginReconcileParams{})
 	})

@@ -569,8 +569,6 @@ func testStructFields(t *testing.T) {
 		{"schema/json/v2/ThreadForkResponse.json", reflect.TypeOf(ThreadForkResponse{})},
 		{"schema/json/v2/ThreadMetadataUpdateParams.json", reflect.TypeOf(ThreadMetadataUpdateParams{})},
 		{"schema/json/v2/ThreadMetadataUpdateResponse.json", reflect.TypeOf(ThreadMetadataUpdateResponse{})},
-		{"schema/json/v2/ThreadRollbackParams.json", reflect.TypeOf(ThreadRollbackParams{})},
-		{"schema/json/v2/ThreadRollbackResponse.json", reflect.TypeOf(ThreadRollbackResponse{})},
 		{"schema/json/v2/ThreadSetNameParams.json", reflect.TypeOf(ThreadSetNameParams{})},
 		{"schema/json/v2/ThreadSetNameResponse.json", reflect.TypeOf(ThreadSetNameResponse{})},
 		{"schema/json/v2/ThreadArchiveParams.json", reflect.TypeOf(ThreadArchiveParams{})},
@@ -838,7 +836,7 @@ func testEnumValues(t *testing.T) {
 			specPath: "schema/json/v2/AccountRateLimitsUpdatedNotification.json",
 			defName:  "PlanType",
 			goValues: enumStrings(
-				PlanTypeFree, PlanTypeGo, PlanTypePlus, PlanTypePro, PlanTypeProLite,
+				PlanTypeFree, PlanTypeGo, PlanTypePlus, PlanTypePro, PlanTypePromax, PlanTypeProLite,
 				PlanTypeTeam, PlanTypeBusiness, PlanTypeEnterprise,
 				PlanTypeEdu, PlanTypeSelfServeBusinessUsageBased,
 				PlanTypeEnterpriseCBPUsageBased, PlanTypeSelfServeBusinessProLite,
@@ -850,7 +848,7 @@ func testEnumValues(t *testing.T) {
 			specPath: "schema/json/v2/AccountUpdatedNotification.json",
 			defName:  "PlanType",
 			goValues: enumStrings(
-				PlanTypeFree, PlanTypeGo, PlanTypePlus, PlanTypePro, PlanTypeProLite,
+				PlanTypeFree, PlanTypeGo, PlanTypePlus, PlanTypePro, PlanTypePromax, PlanTypeProLite,
 				PlanTypeTeam, PlanTypeBusiness, PlanTypeEnterprise,
 				PlanTypeEdu, PlanTypeSelfServeBusinessUsageBased,
 				PlanTypeEnterpriseCBPUsageBased, PlanTypeSelfServeBusinessProLite,

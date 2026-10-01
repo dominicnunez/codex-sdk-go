@@ -12,7 +12,7 @@ func TestPaginatedHistoryItemsAndTurns(t *testing.T) {
 	transport := NewMockTransport()
 	client := codex.NewClient(transport)
 	t.Cleanup(func() { _ = client.Close() })
-	transport.SetResponse("thread/items/list", codex.Response{Result: json.RawMessage(`{"data":[{"turnId":"tu1","item":{"type":"agentMessage","id":"i1","text":"hello"}}],"nextCursor":"next-item","backwardsCursor":"back-item"}`)})
+	transport.SetResponse("thread/items/list", codex.Response{Result: json.RawMessage(`{"data":[{"turnId":"tu1","startedAtMs":1,"item":{"type":"agentMessage","id":"i1","text":"hello"}}],"nextCursor":"next-item","backwardsCursor":"back-item"}`)})
 	sortDirection := codex.SortDirectionDesc
 	items, err := client.Thread.ItemsList(context.Background(), codex.ThreadItemsListParams{
 		ThreadID: "t1", TurnID: strPtr("tu1"), Cursor: strPtr("anchor"), Limit: codex.Ptr(uint32(0)), SortDirection: &sortDirection,

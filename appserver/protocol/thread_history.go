@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"encoding/json"
+	"errors"
 )
 
 const (
@@ -54,13 +55,43 @@ func (v *TurnItemsView) UnmarshalJSON(data []byte) error {
 
 // ThreadItemsListParams selects a page of items, optionally restricted to one turn.
 type ThreadItemsListParams struct {
-	ThreadID      string         `json:"threadId"`
-	TurnID        *string        `json:"turnId,omitempty"`
-	Cursor        *string        `json:"cursor,omitempty"`
-	Limit         *uint32        `json:"limit,omitempty"`
-	SortDirection *SortDirection `json:"sortDirection,omitempty"`
+	ThreadID string  `json:"threadId"`
+	TurnID   *string `json:"turnId,omitempty"`
+	Cursor   *string `json:"cursor,omitempty"`
+	// CursorAnchor selects an item-relative position. It is mutually exclusive with Cursor.
+	CursorAnchor  *ThreadItemsListAnchor `json:"-"`
+	Limit         *uint32                `json:"limit,omitempty"`
+	SortDirection *SortDirection         `json:"sortDirection,omitempty"`
 }
 
+func (p ThreadItemsListParams) MarshalJSON() ([]byte, error) {
+	if p.Cursor != nil && p.CursorAnchor != nil {
+		return nil, errors.New("cursor and cursor anchor are mutually exclusive")
+	}
+	type wire struct {
+		ThreadID      string         `json:"threadId"`
+		TurnID        *string        `json:"turnId,omitempty"`
+		Cursor        interface{}    `json:"cursor,omitempty"`
+		Limit         *uint32        `json:"limit,omitempty"`
+		SortDirection *SortDirection `json:"sortDirection,omitempty"`
+	}
+	var cursor interface{}
+	if p.Cursor != nil {
+		cursor = *p.Cursor
+	}
+	if p.CursorAnchor != nil {
+		cursor = p.CursorAnchor
+	}
+	return json.Marshal(wire{p.ThreadID, p.TurnID, cursor, p.Limit, p.SortDirection})
+}
+
+// ThreadItemsListAnchor identifies an exclusive item position in a visible turn.
+type ThreadItemsListAnchor struct {
+	Type   string `json:"type"`
+	ItemID string `json:"itemId"`
+}
+
+// ThreadItemsListCursor supports either an opaque continuation token or an item anchor.
 func (p ThreadItemsListParams) prepareRequest() (interface{}, error) {
 	if err := validateThreadScopedRequest(p.ThreadID); err != nil {
 		return nil, err
@@ -73,12 +104,14 @@ func (p ThreadItemsListParams) prepareRequest() (interface{}, error) {
 
 // ThreadItemEntry associates a history item with its containing turn.
 type ThreadItemEntry struct {
-	Item   ThreadItemWrapper `json:"item"`
-	TurnID string            `json:"turnId"`
+	Item          ThreadItemWrapper `json:"item"`
+	TurnID        string            `json:"turnId"`
+	StartedAtMs   int64             `json:"startedAtMs"`
+	CompletedAtMs *int64            `json:"completedAtMs,omitempty"`
 }
 
 func (e *ThreadItemEntry) UnmarshalJSON(data []byte) error {
-	if err := validateRequiredObjectFields(data, "item", "turnId"); err != nil {
+	if err := validateRequiredObjectFields(data, "item", "startedAtMs", "turnId"); err != nil {
 		return err
 	}
 	type wire ThreadItemEntry

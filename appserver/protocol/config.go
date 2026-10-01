@@ -441,6 +441,7 @@ type ConfigRequirementsReadResponse struct {
 
 // ConfigRequirements represents configuration requirements
 type ConfigRequirements struct {
+	AllowedLoginMethods                  json.RawMessage           `json:"allowedLoginMethods,omitempty"`
 	AdditionalDeveloperInstructions      *string                   `json:"additionalDeveloperInstructions,omitempty"`
 	AllowBrowserAndComputerUse           *bool                     `json:"allowBrowserAndComputerUse,omitempty"`
 	InAppBrowser                         *InAppBrowserRequirements `json:"inAppBrowser,omitempty"`
@@ -466,6 +467,8 @@ type ConfigRequirements struct {
 	LogDir                               *string                   `json:"logDir,omitempty"`
 	ModelCatalogJSON                     *string                   `json:"modelCatalogJson,omitempty"`
 	Models                               json.RawMessage           `json:"models,omitempty"`
+	ModelProvider                        *string                   `json:"modelProvider,omitempty"`
+	ModelProviders                       json.RawMessage           `json:"modelProviders,omitempty"`
 	SQLiteHome                           *string                   `json:"sqliteHome,omitempty"`
 	WindowsSandboxPrivateDesktop         *bool                     `json:"windowsSandboxPrivateDesktop,omitempty"`
 }

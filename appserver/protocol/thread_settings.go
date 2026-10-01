@@ -30,6 +30,7 @@ type ThreadSettings struct {
 	SandboxPolicy           SandboxPolicyWrapper     `json:"sandboxPolicy"`
 	ServiceTier             *string                  `json:"serviceTier,omitempty"`
 	Summary                 *ReasoningSummaryWrapper `json:"summary,omitempty"`
+	DisabledPluginIDs       []string                 `json:"disabledPluginIds,omitempty"`
 }
 
 func (s *ThreadSettings) UnmarshalJSON(data []byte) error {

@@ -65,7 +65,20 @@ type Model struct {
 	// Availability nux message for the model.
 	AvailabilityNux *ModelAvailabilityNux `json:"availabilityNux,omitempty"`
 	// Upgrade information for the model.
-	UpgradeInfo *ModelUpgradeInfo `json:"upgradeInfo,omitempty"`
+	UpgradeInfo             *ModelUpgradeInfo    `json:"upgradeInfo,omitempty"`
+	AvailableAccessPrograms *ModelAccessPrograms `json:"availableAccessPrograms,omitempty"`
+}
+
+type CyberAccessProgram string
+
+const (
+	CyberAccessProgramStandard     CyberAccessProgram = "standard"
+	CyberAccessProgramDaybreakBlue CyberAccessProgram = "daybreakBlue"
+	CyberAccessProgramDaybreakRed  CyberAccessProgram = "daybreakRed"
+)
+
+type ModelAccessPrograms struct {
+	Cyber []CyberAccessProgram `json:"cyber"`
 }
 
 func (m *Model) UnmarshalJSON(data []byte) error {

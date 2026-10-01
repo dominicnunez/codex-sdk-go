@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"encoding/json"
+	"errors"
 )
 
 // TurnService handles turn-related operations
@@ -36,6 +37,7 @@ type TurnStartParams struct {
 	ServiceTier       *ServiceTier             `json:"serviceTier,omitempty"`
 	Summary           *ReasoningSummaryWrapper `json:"summary,omitempty"`
 	CollaborationMode *CollaborationMode       `json:"collaborationMode,omitempty"`
+	DisabledPluginIDs *[]string                `json:"disabledPluginIds,omitempty"`
 }
 
 // MarshalJSON ensures union fields use wrapper marshalers so wire payloads
@@ -59,6 +61,7 @@ func (p TurnStartParams) MarshalJSON() ([]byte, error) {
 		ServiceTier         *ServiceTier             `json:"serviceTier,omitempty"`
 		Summary             *ReasoningSummaryWrapper `json:"summary,omitempty"`
 		CollaborationMode   *CollaborationMode       `json:"collaborationMode,omitempty"`
+		DisabledPluginIDs   *[]string                `json:"disabledPluginIds,omitempty"`
 	}
 
 	wire := wireTurnStartParams{
@@ -75,6 +78,7 @@ func (p TurnStartParams) MarshalJSON() ([]byte, error) {
 		ServiceTier:         p.ServiceTier,
 		Summary:             p.Summary,
 		CollaborationMode:   p.CollaborationMode,
+		DisabledPluginIDs:   p.DisabledPluginIDs,
 	}
 	if p.ApprovalPolicy != nil {
 		wire.ApprovalPolicy = &AskForApprovalWrapper{Value: *p.ApprovalPolicy}
@@ -299,12 +303,16 @@ func (t *TextUserInput) MarshalJSON() ([]byte, error) {
 
 // ImageUserInput represents image input
 type ImageUserInput struct {
-	URL string `json:"url"`
+	URL    string  `json:"url,omitempty"`
+	FileID *string `json:"fileId,omitempty"`
 }
 
 func (i *ImageUserInput) userInput() {}
 
 func (i *ImageUserInput) MarshalJSON() ([]byte, error) {
+	if i.URL == "" && i.FileID == nil {
+		return nil, errors.New("image input requires url or fileId")
+	}
 	type Alias ImageUserInput
 	return json.Marshal(&struct {
 		Type string `json:"type"`
@@ -313,6 +321,19 @@ func (i *ImageUserInput) MarshalJSON() ([]byte, error) {
 		Type:  "image",
 		Alias: (*Alias)(i),
 	})
+}
+
+func (i *ImageUserInput) UnmarshalJSON(data []byte) error {
+	type wire ImageUserInput
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	if decoded.URL == "" && decoded.FileID == nil {
+		return errors.New("image input requires url or fileId")
+	}
+	*i = ImageUserInput(decoded)
+	return nil
 }
 
 // LocalImageUserInput represents local image input

@@ -20,6 +20,20 @@ type GetAccountResponse struct {
 	RequiresOpenaiAuth bool            `json:"requiresOpenaiAuth"`
 }
 
+type AccountRoutingOverride string
+
+const (
+	AccountRoutingOverrideNoConstraint AccountRoutingOverride = "NO_CONSTRAINT"
+	AccountRoutingOverrideUS           AccountRoutingOverride = "us"
+	AccountRoutingOverrideUSCR         AccountRoutingOverride = "us_cr"
+)
+
+type WorkspaceRouting struct {
+	AccountRoutingOverride AccountRoutingOverride `json:"accountRoutingOverride"`
+	BackendOrigin          string                 `json:"backendOrigin"`
+	ChatGPTAccountID       string                 `json:"chatgptAccountId"`
+}
+
 func (r *GetAccountResponse) UnmarshalJSON(data []byte) error {
 	if err := validateRequiredObjectFields(data, "requiresOpenaiAuth"); err != nil {
 		return err
@@ -129,6 +143,8 @@ const (
 	PlanTypeGo                          PlanType = "go"
 	PlanTypePlus                        PlanType = "plus"
 	PlanTypePro                         PlanType = "pro"
+	PlanTypeProMax                      PlanType = "promax"
+	PlanTypePromax                      PlanType = "promax"
 	PlanTypeProLite                     PlanType = "prolite"
 	PlanTypeTeam                        PlanType = "team"
 	PlanTypeBusiness                    PlanType = "business"
@@ -149,6 +165,7 @@ var validPlanTypes = map[PlanType]struct{}{
 	PlanTypeGo:                          {},
 	PlanTypePlus:                        {},
 	PlanTypePro:                         {},
+	PlanTypeProMax:                      {},
 	PlanTypeProLite:                     {},
 	PlanTypeTeam:                        {},
 	PlanTypeBusiness:                    {},

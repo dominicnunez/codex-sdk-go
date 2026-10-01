@@ -170,6 +170,21 @@ type McpToolCallThreadItem struct {
 	AppContext        *McpToolCallAppContext `json:"appContext,omitempty"`
 	PluginID          *string                `json:"pluginId,omitempty"`
 	ReadOnlyHint      *bool                  `json:"readOnlyHint,omitempty"`
+	McpAppUI          *McpAppUI              `json:"mcpAppUi,omitempty"`
+}
+
+// McpAppDisplayMode controls how an MCP app is presented.
+type McpAppDisplayMode string
+
+const (
+	McpAppDisplayModeInline     McpAppDisplayMode = "inline"
+	McpAppDisplayModeFullscreen McpAppDisplayMode = "fullscreen"
+)
+
+// McpAppUI is UI metadata captured from an invoked MCP tool descriptor.
+type McpAppUI struct {
+	PreferredModelDisplayMode McpAppDisplayMode `json:"preferredModelDisplayMode"`
+	ResourceURI               string            `json:"resourceUri"`
 }
 
 func (McpToolCallThreadItem) threadItem() {}

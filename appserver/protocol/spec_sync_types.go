@@ -289,14 +289,18 @@ func (v *ImageDetail) UnmarshalJSON(data []byte) error {
 // InputImageFunctionCallOutputContentItem follows the upstream InputImageFunctionCallOutputContentItem schema.
 type InputImageFunctionCallOutputContentItem struct {
 	Detail   *ImageDetail `json:"detail,omitempty"`
-	ImageURL string       `json:"image_url"`
+	ImageURL string       `json:"image_url,omitempty"`
+	FileID   *string      `json:"file_id,omitempty"`
 }
 
 func (v *InputImageFunctionCallOutputContentItem) UnmarshalJSON(data []byte) error {
 	type wire InputImageFunctionCallOutputContentItem
 	var decoded wire
-	if err := unmarshalInboundObject(data, &decoded, []string{"image_url"}, []string{"image_url"}); err != nil {
+	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
+	}
+	if decoded.ImageURL == "" && decoded.FileID == nil {
+		return fmt.Errorf("input image requires image_url or file_id")
 	}
 	*v = InputImageFunctionCallOutputContentItem(decoded)
 	return nil
@@ -304,6 +308,9 @@ func (v *InputImageFunctionCallOutputContentItem) UnmarshalJSON(data []byte) err
 
 func (*InputImageFunctionCallOutputContentItem) isFunctionCallOutputContentItem() {}
 func (v *InputImageFunctionCallOutputContentItem) MarshalJSON() ([]byte, error) {
+	if v.ImageURL == "" && v.FileID == nil {
+		return nil, fmt.Errorf("input image requires image_url or file_id")
+	}
 	type wire InputImageFunctionCallOutputContentItem
 	return json.Marshal(struct {
 		Type string `json:"type"`

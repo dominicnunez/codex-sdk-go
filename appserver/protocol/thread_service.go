@@ -69,6 +69,7 @@ type ThreadStartResponse struct {
 	Sandbox            SandboxPolicyWrapper  `json:"sandbox"`
 	ServiceTier        *ServiceTier          `json:"serviceTier,omitempty"`
 	Thread             Thread                `json:"thread"`
+	DisabledPluginIDs  []string              `json:"disabledPluginIds,omitempty"`
 }
 
 func (r *ThreadStartResponse) UnmarshalJSON(data []byte) error {
@@ -378,6 +379,8 @@ type ThreadResumeResponse struct {
 	Sandbox              SandboxPolicyWrapper  `json:"sandbox"`
 	ServiceTier          *ServiceTier          `json:"serviceTier,omitempty"`
 	Thread               Thread                `json:"thread"`
+	DisabledPluginIDs    []string              `json:"disabledPluginIds,omitempty"`
+	CollaborationMode    *CollaborationMode    `json:"collaborationMode,omitempty"`
 }
 
 func (r *ThreadResumeResponse) UnmarshalJSON(data []byte) error {
@@ -452,6 +455,7 @@ type ThreadForkResponse struct {
 	Sandbox            SandboxPolicyWrapper  `json:"sandbox"`
 	ServiceTier        *ServiceTier          `json:"serviceTier,omitempty"`
 	Thread             Thread                `json:"thread"`
+	DisabledPluginIDs  []string              `json:"disabledPluginIds,omitempty"`
 }
 
 func (r *ThreadForkResponse) UnmarshalJSON(data []byte) error {
