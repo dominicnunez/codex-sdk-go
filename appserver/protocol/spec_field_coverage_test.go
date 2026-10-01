@@ -824,6 +824,11 @@ func testEnumValues(t *testing.T) {
 	// Each entry picks one canonical spec file that defines the enum
 	// (many are duplicated across specs; we only need to check once).
 	registry := []enumEntry{
+		{
+			specPath: "schema/json/v2/ConfigReadResponse.json",
+			defName:  "ToolExposureSurface",
+			goValues: enumStrings(ToolExposureSurfaceCodeMode, ToolExposureSurfaceDeferred, ToolExposureSurfaceDirect),
+		},
 		// From ServerNotification.json definitions
 		{
 			specPath: "schema/json/v2/ModelReroutedNotification.json",
