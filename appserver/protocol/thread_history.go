@@ -85,6 +85,34 @@ func (p ThreadItemsListParams) MarshalJSON() ([]byte, error) {
 	return json.Marshal(wire{p.ThreadID, p.TurnID, cursor, p.Limit, p.SortDirection})
 }
 
+// UnmarshalJSON distinguishes the schema's string and item-anchor cursor variants.
+func (p *ThreadItemsListParams) UnmarshalJSON(data []byte) error {
+	type wire struct {
+		ThreadID      string          `json:"threadId"`
+		TurnID        *string         `json:"turnId,omitempty"`
+		Cursor        json.RawMessage `json:"cursor,omitempty"`
+		Limit         *uint32         `json:"limit,omitempty"`
+		SortDirection *SortDirection  `json:"sortDirection,omitempty"`
+	}
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*p = ThreadItemsListParams{ThreadID: decoded.ThreadID, TurnID: decoded.TurnID, Limit: decoded.Limit, SortDirection: decoded.SortDirection}
+	if len(decoded.Cursor) == 0 || string(decoded.Cursor) == "null" {
+		return nil
+	}
+	if decoded.Cursor[0] == '"' {
+		return json.Unmarshal(decoded.Cursor, &p.Cursor)
+	}
+	var anchor ThreadItemsListAnchor
+	if err := json.Unmarshal(decoded.Cursor, &anchor); err != nil {
+		return err
+	}
+	p.CursorAnchor = &anchor
+	return nil
+}
+
 // ThreadItemsListAnchor identifies an exclusive item position in a visible turn.
 type ThreadItemsListAnchor struct {
 	ItemID string `json:"itemId"`
@@ -98,6 +126,24 @@ func (a ThreadItemsListAnchor) MarshalJSON() ([]byte, error) {
 		Type   string `json:"type"`
 		ItemID string `json:"itemId"`
 	}{Type: "item", ItemID: a.ItemID})
+}
+
+func (a *ThreadItemsListAnchor) UnmarshalJSON(data []byte) error {
+	var wire struct {
+		Type   string `json:"type"`
+		ItemID string `json:"itemId"`
+	}
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+	if wire.Type != "item" {
+		return errors.New("thread items anchor requires type item")
+	}
+	if wire.ItemID == "" {
+		return errors.New("thread items anchor requires itemId")
+	}
+	*a = ThreadItemsListAnchor{ItemID: wire.ItemID}
+	return nil
 }
 
 // ThreadItemsListCursor supports either an opaque continuation token or an item anchor.
@@ -126,12 +172,12 @@ func (p ThreadItemsListParams) prepareRequest() (interface{}, error) {
 type ThreadItemEntry struct {
 	Item          ThreadItemWrapper `json:"item"`
 	TurnID        string            `json:"turnId"`
-	StartedAtMs   int64             `json:"startedAtMs"`
+	StartedAtMs   *int64            `json:"startedAtMs,omitempty"`
 	CompletedAtMs *int64            `json:"completedAtMs,omitempty"`
 }
 
 func (e *ThreadItemEntry) UnmarshalJSON(data []byte) error {
-	if err := validateRequiredObjectFields(data, "item", "startedAtMs", "turnId"); err != nil {
+	if err := validateRequiredObjectFields(data, "item", "turnId"); err != nil {
 		return err
 	}
 	type wire ThreadItemEntry

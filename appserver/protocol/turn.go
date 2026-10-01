@@ -122,6 +122,7 @@ func (p *TurnStartParams) UnmarshalJSON(data []byte) error {
 		ServiceTier         *ServiceTier             `json:"serviceTier,omitempty"`
 		Summary             *ReasoningSummaryWrapper `json:"summary,omitempty"`
 		CollaborationMode   *CollaborationMode       `json:"collaborationMode,omitempty"`
+		DisabledPluginIDs   *[]string                `json:"disabledPluginIds,omitempty"`
 	}
 
 	wire := &wireTurnStartParams{}
@@ -163,6 +164,7 @@ func (p *TurnStartParams) UnmarshalJSON(data []byte) error {
 		ServiceTier:         wire.ServiceTier,
 		Summary:             wire.Summary,
 		CollaborationMode:   wire.CollaborationMode,
+		DisabledPluginIDs:   wire.DisabledPluginIDs,
 	}
 	return nil
 }

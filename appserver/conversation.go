@@ -282,6 +282,7 @@ func cloneThreadItemWrapper(w ThreadItemWrapper) ThreadItemWrapper {
 		cp.McpAppResourceURI = cloneStringPtr(v.McpAppResourceURI)
 		cp.AppContext = cloneArbitraryValue(v.AppContext)
 		cp.PluginID = cloneStringPtr(v.PluginID)
+		cp.McpAppUI = clonePtr(v.McpAppUI)
 		cp.ReadOnlyHint = cloneBoolPtr(v.ReadOnlyHint)
 		cp.Arguments = cloneJSONValue(v.Arguments)
 		cp.Result = cloneMcpToolCallResult(v.Result)
@@ -409,6 +410,7 @@ func cloneUserInput(in UserInput) UserInput {
 		return &cp
 	case *ImageUserInput:
 		cp := *v
+		cp.FileID = cloneStringPtr(v.FileID)
 		return &cp
 	case *LocalImageUserInput:
 		cp := *v

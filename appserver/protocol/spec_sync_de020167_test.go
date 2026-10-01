@@ -137,6 +137,58 @@ func TestThreadItemsAnchorInjectsDiscriminator(t *testing.T) {
 	}
 }
 
+func TestThreadItemsParamsCursorVariantsRoundTrip(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		data string
+	}{
+		{name: "string", data: `{"threadId":"thread-1","cursor":"next"}`},
+		{name: "anchor", data: `{"threadId":"thread-1","turnId":"turn-1","cursor":{"type":"item","itemId":"item-1"}}`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var params codex.ThreadItemsListParams
+			if err := json.Unmarshal([]byte(test.data), &params); err != nil {
+				t.Fatal(err)
+			}
+			got, err := json.Marshal(params)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(got) != test.data {
+				t.Fatalf("round trip = %s, want %s", got, test.data)
+			}
+		})
+	}
+}
+
+func TestThreadItemEntryAllowsMissingStartedAt(t *testing.T) {
+	var entry codex.ThreadItemEntry
+	if err := json.Unmarshal([]byte(`{"item":{"type":"agentMessage","id":"item-1","text":"ok"},"turnId":"turn-1"}`), &entry); err != nil {
+		t.Fatal(err)
+	}
+	if entry.StartedAtMs != nil {
+		t.Fatalf("startedAtMs = %v, want nil", entry.StartedAtMs)
+	}
+}
+
+func TestTurnStartDisabledPluginIDsRoundTrip(t *testing.T) {
+	data := []byte(`{"threadId":"thread-1","input":[],"disabledPluginIds":[]}`)
+	var params codex.TurnStartParams
+	if err := json.Unmarshal(data, &params); err != nil {
+		t.Fatal(err)
+	}
+	if params.DisabledPluginIDs == nil || len(*params.DisabledPluginIDs) != 0 {
+		t.Fatalf("disabledPluginIds = %#v, want non-nil empty slice", params.DisabledPluginIDs)
+	}
+	got, err := json.Marshal(params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !containsJSONField(t, got, "disabledPluginIds") {
+		t.Fatalf("round trip omitted disabledPluginIds: %s", got)
+	}
+}
+
 func containsJSONField(t *testing.T, data []byte, field string) bool {
 	t.Helper()
 	var object map[string]json.RawMessage
