@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
 // ReviewDelivery specifies where to run the review.
@@ -168,18 +169,16 @@ func (w ReviewTargetWrapper) MarshalJSON() ([]byte, error) {
 }
 
 func (w *ReviewTargetWrapper) UnmarshalJSON(data []byte) error {
-	var raw struct {
-		Type string `json:"type"`
-	}
-	if err := json.Unmarshal(data, &raw); err != nil {
+	typeStr, typeErr := jsonobject.TypeField(data)
+	if err := typeErr; err != nil {
 		return err
 	}
 
-	if raw.Type == "" {
+	if typeStr == "" {
 		return fmt.Errorf("review target: missing or empty type field")
 	}
 
-	switch raw.Type {
+	switch typeStr {
 	case reviewTargetTypeUncommittedChanges:
 		var target UncommittedChangesReviewTarget
 		if err := json.Unmarshal(data, &target); err != nil {
@@ -205,7 +204,7 @@ func (w *ReviewTargetWrapper) UnmarshalJSON(data []byte) error {
 		}
 		w.Value = &target
 	default:
-		w.Value = &UnknownReviewTarget{Type: raw.Type, Raw: append(json.RawMessage(nil), data...)}
+		w.Value = &UnknownReviewTarget{Type: typeStr, Raw: append(json.RawMessage(nil), data...)}
 	}
 
 	return nil
@@ -235,14 +234,12 @@ func validateReviewTargetVariantFields(data []byte, wantType string, requiredFie
 		return err
 	}
 
-	var raw struct {
-		Type string `json:"type"`
-	}
-	if err := json.Unmarshal(data, &raw); err != nil {
+	typeStr, typeErr := jsonobject.TypeField(data)
+	if err := typeErr; err != nil {
 		return err
 	}
-	if raw.Type != wantType {
-		return fmt.Errorf("review target: type %q does not match %q", raw.Type, wantType)
+	if typeStr != wantType {
+		return fmt.Errorf("review target: type %q does not match %q", typeStr, wantType)
 	}
 
 	return nil

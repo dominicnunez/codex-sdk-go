@@ -42,17 +42,19 @@ const (
 	protectedNotificationWorkers       = 8
 	criticalNotificationWorkers        = 2
 	turnScopedNotificationWorkers      = 8
-	maxTurnScopedNotificationQueueSize = 256
+	maxTurnScopedNotificationQueueSize = streamingNotifQueueSize + maxStreamingNotificationBacklog
 	maxTurnScopedNotificationQueues    = 128
-	maxStreamingNotificationBacklog    = 1024
-	inboundNotifQueueSize              = 128
-	streamingNotifQueueSize            = 256
-	protectedNotifQueueSize            = 128
-	criticalNotifQueueSize             = 64
-	outboundWriteQueueSize             = 256
-	readBufferSizeBytes                = 64 * 1024
-	maxInboundMessageSizeBytes         = 10 * 1024 * 1024
-	defaultSendTimeout                 = 5 * time.Minute
+	// Preserve the previous aggregate completion-plus-streaming queue budget.
+	maxOrderedNotificationBacklog   = maxTurnScopedNotificationQueues*256 + maxTurnScopedNotificationQueueSize
+	maxStreamingNotificationBacklog = 1024
+	inboundNotifQueueSize           = 128
+	streamingNotifQueueSize         = 256
+	protectedNotifQueueSize         = 128
+	criticalNotifQueueSize          = 64
+	outboundWriteQueueSize          = 256
+	readBufferSizeBytes             = 64 * 1024
+	maxInboundMessageSizeBytes      = 10 * 1024 * 1024
+	defaultSendTimeout              = 5 * time.Minute
 )
 
 const (
@@ -79,19 +81,22 @@ type StdioTransport struct {
 	reqHandler          RequestHandler
 	notifHandler        NotificationHandler
 	pendingReqHandler   []Request
-	pendingNotifHandle  []Notification
+	pendingNotifHandle  []bufferedNotification
+	notificationBudget  notificationBudget
 	requestQueue        chan Request
 	turnNotifQueuesMu   sync.Mutex
 	turnNotifQueues     map[string]*turnScopedNotificationQueue
+	orderedNotifCount   int // guarded by turnNotifQueuesMu
 	turnNotifReadyMu    sync.Mutex
 	turnNotifReady      []*turnScopedNotificationQueue
 	turnNotifReadyCond  *sync.Cond
 	turnNotifReadyOnce  sync.Once
-	streamingNotifQueue chan Notification
+	turnNotifStopped    atomic.Bool
+	streamingNotifQueue chan bufferedNotification
 	streamingBacklog    streamingNotificationBacklog
-	protectedNotifQueue chan Notification
-	criticalNotifQueue  chan Notification
-	notifQueue          chan Notification
+	protectedNotifQueue chan bufferedNotification
+	criticalNotifQueue  chan bufferedNotification
+	notifQueue          chan bufferedNotification
 	writeQueue          chan writeEnvelope
 	readerStopped       chan struct{}
 	once                sync.Once
@@ -134,10 +139,10 @@ func NewStdioTransport(reader io.ReadCloser, writer io.Writer) *StdioTransport {
 		pendingReqs:         make(map[string]pendingReq),
 		requestQueue:        make(chan Request, inboundRequestQueueSize),
 		turnNotifQueues:     make(map[string]*turnScopedNotificationQueue),
-		streamingNotifQueue: make(chan Notification, streamingNotifQueueSize),
-		protectedNotifQueue: make(chan Notification, protectedNotifQueueSize),
-		criticalNotifQueue:  make(chan Notification, criticalNotifQueueSize),
-		notifQueue:          make(chan Notification, inboundNotifQueueSize),
+		streamingNotifQueue: make(chan bufferedNotification, streamingNotifQueueSize),
+		protectedNotifQueue: make(chan bufferedNotification, protectedNotifQueueSize),
+		criticalNotifQueue:  make(chan bufferedNotification, criticalNotifQueueSize),
+		notifQueue:          make(chan bufferedNotification, inboundNotifQueueSize),
 		writeQueue:          make(chan writeEnvelope, outboundWriteQueueSize),
 		readerStopped:       make(chan struct{}),
 		ctx:                 ctx,
@@ -252,12 +257,18 @@ func (t *StdioTransport) OnRequest(handler RequestHandler) {
 // OnNotify registers a handler for incoming JSON-RPC notifications from the server.
 func (t *StdioTransport) OnNotify(handler NotificationHandler) {
 	pending := swapPendingHandler(t, func() { t.notifHandler = handler }, &t.pendingNotifHandle)
-	replayPending(pending, t.enqueueNotification)
+	for i := range pending {
+		notif := pending[i]
+		pending[i] = bufferedNotification{}
+		t.enqueueBufferedNotification(notif)
+	}
+	t.wakeTurnScopedNotificationWorkers()
 }
 
 // OnPanic registers a handler called when a request handler or notification
 // handler panics. The transport recovers from the panic and continues
 // operating; this callback provides observability into the recovered value.
+// A panic in this callback is suppressed so dispatch can continue.
 func (t *StdioTransport) OnPanic(handler func(v any)) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -266,6 +277,7 @@ func (t *StdioTransport) OnPanic(handler func(v any)) {
 
 // Close shuts down the transport. Safe to call multiple times.
 func (t *StdioTransport) Close() error {
+	t.stopNotificationWorkers()
 	t.closeWithFailure(nil, errTransportClosed)
 	return nil
 }
@@ -382,6 +394,7 @@ func (t *StdioTransport) closeWithFailure(scanErr error, cause error) {
 	pending, cancel, readerCloser := t.takeStopResourcesLocked()
 	t.mu.Unlock()
 
+	t.stopNotificationWorkers()
 	t.finishTransportStop(cancel, readerCloser)
 
 	pendingErr := pendingRequestTransportError("send failed", cause)
@@ -675,6 +688,11 @@ func (t *StdioTransport) handleMalformedFrame(data []byte) {
 	if !hasID || hasMethod {
 		return
 	}
+	// A longer JSON number cannot correlate to an int64 request ID. Avoid
+	// passing peer-sized rejected spellings into numeric error formatting.
+	if number, ok := id.Value.(json.Number); ok && len(number) > 20 {
+		return
+	}
 	t.failPendingIDWithError(id, ErrCodeParseError, "failed to parse server response")
 }
 
@@ -687,14 +705,19 @@ func (t *StdioTransport) handleMalformedInboundObject() {
 func (t *StdioTransport) handleMalformedResponse(data []byte) {
 	t.malformedCount.Add(1)
 
-	var partial struct {
-		ID json.RawMessage `json:"id"`
+	if !json.Valid(data) {
+		return
 	}
-	if json.Unmarshal(data, &partial) != nil || len(partial.ID) == 0 {
+	var rawID json.RawMessage
+	if !walkJSONObjectFields(data, true, func(key, value []byte) {
+		if jsonFieldMatchesFolded(key, "id") {
+			rawID = value
+		}
+	}) || len(rawID) == 0 {
 		return
 	}
 
-	id, err := parseRequestID(partial.ID)
+	id, err := parseRequestID(rawID)
 	if err != nil {
 		return
 	}
@@ -768,9 +791,7 @@ func (t *StdioTransport) handleRequest(req Request) {
 	defer func() {
 		if r := recover(); r != nil {
 			t.writeErrorResponse(req.ID, ErrCodeInternalError, "internal handler error")
-			if panicFn != nil {
-				panicFn(r)
-			}
+			reportRecoveredPanic(panicFn, r)
 		}
 	}()
 
@@ -794,6 +815,15 @@ func (t *StdioTransport) handleRequest(req Request) {
 	if err := t.writeMessage(resp); err != nil {
 		t.handleWriteFailure(err)
 	}
+}
+
+// Reporting must not turn a recovered handler panic into a worker crash.
+func reportRecoveredPanic(handler func(any), value any) {
+	if handler == nil {
+		return
+	}
+	defer func() { _ = recover() }()
+	handler(value)
 }
 
 func (t *StdioTransport) resolveRequestHandler(req Request) (RequestHandler, func(any), requestHandlerResolution) {

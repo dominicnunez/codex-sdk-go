@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -14,6 +15,91 @@ import (
 	codex "github.com/dominicnunez/codex-sdk-go/appserver"
 	codextransport "github.com/dominicnunez/codex-sdk-go/appserver/transport"
 )
+
+type deltaBeforeCompletionWriter struct{ writer io.Writer }
+
+func (w deltaBeforeCompletionWriter) Write(p []byte) (int, error) {
+	var envelope struct {
+		Method string `json:"method"`
+	}
+	if err := json.Unmarshal(p, &envelope); err != nil {
+		return 0, err
+	}
+	if envelope.Method == "item/completed" {
+		if err := writeStdioNotification(json.NewEncoder(w.writer), "item/agentMessage/delta", map[string]any{"threadId": "thread-1", "turnId": "turn-1", "itemId": "item-1", "delta": "answer"}); err != nil {
+			return 0, err
+		}
+	}
+	return w.writer.Write(p)
+}
+
+func TestRunStreamedRetainsBlockedDeltaBeforeCompletionAtEOF(t *testing.T) {
+	clientReader, serverWriter := io.Pipe()
+	serverReader, clientWriter := io.Pipe()
+	t.Cleanup(func() {
+		_ = clientReader.Close()
+		_ = serverWriter.Close()
+		_ = serverReader.Close()
+		_ = clientWriter.Close()
+	})
+	serverDone := make(chan error, 1)
+	go func() {
+		serverDone <- serveLifecycleOverStdio(serverReader, deltaBeforeCompletionWriter{serverWriter}, "thread-1", "turn-1", "item-1", "answer")
+		_ = serverWriter.Close()
+	}()
+	tr := codextransport.NewStdioTransport(clientReader, clientWriter)
+	t.Cleanup(func() { _ = tr.Close() })
+	client := codex.NewClient(tr, codex.WithRequestTimeout(5*time.Second))
+	entered, release := make(chan struct{}), make(chan struct{})
+	var releaseOnce sync.Once
+	unblock := func() { releaseOnce.Do(func() { close(release) }) }
+	t.Cleanup(unblock)
+	client.AddAgentMessageDeltaListener(func(codex.AgentMessageDeltaNotification) { close(entered); <-release })
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	t.Cleanup(cancel)
+	stream := codex.NewProcessFromClient(client).RunStreamed(ctx, codex.RunOptions{Prompt: "hello"})
+	select {
+	case <-entered:
+	case <-ctx.Done():
+		t.Fatal("delta listener did not enter")
+	}
+	select {
+	case err := <-serverDone:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-ctx.Done():
+		t.Fatal("completion could not enter the read loop")
+	}
+	select {
+	case <-tr.ReaderStopped():
+	case <-ctx.Done():
+		t.Fatal("reader did not reach EOF")
+	}
+	unblock()
+	var events []codex.Event
+	for event, err := range stream.Events() {
+		if err != nil {
+			t.Fatal(err)
+		}
+		events = append(events, event)
+	}
+	if len(events) != 3 {
+		t.Fatalf("stream has %d events; want delta, item, turn", len(events))
+	}
+	if delta, ok := events[0].(*codex.TextDelta); !ok || delta.Delta != "answer" {
+		t.Fatalf("first stream event = %#v", events[0])
+	}
+	if _, ok := events[1].(*codex.ItemCompleted); !ok {
+		t.Fatalf("second stream event = %T", events[1])
+	}
+	if _, ok := events[2].(*codex.TurnCompleted); !ok {
+		t.Fatalf("third stream event = %T", events[2])
+	}
+	if result := stream.Result(); result == nil || result.Response != "answer" || len(result.Items) != 1 {
+		t.Fatalf("stream result = %#v", result)
+	}
+}
 
 const (
 	preStartOverflowFloodCount = 1100

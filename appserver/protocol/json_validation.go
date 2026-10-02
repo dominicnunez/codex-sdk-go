@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
 type inboundObjectField struct {
@@ -57,27 +59,148 @@ func decodeObjectWithValidation(
 		return nil
 	}
 
-	decoder := newInboundObjectDecoder(data)
-	if err := expectInboundObjectStart(decoder); err != nil {
-		return validation.notObject(err)
+	if !json.Valid(data) {
+		return decodeMalformedObject(data, destValue, fields, required, nonNull, validation)
 	}
-
-	for decoder.More() {
-		if err := decodeInboundObjectField(decoder, required, nonNull, destValue, fields, validation); err != nil {
-			return err
-		}
+	if bytes.TrimSpace(data)[0] != '{' {
+		return validation.notObject(fmt.Errorf("expected JSON object"))
 	}
-
-	if err := expectInboundObjectEnd(decoder); err != nil {
-		return validation.notObject(err)
+	state := inboundObjectDecodeState{dest: destValue, fields: fields, required: required, nonNull: nonNull, validation: validation}
+	jsonobject.WalkFields(data, true, state.visit)
+	state.flushStrings()
+	if state.err != nil {
+		return state.err
 	}
 	if err := validateRequiredInboundObjectFields(required, validation); err != nil {
 		return err
 	}
-	if err := expectNoTrailingInboundObjectData(decoder); err != nil {
+	return nil
+}
+
+type inboundObjectDecodeState struct {
+	dest            reflect.Value
+	fields          map[string]inboundObjectField
+	required        inboundRequiredFields
+	nonNull         map[string]struct{}
+	validation      objectValidationErrors
+	selectedStrings map[string][]byte
+	err             error
+}
+
+// Visit recognized occurrences in wire order. Invalid known values remain
+// visible even when a later duplicate would otherwise overwrite them.
+func (s *inboundObjectDecodeState) visit(key, raw []byte) {
+	if s.err != nil {
+		return
+	}
+	name, recognized := inboundObjectKey(key, s.fields, s.required, s.nonNull)
+	if !recognized {
+		return
+	}
+	deferred, err := s.deferString(name, raw)
+	if deferred {
+		s.err = err
+		return
+	}
+	s.err = decodeInboundObjectField(name, raw, s.required, s.nonNull, s.dest, s.fields, s.validation)
+}
+
+func (s *inboundObjectDecodeState) deferString(name string, raw []byte) (bool, error) {
+	field, exists := s.fields[name]
+	if !exists || !s.dest.IsValid() {
+		return false, nil
+	}
+	value := s.dest.FieldByIndex(field.index)
+	plain := value.Type() == reflect.TypeFor[string]()
+	pointer := value.Type() == reflect.TypeFor[*string]()
+	if !plain && !pointer {
+		return false, nil
+	}
+	// Existing pointers may be aliased by direct helper callers. Preserve
+	// observable mutations of that prior storage in original wire order.
+	if pointer && !value.IsNil() {
+		return false, nil
+	}
+	if _, exists := s.required.seen[name]; exists {
+		s.required.seen[name] = true
+	}
+	if isNullJSONValue(raw) {
+		if _, mustBeNonNull := s.nonNull[name]; mustBeNonNull {
+			return true, s.validation.null(name)
+		}
+		if plain {
+			return true, nil
+		}
+	} else if raw[0] != '"' {
+		// Decode the prefix before reporting this occurrence's type failure.
+		if previous, exists := s.selectedStrings[name]; exists {
+			_ = json.Unmarshal(previous, value.Addr().Interface())
+			delete(s.selectedStrings, name)
+		}
+		return true, json.Unmarshal(raw, value.Addr().Interface())
+	}
+	if s.selectedStrings == nil {
+		s.selectedStrings = make(map[string][]byte)
+	}
+	s.selectedStrings[name] = raw
+	return true, nil
+}
+
+func (s *inboundObjectDecodeState) flushStrings() {
+	for name, raw := range s.selectedStrings {
+		field := s.fields[name]
+		if err := json.Unmarshal(raw, s.dest.FieldByIndex(field.index).Addr().Interface()); err != nil && s.err == nil {
+			s.err = err
+		}
+	}
+}
+
+// Direct helper/receiver callers can pass syntactically invalid JSON. Preserve
+// the original prefix mutation and error precedence there. Wire unmarshaling
+// validates syntax before invoking receivers and uses the raw walk above.
+func decodeMalformedObject(data []byte, dest reflect.Value, fields map[string]inboundObjectField, required inboundRequiredFields, nonNull map[string]struct{}, validation objectValidationErrors) error {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	start, err := decoder.Token()
+	if err != nil {
 		return validation.notObject(err)
 	}
-
+	if start != json.Delim('{') {
+		return validation.notObject(fmt.Errorf("expected JSON object"))
+	}
+	for decoder.More() {
+		key, err := decoder.Token()
+		if err != nil {
+			return validation.notObject(err)
+		}
+		name, ok := key.(string)
+		if !ok {
+			return validation.notObject(fmt.Errorf("expected object field name"))
+		}
+		var raw json.RawMessage
+		if err := decoder.Decode(&raw); err != nil {
+			return validation.notObject(err)
+		}
+		if err := decodeInboundObjectField(name, raw, required, nonNull, dest, fields, validation); err != nil {
+			return err
+		}
+	}
+	end, err := decoder.Token()
+	if err != nil {
+		return validation.notObject(err)
+	}
+	if end != json.Delim('}') {
+		return validation.notObject(fmt.Errorf("expected JSON object end"))
+	}
+	if err := validateRequiredInboundObjectFields(required, validation); err != nil {
+		return err
+	}
+	if _, err := decoder.Token(); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return validation.notObject(fmt.Errorf("unexpected trailing data"))
+		}
+		return validation.notObject(err)
+	}
 	return nil
 }
 
@@ -197,58 +320,34 @@ func resolveInboundObjectDestination(
 	return destValue, inboundObjectFields(destValue.Type()), false, nil
 }
 
-func newInboundObjectDecoder(data []byte) *json.Decoder {
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.UseNumber()
-	return decoder
-}
-
-func expectInboundObjectStart(decoder *json.Decoder) error {
-	start, err := decoder.Token()
-	if err != nil {
-		return err
+func inboundObjectKey(raw []byte, fields map[string]inboundObjectField, required inboundRequiredFields, nonNull map[string]struct{}) (string, bool) {
+	for name := range fields {
+		if jsonobject.FieldMatches(raw, name) {
+			return name, true
+		}
 	}
-	delim, ok := start.(json.Delim)
-	if !ok || delim != '{' {
-		return fmt.Errorf("expected JSON object")
+	for name := range required.seen {
+		if jsonobject.FieldMatches(raw, name) {
+			return name, true
+		}
 	}
-	return nil
+	for name := range nonNull {
+		if jsonobject.FieldMatches(raw, name) {
+			return name, true
+		}
+	}
+	return "", false
 }
 
 func decodeInboundObjectField(
-	decoder *json.Decoder,
+	key string,
+	raw []byte,
 	required inboundRequiredFields,
 	nonNull map[string]struct{},
 	destValue reflect.Value,
 	fields map[string]inboundObjectField,
 	validation objectValidationErrors,
 ) error {
-	keyToken, err := decoder.Token()
-	if err != nil {
-		return validation.notObject(err)
-	}
-	key, ok := keyToken.(string)
-	if !ok {
-		return validation.notObject(fmt.Errorf("expected object field name"))
-	}
-	if field, exists := fields[key]; exists && destValue.IsValid() {
-		value := destValue.FieldByIndex(field.index)
-		// Decode built-in strings directly to avoid copying and reparsing large
-		// text fields. Named types retain their custom unmarshaling path.
-		if value.Type() == reflect.TypeFor[string]() {
-			if _, exists := required.seen[key]; exists {
-				required.seen[key] = true
-			}
-			_, mustBeNonNull := nonNull[key]
-			return decodeInboundStringField(decoder, value, key, mustBeNonNull, validation)
-		}
-	}
-
-	var raw json.RawMessage
-	if err := decoder.Decode(&raw); err != nil {
-		return validation.notObject(err)
-	}
-
 	if _, ok := required.seen[key]; ok {
 		required.seen[key] = true
 	}
@@ -266,54 +365,12 @@ func decodeInboundObjectField(
 	return json.Unmarshal(raw, destValue.FieldByIndex(field.index).Addr().Interface())
 }
 
-func decodeInboundStringField(decoder *json.Decoder, value reflect.Value, key string, nonNull bool, validation objectValidationErrors) error {
-	var decoded *string
-	if err := decoder.Decode(&decoded); err != nil {
-		var typeError *json.UnmarshalTypeError
-		if errors.As(err, &typeError) {
-			return err
-		}
-		return validation.notObject(err)
-	}
-	if decoded == nil {
-		if nonNull {
-			return validation.null(key)
-		}
-		// JSON null leaves an existing non-pointer string unchanged.
-		return nil
-	}
-	value.SetString(*decoded)
-	return nil
-}
-
-func expectInboundObjectEnd(decoder *json.Decoder) error {
-	end, err := decoder.Token()
-	if err != nil {
-		return err
-	}
-	delim, ok := end.(json.Delim)
-	if !ok || delim != '}' {
-		return fmt.Errorf("expected JSON object end")
-	}
-	return nil
-}
-
 func validateRequiredInboundObjectFields(required inboundRequiredFields, validation objectValidationErrors) error {
 	for _, field := range required.order {
 		seen := required.seen[field]
 		if !seen {
 			return validation.missing(field)
 		}
-	}
-	return nil
-}
-
-func expectNoTrailingInboundObjectData(decoder *json.Decoder) error {
-	if _, err := decoder.Token(); !errors.Is(err, io.EOF) {
-		if err == nil {
-			return fmt.Errorf("unexpected trailing data")
-		}
-		return err
 	}
 	return nil
 }

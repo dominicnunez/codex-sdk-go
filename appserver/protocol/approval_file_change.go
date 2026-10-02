@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
 // ApplyPatchApprovalParams represents the parameters for a server→client applyPatchApproval request.
@@ -131,14 +132,12 @@ func (w *FileChangeWrapper) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	var raw struct {
-		Type string `json:"type"`
-	}
-	if err := json.Unmarshal(data, &raw); err != nil {
+	typeStr, typeErr := jsonobject.TypeField(data)
+	if err := typeErr; err != nil {
 		return err
 	}
 
-	switch raw.Type {
+	switch typeStr {
 	case fileChangeTypeAdd:
 		if err := validateRequiredObjectFields(data, "type", "content"); err != nil {
 			return err
@@ -167,7 +166,7 @@ func (w *FileChangeWrapper) UnmarshalJSON(data []byte) error {
 		}
 		w.Value = &upd
 	default:
-		w.Value = &UnknownFileChange{Type: raw.Type, Raw: append(json.RawMessage(nil), data...)}
+		w.Value = &UnknownFileChange{Type: typeStr, Raw: append(json.RawMessage(nil), data...)}
 	}
 
 	return nil
@@ -251,8 +250,8 @@ func (w *ReviewDecisionWrapper) UnmarshalJSON(data []byte) error {
 	}
 
 	// Dispatch on which key is present in the JSON object
-	var keys map[string]json.RawMessage
-	if err := json.Unmarshal(data, &keys); err != nil {
+	keys, selectErr := jsonobject.SelectFields(data, "approved_execpolicy_amendment", "network_policy_amendment", "denied")
+	if err := selectErr; err != nil {
 		return fmt.Errorf("unable to unmarshal ReviewDecision: %w", err)
 	}
 

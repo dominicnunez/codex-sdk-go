@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 )
 
 const (
@@ -141,8 +142,8 @@ func (e *inboundError) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	var parsed Error
-	if json.Unmarshal(data, &parsed) != nil {
+	parsed, ok := decodeInboundRPCError(data)
+	if !ok {
 		e.invalid = true
 		//nolint:nilerr // Preserve frame routing; invalid error payload is handled as malformed response.
 		return nil
@@ -271,8 +272,52 @@ func handleOversizedLine(reader *bufio.Reader, readErr error, line []byte) ([]by
 
 func decodeInboundFrame(data []byte) (inboundFrame, error) {
 	var frame inboundFrame
-	if err := json.Unmarshal(data, &frame); err != nil {
-		return inboundFrame{}, err
+	if !json.Valid(data) {
+		return frame, errors.New("invalid inbound JSON")
+	}
+	var version, id, method, params, result, rpcError json.RawMessage
+	methodInvalid := false
+	if !walkJSONObjectFields(data, true, func(key, value []byte) {
+		switch {
+		case jsonFieldMatchesFolded(key, "jsonrpc"):
+			version = value
+		case jsonFieldMatchesFolded(key, "id"):
+			id = value
+		case jsonFieldMatchesFolded(key, "method"):
+			// A null leaves the previous string intact. A wrong type anywhere
+			// remains an error, even when a later duplicate has a valid string.
+			if value[0] == '"' {
+				method = value
+			} else if !bytes.Equal(value, []byte("null")) {
+				methodInvalid = true
+			}
+		case jsonFieldMatchesFolded(key, "params"):
+			params = value
+		case jsonFieldMatchesFolded(key, "result"):
+			result = value
+		case jsonFieldMatchesFolded(key, "error"):
+			rpcError = value
+		}
+	}) || methodInvalid {
+		return frame, errors.New("invalid inbound object")
+	}
+	// Decode selected fields once. Raw data is copied only after selection,
+	// so ignored keys and overwritten duplicate IDs cannot amplify memory.
+	if len(version) > 0 {
+		_ = frame.JSONRPC.UnmarshalJSON(version)
+	}
+	if len(id) > 0 {
+		_ = frame.ID.UnmarshalJSON(id)
+	}
+	if len(method) > 0 {
+		if err := json.Unmarshal(method, &frame.Method); err != nil {
+			return inboundFrame{}, err
+		}
+	}
+	frame.Params = append(json.RawMessage(nil), params...)
+	frame.Result = append(json.RawMessage(nil), result...)
+	if len(rpcError) > 0 {
+		_ = frame.Error.UnmarshalJSON(rpcError)
 	}
 	return frame, nil
 }
@@ -297,68 +342,35 @@ func (f inboundFrame) toNotification() Notification {
 }
 
 func extractTopLevelIDAndMethod(data []byte) (RequestID, bool, bool) {
-	id, hasID, hasMethod, _ := extractTopLevelIDAndMethodFromReader(bytes.NewReader(data))
-	return id, hasID, hasMethod
-}
-
-func extractTopLevelIDAndMethodFromReader(reader io.Reader) (RequestID, bool, bool, error) {
 	var id RequestID
-	decoder := json.NewDecoder(reader)
-	decoder.UseNumber()
-
-	start, err := decoder.Token()
-	if err != nil {
-		return id, false, false, err
-	}
-	delim, ok := start.(json.Delim)
-	if !ok || delim != '{' {
-		return id, false, false, nil
-	}
-
+	var selected json.RawMessage
 	var hasID bool
 	var hasMethod bool
-	for decoder.More() {
-		keyTok, err := decoder.Token()
-		if err != nil {
-			return id, hasID, hasMethod, err
-		}
-		key, ok := keyTok.(string)
-		if !ok {
-			return id, hasID, hasMethod, nil
-		}
-
-		valueTok, err := decoder.Token()
-		if err != nil {
-			return id, hasID, hasMethod, err
-		}
-
-		switch key {
-		case "id":
-			switch v := valueTok.(type) {
-			case string:
-				id = RequestID{Value: v}
-				hasID = true
-			case json.Number:
-				id = RequestID{Value: v}
-				hasID = true
-			case float64:
-				id = RequestID{Value: v}
-				hasID = true
+	// Keep useful correlation before a malformed suffix, without decoding
+	// every token in unrelated metadata. Unsupported later IDs do not erase
+	// an earlier scalar ID in this best-effort recovery path.
+	walkJSONObjectFields(data, false, func(key, value []byte) {
+		switch {
+		case jsonFieldMatches(key, "id"):
+			if value[0] == '"' || value[0] == '-' || (value[0] >= '0' && value[0] <= '9') {
+				selected, hasID = value, true
 			}
-		case "method":
-			if _, ok := valueTok.(string); ok {
+		case jsonFieldMatches(key, "method"):
+			if value[0] == '"' {
 				hasMethod = true
 			}
 		}
-
-		if valueDelim, ok := valueTok.(json.Delim); ok && (valueDelim == '{' || valueDelim == '[') {
-			if err := consumeNestedJSONValue(decoder); err != nil {
-				return id, hasID, hasMethod, err
-			}
+	})
+	if hasID {
+		if selected[0] == '"' {
+			var value string
+			_ = json.Unmarshal(selected, &value)
+			id.Value = value
+		} else {
+			id.Value = json.Number(string(selected))
 		}
 	}
-
-	return id, hasID, hasMethod, nil
+	return id, hasID, hasMethod
 }
 
 func extractOversizedFrameInfo(prefix []byte, reader *bufio.Reader) oversizedFrameInfo {
@@ -385,8 +397,13 @@ func extractOversizedFrameInfo(prefix []byte, reader *bufio.Reader) oversizedFra
 	return inspectOversizedFramePrefix(inspectionBytes)
 }
 
-func inspectOversizedFramePrefix(data []byte) oversizedFrameInfo {
-	var info oversizedFrameInfo
+func inspectOversizedFramePrefix(data []byte) (info oversizedFrameInfo) {
+	var selectedID json.RawMessage
+	defer func() {
+		if len(selectedID) > 0 {
+			_ = json.Unmarshal(selectedID, &info.id)
+		}
+	}()
 
 	i := skipJSONWhitespace(data, 0)
 	if i >= len(data) || data[i] != '{' {
@@ -411,9 +428,16 @@ func inspectOversizedFramePrefix(data []byte) oversizedFrameInfo {
 			}
 		}
 
-		key, next, ok := consumeJSONString(data, i)
-		if !ok {
+		next, ok := scanJSONStringEnd(data, i)
+		if !ok || !json.Valid(data[i:next]) {
 			return info
+		}
+		key := ""
+		for _, name := range [...]string{"id", "method", "result", "error"} {
+			if jsonFieldMatches(data[i:next], name) {
+				key = name
+				break
+			}
 		}
 		i = skipJSONWhitespace(data, next)
 		if i >= len(data) || data[i] != ':' {
@@ -424,7 +448,7 @@ func inspectOversizedFramePrefix(data []byte) oversizedFrameInfo {
 			return info
 		}
 
-		valueEnd, ok := inspectOversizedFrameField(data, key, i, &info)
+		valueEnd, ok := inspectOversizedFrameField(data, key, i, &info, &selectedID)
 		if !ok || info.hasMethod || (info.hasResponseFields && info.hasID) {
 			return info
 		}
@@ -434,15 +458,15 @@ func inspectOversizedFramePrefix(data []byte) oversizedFrameInfo {
 	return info
 }
 
-func inspectOversizedFrameField(data []byte, key string, valueStart int, info *oversizedFrameInfo) (int, bool) {
+func inspectOversizedFrameField(data []byte, key string, valueStart int, info *oversizedFrameInfo, selectedID *json.RawMessage) (int, bool) {
 	switch key {
 	case "id":
-		id, valueEnd, ok := consumeRequestIDValue(data, valueStart)
-		if !ok {
+		valueEnd, ok := consumeJSONValue(data, valueStart)
+		if !ok || !validRawRequestID(data[valueStart:valueEnd]) {
 			return valueStart, false
 		}
-		info.id = id
-		info.hasID = id.Value != nil
+		*selectedID = data[valueStart:valueEnd]
+		info.hasID = !bytes.Equal(*selectedID, []byte("null"))
 		return valueEnd, true
 	case "method":
 		valueEnd, ok := consumeJSONValue(data, valueStart)
@@ -474,161 +498,52 @@ func skipJSONWhitespace(data []byte, start int) int {
 	return start
 }
 
-func consumeJSONString(data []byte, start int) (string, int, bool) {
-	if start >= len(data) || data[start] != '"' {
-		return "", start, false
+func validRawRequestID(raw []byte) bool {
+	if raw[0] == '"' || bytes.Equal(raw, []byte("null")) {
+		return true
 	}
-
-	for i := start + 1; i < len(data); i++ {
-		switch data[i] {
-		case '\\':
-			i++
-		case '"':
-			raw := data[start : i+1]
-			var value string
-			if err := json.Unmarshal(raw, &value); err != nil {
-				return "", start, false
-			}
-			return value, i + 1, true
-		}
+	if len(raw) > 20 {
+		return false
 	}
-
-	return "", start, false
-}
-
-func consumeRequestIDValue(data []byte, start int) (RequestID, int, bool) {
-	if start >= len(data) {
-		return RequestID{}, start, false
-	}
-
-	switch data[start] {
-	case '"':
-		_, end, ok := consumeJSONString(data, start)
-		if !ok {
-			return RequestID{}, start, false
-		}
-		return consumeRequestIDBytes(data, start, end)
-	case '{', '[':
-		return RequestID{}, start, false
-	default:
-		end, ok := consumeJSONScalar(data, start)
-		if !ok {
-			return RequestID{}, start, false
-		}
-		return consumeRequestIDBytes(data, start, end)
-	}
-}
-
-func consumeRequestIDBytes(data []byte, start int, end int) (RequestID, int, bool) {
-	var id RequestID
-	if err := json.Unmarshal(data[start:end], &id); err != nil {
-		return RequestID{}, start, false
-	}
-	return id, end, true
+	_, err := strconv.ParseInt(string(raw), 10, 64)
+	return err == nil
 }
 
 func consumeJSONValue(data []byte, start int) (int, bool) {
-	if start >= len(data) {
+	end, ok := scanJSONValueEnd(data, start)
+	if !ok || !json.Valid(data[start:end]) {
 		return start, false
 	}
-
-	switch data[start] {
-	case '"':
-		_, end, ok := consumeJSONString(data, start)
-		return end, ok
-	case '{', '[':
-		return consumeCompositeJSONValue(data, start)
-	default:
-		return consumeJSONScalar(data, start)
-	}
-}
-
-func consumeCompositeJSONValue(data []byte, start int) (int, bool) {
-	var stack []byte
-	i := start
-
-	for i < len(data) {
-		switch data[i] {
-		case '"':
-			_, next, ok := consumeJSONString(data, i)
-			if !ok {
-				return start, false
-			}
-			i = next
-			continue
-		case '{':
-			stack = append(stack, '}')
-		case '[':
-			stack = append(stack, ']')
-		case '}', ']':
-			if len(stack) == 0 || data[i] != stack[len(stack)-1] {
-				return start, false
-			}
-			stack = stack[:len(stack)-1]
-			if len(stack) == 0 {
-				return i + 1, true
-			}
-		}
-		i++
-	}
-
-	return start, false
-}
-
-func consumeJSONScalar(data []byte, start int) (int, bool) {
-	i := start
-	for i < len(data) {
-		switch data[i] {
+	// Oversized scalar inspection requires a delimiter. Malformed Token
+	// recovery separately permits useful scalar prefixes such as 7 in 7x.
+	if data[start] != '"' && data[start] != '{' && data[start] != '[' && end < len(data) {
+		switch data[end] {
 		case ',', '}', ']', ' ', '\n', '\r', '\t':
-			end := i
-			i = skipJSONWhitespace(data, i)
-			if end > start && json.Valid(data[start:end]) {
-				return i, true
-			}
-			return start, false
 		default:
-			i++
+			return start, false
 		}
 	}
-
-	if json.Valid(data[start:i]) {
-		return i, true
-	}
-	return start, false
-}
-
-func consumeNestedJSONValue(decoder *json.Decoder) error {
-	depth := 1
-	for depth > 0 {
-		tok, err := decoder.Token()
-		if err != nil {
-			return err
-		}
-		d, ok := tok.(json.Delim)
-		if !ok {
-			continue
-		}
-		switch d {
-		case '{', '[':
-			depth++
-		case '}', ']':
-			depth--
-		}
-	}
-	return nil
+	return end, true
 }
 
 func extractInboundRequestObjectID(data []byte) (RequestID, bool, bool) {
-	var topLevel map[string]json.RawMessage
-	if json.Unmarshal(data, &topLevel) != nil {
+	if !json.Valid(data) {
 		return RequestID{}, false, false
 	}
 
-	if _, hasMethod := topLevel["method"]; !hasMethod {
+	var rawID json.RawMessage
+	var hasID, hasMethod bool
+	if !walkJSONObjectFields(data, true, func(key, value []byte) {
+		if jsonFieldMatches(key, "method") {
+			hasMethod = true
+		}
+		if jsonFieldMatches(key, "id") {
+			rawID, hasID = value, true
+		}
+	}) || !hasMethod {
 		return RequestID{}, false, false
 	}
 
-	rawID, hasID := topLevel["id"]
 	if !hasID {
 		return RequestID{}, false, true
 	}

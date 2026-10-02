@@ -1,6 +1,7 @@
 package appserver
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -8,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/dominicnunez/codex-sdk-go/appserver/protocol"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
 const maxPendingTurnStartNotifications = 1024
@@ -33,7 +35,7 @@ type rawItemCompletedCarrier struct {
 
 func unmarshalThreadIDCarrier(params json.RawMessage) (threadIDCarrier, bool) {
 	var carrier threadIDCarrier
-	if err := json.Unmarshal(params, &carrier); err != nil {
+	if !decodeExactCarrier(params, map[string]any{"threadId": &carrier.ThreadID, "turnId": &carrier.TurnID}) {
 		return threadIDCarrier{}, false
 	}
 	return carrier, true
@@ -41,7 +43,7 @@ func unmarshalThreadIDCarrier(params json.RawMessage) (threadIDCarrier, bool) {
 
 func unmarshalItemCompletedCarrier(params json.RawMessage) (rawItemCompletedCarrier, bool) {
 	var carrier rawItemCompletedCarrier
-	if err := json.Unmarshal(params, &carrier); err != nil {
+	if !decodeExactCarrier(params, map[string]any{"threadId": &carrier.ThreadID, "turnId": &carrier.TurnID, "item": &carrier.Item}) {
 		return rawItemCompletedCarrier{}, false
 	}
 	return carrier, true
@@ -49,10 +51,37 @@ func unmarshalItemCompletedCarrier(params json.RawMessage) (rawItemCompletedCarr
 
 func unmarshalTurnCompletedCarrier(params json.RawMessage) (rawTurnCompletedCarrier, bool) {
 	var carrier rawTurnCompletedCarrier
-	if err := json.Unmarshal(params, &carrier); err != nil {
+	if !decodeExactCarrier(params, map[string]any{"threadId": &carrier.ThreadID, "turn": &carrier.Turn}) {
 		return rawTurnCompletedCarrier{}, false
 	}
 	return carrier, true
+}
+
+// Fallback attribution must use the same exact property names as typed
+// notifications. Extra fields must not select another thread or turn.
+func decodeExactCarrier(params json.RawMessage, dest map[string]any) bool {
+	if !json.Valid(params) || bytes.TrimSpace(params)[0] != '{' {
+		return false
+	}
+	fields := make(map[string]json.RawMessage, len(dest))
+	if !jsonobject.WalkFields(params, true, func(key, value []byte) {
+		for name := range dest {
+			if jsonobject.FieldMatches(key, name) {
+				fields[name] = value
+				break
+			}
+		}
+	}) {
+		return false
+	}
+	for key, value := range dest {
+		if raw, ok := fields[key]; ok {
+			if err := json.Unmarshal(raw, value); err != nil {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func rawCarrierForThread[T any](params json.RawMessage, threadID string, unmarshal func(json.RawMessage) (T, bool), threadIDOf func(T) string) (T, bool) {
@@ -83,13 +112,14 @@ func extractRawTurnCompletedID(turn json.RawMessage) string {
 		return ""
 	}
 
-	var carrier struct {
-		ID string `json:"id"`
-	}
-	if err := json.Unmarshal(turn, &carrier); err != nil {
+	// Turn's public decoder retains standard folded ID matching. Preserve that
+	// identity on semantic failure, including null and duplicate behavior, so
+	// start responses, successful callbacks and fallback completion agree.
+	id, err := jsonobject.IDField(turn)
+	if err != nil {
 		return ""
 	}
-	return carrier.ID
+	return id
 }
 
 func parseItemCompletedForThread(params json.RawMessage, threadID string) (ItemCompletedNotification, bool, error) {

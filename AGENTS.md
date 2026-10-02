@@ -36,6 +36,28 @@ This SDK uses **stdlib only** — no external dependencies. Do NOT introduce any
 ### Notification Handlers
 Register via `client.On<EventName>(func(notif <Type>))`. Client dispatches incoming notifications to registered handlers by method name.
 
+For transport ordering or delivery changes, derive the affected inventory from
+`ServerNotification.json` and typed handlers, including methods outside existing
+priority switches. Check that transport, typed and malformed fallback decoders
+agree on owner identity. Verify that shutdown releases queued payloads as well
+as preventing further callback admission. Require an explicit delivery policy
+for every known schema method, and verify that callback finalization survives
+failures in error-reporting hooks as well as in the primary handler.
+For peer-controlled buffers, bound retained data as well as event counts across
+queued, in-flight, fallback and replay ownership.
+For peer-controlled JSON selection, check temporary allocations across ignored
+fields, duplicate selected fields, identity length and nesting depth. Preserve
+the actual duplicate, alias, null and malformed-prefix rules; measure complete
+transport operations as well as isolated selection helpers.
+Follow identity selection into typed callbacks and runtime fallback attribution;
+distinguish ignored-property work from necessary semantic decoding of selected
+payloads. Check malformed semantic fields before and after dense metadata,
+including nested recovery and successful typed/cache paths.
+When replacing shared decoders, compare the complete public error contract,
+including outer wrappers, error precedence and direct receiver calls with invalid
+JSON. Keep reference models independent and verify new regressions against the
+prior revision instead of copying a helper without its calling boundary.
+
 ### Approval Flow
 Server→client requests for user approval (command exec, file write, etc.) flow through `Transport.OnRequest`. Each approval type has `*Params` and `*Response` types matching specs.
 

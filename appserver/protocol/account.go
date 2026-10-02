@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 	"reflect"
 )
 
@@ -200,14 +201,12 @@ func (a *AccountWrapper) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	var typeCheck struct {
-		Type string `json:"type"`
-	}
-	if err := json.Unmarshal(data, &typeCheck); err != nil {
+	typeStr, typeErr := jsonobject.TypeField(data)
+	if err := typeErr; err != nil {
 		return err
 	}
 
-	switch typeCheck.Type {
+	switch typeStr {
 	case "apiKey":
 		var apiKey ApiKeyAccount
 		if err := json.Unmarshal(data, &apiKey); err != nil {
@@ -221,7 +220,7 @@ func (a *AccountWrapper) UnmarshalJSON(data []byte) error {
 		}
 		a.Value = &chatgpt
 	default:
-		a.Value = &UnknownAccount{Type: typeCheck.Type, Raw: append(json.RawMessage(nil), data...)}
+		a.Value = &UnknownAccount{Type: typeStr, Raw: append(json.RawMessage(nil), data...)}
 	}
 
 	return nil
@@ -806,8 +805,8 @@ func UnmarshalLoginAccountResponse(data []byte) (LoginAccountResponse, error) {
 		return nil, errEmptyLoginAccountResponse
 	}
 
-	var envelope map[string]json.RawMessage
-	if err := json.Unmarshal(trimmed, &envelope); err != nil {
+	envelope, selectErr := jsonobject.SelectFields(trimmed, "type")
+	if err := selectErr; err != nil {
 		return nil, err
 	}
 	rawType, ok := envelope["type"]
