@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"io"
 )
 
 // jsonrpcVersion is the protocol version string for JSON-RPC 2.0.
@@ -104,23 +103,30 @@ func (r RequestID) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements json.Unmarshaler for RequestID.
 func (r *RequestID) UnmarshalJSON(data []byte) error {
+	if !json.Valid(data) {
+		return errors.New("invalid request id")
+	}
+	data = bytes.TrimSpace(data)
 	if bytes.Equal(data, []byte("null")) {
 		r.Value = nil
 		return nil
 	}
 
-	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.UseNumber()
-
-	var v interface{}
-	if err := dec.Decode(&v); err != nil {
-		return err
+	if data[0] == '"' {
+		var value string
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		r.Value = value
+		return nil
 	}
-	var trailing interface{}
-	if err := dec.Decode(&trailing); !errors.Is(err, io.EOF) {
-		return errors.New("invalid request id")
+	// Reject composite IDs before they can materialize a peer-controlled graph.
+	// An int64 spelling is at most 20 bytes; reject longer input before an
+	// error formatter or numeric parser can copy the entire rejected value.
+	if len(data) > 20 || (data[0] != '-' && (data[0] < '0' || data[0] > '9')) {
+		return errUnexpectedIDType
 	}
-	value, err := canonicalRequestIDValue(v, true)
+	value, err := parseJSONRequestID(string(data))
 	if err != nil {
 		return err
 	}

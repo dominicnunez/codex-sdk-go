@@ -688,6 +688,11 @@ func (t *StdioTransport) handleMalformedFrame(data []byte) {
 	if !hasID || hasMethod {
 		return
 	}
+	// A longer JSON number cannot correlate to an int64 request ID. Avoid
+	// passing peer-sized rejected spellings into numeric error formatting.
+	if number, ok := id.Value.(json.Number); ok && len(number) > 20 {
+		return
+	}
 	t.failPendingIDWithError(id, ErrCodeParseError, "failed to parse server response")
 }
 
@@ -700,14 +705,19 @@ func (t *StdioTransport) handleMalformedInboundObject() {
 func (t *StdioTransport) handleMalformedResponse(data []byte) {
 	t.malformedCount.Add(1)
 
-	var partial struct {
-		ID json.RawMessage `json:"id"`
+	if !json.Valid(data) {
+		return
 	}
-	if json.Unmarshal(data, &partial) != nil || len(partial.ID) == 0 {
+	var rawID json.RawMessage
+	if !walkJSONObjectFields(data, true, func(key, value []byte) {
+		if jsonFieldMatchesFolded(key, "id") {
+			rawID = value
+		}
+	}) || len(rawID) == 0 {
 		return
 	}
 
-	id, err := parseRequestID(partial.ID)
+	id, err := parseRequestID(rawID)
 	if err != nil {
 		return
 	}

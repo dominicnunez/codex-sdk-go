@@ -45,6 +45,10 @@ for every known schema method, and verify that callback finalization survives
 failures in error-reporting hooks as well as in the primary handler.
 For peer-controlled buffers, bound retained data as well as event counts across
 queued, in-flight, fallback and replay ownership.
+For peer-controlled JSON selection, check temporary allocations across ignored
+fields, duplicate selected fields, identity length and nesting depth. Preserve
+the actual duplicate, alias, null and malformed-prefix rules; measure complete
+transport operations as well as isolated selection helpers.
 
 ### Approval Flow
 Server→client requests for user approval (command exec, file write, etc.) flow through `Transport.OnRequest`. Each approval type has `*Params` and `*Response` types matching specs.

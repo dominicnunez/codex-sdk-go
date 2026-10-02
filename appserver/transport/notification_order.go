@@ -21,19 +21,29 @@ func orderedNotificationKey(notif Notification) string {
 	field := "threadId"
 	switch notif.Method {
 	case protocol.NotifyThreadStarted:
-		var fields map[string]json.RawMessage
-		if err := json.Unmarshal(notif.Params, &fields); err != nil {
+		raw, _, ok := selectJSONObjectField(notif.Params, "thread")
+		if !ok {
 			return ""
 		}
-		// Thread's own decoder uses the standard field matching rules for id.
-		// The containing notification requires an exact "thread" property.
-		var carrier struct {
-			ID *string `json:"id"`
-		}
-		if err := json.Unmarshal(fields["thread"], &carrier); err != nil || carrier.ID == nil {
+		// Thread.id follows standard field matching, including aliases and
+		// sticky type errors, while the containing "thread" is exact.
+		var selected json.RawMessage
+		invalid := false
+		if !walkJSONObjectFields(raw, true, func(key, value []byte) {
+			if jsonFieldMatchesFolded(key, "id") {
+				selected = value
+				if value[0] != '"' && string(value) != "null" {
+					invalid = true
+				}
+			}
+		}) || invalid {
 			return ""
 		}
-		return "thread:" + *carrier.ID
+		var id *string
+		if err := json.Unmarshal(selected, &id); err != nil || id == nil {
+			return ""
+		}
+		return "thread:" + *id
 	case protocol.NotifyProcessOutputDelta, protocol.NotifyProcessExited:
 		kind, field = "process", "processHandle"
 	case protocol.NotifyCommandExecOutputDelta:
@@ -56,12 +66,11 @@ func orderedNotificationKey(notif Notification) string {
 			return "method:" + notif.Method
 		}
 	}
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(notif.Params, &fields); err != nil {
+	raw, exists, ok := selectJSONObjectField(notif.Params, field)
+	if !ok {
 		return ""
 	}
 	var id *string
-	raw, exists := fields[field]
 	if !exists && hasOptionalThreadOwner(notif.Method) {
 		return "method:" + notif.Method
 	}
