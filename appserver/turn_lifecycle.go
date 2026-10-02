@@ -112,13 +112,14 @@ func extractRawTurnCompletedID(turn json.RawMessage) string {
 		return ""
 	}
 
-	var carrier struct {
-		ID string `json:"id"`
-	}
-	if !decodeExactCarrier(turn, map[string]any{"id": &carrier.ID}) {
+	// Turn's public decoder retains standard folded ID matching. Preserve that
+	// identity on semantic failure, including null and duplicate behavior, so
+	// start responses, successful callbacks and fallback completion agree.
+	id, err := jsonobject.IDField(turn)
+	if err != nil {
 		return ""
 	}
-	return carrier.ID
+	return id
 }
 
 func parseItemCompletedForThread(params json.RawMessage, threadID string) (ItemCompletedNotification, bool, error) {

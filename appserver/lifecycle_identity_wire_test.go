@@ -62,7 +62,7 @@ func (w denseLifecycleWriter) Write(p []byte) (int, error) {
 		}
 	}
 	if notification.Method == "turn/completed" && w.scenario == "turn" {
-		turn := lifecycleWireMetadata(`{"id":"turn-1","ID":"foreign","status":99`, `,"items":[]}`, w.count)
+		turn := lifecycleWireMetadata(`{"ID":"foreign","id":"turn-1","status":99`, `,"items":[]}`, w.count)
 		notification.Params = append(json.RawMessage(`{"threadId":"thread-1","turn":`), turn...)
 		notification.Params = append(notification.Params, '}')
 	}

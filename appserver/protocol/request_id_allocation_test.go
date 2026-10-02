@@ -13,7 +13,7 @@ import (
 
 func TestRequestIDRejectsCompositeWithoutMaterialization(t *testing.T) {
 	object := `{"k":[` + strings.Repeat(`{},`, 50000) + `null]}`
-	for _, data := range []string{object, `[` + object + `]`, `7 ` + object, strings.Repeat("9", 1024*1024)} {
+	for _, data := range []string{object, `[` + object + `]`, `7 ` + object, object + ` x`, object[:len(object)-1], strings.Repeat("9", 1024*1024)} {
 		raw := []byte(data)
 		var id protocol.RequestID
 		var err error

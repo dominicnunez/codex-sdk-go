@@ -5,6 +5,7 @@ package jsonobject
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"unicode"
 	"unicode/utf8"
 )
@@ -40,27 +41,52 @@ func TypeField(data []byte) (string, error) {
 		err := json.Unmarshal(data, &value)
 		return value.Type, err
 	}
+	return stringField(data, "type")
+}
+
+// IDField follows the standard nested Turn string ID decoder, including folded
+// aliases, null leaving a prior string unchanged and sticky type failures.
+func IDField(data []byte) (string, error) {
+	if !json.Valid(data) || bytes.TrimSpace(data)[0] != '{' {
+		var value struct {
+			ID string `json:"id"`
+		}
+		err := json.Unmarshal(data, &value)
+		return value.ID, err
+	}
+	return stringField(data, "id")
+}
+
+func stringField(data []byte, name string) (string, error) {
 	var selected []byte
 	var invalid []byte
-	WalkFields(data, true, func(key, value []byte) {
-		if !FieldMatchesFolded(key, "type") {
+	var invalidOffset int
+	walkFields(data, true, func(key, value []byte, offset int) {
+		if !FieldMatchesFolded(key, name) {
 			return
 		}
 		if value[0] == '"' {
 			selected = value
 		} else if !bytes.Equal(value, []byte("null")) && invalid == nil {
 			invalid = value
+			invalidOffset = offset
 		}
 	})
 	var value string
-	if invalid != nil {
-		err := json.Unmarshal(invalid, &value)
-		return "", err
-	}
 	if selected != nil {
 		if err := json.Unmarshal(selected, &value); err != nil {
 			return "", err
 		}
+	}
+	if invalid != nil {
+		var ignored string
+		err := json.Unmarshal(invalid, &ignored)
+		var typeError *json.UnmarshalTypeError
+		if errors.As(err, &typeError) {
+			typeError.Field = name
+			typeError.Offset += int64(invalidOffset)
+		}
+		return value, err
 	}
 	return value, nil
 }
@@ -85,6 +111,10 @@ func SelectField(data []byte, name string) (json.RawMessage, bool, bool) {
 // property before a malformed suffix. Full
 // object selection validates first; prefix recovery validates each property.
 func WalkFields(data []byte, validated bool, visit func(key, value []byte)) bool {
+	return walkFields(data, validated, func(key, value []byte, _ int) { visit(key, value) })
+}
+
+func walkFields(data []byte, validated bool, visit func(key, value []byte, offset int)) bool {
 	i := SkipWhitespace(data, 0)
 	if bytes.Equal(bytes.TrimSpace(data), []byte("null")) {
 		return true
@@ -111,7 +141,7 @@ func WalkFields(data []byte, validated bool, visit func(key, value []byte)) bool
 		if !ok || (!validated && !json.Valid(data[i:valueEnd])) {
 			return false
 		}
-		visit(data[keyStart:keyEnd], data[i:valueEnd])
+		visit(data[keyStart:keyEnd], data[i:valueEnd], i)
 		i = SkipWhitespace(data, valueEnd)
 		if i >= len(data) {
 			return false

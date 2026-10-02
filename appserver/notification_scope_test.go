@@ -23,7 +23,9 @@ func TestMalformedCompletionFallbackUsesExactOwner(t *testing.T) {
 		t.Fatal("extra metadata attributed malformed completion to another thread")
 	}
 	candidate, ok, err := parseTurnCompletedForThread(turn, "a", false)
-	if !ok || err == nil || candidate.notification.ThreadID != "a" || candidate.turnID != "turn-a" {
+	// The outer owner remains exact. Nested Turn IDs retain the typed Turn
+	// decoder's folded spelling, so failure must still correlate to turn-b.
+	if !ok || err == nil || candidate.notification.ThreadID != "a" || candidate.turnID != "turn-b" {
 		t.Fatalf("malformed turn attribution = %#v, %v, %v", candidate, ok, err)
 	}
 }

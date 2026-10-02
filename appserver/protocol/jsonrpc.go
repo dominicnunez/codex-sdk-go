@@ -104,7 +104,7 @@ func (r RequestID) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON implements json.Unmarshaler for RequestID.
 func (r *RequestID) UnmarshalJSON(data []byte) error {
 	if !json.Valid(data) {
-		return errors.New("invalid request id")
+		return invalidRequestIDSyntax(data)
 	}
 	data = bytes.TrimSpace(data)
 	if bytes.Equal(data, []byte("null")) {
@@ -132,4 +132,21 @@ func (r *RequestID) UnmarshalJSON(data []byte) error {
 	}
 	r.Value = value
 	return nil
+}
+
+// Preserve the original Decoder diagnostics and trailing-input error without
+// constructing a value graph. Decoder validates before invoking this sink.
+type discardedRequestIDValue struct{}
+
+func (*discardedRequestIDValue) UnmarshalJSON([]byte) error { return nil }
+
+func invalidRequestIDSyntax(data []byte) error {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	var ignored discardedRequestIDValue
+	if err := decoder.Decode(&ignored); err != nil {
+		return err
+	}
+	// Whole-input validation already failed. If the first value decoded, the
+	// remaining input is exactly the old trailing-input error case.
+	return errors.New("invalid request id")
 }
