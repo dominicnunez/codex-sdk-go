@@ -41,6 +41,8 @@ For transport ordering or delivery changes, derive the affected inventory from
 priority switches. Check that transport, typed and malformed fallback decoders
 agree on owner identity. Verify that shutdown releases queued payloads as well
 as preventing further callback admission.
+For peer-controlled buffers, bound retained data as well as event counts across
+queued, in-flight, fallback and replay ownership.
 
 ### Approval Flow
 Server→client requests for user approval (command exec, file write, etc.) flow through `Transport.OnRequest`. Each approval type has `*Params` and `*Response` types matching specs.

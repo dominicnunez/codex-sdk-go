@@ -316,7 +316,7 @@ func TestOrderedAggregateBacklogIsBounded(t *testing.T) {
 	t.Cleanup(cancel)
 	tr := &StdioTransport{ctx: ctx, cancelCtx: cancel, readerStopped: make(chan struct{})}
 	for i := range maxOrderedNotificationBacklog {
-		tr.enqueueTurnScopedNotification(Notification{Method: protocol.NotifyTurnCompleted}, fmt.Sprintf("thread:%d", i/maxTurnScopedNotificationQueueSize))
+		tr.enqueueTurnScopedNotification(bufferedNotification{Notification: Notification{Method: protocol.NotifyTurnCompleted}}, fmt.Sprintf("thread:%d", i/maxTurnScopedNotificationQueueSize))
 	}
 	if tr.ScanErr() != nil {
 		t.Fatalf("valid aggregate backlog rejected: %v", tr.ScanErr())
@@ -325,7 +325,7 @@ func TestOrderedAggregateBacklogIsBounded(t *testing.T) {
 	if _, ok := tr.dequeueTurnScopedNotification(queue); !ok {
 		t.Fatal("full backlog could not drain")
 	}
-	tr.enqueueTurnScopedNotification(Notification{Method: protocol.NotifyAgentMessageDelta}, "thread:0")
+	tr.enqueueTurnScopedNotification(bufferedNotification{Notification: Notification{Method: protocol.NotifyAgentMessageDelta}}, "thread:0")
 	if tr.ScanErr() != nil || tr.orderedNotifCount != maxOrderedNotificationBacklog {
 		t.Fatal("dequeue did not restore aggregate capacity")
 	}
@@ -334,12 +334,12 @@ func TestOrderedAggregateBacklogIsBounded(t *testing.T) {
 		t.Fatal("clear did not release all queued capacity")
 	}
 	for range maxTurnScopedNotificationQueueSize {
-		tr.enqueueTurnScopedNotification(Notification{Method: protocol.NotifyTurnCompleted}, "thread:0")
+		tr.enqueueTurnScopedNotification(bufferedNotification{Notification: Notification{Method: protocol.NotifyTurnCompleted}}, "thread:0")
 	}
 	if tr.ScanErr() != nil || tr.orderedNotifCount != maxOrderedNotificationBacklog {
 		t.Fatal("clear did not restore aggregate capacity")
 	}
-	tr.enqueueTurnScopedNotification(Notification{Method: protocol.NotifyAgentMessageDelta}, "thread:extra")
+	tr.enqueueTurnScopedNotification(bufferedNotification{Notification: Notification{Method: protocol.NotifyAgentMessageDelta}}, "thread:extra")
 	if !errors.Is(tr.ScanErr(), errTurnScopedNotificationQueueOverflow) {
 		t.Fatalf("aggregate overflow = %v", tr.ScanErr())
 	}
@@ -418,7 +418,7 @@ func TestCloseRejectsOrderedQueueSelectedBeforeEOF(t *testing.T) {
 	tr := &StdioTransport{ctx: ctx, cancelCtx: cancel, readerStopped: make(chan struct{})}
 	var handled atomic.Int32
 	tr.OnNotify(func(context.Context, Notification) { handled.Add(1) })
-	tr.enqueueTurnScopedNotification(Notification{Method: protocol.NotifyTurnCompleted}, "thread:a")
+	tr.enqueueTurnScopedNotification(bufferedNotification{Notification: Notification{Method: protocol.NotifyTurnCompleted}}, "thread:a")
 	queue, ok := tr.nextTurnScopedNotificationQueue()
 	if !ok {
 		t.Fatal("queue was not selected")

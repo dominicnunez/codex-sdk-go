@@ -81,7 +81,8 @@ type StdioTransport struct {
 	reqHandler          RequestHandler
 	notifHandler        NotificationHandler
 	pendingReqHandler   []Request
-	pendingNotifHandle  []Notification
+	pendingNotifHandle  []bufferedNotification
+	notificationBudget  notificationBudget
 	requestQueue        chan Request
 	turnNotifQueuesMu   sync.Mutex
 	turnNotifQueues     map[string]*turnScopedNotificationQueue
@@ -91,11 +92,11 @@ type StdioTransport struct {
 	turnNotifReadyCond  *sync.Cond
 	turnNotifReadyOnce  sync.Once
 	turnNotifStopped    atomic.Bool
-	streamingNotifQueue chan Notification
+	streamingNotifQueue chan bufferedNotification
 	streamingBacklog    streamingNotificationBacklog
-	protectedNotifQueue chan Notification
-	criticalNotifQueue  chan Notification
-	notifQueue          chan Notification
+	protectedNotifQueue chan bufferedNotification
+	criticalNotifQueue  chan bufferedNotification
+	notifQueue          chan bufferedNotification
 	writeQueue          chan writeEnvelope
 	readerStopped       chan struct{}
 	once                sync.Once
@@ -138,10 +139,10 @@ func NewStdioTransport(reader io.ReadCloser, writer io.Writer) *StdioTransport {
 		pendingReqs:         make(map[string]pendingReq),
 		requestQueue:        make(chan Request, inboundRequestQueueSize),
 		turnNotifQueues:     make(map[string]*turnScopedNotificationQueue),
-		streamingNotifQueue: make(chan Notification, streamingNotifQueueSize),
-		protectedNotifQueue: make(chan Notification, protectedNotifQueueSize),
-		criticalNotifQueue:  make(chan Notification, criticalNotifQueueSize),
-		notifQueue:          make(chan Notification, inboundNotifQueueSize),
+		streamingNotifQueue: make(chan bufferedNotification, streamingNotifQueueSize),
+		protectedNotifQueue: make(chan bufferedNotification, protectedNotifQueueSize),
+		criticalNotifQueue:  make(chan bufferedNotification, criticalNotifQueueSize),
+		notifQueue:          make(chan bufferedNotification, inboundNotifQueueSize),
 		writeQueue:          make(chan writeEnvelope, outboundWriteQueueSize),
 		readerStopped:       make(chan struct{}),
 		ctx:                 ctx,
@@ -256,7 +257,11 @@ func (t *StdioTransport) OnRequest(handler RequestHandler) {
 // OnNotify registers a handler for incoming JSON-RPC notifications from the server.
 func (t *StdioTransport) OnNotify(handler NotificationHandler) {
 	pending := swapPendingHandler(t, func() { t.notifHandler = handler }, &t.pendingNotifHandle)
-	replayPending(pending, t.enqueueNotification)
+	for i := range pending {
+		notif := pending[i]
+		pending[i] = bufferedNotification{}
+		t.enqueueBufferedNotification(notif)
+	}
 	t.wakeTurnScopedNotificationWorkers()
 }
 
@@ -271,7 +276,7 @@ func (t *StdioTransport) OnPanic(handler func(v any)) {
 
 // Close shuts down the transport. Safe to call multiple times.
 func (t *StdioTransport) Close() error {
-	t.stopTurnScopedNotificationWorkers()
+	t.stopNotificationWorkers()
 	t.closeWithFailure(nil, errTransportClosed)
 	return nil
 }
@@ -388,7 +393,7 @@ func (t *StdioTransport) closeWithFailure(scanErr error, cause error) {
 	pending, cancel, readerCloser := t.takeStopResourcesLocked()
 	t.mu.Unlock()
 
-	t.stopTurnScopedNotificationWorkers()
+	t.stopNotificationWorkers()
 	t.finishTransportStop(cancel, readerCloser)
 
 	pendingErr := pendingRequestTransportError("send failed", cause)

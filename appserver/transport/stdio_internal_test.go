@@ -529,20 +529,20 @@ func TestRequestWorkerSkipsBufferedRequestAfterCancellation(t *testing.T) {
 func TestNotificationWorkerSkipsBufferedNotificationsAfterCancellation(t *testing.T) {
 	tests := []struct {
 		name   string
-		queue  chan Notification
+		queue  chan bufferedNotification
 		worker func(*StdioTransport)
 	}{
 		{
 			name: "standard",
-			queue: func() chan Notification {
-				return make(chan Notification, 1)
+			queue: func() chan bufferedNotification {
+				return make(chan bufferedNotification, 1)
 			}(),
 			worker: (*StdioTransport).notificationWorker,
 		},
 		{
 			name: "critical",
-			queue: func() chan Notification {
-				return make(chan Notification, 1)
+			queue: func() chan bufferedNotification {
+				return make(chan bufferedNotification, 1)
 			}(),
 			worker: (*StdioTransport).criticalNotificationWorker,
 		},
@@ -563,7 +563,7 @@ func TestNotificationWorkerSkipsBufferedNotificationsAfterCancellation(t *testin
 				handled.Add(1)
 			})
 
-			tt.queue <- Notification{Method: "test/notification"}
+			tt.queue <- bufferedNotification{Notification: Notification{Method: "test/notification"}}
 			cancel()
 			tt.worker(transport)
 
@@ -590,7 +590,7 @@ func TestTurnScopedNotificationWorkerSkipsBufferedNotificationsAfterCancellation
 
 	queue := &turnScopedNotificationQueue{
 		threadKey: "thread-1",
-		queue:     []Notification{{Method: notifyTurnCompleted}},
+		queue:     []bufferedNotification{{Notification: Notification{Method: notifyTurnCompleted}}},
 	}
 	queue.scheduled = true
 	transport.turnNotifQueues["thread-1"] = queue
@@ -619,9 +619,9 @@ func TestEnqueueTurnScopedNotificationSchedulesDistinctQueuesOnce(t *testing.T) 
 	transport.initTurnScopedScheduler()
 
 	for i := range 8 {
-		transport.enqueueTurnScopedNotification(Notification{Method: notifyTurnCompleted}, fmt.Sprintf("thread-%d", i))
+		transport.enqueueTurnScopedNotification(bufferedNotification{Notification: Notification{Method: notifyTurnCompleted}}, fmt.Sprintf("thread-%d", i))
 	}
-	transport.enqueueTurnScopedNotification(Notification{Method: notifyTurnCompleted}, "thread-3")
+	transport.enqueueTurnScopedNotification(bufferedNotification{Notification: Notification{Method: notifyTurnCompleted}}, "thread-3")
 
 	if got := len(transport.turnNotifQueues); got != 8 {
 		t.Fatalf("tracked turn-scoped queues = %d, want 8", got)
@@ -648,10 +648,10 @@ func TestEnqueueTurnScopedNotificationOverflowClosesTransport(t *testing.T) {
 	transport.initTurnScopedScheduler()
 
 	for i := 0; i < maxTurnScopedNotificationQueueSize; i++ {
-		transport.enqueueTurnScopedNotification(Notification{Method: notifyTurnCompleted}, "thread-1")
+		transport.enqueueTurnScopedNotification(bufferedNotification{Notification: Notification{Method: notifyTurnCompleted}}, "thread-1")
 	}
 
-	transport.enqueueTurnScopedNotification(Notification{Method: notifyTurnCompleted}, "thread-1")
+	transport.enqueueTurnScopedNotification(bufferedNotification{Notification: Notification{Method: notifyTurnCompleted}}, "thread-1")
 
 	if !errors.Is(transport.ScanErr(), errTurnScopedNotificationQueueOverflow) {
 		t.Fatalf("ScanErr() = %v, want %v", transport.ScanErr(), errTurnScopedNotificationQueueOverflow)
@@ -865,9 +865,9 @@ func TestEnqueueTurnScopedNotificationQueueLimitClosesTransport(t *testing.T) {
 	transport.initTurnScopedScheduler()
 
 	for i := range maxTurnScopedNotificationQueues {
-		transport.enqueueTurnScopedNotification(Notification{Method: notifyTurnCompleted}, fmt.Sprintf("thread-%d", i))
+		transport.enqueueTurnScopedNotification(bufferedNotification{Notification: Notification{Method: notifyTurnCompleted}}, fmt.Sprintf("thread-%d", i))
 	}
-	transport.enqueueTurnScopedNotification(Notification{Method: notifyTurnCompleted}, "thread-overflow")
+	transport.enqueueTurnScopedNotification(bufferedNotification{Notification: Notification{Method: notifyTurnCompleted}}, "thread-overflow")
 
 	if got := len(transport.turnNotifQueues); got != 0 {
 		t.Fatalf("stopped transport retained %d turn-scoped queues", got)
@@ -893,7 +893,7 @@ func TestProtectedNotificationQueueOverflowClosesTransport(t *testing.T) {
 
 	transport := &StdioTransport{
 		pendingReqs:         make(map[string]pendingReq),
-		protectedNotifQueue: make(chan Notification, 1),
+		protectedNotifQueue: make(chan bufferedNotification, 1),
 		readerStopped:       make(chan struct{}),
 		ctx:                 ctx,
 		cancelCtx:           cancel,
@@ -901,8 +901,8 @@ func TestProtectedNotificationQueueOverflowClosesTransport(t *testing.T) {
 
 	first := Notification{Method: notifyConfigWarning}
 	second := Notification{Method: notifyModelRerouted}
-	transport.protectedNotifQueue <- first
-	transport.enqueueProtectedNotification(second)
+	transport.protectedNotifQueue <- bufferedNotification{Notification: first}
+	transport.enqueueProtectedNotification(bufferedNotification{Notification: second})
 
 	if !errors.Is(transport.ScanErr(), errNotificationQueueOverflow) {
 		t.Fatalf("ScanErr() = %v, want %v", transport.ScanErr(), errNotificationQueueOverflow)
