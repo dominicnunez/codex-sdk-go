@@ -3,6 +3,7 @@ package protocol
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
 // Shared Event Types
@@ -349,14 +350,12 @@ func (w *PatchChangeKindWrapper) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	var typeCheck struct {
-		Type string `json:"type"`
-	}
-	if err := json.Unmarshal(data, &typeCheck); err != nil {
+	typeStr, typeErr := jsonobject.TypeField(data)
+	if err := typeErr; err != nil {
 		return err
 	}
 
-	switch typeCheck.Type {
+	switch typeStr {
 	case "add":
 		w.Value = &AddPatchChangeKind{}
 		return nil
@@ -371,7 +370,7 @@ func (w *PatchChangeKindWrapper) UnmarshalJSON(data []byte) error {
 		w.Value = &u
 		return nil
 	default:
-		w.Value = &UnknownPatchChangeKind{Type: typeCheck.Type, Raw: append(json.RawMessage(nil), data...)}
+		w.Value = &UnknownPatchChangeKind{Type: typeStr, Raw: append(json.RawMessage(nil), data...)}
 		return nil
 	}
 }
@@ -498,14 +497,12 @@ func (w *WebSearchActionWrapper) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	var typeCheck struct {
-		Type string `json:"type"`
-	}
-	if err := json.Unmarshal(data, &typeCheck); err != nil {
+	typeStr, typeErr := jsonobject.TypeField(data)
+	if err := typeErr; err != nil {
 		return err
 	}
 
-	switch typeCheck.Type {
+	switch typeStr {
 	case "search":
 		var s SearchWebSearchAction
 		if err := json.Unmarshal(data, &s); err != nil {
@@ -531,7 +528,7 @@ func (w *WebSearchActionWrapper) UnmarshalJSON(data []byte) error {
 		w.Value = &OtherWebSearchAction{}
 		return nil
 	default:
-		w.Value = &UnknownWebSearchAction{Type: typeCheck.Type, Raw: append(json.RawMessage(nil), data...)}
+		w.Value = &UnknownWebSearchAction{Type: typeStr, Raw: append(json.RawMessage(nil), data...)}
 		return nil
 	}
 }

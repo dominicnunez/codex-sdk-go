@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
 // CommandExecutionRequestApprovalParams represents parameters for command execution approval.
@@ -163,14 +164,12 @@ func (w *CommandActionWrapper) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	var raw struct {
-		Type string `json:"type"`
-	}
-	if err := json.Unmarshal(data, &raw); err != nil {
+	typeStr, typeErr := jsonobject.TypeField(data)
+	if err := typeErr; err != nil {
 		return err
 	}
 
-	switch raw.Type {
+	switch typeStr {
 	case "read":
 		if err := validateRequiredObjectFields(data, "command", "name", "path", "type"); err != nil {
 			return err
@@ -320,8 +319,8 @@ func (w *CommandExecutionApprovalDecisionWrapper) UnmarshalJSON(data []byte) err
 	}
 
 	// Dispatch on which key is present in the JSON object
-	var keys map[string]json.RawMessage
-	if err := json.Unmarshal(data, &keys); err != nil {
+	keys, selectErr := jsonobject.SelectFields(data, "acceptWithExecpolicyAmendment", "applyNetworkPolicyAmendment")
+	if err := selectErr; err != nil {
 		return fmt.Errorf("unable to unmarshal CommandExecutionApprovalDecision: %w", err)
 	}
 
@@ -585,14 +584,12 @@ func (w *ParsedCommandWrapper) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	var raw struct {
-		Type string `json:"type"`
-	}
-	if err := json.Unmarshal(data, &raw); err != nil {
+	typeStr, typeErr := jsonobject.TypeField(data)
+	if err := typeErr; err != nil {
 		return err
 	}
 
-	switch raw.Type {
+	switch typeStr {
 	case "read":
 		if err := validateRequiredObjectFields(data, "cmd", "name", "path", "type"); err != nil {
 			return err

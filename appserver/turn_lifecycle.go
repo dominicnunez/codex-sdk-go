@@ -1,6 +1,7 @@
 package appserver
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -8,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/dominicnunez/codex-sdk-go/appserver/protocol"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
 const maxPendingTurnStartNotifications = 1024
@@ -58,8 +60,18 @@ func unmarshalTurnCompletedCarrier(params json.RawMessage) (rawTurnCompletedCarr
 // Fallback attribution must use the same exact property names as typed
 // notifications. Extra fields must not select another thread or turn.
 func decodeExactCarrier(params json.RawMessage, dest map[string]any) bool {
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(params, &fields); err != nil || fields == nil {
+	if !json.Valid(params) || bytes.TrimSpace(params)[0] != '{' {
+		return false
+	}
+	fields := make(map[string]json.RawMessage, len(dest))
+	if !jsonobject.WalkFields(params, true, func(key, value []byte) {
+		for name := range dest {
+			if jsonobject.FieldMatches(key, name) {
+				fields[name] = value
+				break
+			}
+		}
+	}) {
 		return false
 	}
 	for key, value := range dest {

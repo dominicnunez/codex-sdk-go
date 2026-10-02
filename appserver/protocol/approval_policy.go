@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
 // AskForApproval represents approval policy for operations
@@ -85,8 +86,7 @@ func (a *AskForApprovalWrapper) UnmarshalJSON(data []byte) error {
 
 	// Try granular object — validate that the discriminating "granular" key
 	// is present, otherwise any JSON object would silently match
-	var rawObj map[string]json.RawMessage
-	if err := json.Unmarshal(data, &rawObj); err == nil {
+	if rawObj, err := jsonobject.SelectFields(data, "granular"); err == nil {
 		if _, hasKey := rawObj["granular"]; hasKey {
 			var granular ApprovalPolicyGranular
 			if err := json.Unmarshal(data, &granular); err != nil {

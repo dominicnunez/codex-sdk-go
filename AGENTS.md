@@ -49,6 +49,10 @@ For peer-controlled JSON selection, check temporary allocations across ignored
 fields, duplicate selected fields, identity length and nesting depth. Preserve
 the actual duplicate, alias, null and malformed-prefix rules; measure complete
 transport operations as well as isolated selection helpers.
+Follow identity selection into typed callbacks and runtime fallback attribution;
+distinguish ignored-property work from necessary semantic decoding of selected
+payloads. Check malformed semantic fields before and after dense metadata,
+including nested recovery and successful typed/cache paths.
 
 ### Approval Flow
 Server→client requests for user approval (command exec, file write, etc.) flow through `Transport.OnRequest`. Each approval type has `*Params` and `*Response` types matching specs.

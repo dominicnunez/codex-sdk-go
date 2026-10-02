@@ -79,6 +79,29 @@ func TestStdioPreservesCachedThreadNameOrder(t *testing.T) {
 	}
 }
 
+func TestStdioDenseTypedThreadUpdate(t *testing.T) {
+	r, w := io.Pipe()
+	tr := transport.NewStdioTransport(r, io.Discard)
+	t.Cleanup(func() { _ = tr.Close(); _ = w.Close() })
+	c := protocol.NewClient(tr)
+	c.CacheThreadState(protocol.Thread{ID: "thread"})
+	seen := make(chan string, 1)
+	c.OnThreadNameUpdated(func(n protocol.ThreadNameUpdatedNotification) { seen <- n.ThreadID })
+	params := denseLifecycleObject(`{"threadId":"thread","ThreadID":"foreign","threadName":"new"`, `}`, 50000)
+	writeOrderedWire(t, w, protocol.NotifyThreadNameUpdated, params)
+	select {
+	case owner := <-seen:
+		if owner != "thread" {
+			t.Fatal(owner)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("typed update did not complete")
+	}
+	if snapshot, ok := c.ThreadStateSnapshot("thread"); !ok || snapshot.Name == nil || *snapshot.Name != "new" {
+		t.Fatalf("cache=%+v,%v", snapshot, ok)
+	}
+}
+
 func writeOrderedWire(t *testing.T, w io.Writer, method string, params any) {
 	t.Helper()
 	b, err := json.Marshal(map[string]any{"jsonrpc": "2.0", "method": method, "params": params})

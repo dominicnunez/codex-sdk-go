@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
 // SessionSource represents the source of a thread session
@@ -143,8 +144,7 @@ func (s *SessionSourceWrapper) UnmarshalJSON(data []byte) error {
 	}
 
 	// Try object
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(data, &raw); err == nil {
+	if raw, err := jsonobject.SelectFields(data, "subAgent"); err == nil {
 		if subAgentRaw, hasKey := raw["subAgent"]; hasKey {
 			subAgent, err := unmarshalSubAgentSource(subAgentRaw)
 			if err != nil {
@@ -170,8 +170,8 @@ func unmarshalSubAgentSource(data json.RawMessage) (SubAgentSource, error) {
 	}
 
 	// Try object variants
-	var keys map[string]json.RawMessage
-	if err := json.Unmarshal(data, &keys); err != nil {
+	keys, selectErr := jsonobject.SelectFields(data, "thread_spawn", "other")
+	if err := selectErr; err != nil {
 		return nil, fmt.Errorf("unable to unmarshal SubAgentSource: %w", err)
 	}
 

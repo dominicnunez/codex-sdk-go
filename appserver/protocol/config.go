@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
 // ConfigReadParams represents parameters for config/read request
@@ -377,8 +378,8 @@ func (w *ConfigLayerSourceWrapper) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("config layer source: %w", err)
 	}
 
-	var obj map[string]json.RawMessage
-	if err := json.Unmarshal(data, &obj); err != nil {
+	obj, selectErr := jsonobject.SelectFields(data, "type")
+	if err := selectErr; err != nil {
 		return fmt.Errorf("config layer source: %w", err)
 	}
 

@@ -10,6 +10,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
 var errInvalidParams = ErrInvalidParams
@@ -75,8 +77,7 @@ func validateObjectResponseResult(result json.RawMessage) error {
 		return ErrEmptyResult
 	}
 
-	var payload map[string]json.RawMessage
-	if err := json.Unmarshal(result, &payload); err != nil {
+	if _, err := jsonobject.SelectFields(result); err != nil {
 		return fmt.Errorf("%w: %w", ErrResultNotObject, err)
 	}
 
@@ -124,17 +125,15 @@ func decodeRequiredObjectTypeField(data []byte, context string) (string, error) 
 		return "", err
 	}
 
-	var raw struct {
-		Type string `json:"type"`
-	}
-	if err := json.Unmarshal(data, &raw); err != nil {
+	typeStr, typeErr := jsonobject.TypeField(data)
+	if err := typeErr; err != nil {
 		return "", err
 	}
-	if raw.Type == "" {
+	if typeStr == "" {
 		return "", fmt.Errorf("%s: missing or empty type field", context)
 	}
 
-	return raw.Type, nil
+	return typeStr, nil
 }
 
 func validateDecodedResponse(result interface{}) error {
