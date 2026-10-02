@@ -276,15 +276,19 @@ func (t *StdioTransport) handleTurnScopedNotificationQueue(queue *turnScopedNoti
 	t.mu.Lock()
 	handler, panicFn := t.notifHandler, t.panicHandler
 	t.mu.Unlock()
+	var current bufferedNotification
+	defer func() {
+		// Finalize even when callback reporting fails, retaining the key's
+		// reservation until finish retires or reschedules this owner.
+		t.finishTurnScopedNotification(queue)
+		current.release()
+	}()
 	if handler != nil {
 		if notif, ok := t.dequeueTurnScopedNotification(queue); ok {
-			// Release after finish retires an empty queue's owner key.
-			defer notif.release()
+			current = notif
 			t.invokeNotificationHandler(notif.Notification, handler, panicFn)
 		}
 	}
-	// Yield after each callback so a busy scope cannot monopolize a worker.
-	t.finishTurnScopedNotification(queue)
 }
 
 func (t *StdioTransport) finishTurnScopedNotification(queue *turnScopedNotificationQueue) {
@@ -535,6 +539,9 @@ func isProtectedNotificationMethod(method string) bool {
 		protocol.NotifyItemGuardianApprovalReviewCompleted:
 		return true
 	case protocol.NotifyFileChangePatchUpdated,
+		"externalAgentConfig/import/progress", "externalAgentConfig/import/completed",
+		"project/changed", "fs/changed", "mcpServer/event/stream/notification",
+		"remoteControl/status/changed",
 		"thread/deleted", "thread/reverted", "thread/goal/updated", "thread/goal/cleared",
 		"thread/queue/changed", "thread/project/updated",
 		"thread/environment/connected", "thread/environment/disconnected",
@@ -655,9 +662,7 @@ func (t *StdioTransport) handleNotification(notif bufferedNotification) {
 func (t *StdioTransport) invokeNotificationHandler(notif Notification, handler NotificationHandler, panicFn func(any)) {
 	defer func() {
 		if r := recover(); r != nil {
-			if panicFn != nil {
-				panicFn(r)
-			}
+			reportRecoveredPanic(panicFn, r)
 		}
 	}()
 	handler(t.ctx, notif)

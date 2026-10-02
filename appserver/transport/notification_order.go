@@ -30,7 +30,7 @@ func orderedNotificationKey(notif Notification) string {
 		var carrier struct {
 			ID *string `json:"id"`
 		}
-		if err := json.Unmarshal(fields["thread"], &carrier); err != nil || carrier.ID == nil || *carrier.ID == "" {
+		if err := json.Unmarshal(fields["thread"], &carrier); err != nil || carrier.ID == nil {
 			return ""
 		}
 		return "thread:" + *carrier.ID
@@ -40,6 +40,14 @@ func orderedNotificationKey(notif Notification) string {
 		kind, field = "command", "processId"
 	case protocol.NotifyFuzzyFileSearchSessionUpdated, protocol.NotifyFuzzyFileSearchSessionCompleted:
 		kind, field = "search", "sessionId"
+	case "externalAgentConfig/import/progress", "externalAgentConfig/import/completed":
+		kind, field = "import", "importId"
+	case "project/changed":
+		kind, field = "project", "projectId"
+	case "fs/changed":
+		kind, field = "watch", "watchId"
+	case "mcpServer/event/stream/notification":
+		kind, field = "subscription", "subscriptionId"
 	default:
 		if strings.HasPrefix(notif.Method, "account/") {
 			return "account"
@@ -52,7 +60,7 @@ func orderedNotificationKey(notif Notification) string {
 	if err := json.Unmarshal(notif.Params, &fields); err != nil {
 		return ""
 	}
-	var id string
+	var id *string
 	raw, exists := fields[field]
 	if !exists && hasOptionalThreadOwner(notif.Method) {
 		return "method:" + notif.Method
@@ -60,13 +68,15 @@ func orderedNotificationKey(notif Notification) string {
 	if err := json.Unmarshal(raw, &id); err != nil {
 		return ""
 	}
-	if id == "" {
+	if id == nil {
 		if hasOptionalThreadOwner(notif.Method) {
 			return "method:" + notif.Method
 		}
 		return ""
 	}
-	return kind + ":" + id
+	// A schema string may be empty. Distinguish it from missing/null instead
+	// of allowing a valid owner to bypass ordered delivery.
+	return kind + ":" + *id
 }
 
 func isThreadNotificationMethod(method string) bool {

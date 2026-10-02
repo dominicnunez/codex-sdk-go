@@ -47,6 +47,18 @@ func TestStdioOrdersNotificationsWithinScope(t *testing.T) {
 		{"search session", Notification{Method: protocol.NotifyFuzzyFileSearchSessionUpdated, Params: json.RawMessage(`{"sessionId":"a","threadId":99}`)}, []Notification{
 			{Method: protocol.NotifyFuzzyFileSearchSessionCompleted, Params: json.RawMessage(`{"sessionId":"a"}`)},
 		}},
+		{"import", Notification{Method: "externalAgentConfig/import/progress", Params: json.RawMessage(`{"importId":"a","ImportID":"other","threadId":99,"itemTypeResults":[]}`)}, []Notification{
+			{Method: "externalAgentConfig/import/completed", Params: json.RawMessage(`{"importId":"a","threadId":"other","itemTypeResults":[]}`)},
+		}},
+		{"project", Notification{Method: "project/changed", Params: json.RawMessage(`{"projectId":"a","ProjectID":"other","changeType":"created"}`)}, []Notification{
+			{Method: "project/changed", Params: json.RawMessage(`{"projectId":"a","changeType":"deleted"}`)},
+		}},
+		{"watch", Notification{Method: "fs/changed", Params: json.RawMessage(`{"watchId":"a","WatchID":"other","threadId":99,"changedPaths":[]}`)}, []Notification{
+			{Method: "fs/changed", Params: json.RawMessage(`{"watchId":"a","changedPaths":[]}`)},
+		}},
+		{"MCP subscription", Notification{Method: "mcpServer/event/stream/notification", Params: json.RawMessage(`{"subscriptionId":"a","SubscriptionID":"other","threadId":99}`)}, []Notification{
+			{Method: "mcpServer/event/stream/notification", Params: json.RawMessage(`{"subscriptionId":"a"}`)},
+		}},
 		{"account", Notification{Method: protocol.NotifyAccountUpdated, Params: json.RawMessage(`{"threadId":"other"}`)}, []Notification{
 			{Method: protocol.NotifyGatewayOAuthChanged, Params: json.RawMessage(`{}`)},
 		}},
@@ -70,6 +82,10 @@ func TestStdioOrdersNotificationsWithinScope(t *testing.T) {
 		}},
 		{"optional warning global owner", Notification{Method: "warning", Params: json.RawMessage(`{"message":"first","ThreadID":"other"}`)}, []Notification{
 			{Method: "warning", Params: json.RawMessage(`{"message":"second","threadId":null}`)},
+		}},
+		{"optional empty thread owner", Notification{Method: protocol.NotifyAgentMessageDelta, Params: json.RawMessage(`{"threadId":"","turnId":"turn","itemId":"item","delta":"A"}`)}, []Notification{
+			{Method: "warning", Params: json.RawMessage(`{"message":"warning","threadId":""}`)},
+			{Method: protocol.NotifyMcpServerOauthLoginCompleted, Params: json.RawMessage(`{"name":"server","success":true,"threadId":""}`)},
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -477,7 +493,7 @@ func TestStdioCloseReleasesOrderedPayloads(t *testing.T) {
 	}
 }
 
-func TestStdioOrdersAllSchemaThreadNotifications(t *testing.T) {
+func TestStdioOrdersAllSchemaNotifications(t *testing.T) {
 	data, err := os.ReadFile("../protocol/schema/json/ServerNotification.json")
 	if err != nil {
 		t.Fatal(err)
@@ -508,57 +524,68 @@ func TestStdioOrdersAllSchemaThreadNotifications(t *testing.T) {
 		if !exists || len(event.Properties.Method.Values) != 1 {
 			t.Fatal("unsupported schema notification shape")
 		}
-		if _, owned := definition.Properties["threadId"]; !owned {
-			continue
-		}
+		_ = definition // Every schema method participates, including globals.
 		method := event.Properties.Method.Values[0]
-		t.Run(method, func(t *testing.T) {
-			r, w := io.Pipe()
-			tr := NewStdioTransport(r, io.Discard)
-			t.Cleanup(func() { _ = tr.Close(); _ = w.Close() })
-			entered, release := make(chan struct{}), make(chan struct{})
-			var releaseOnce sync.Once
-			unblock := func() { releaseOnce.Do(func() { close(release) }) }
-			t.Cleanup(unblock)
-			seen := make(chan int, 2)
-			var first atomic.Bool
-			barrier := make(chan struct{})
-			tr.OnNotify(func(_ context.Context, n Notification) {
-				if n.Method == protocol.NotifyConfigWarning {
-					close(barrier)
-					return
+		for _, owner := range []string{"a", ""} {
+			t.Run(method+" owner="+owner, func(t *testing.T) {
+				r, w := io.Pipe()
+				tr := NewStdioTransport(r, io.Discard)
+				t.Cleanup(func() { _ = tr.Close(); _ = w.Close() })
+				entered, release := make(chan struct{}), make(chan struct{})
+				var releaseOnce sync.Once
+				unblock := func() { releaseOnce.Do(func() { close(release) }) }
+				t.Cleanup(unblock)
+				seen := make(chan int, 2)
+				var first atomic.Bool
+				barrier := make(chan struct{})
+				barrierMethod := protocol.NotifyConfigWarning
+				if method == barrierMethod {
+					barrierMethod = protocol.NotifySkillsChanged
 				}
-				var payload struct {
-					Sequence int `json:"sequence"`
-				}
-				if err := json.Unmarshal(n.Params, &payload); err != nil {
-					t.Error(err)
-				}
-				if first.CompareAndSwap(false, true) {
-					close(entered)
-					<-release
-				}
-				seen <- payload.Sequence
-			})
-			// The schema selects methods and their owned key independently of
-			// the dispatch lists. Payload validation remains the typed client's job.
-			writeAuditNotification(t, w, Notification{Method: method, Params: json.RawMessage(`{"threadId":"a","ThreadID":"other","sequence":1}`)})
-			waitAuditSignal(t, entered)
-			writeAuditNotification(t, w, Notification{Method: protocol.NotifyTurnCompleted, Params: json.RawMessage(`{"threadId":"a","sequence":2}`)})
-			writeAuditNotification(t, w, Notification{Method: protocol.NotifyConfigWarning, Params: json.RawMessage(`{}`)})
-			waitAuditSignal(t, barrier)
-			unblock()
-			for _, want := range []int{1, 2} {
-				select {
-				case got := <-seen:
-					if got != want {
-						t.Fatalf("schema-owned event = %d; want %d", got, want)
+				tr.OnNotify(func(_ context.Context, n Notification) {
+					if n.Method == barrierMethod {
+						close(barrier)
+						return
 					}
-				case <-time.After(2 * time.Second):
-					t.Fatal("schema-owned event lost")
+					var payload struct {
+						Sequence int `json:"sequence"`
+					}
+					if err := json.Unmarshal(n.Params, &payload); err != nil {
+						t.Error(err)
+					}
+					if first.CompareAndSwap(false, true) {
+						close(entered)
+						<-release
+					}
+					seen <- payload.Sequence
+				})
+				// The schema selects methods independently of the dispatch lists.
+				// Supply every candidate owner; only the method's actual owner may
+				// determine routing. Typed payload validation remains the client's job.
+				payload := `{"threadId":"a","thread":{"id":"a"},"processHandle":"a","processId":"a","sessionId":"a","importId":"a","projectId":"a","watchId":"a","subscriptionId":"a","sequence":%d}`
+				if owner == "" {
+					// These schema string properties have no minLength constraint.
+					// A present empty string still identifies one ordered scope.
+					payload = strings.ReplaceAll(payload, `"a"`, `""`)
 				}
-			}
-		})
+				writeAuditNotification(t, w, Notification{Method: method, Params: json.RawMessage(fmt.Sprintf(payload, 1))})
+				waitAuditSignal(t, entered)
+				writeAuditNotification(t, w, Notification{Method: method, Params: json.RawMessage(fmt.Sprintf(payload, 2))})
+				writeAuditNotification(t, w, Notification{Method: barrierMethod, Params: json.RawMessage(`{}`)})
+				waitAuditSignal(t, barrier)
+				unblock()
+				for _, want := range []int{1, 2} {
+					select {
+					case got := <-seen:
+						if got != want {
+							t.Fatalf("schema-owned event = %d; want %d", got, want)
+						}
+					case <-time.After(2 * time.Second):
+						t.Fatal("schema-owned event lost")
+					}
+				}
+			})
+		}
 	}
 }
 

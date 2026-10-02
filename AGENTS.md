@@ -40,7 +40,9 @@ For transport ordering or delivery changes, derive the affected inventory from
 `ServerNotification.json` and typed handlers, including methods outside existing
 priority switches. Check that transport, typed and malformed fallback decoders
 agree on owner identity. Verify that shutdown releases queued payloads as well
-as preventing further callback admission.
+as preventing further callback admission. Require an explicit delivery policy
+for every known schema method, and verify that callback finalization survives
+failures in error-reporting hooks as well as in the primary handler.
 For peer-controlled buffers, bound retained data as well as event counts across
 queued, in-flight, fallback and replay ownership.
 

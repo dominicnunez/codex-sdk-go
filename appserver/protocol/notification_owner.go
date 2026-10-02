@@ -8,6 +8,36 @@ func decodeOwnedNotification[T any](data []byte, required []string) (T, error) {
 	return decoded, err
 }
 
+func (n *ExternalAgentConfigImportProgressNotification) UnmarshalJSON(data []byte) error {
+	type wire ExternalAgentConfigImportProgressNotification
+	decoded, err := decodeOwnedNotification[wire](data, []string{"importId", "itemTypeResults"})
+	if err != nil {
+		return err
+	}
+	*n = ExternalAgentConfigImportProgressNotification(decoded)
+	return nil
+}
+
+func (n *ExternalAgentConfigImportCompletedNotification) UnmarshalJSON(data []byte) error {
+	type wire ExternalAgentConfigImportCompletedNotification
+	decoded, err := decodeOwnedNotification[wire](data, []string{"importId", "itemTypeResults"})
+	if err != nil {
+		return err
+	}
+	*n = ExternalAgentConfigImportCompletedNotification(decoded)
+	return nil
+}
+
+func (n *ProjectChangedNotification) UnmarshalJSON(data []byte) error {
+	type wire ProjectChangedNotification
+	decoded, err := decodeOwnedNotification[wire](data, []string{"changeType", "projectId"})
+	if err != nil {
+		return err
+	}
+	*n = ProjectChangedNotification(decoded)
+	return nil
+}
+
 func (n *ThreadDeletedNotification) UnmarshalJSON(data []byte) error {
 	type wire ThreadDeletedNotification
 	decoded, err := decodeOwnedNotification[wire](data, []string{"threadId"})

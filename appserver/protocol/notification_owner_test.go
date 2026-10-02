@@ -15,6 +15,15 @@ func TestTypedNotificationOwnerIgnoresCasingMetadata(t *testing.T) {
 		params   string
 		register func(*protocol.Client, func(string))
 	}{
+		{"externalAgentConfig/import/progress", `{"importId":"a","ImportID":"b","itemTypeResults":[]}`, func(c *protocol.Client, h func(string)) {
+			c.OnExternalAgentConfigImportProgress(func(n protocol.ExternalAgentConfigImportProgressNotification) { h(n.ImportID) })
+		}},
+		{"externalAgentConfig/import/completed", `{"importId":"a","ImportID":"b","itemTypeResults":[]}`, func(c *protocol.Client, h func(string)) {
+			c.OnExternalAgentConfigImportCompleted(func(n protocol.ExternalAgentConfigImportCompletedNotification) { h(n.ImportID) })
+		}},
+		{"project/changed", `{"projectId":"a","ProjectID":"b","changeType":"updated"}`, func(c *protocol.Client, h func(string)) {
+			c.OnProjectChanged(func(n protocol.ProjectChangedNotification) { h(n.ProjectID) })
+		}},
 		{"thread/deleted", `{"threadId":"a","ThreadID":"b"}`, func(c *protocol.Client, h func(string)) {
 			c.OnThreadDeleted(func(n protocol.ThreadDeletedNotification) { h(n.ThreadID) })
 		}},

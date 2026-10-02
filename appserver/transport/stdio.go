@@ -268,6 +268,7 @@ func (t *StdioTransport) OnNotify(handler NotificationHandler) {
 // OnPanic registers a handler called when a request handler or notification
 // handler panics. The transport recovers from the panic and continues
 // operating; this callback provides observability into the recovered value.
+// A panic in this callback is suppressed so dispatch can continue.
 func (t *StdioTransport) OnPanic(handler func(v any)) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -780,9 +781,7 @@ func (t *StdioTransport) handleRequest(req Request) {
 	defer func() {
 		if r := recover(); r != nil {
 			t.writeErrorResponse(req.ID, ErrCodeInternalError, "internal handler error")
-			if panicFn != nil {
-				panicFn(r)
-			}
+			reportRecoveredPanic(panicFn, r)
 		}
 	}()
 
@@ -806,6 +805,15 @@ func (t *StdioTransport) handleRequest(req Request) {
 	if err := t.writeMessage(resp); err != nil {
 		t.handleWriteFailure(err)
 	}
+}
+
+// Reporting must not turn a recovered handler panic into a worker crash.
+func reportRecoveredPanic(handler func(any), value any) {
+	if handler == nil {
+		return
+	}
+	defer func() { _ = recover() }()
+	handler(value)
 }
 
 func (t *StdioTransport) resolveRequestHandler(req Request) (RequestHandler, func(any), requestHandlerResolution) {
