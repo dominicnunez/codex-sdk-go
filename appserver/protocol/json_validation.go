@@ -197,9 +197,9 @@ func decodeMalformedObject(data []byte, dest reflect.Value, fields map[string]in
 	}
 	if _, err := decoder.Token(); !errors.Is(err, io.EOF) {
 		if err == nil {
-			return fmt.Errorf("unexpected trailing data")
+			return validation.notObject(fmt.Errorf("unexpected trailing data"))
 		}
-		return err
+		return validation.notObject(err)
 	}
 	return nil
 }

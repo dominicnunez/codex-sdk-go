@@ -53,6 +53,10 @@ Follow identity selection into typed callbacks and runtime fallback attribution;
 distinguish ignored-property work from necessary semantic decoding of selected
 payloads. Check malformed semantic fields before and after dense metadata,
 including nested recovery and successful typed/cache paths.
+When replacing shared decoders, compare the complete public error contract,
+including outer wrappers, error precedence and direct receiver calls with invalid
+JSON. Keep reference models independent and verify new regressions against the
+prior revision instead of copying a helper without its calling boundary.
 
 ### Approval Flow
 Server→client requests for user approval (command exec, file write, etc.) flow through `Transport.OnRequest`. Each approval type has `*Params` and `*Response` types matching specs.

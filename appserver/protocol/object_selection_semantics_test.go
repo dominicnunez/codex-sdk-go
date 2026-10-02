@@ -81,9 +81,9 @@ func referenceSelection(data []byte, value *selectionReferencePayload) error {
 	}
 	if _, err := decoder.Token(); !errors.Is(err, io.EOF) {
 		if err == nil {
-			return errors.New("trailing JSON")
+			return fmt.Errorf("%w: trailing JSON", ErrResultNotObject)
 		}
-		return err
+		return fmt.Errorf("%w: %w", ErrResultNotObject, err)
 	}
 	return nil
 }
