@@ -88,6 +88,15 @@ returns. Accepted response outcomes and the separate notification EOF-drain
 policy remain intact. Releasing transport references is not secure erasure or
 a guarantee that application-owned or actively executing data has been freed.
 
+The stream collector copies a retained suffix when trimming oversized plan text
+or command delta history and clears evicted delta/raw-chunk backing slots. Its
+existing byte/count limits therefore release the discarded text references in
+those owners while preserving suffix and aggregation semantics. These limits do
+not bound full semantic lifecycle items, the number of lifecycle records, or
+snapshots retained by the application. Untrimmed immutable strings may share
+caller storage, and ingestion can temporarily allocate for the complete input;
+this is not a total collector heap or peak-allocation budget.
+
 For an outbound request admitted to the serialized write queue, accepting its
 correlated result and abandoning it on cancellation or transport failure share
 one synchronized ownership boundary. An accepted response survives later EOF,

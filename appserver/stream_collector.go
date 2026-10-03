@@ -578,6 +578,7 @@ func appendBoundedStringHistory(history []string, historyBytes int, next string,
 	for len(history) > maxEntries {
 		droppedBytes += len(history[0])
 		historyBytes -= len(history[0])
+		history[0] = ""
 		history = history[1:]
 		droppedEntries++
 	}
@@ -593,6 +594,7 @@ func appendBoundedStringHistory(history []string, historyBytes int, next string,
 
 		droppedBytes += len(history[0])
 		historyBytes -= len(history[0])
+		history[0] = ""
 		history = history[1:]
 		droppedEntries++
 	}
@@ -619,19 +621,23 @@ func retainSuffixWithinByteLimit(text string, maxBytes int) (string, int) {
 	if start >= len(text) {
 		return "", len(text)
 	}
-	return text[start:], start
+	// Own only the retained bytes; a substring would keep the discarded
+	// prefix allocation alive even after the caller releases the input.
+	return strings.Clone(text[start:]), start
 }
 
 func trimBoundedStringHistory(history []string, totalBytes int, maxChunks int, maxBytes int) ([]string, int) {
 	if maxChunks > 0 {
 		for len(history) > maxChunks {
 			totalBytes -= len(history[0])
+			history[0] = ""
 			history = history[1:]
 		}
 	}
 	if maxBytes > 0 {
 		for len(history) > 0 && totalBytes > maxBytes {
 			totalBytes -= len(history[0])
+			history[0] = ""
 			history = history[1:]
 		}
 	}
