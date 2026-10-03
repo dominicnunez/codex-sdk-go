@@ -188,7 +188,7 @@ func TestExternalAgentConfigImport(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := NewMockTransport()
-			_ = mock.SetResponseData("externalAgentConfig/import", map[string]interface{}{})
+			_ = mock.SetResponseData("externalAgentConfig/import", map[string]interface{}{"importId": "import-a"})
 
 			client := codex.NewClient(mock)
 
@@ -197,8 +197,9 @@ func TestExternalAgentConfigImport(t *testing.T) {
 				t.Fatalf("ConfigImport() error = %v", err)
 			}
 
-			// Response is empty struct per spec
-			_ = resp
+			if resp.ImportID != "import-a" {
+				t.Fatalf("ImportID = %q, want import-a", resp.ImportID)
+			}
 
 			if len(mock.SentRequests) != 1 {
 				t.Fatalf("expected 1 import request, got %d", len(mock.SentRequests))
@@ -398,7 +399,7 @@ func TestExternalAgentConfigImportPreparesRequestParams(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := NewMockTransport()
-			_ = mock.SetResponseData("externalAgentConfig/import", map[string]interface{}{})
+			_ = mock.SetResponseData("externalAgentConfig/import", map[string]interface{}{"importId": "import-a"})
 			client := codex.NewClient(mock)
 
 			_, err := client.ExternalAgent.ConfigImport(context.Background(), tt.params)

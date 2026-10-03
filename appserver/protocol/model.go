@@ -40,6 +40,11 @@ func (r *ModelListResponse) UnmarshalJSON(data []byte) error {
 
 // Model represents a language model available in Codex.
 type Model struct {
+	AdditionalSpeedTiers []string           `json:"additionalSpeedTiers,omitzero"`
+	DefaultServiceTier   *string            `json:"defaultServiceTier,omitempty"`
+	ModelSpecialty       *string            `json:"modelSpecialty,omitempty"`
+	MultiAgentVersion    *MultiAgentVersion `json:"multiAgentVersion,omitempty"`
+	ServiceTiers         []ModelServiceTier `json:"serviceTiers,omitzero"`
 	// Unique identifier for the model.
 	ID string `json:"id"`
 	// Model identifier string (e.g., "claude-opus-4-6").
@@ -117,6 +122,9 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 	); err != nil {
 		return err
 	}
+	if err := validateObjectFields(data, nil, []string{"additionalSpeedTiers", "serviceTiers"}); err != nil {
+		return err
+	}
 	type wire Model
 	var decoded wire
 	if err := json.Unmarshal(data, &decoded); err != nil {
@@ -146,6 +154,7 @@ func (n *ModelAvailabilityNux) UnmarshalJSON(data []byte) error {
 
 // ModelUpgradeInfo contains upgrade information for a model.
 type ModelUpgradeInfo struct {
+	RetirementAt      *int64  `json:"retirementAt,omitempty"`
 	Model             string  `json:"model"`
 	MigrationMarkdown *string `json:"migrationMarkdown,omitempty"`
 	ModelLink         *string `json:"modelLink,omitempty"`

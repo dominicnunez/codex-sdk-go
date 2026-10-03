@@ -116,6 +116,7 @@ func TestPluginRead(t *testing.T) {
 			JSONRPC: "2.0",
 			Result: json.RawMessage(`{
 				"plugin":{
+					"appTemplates":[],
 					"apps":[{"id":"app-1","name":"Calendar","description":"desc","needsAuth":true}],
 					"description":"Plugin description",
 					"hooks":[],
@@ -609,6 +610,7 @@ func pluginReadResponseWithMissingField(missingField string) map[string]interfac
 
 func pluginReadPayloadWithSummary(summary map[string]interface{}) map[string]interface{} {
 	return map[string]interface{}{
+		"appTemplates":    []interface{}{},
 		"apps":            []interface{}{},
 		"hooks":           []interface{}{},
 		"marketplaceName": "official",

@@ -44,6 +44,7 @@ func (t *ExternalAgentConfigMigrationItemType) UnmarshalJSON(data []byte) error 
 type ExternalAgentConfigMigrationItem struct {
 	Cwd         *string                              `json:"cwd,omitempty"`
 	Description string                               `json:"description"`
+	Details     *MigrationDetails                    `json:"details,omitempty"`
 	ItemType    ExternalAgentConfigMigrationItemType `json:"itemType"`
 }
 
@@ -149,8 +150,23 @@ func (p ExternalAgentConfigImportParams) prepareRequest() (interface{}, error) {
 	return p, nil
 }
 
-// ExternalAgentConfigImportResponse is an empty response from config import.
-type ExternalAgentConfigImportResponse struct{}
+// ExternalAgentConfigImportResponse identifies the asynchronous import operation.
+type ExternalAgentConfigImportResponse struct {
+	ImportID string `json:"importId"`
+}
+
+func (r *ExternalAgentConfigImportResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "importId"); err != nil {
+		return err
+	}
+	type wire ExternalAgentConfigImportResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*r = ExternalAgentConfigImportResponse(decoded)
+	return nil
+}
 
 // ExternalAgentConfigImportCompletedNotification is sent when config import completes.
 type ExternalAgentConfigImportCompletedNotification struct {
@@ -178,10 +194,11 @@ func (s *ExternalAgentService) ConfigDetect(ctx context.Context, params External
 
 // ConfigImport imports detected external agent configurations.
 func (s *ExternalAgentService) ConfigImport(ctx context.Context, params ExternalAgentConfigImportParams) (ExternalAgentConfigImportResponse, error) {
-	if err := s.client.sendEmptyObjectRequest(ctx, methodExternalAgentConfigImport, params); err != nil {
+	var resp ExternalAgentConfigImportResponse
+	if err := s.client.sendRequest(ctx, methodExternalAgentConfigImport, params, &resp); err != nil {
 		return ExternalAgentConfigImportResponse{}, err
 	}
-	return ExternalAgentConfigImportResponse{}, nil
+	return resp, nil
 }
 
 // OnExternalAgentConfigImportCompleted registers a listener for config import completion notifications.

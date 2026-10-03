@@ -163,18 +163,6 @@ func emptyObjectMethodCases() []emptyObjectMethodCase {
 			},
 		},
 		{
-			name:   "external_agent_config_import",
-			method: "externalAgentConfig/import",
-			call: func(client *codex.Client) error {
-				_, err := client.ExternalAgent.ConfigImport(context.Background(), codex.ExternalAgentConfigImportParams{
-					MigrationItems: []codex.ExternalAgentConfigMigrationItem{
-						{Description: "Config file", ItemType: codex.MigrationItemTypeConfig},
-					},
-				})
-				return err
-			},
-		},
-		{
 			name:   "mcp_refresh",
 			method: "config/mcpServer/reload",
 			call: func(client *codex.Client) error {

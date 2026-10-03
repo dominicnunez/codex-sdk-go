@@ -21,6 +21,12 @@ Do:
 
 Run `go test ./appserver/protocol -run TestSpecCoverage` to verify all specs have corresponding Go types.
 
+For schema field changes, inventory properties, requiredness, nullability and
+union branches, including nested definitions. Check custom wire structs and
+assignment lists through public calls; type-name coverage cannot detect field
+loss. Preserve present empty values and legacy public fields without requiring
+fields absent from the current schema.
+
 ## Architecture
 
 ### Zero Dependencies

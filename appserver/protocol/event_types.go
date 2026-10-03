@@ -383,6 +383,8 @@ func (w PatchChangeKindWrapper) MarshalJSON() ([]byte, error) {
 type McpToolCallResult struct {
 	Content           []interface{} `json:"content"`
 	StructuredContent interface{}   `json:"structuredContent,omitempty"`
+	// Meta preserves arbitrary JSON, including explicit null and precise numbers.
+	Meta json.RawMessage `json:"_meta,omitempty"`
 }
 
 func (r *McpToolCallResult) UnmarshalJSON(data []byte) error {

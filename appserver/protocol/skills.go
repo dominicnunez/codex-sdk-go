@@ -35,6 +35,8 @@ type SkillInterface struct {
 	BrandColor       *string `json:"brandColor,omitempty"`
 	IconSmall        *string `json:"iconSmall,omitempty"`
 	IconLarge        *string `json:"iconLarge,omitempty"`
+	IconSmallURL     *string `json:"iconSmallUrl,omitempty"`
+	IconLargeURL     *string `json:"iconLargeUrl,omitempty"`
 }
 
 // SkillToolDependency represents a tool that a skill depends on
