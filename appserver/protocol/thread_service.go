@@ -91,7 +91,7 @@ func (r *ThreadStartResponse) UnmarshalJSON(data []byte) error {
 }
 
 func validateThreadLifecycleResponseObject(data []byte) error {
-	return validateRequiredObjectFields(
+	if err := validateRequiredObjectFields(
 		data,
 		"approvalPolicy",
 		"approvalsReviewer",
@@ -100,7 +100,10 @@ func validateThreadLifecycleResponseObject(data []byte) error {
 		"modelProvider",
 		"sandbox",
 		"thread",
-	)
+	); err != nil {
+		return err
+	}
+	return validateOptionalStringArrays(data, "disabledPluginIds", "instructionSources")
 }
 
 func validateThreadLifecycleResponseFields(

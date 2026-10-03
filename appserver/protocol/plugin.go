@@ -355,6 +355,9 @@ func (p *PluginSummary) UnmarshalJSON(data []byte) error {
 	case wire.Source == nil:
 		return errors.New("missing plugin.summary.source")
 	}
+	if err := validateOptionalStringArrays(data, "keywords"); err != nil {
+		return err
+	}
 
 	p.AuthPolicy = *wire.AuthPolicy
 	p.DisabledReason = wire.DisabledReason
@@ -464,18 +467,17 @@ func (r *PluginListResponse) UnmarshalJSON(data []byte) error {
 	if err := validateObjectFields(data, nil, []string{"featuredPluginIds", "marketplaceLoadErrors"}); err != nil {
 		return err
 	}
+	if err := validateOptionalArrays(data, nil, "marketplaceLoadErrors"); err != nil {
+		return err
+	}
 	type wire PluginListResponse
 	var decoded wire
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
-	var lists struct {
-		FeaturedPluginIDs nonNullStringList `json:"featuredPluginIds"`
-	}
-	if err := json.Unmarshal(data, &lists); err != nil {
+	if err := validateOptionalStringArrays(data, "featuredPluginIds"); err != nil {
 		return err
 	}
-	decoded.FeaturedPluginIDs = []string(lists.FeaturedPluginIDs)
 	*r = PluginListResponse(decoded)
 	return nil
 }
@@ -485,6 +487,9 @@ func (r *PluginInstalledResponse) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	if err := validateObjectFields(data, nil, []string{"marketplaceLoadErrors"}); err != nil {
+		return err
+	}
+	if err := validateOptionalArrays(data, nil, "marketplaceLoadErrors"); err != nil {
 		return err
 	}
 	type wire PluginInstalledResponse

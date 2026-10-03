@@ -97,6 +97,22 @@ and admission flags before reuse; it does not bound the number of valid records
 in an admitted payload. Generic raw notification handlers remain responsible
 for their own decoding and validation.
 
+[Optional array admission](../appserver/protocol/optional_array_validation.go)
+rejects forbidden null arrays and null string elements in plugin, app, model,
+thread lifecycle, reasoning, text-input and workspace-sandbox carriers. Guards
+cover the folded and escaped names accepted by their existing wire decoders;
+invalid earlier occurrences remain failures after valid duplicates. Nullable
+arrays retain their separate schema contracts, and opaque strings do not gain
+path restrictions. Marketplace error records validate their required string
+members. Formerly plain concrete variants retain valid receiver merging and
+omitted-field state through their custom decoders; fresh response owners retain
+replacement semantics. A rejected array can stop an enclosing application
+decoder, so callers must not consume a failed decode. Applications embedding a
+type with JSON methods anonymously must implement their envelope methods to
+avoid Go method promotion; named members preserve normal envelope traversal.
+These admission checks neither authorize the reported data nor bound the number
+of valid elements or callback-owned copies.
+
 Terminal transport cleanup clears requests awaiting handler registration and
 drains abandoned inbound requests and outbound envelopes. Queue admission is
 coordinated with cleanup, including blocked producers and registration replay,

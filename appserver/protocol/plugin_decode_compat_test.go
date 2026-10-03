@@ -22,7 +22,7 @@ func TestPluginSummaryDecodeCompatibility(t *testing.T) {
 		}
 	}
 	for _, extra := range []string{
-		`,"keywords":null,"keywords":["last"]`,
+		`,"keywords":[],"keywords":["last"]`,
 		`,"availability":null,"availability":"AVAILABLE"`,
 	} {
 		body := strings.TrimSuffix(issue74PluginSummary, "}") + extra + "}"
