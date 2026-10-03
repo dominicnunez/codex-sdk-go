@@ -363,6 +363,8 @@ func (r *GuardianApprovalReview) UnmarshalJSON(data []byte) error {
 }
 
 // ItemGuardianApprovalReviewStartedNotification is sent when guardian review begins.
+// Action remains a generic JSON value. For requestPermissions, globScanMaxDepth
+// is json.Number so permission integers retain their exact value.
 type ItemGuardianApprovalReviewStartedNotification struct {
 	Action       interface{}            `json:"action"`
 	Review       GuardianApprovalReview `json:"review"`
@@ -376,15 +378,21 @@ type ItemGuardianApprovalReviewStartedNotification struct {
 func (n *ItemGuardianApprovalReviewStartedNotification) UnmarshalJSON(data []byte) error {
 	type wire ItemGuardianApprovalReviewStartedNotification
 	var decoded wire
+	payload := struct {
+		*wire
+		Action guardianPermissionAction `json:"action"`
+	}{wire: &decoded}
 	required := []string{"action", "review", "reviewId", "startedAtMs", "threadId", "turnId"}
-	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+	if err := unmarshalInboundObject(data, &payload, required, required); err != nil {
 		return err
 	}
+	decoded.Action = payload.Action.Value
 	*n = ItemGuardianApprovalReviewStartedNotification(decoded)
 	return nil
 }
 
 // ItemGuardianApprovalReviewCompletedNotification is sent when guardian review finishes.
+// Action follows the same exact permission-depth representation as the start notification.
 type ItemGuardianApprovalReviewCompletedNotification struct {
 	Action         interface{}              `json:"action"`
 	CompletedAtMs  int64                    `json:"completedAtMs"`
@@ -400,10 +408,15 @@ type ItemGuardianApprovalReviewCompletedNotification struct {
 func (n *ItemGuardianApprovalReviewCompletedNotification) UnmarshalJSON(data []byte) error {
 	type wire ItemGuardianApprovalReviewCompletedNotification
 	var decoded wire
+	payload := struct {
+		*wire
+		Action guardianPermissionAction `json:"action"`
+	}{wire: &decoded}
 	required := []string{"action", "completedAtMs", "decisionSource", "review", "reviewId", "startedAtMs", "threadId", "turnId"}
-	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+	if err := unmarshalInboundObject(data, &payload, required, required); err != nil {
 		return err
 	}
+	decoded.Action = payload.Action.Value
 	*n = ItemGuardianApprovalReviewCompletedNotification(decoded)
 	return nil
 }
