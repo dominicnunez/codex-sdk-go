@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -26,12 +25,12 @@ type InitializeCapabilities struct {
 	// ExplicitGatewayOAuth uses explicit gateway OAuth login instead of automatic browser authorization.
 	ExplicitGatewayOAuth bool `json:"explicitGatewayOauth,omitempty"`
 	// Extensions declares MCP extension settings. Empty maps declare no extensions.
-	// Values must be JSON-serializable. Initialize snapshots their JSON representation;
-	// returned settings use maps, slices, primitives and json.Number values. Handshake
+	// Each value is arbitrary JSON. Initialize snapshots its canonical JSON representation.
+	// Raw values preserve exact numbers without changing ordinary struct decoding. Handshake
 	// identity ignores object key order but retains array order and number spelling.
 	// Absent, null and empty root maps declare no extensions; named null settings
 	// and empty settings objects still declare their extension names.
-	Extensions map[string]interface{} `json:"extensions,omitempty"`
+	Extensions map[string]json.RawMessage `json:"extensions,omitempty"`
 	// McpServerOpenaiFormElicitation is the legacy openai/form opt-in.
 	McpServerOpenaiFormElicitation bool `json:"mcpServerOpenaiFormElicitation,omitempty"`
 	// RequestAttestation opts into attestation/generate requests.
@@ -40,24 +39,6 @@ type InitializeCapabilities struct {
 	// OptOutNotificationMethods are exact notification method names that should be suppressed
 	// for this connection (for example "codex/event/session_configured").
 	OptOutNotificationMethods []string `json:"optOutNotificationMethods,omitempty"`
-}
-
-// UnmarshalJSON preserves extension numbers without rounding them through float64.
-func (c *InitializeCapabilities) UnmarshalJSON(data []byte) error {
-	if !json.Valid(data) {
-		var raw json.RawMessage
-		return json.Unmarshal(data, &raw)
-	}
-	type wire InitializeCapabilities
-	decoded := wire(*c)
-	decoded.Extensions = cloneArbitraryValue(decoded.Extensions)
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.UseNumber()
-	if err := decoder.Decode(&decoded); err != nil {
-		return err
-	}
-	*c = InitializeCapabilities(decoded)
-	return nil
 }
 
 // InitializeParams are the parameters for the initialize request.
@@ -170,9 +151,8 @@ func normalizedInitializeParamsEqual(a, b InitializeParams) bool {
 	}
 }
 
-// Admission already converted settings to owned JSON containers and json.Number.
-// Comparing those trees ignores object key order while preserving number spelling.
-func extensionsEqual(a, b map[string]interface{}) bool {
+// Admission already canonicalized each raw setting, preserving number spelling.
+func extensionsEqual(a, b map[string]json.RawMessage) bool {
 	if len(a) == 0 || len(b) == 0 {
 		return len(a) == 0 && len(b) == 0
 	}
@@ -213,7 +193,7 @@ func (c *Client) Initialize(ctx context.Context, params InitializeParams) (Initi
 	}
 
 	admitted := params
-	var extensions map[string]interface{}
+	var extensions map[string]json.RawMessage
 	if params.Capabilities != nil {
 		var err error
 		extensions, err = jsonvalue.CloneObject(params.Capabilities.Extensions)

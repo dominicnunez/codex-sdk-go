@@ -1,11 +1,12 @@
 package protocol_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
-	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -13,46 +14,6 @@ import (
 
 	codex "github.com/dominicnunez/codex-sdk-go/appserver/protocol"
 )
-
-func TestInitializeEachSchemaOptInReachesWire(t *testing.T) {
-	for _, declaration := range []string{
-		`{"requestAttestation":true}`,
-		`{"mcpServerOpenaiFormElicitation":true}`,
-		`{"extensions":{"openai/form":{}}}`,
-	} {
-		t.Run(declaration, func(t *testing.T) {
-			mock := NewMockTransport()
-			mock.SetResponse("initialize", codex.Response{Result: json.RawMessage(`{"codexHome":"/home","platformFamily":"unix","platformOs":"linux","userAgent":"test"}`)})
-			var capabilities codex.InitializeCapabilities
-			if err := json.Unmarshal([]byte(declaration), &capabilities); err != nil {
-				t.Fatal(err)
-			}
-			client := codex.NewClient(mock)
-			params := codex.InitializeParams{ClientInfo: codex.ClientInfo{Name: "test", Version: "1"}, Capabilities: &capabilities}
-			if _, err := client.Initialize(context.Background(), params); err != nil {
-				t.Fatal(err)
-			}
-			if mock.CallCount() != 1 {
-				t.Fatalf("calls=%d", mock.CallCount())
-			}
-			var sent struct {
-				Capabilities map[string]json.RawMessage `json:"capabilities"`
-			}
-			if err := json.Unmarshal(mock.GetSentRequest(0).Params, &sent); err != nil {
-				t.Fatal(err)
-			}
-			var want map[string]json.RawMessage
-			if err := json.Unmarshal([]byte(declaration), &want); err != nil {
-				t.Fatal(err)
-			}
-			for field, expected := range want {
-				if string(sent.Capabilities[field]) != string(expected) {
-					t.Fatalf("opt-in %s lost: got=%s want=%s", field, sent.Capabilities[field], expected)
-				}
-			}
-		})
-	}
-}
 
 func capabilityParams(t *testing.T, declaration string) codex.InitializeParams {
 	t.Helper()
@@ -72,6 +33,36 @@ func capabilityClient(t *testing.T) (*codex.Client, *MockTransport) {
 	return codex.NewClient(mock), mock
 }
 
+func TestInitializeEachSchemaOptInReachesWire(t *testing.T) {
+	for _, declaration := range []string{`{"requestAttestation":true}`, `{"mcpServerOpenaiFormElicitation":true}`, `{"extensions":{"openai/form":{}}}`} {
+		t.Run(declaration, func(t *testing.T) {
+			client, mock := capabilityClient(t)
+			params := capabilityParams(t, declaration)
+			if _, err := client.Initialize(context.Background(), params); err != nil {
+				t.Fatal(err)
+			}
+			if mock.CallCount() != 1 {
+				t.Fatalf("calls=%d", mock.CallCount())
+			}
+			var sent struct {
+				Capabilities map[string]json.RawMessage `json:"capabilities"`
+			}
+			if err := json.Unmarshal(mock.GetSentRequest(0).Params, &sent); err != nil {
+				t.Fatal(err)
+			}
+			var want map[string]json.RawMessage
+			if err := json.Unmarshal([]byte(declaration), &want); err != nil {
+				t.Fatal(err)
+			}
+			for name, value := range want {
+				if !bytes.Equal(sent.Capabilities[name], value) {
+					t.Fatalf("opt-in %s lost: got=%s want=%s", name, sent.Capabilities[name], value)
+				}
+			}
+		})
+	}
+}
+
 func TestInitializeCapabilityIdentity(t *testing.T) {
 	for _, tc := range []struct {
 		name, first, second string
@@ -81,14 +72,13 @@ func TestInitializeCapabilityIdentity(t *testing.T) {
 		{"attestation changed", `{"requestAttestation":true}`, `{}`, false},
 		{"legacy form retained", `{"mcpServerOpenaiFormElicitation":true}`, `{"mcpServerOpenaiFormElicitation":true}`, true},
 		{"legacy form changed", `{}`, `{"mcpServerOpenaiFormElicitation":true}`, false},
-		{"empty extension declaration", `{"extensions":{"openai/form":{}}}`, `{"extensions":{"openai/form":{}}}`, true},
+		{"empty named setting", `{"extensions":{"openai/form":{}}}`, `{"extensions":{"openai/form":{}}}`, true},
 		{"named null present", `{"extensions":{"future":null}}`, `{}`, false},
-		{"duplicate null then object", `{"extensions":null,"extensions":{"openai/form":{}}}`, `{"extensions":{"openai/form":{}}}`, true},
 		{"duplicate object merge", `{"extensions":{"a":1},"extensions":{"b":2}}`, `{"extensions":{"a":1,"b":2}}`, true},
 		{"duplicate object overlap", `{"extensions":{"a":{"x":1},"b":true},"extensions":{"a":{"y":2}}}`, `{"extensions":{"a":{"y":2},"b":true}}`, true},
+		{"duplicate null reset", `{"extensions":{"old":true},"extensions":null,"extensions":{"new":true}}`, `{"extensions":{"new":true}}`, true},
 		{"duplicate alias merge", `{"Extensions":{"a":1},"extensions":{"b":2}}`, `{"extensions":{"a":1,"b":2}}`, true},
-		{"duplicate null settings", `{"extensions":{"a":{},"b":true},"extensions":{"a":null}}`, `{"extensions":{"a":null,"b":true}}`, true},
-		{"duplicate object null object", `{"extensions":{"old":true},"extensions":null,"extensions":{"new":true}}`, `{"extensions":{"new":true}}`, true},
+		{"duplicate null setting", `{"extensions":{"a":{},"b":true},"extensions":{"a":null}}`, `{"extensions":{"a":null,"b":true}}`, true},
 		{"empty root", `{"extensions":{}}`, `{"extensions":null}`, true},
 		{"absent root", `{"extensions":null}`, `{}`, true},
 		{"key order", `{"extensions":{"future":{"a":true,"b":[null,"x",2]}}}`, `{"extensions":{"future":{"b":[null,"x",2],"a":true}}}`, true},
@@ -97,8 +87,8 @@ func TestInitializeCapabilityIdentity(t *testing.T) {
 		{"extension name", `{"extensions":{"one":{}}}`, `{"extensions":{"two":{}}}`, false},
 		{"large integer", `{"extensions":{"n":9007199254740992}}`, `{"extensions":{"n":9007199254740993}}`, false},
 		{"number spelling", `{"extensions":{"n":1}}`, `{"extensions":{"n":1.0}}`, false},
-		{"case alias after null", `{"extensions":null,"Extensions":{"openai/form":{}}}`, `{"extensions":{"openai/form":{}}}`, true},
-		{"existing fields", `{"explicitGatewayOauth":true,"extensions":{"future":{}},"optOutNotificationMethods":["b","a","a"]}`, `{"explicitGatewayOauth":true,"extensions":{"future":{}},"optOutNotificationMethods":["a","b"]}`, true},
+		{"large exponent", `{"extensions":{"n":1e400}}`, `{"extensions":{"n":1e400}}`, true},
+		{"old fields", `{"explicitGatewayOauth":true,"extensions":{"future":{}},"optOutNotificationMethods":["b","a","a"]}`, `{"explicitGatewayOauth":true,"extensions":{"future":{}},"optOutNotificationMethods":["a","b"]}`, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			client, mock := capabilityClient(t)
@@ -114,8 +104,8 @@ func TestInitializeCapabilityIdentity(t *testing.T) {
 			if !tc.equal && !errors.As(err, &mismatch) {
 				t.Fatalf("want mismatch, got %v", err)
 			}
-			if mismatch != nil && !reflect.DeepEqual(mismatch.Requested, second) {
-				t.Fatalf("requested snapshot=%#v, want %#v", mismatch.Requested, second)
+			if mismatch != nil {
+				compareInitializeJSON(t, "requested", mismatch.Requested, second)
 			}
 			if mock.CallCount() != 1 {
 				t.Fatalf("calls=%d", mock.CallCount())
@@ -124,99 +114,163 @@ func TestInitializeCapabilityIdentity(t *testing.T) {
 	}
 }
 
-func TestInitializeCapabilityDecodeIntoExistingSettings(t *testing.T) {
-	for _, tc := range []struct{ declaration, expected string }{
-		{`{"extensions":{"b":2},"extensions":{"c":3}}`, `{"a":1,"b":2,"c":3}`},
-		{`{"extensions":{"b":2},"extensions":null,"extensions":{"c":3}}`, `{"c":3}`},
-		{`{"extensions":{"b":2},"extensions":null}`, `null`},
-		{`{}`, `{"a":1}`},
-	} {
-		t.Run(tc.declaration, func(t *testing.T) {
-			capabilities := capabilityParams(t, `{"extensions":{"a":1}}`).Capabilities
-			if err := json.Unmarshal([]byte(tc.declaration), capabilities); err != nil {
-				t.Fatal(err)
-			}
-			data, err := json.Marshal(capabilities.Extensions)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if string(data) != tc.expected {
-				t.Fatalf("settings=%s want=%s", data, tc.expected)
-			}
-		})
+func TestInitializeCapabilitiesReceiverCompatibility(t *testing.T) {
+	declarations := []string{
+		`{"extensions":{"b":2},"extensions":null,"extensions":{"c":3}}`,
+		`{"experimentalApi":"bad","requestAttestation":true}`,
+		`{"requestAttestation":true,"experimentalApi":"bad","explicitGatewayOauth":true}`,
+		`{"extensions":[],"extensions":{"b":2},"requestAttestation":true}`,
+		`{"optOutNotificationMethods":["before",1,"after"],"requestAttestation":true}`,
+		`{"requestAttestation":true} {}`, `{"requestAttestation":true,`, `[]`, `null`, `{}`,
+	}
+	fragments := []string{
+		`"experimentalApi":true`, `"experimentalApi":null`, `"experimentalApi":"bad"`,
+		`"explicitGatewayOauth":true`, `"requestAttestation":true`, `"requestAttestation":null`,
+		`"mcpServerOpenaiFormElicitation":true`, `"mcpServerOpenaiFormElicitation":false`,
+		`"extensions":{"b":2}`, `"Extensions":{"b":{"nested":[1,true,null]}}`,
+		`"extensions":null`, `"extensions":[]`, `"extensions":{"n":1e400}`,
+		`"optOutNotificationMethods":["new"]`, `"optOutNotificationMethods":null`,
+		`"optOutNotificationMethods":["before",1,"after"]`, `"unknown":{"ignored":true}`,
+	}
+	for _, first := range fragments {
+		for _, second := range fragments {
+			declarations = append(declarations, "{"+first+","+second+"}")
+		}
+	}
+	for _, nilMap := range []bool{false, true} {
+		for _, declaration := range declarations {
+			t.Run(declaration+"/nil="+strconv.FormatBool(nilMap), func(t *testing.T) {
+				retained := map[string]json.RawMessage{"a": json.RawMessage(`1`)}
+				wantRetained := map[string]json.RawMessage{"a": json.RawMessage(`1`)}
+				if nilMap {
+					retained = nil
+					wantRetained = nil
+				}
+				methods, wantMethods := []string{"old", "values", "here"}, []string{"old", "values", "here"}
+				actual := codex.InitializeCapabilities{Extensions: retained, OptOutNotificationMethods: methods}
+				expected := initializeCapsReference{Extensions: wantRetained, OptOutNotificationMethods: wantMethods}
+				err := json.Unmarshal([]byte(declaration), &actual)
+				wantErr := json.Unmarshal([]byte(declaration), &expected)
+				compareInitializeJSON(t, "receiver", actual, expected)
+				compareInitializeJSON(t, "retained map", retained, wantRetained)
+				compareInitializeJSON(t, "retained slice", methods, wantMethods)
+				compareInitializeDecodeError(t, err, wantErr)
+			})
+		}
 	}
 }
 
-func TestInitializeCapabilitiesDecodeReference(t *testing.T) {
-	// The standard map field is the compatibility reference. Small integer fixtures
-	// compare serialized values independently of float64 versus json.Number storage.
-	type reference struct {
-		Extensions map[string]interface{} `json:"extensions"`
+func TestInitializeExtensionsSnapshotOwnership(t *testing.T) {
+	client, mock := capabilityClient(t)
+	declaration := `{"extensions":{"future":{"nested":[{"n":9007199254740993},null,true]}}}`
+	params := capabilityParams(t, declaration)
+	if _, err := client.Initialize(context.Background(), params); err != nil {
+		t.Fatal(err)
 	}
-	for _, declaration := range []string{
-		`{}`, `{"extensions":null}`, `{"extensions":{}}`,
-		`{"extensions":{"b":2},"extensions":{"c":3}}`,
-		`{"Extensions":{"b":2},"extensions":null,"extensions":{"c":3}}`,
-		`{"extensions":{"a":{"x":1}},"extensions":{"a":{"y":2}}}`,
-	} {
-		t.Run(declaration, func(t *testing.T) {
-			capabilities := capabilityParams(t, `{"extensions":{"a":1}}`).Capabilities
-			want := reference{Extensions: map[string]interface{}{"a": float64(1)}}
-			if err := json.Unmarshal([]byte(declaration), &want); err != nil {
-				t.Fatal(err)
-			}
-			if err := capabilities.UnmarshalJSON([]byte(declaration)); err != nil {
-				t.Fatal(err)
-			}
-			gotJSON, err := json.Marshal(capabilities.Extensions)
-			if err != nil {
-				t.Fatal(err)
-			}
-			wantJSON, err := json.Marshal(want.Extensions)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !reflect.DeepEqual(gotJSON, wantJSON) {
-				t.Fatalf("settings=%s want=%s", gotJSON, wantJSON)
-			}
-		})
+	raw := params.Capabilities.Extensions["future"]
+	copy(raw, bytes.Replace(raw, []byte("9007199254740993"), []byte("9007199254740994"), 1))
+	snapshot, ok := client.InitializedParams()
+	if !ok {
+		t.Fatal("not initialized")
 	}
-	for _, declaration := range []string{
-		`{"extensions":[],"extensions":{"a":1}}`,
-		`{"extensions":false,"Extensions":{"a":1}}`,
-		`{"extensions":{"a":1},"extensions":"invalid","extensions":{"b":2}}`,
-		`{"extensions":{"a":1}} {}`, `{"extensions":`, `{"extensions":{}},`,
-	} {
-		t.Run(declaration, func(t *testing.T) {
-			var want reference
-			wantErr := json.Unmarshal([]byte(declaration), &want)
-			if wantErr == nil {
-				t.Fatal("reference must reject fixture")
-			}
-			for _, direct := range []bool{false, true} {
-				var capabilities codex.InitializeCapabilities
-				var err error
-				if direct {
-					err = capabilities.UnmarshalJSON([]byte(declaration))
-				} else {
-					err = json.Unmarshal([]byte(declaration), &capabilities)
-				}
-				var wantType, gotType *json.UnmarshalTypeError
-				var wantSyntax, gotSyntax *json.SyntaxError
-				switch {
-				case errors.As(wantErr, &wantType):
-					if !errors.As(err, &gotType) || gotType.Field != wantType.Field || gotType.Offset != wantType.Offset {
-						t.Fatalf("direct=%v got=%v want=%v", direct, err, wantErr)
-					}
-				case errors.As(wantErr, &wantSyntax):
-					if !errors.As(err, &gotSyntax) || gotSyntax.Offset != wantSyntax.Offset {
-						t.Fatalf("direct=%v got=%v want=%v", direct, err, wantErr)
-					}
-				default:
-					t.Fatalf("unexpected reference error: %v", wantErr)
-				}
-			}
-		})
+	if !bytes.Contains(snapshot.Capabilities.Extensions["future"], []byte("9007199254740993")) {
+		t.Fatal("snapshot changed with caller buffer")
+	}
+	output := snapshot.Capabilities.Extensions["future"]
+	copy(output, bytes.Replace(output, []byte("9007199254740993"), []byte("9007199254740995"), 1))
+	delete(snapshot.Capabilities.Extensions, "future")
+	want := capabilityParams(t, declaration)
+	if _, err := client.Initialize(context.Background(), want); err != nil {
+		t.Fatal(err)
+	}
+	_, err := client.Initialize(context.Background(), params)
+	var mismatch *codex.InitializeParamsMismatchError
+	if !errors.As(err, &mismatch) {
+		t.Fatalf("want mismatch, got %v", err)
+	}
+	existing := mismatch.Existing.Capabilities.Extensions["future"]
+	copy(existing, bytes.Replace(existing, []byte("9007199254740993"), []byte("9007199254740996"), 1))
+	requested := mismatch.Requested.Capabilities.Extensions["future"]
+	copy(requested, bytes.Replace(requested, []byte("9007199254740994"), []byte("9007199254740997"), 1))
+	mismatch.Requested.Capabilities.Extensions["other"] = json.RawMessage(`true`)
+	if _, err := client.Initialize(context.Background(), want); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(raw, []byte("9007199254740994")) {
+		t.Fatal("requested diagnostic aliases caller buffer")
+	}
+	if _, present := params.Capabilities.Extensions["other"]; present {
+		t.Fatal("requested diagnostic aliases caller map")
+	}
+	if mock.CallCount() != 1 {
+		t.Fatalf("calls=%d", mock.CallCount())
+	}
+}
+
+func TestInitializeExtensionsEquivalentJSON(t *testing.T) {
+	client, _ := capabilityClient(t)
+	params := capabilityParams(t, `{"extensions":{"future":{"n":2,"a":["x",null]}}}`)
+	if _, err := client.Initialize(context.Background(), params); err != nil {
+		t.Fatal(err)
+	}
+	params.Capabilities.Extensions = map[string]json.RawMessage{"future": json.RawMessage(" { \"a\": [\"x\", null], \"n\": 2 } ")}
+	if _, err := client.Initialize(context.Background(), params); err != nil {
+		t.Fatal(err)
+	}
+	encoded, err := json.Marshal(struct {
+		N int           `json:"n"`
+		A []interface{} `json:"a"`
+	}{N: 2, A: []interface{}{"x", nil}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	params.Capabilities.Extensions["future"] = encoded
+	if _, err := client.Initialize(context.Background(), params); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestInitializeInvalidExtensionsDoNotLatch(t *testing.T) {
+	for _, value := range []json.RawMessage{json.RawMessage(`{`), json.RawMessage(``), json.RawMessage(`NaN`), json.RawMessage(`{} {}`)} {
+		client, mock := capabilityClient(t)
+		params := capabilityParams(t, `{"requestAttestation":true}`)
+		params.Capabilities.Extensions = map[string]json.RawMessage{"bad": value}
+		if _, err := client.Initialize(context.Background(), params); err == nil {
+			t.Fatal("invalid extension accepted")
+		}
+		if _, ok := client.InitializedParams(); ok {
+			t.Fatal("failed snapshot latched")
+		}
+		if mock.CallCount() != 0 {
+			t.Fatal("invalid JSON reached transport")
+		}
+		params.Capabilities.Extensions = map[string]json.RawMessage{"future": nil}
+		if _, err := client.Initialize(context.Background(), params); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestInitializeExtensionSnapshotDepthFailureDoesNotDispatch(t *testing.T) {
+	client, mock := capabilityClient(t)
+	params := capabilityParams(t, `{}`)
+	nested := json.RawMessage(strings.Repeat("[", 10000) + "true" + strings.Repeat("]", 10000))
+	params.Capabilities.Extensions = map[string]json.RawMessage{"future": nested}
+	if _, err := json.Marshal(params.Capabilities.Extensions); err != nil {
+		t.Fatalf("fixture must marshal: %v", err)
+	}
+	if _, err := client.Initialize(context.Background(), params); err == nil {
+		t.Fatal("snapshot decode depth failure ignored")
+	}
+	if _, ok := client.InitializedParams(); ok {
+		t.Fatal("snapshot depth failure latched")
+	}
+	if mock.CallCount() != 0 {
+		t.Fatal("snapshot depth failure dispatched")
+	}
+	params.Capabilities.Extensions = map[string]json.RawMessage{"future": json.RawMessage(`true`)}
+	if _, err := client.Initialize(context.Background(), params); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -257,16 +311,15 @@ func TestInitializeExtensionsConcurrentAdmission(t *testing.T) {
 	for _, tc := range []struct {
 		name                               string
 		different, failFirst, cancelWaiter bool
-	}{
-		{name: "matching"}, {name: "different", different: true}, {name: "failed owner retry", failFirst: true}, {name: "cancelled waiter", cancelWaiter: true},
-	} {
+	}{{name: "matching"}, {name: "different", different: true}, {name: "failed owner retry", failFirst: true}, {name: "cancelled waiter", cancelWaiter: true}} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, mock := capabilityClient(t)
 			transport := &capabilityBlockingTransport{MockTransport: mock, entered: make(chan struct{}), release: make(chan struct{}), failFirst: tc.failFirst}
 			client := codex.NewClient(transport)
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			owner := capabilityParams(t, `{"extensions":{"future":{"n":1}},"requestAttestation":true}`)
+			declaration := `{"extensions":{"future":{"n":1}},"requestAttestation":true}`
+			owner := capabilityParams(t, declaration)
 			ownerDone := make(chan error, 1)
 			go func() { _, err := client.Initialize(ctx, owner); ownerDone <- err }()
 			select {
@@ -274,9 +327,9 @@ func TestInitializeExtensionsConcurrentAdmission(t *testing.T) {
 			case <-ctx.Done():
 				t.Fatal(ctx.Err())
 			}
-			waiter := capabilityParams(t, `{"extensions":{"future":{"n":1}},"requestAttestation":true}`)
+			waiter := capabilityParams(t, declaration)
 			if tc.different {
-				waiter.Capabilities.Extensions["future"].(map[string]interface{})["n"] = json.Number("2")
+				waiter.Capabilities.Extensions["future"] = json.RawMessage(`{"n":2}`)
 			}
 			waitCtx, cancelWaiter := context.WithCancel(ctx)
 			defer cancelWaiter()
@@ -288,9 +341,8 @@ func TestInitializeExtensionsConcurrentAdmission(t *testing.T) {
 			case <-ctx.Done():
 				t.Fatal(ctx.Err())
 			}
-			// Both callers have passed admission; subsequent mutation must affect neither.
-			owner.Capabilities.Extensions["future"].(map[string]interface{})["n"] = 99
-			waiter.Capabilities.Extensions["future"].(map[string]interface{})["n"] = 99
+			copy(owner.Capabilities.Extensions["future"], []byte(`{"n":9}`))
+			copy(waiter.Capabilities.Extensions["future"], []byte(`{"n":9}`))
 			if tc.cancelWaiter {
 				cancelWaiter()
 				if err := <-waiterDone; !errors.Is(err, context.Canceled) {
@@ -308,9 +360,8 @@ func TestInitializeExtensionsConcurrentAdmission(t *testing.T) {
 					if !errors.As(err, &mismatch) {
 						t.Fatalf("want mismatch, got %v", err)
 					}
-					got := mismatch.Requested.Capabilities.Extensions["future"].(map[string]interface{})["n"]
-					if got != json.Number("2") {
-						t.Fatalf("requested admission changed: %v", got)
+					if string(mismatch.Requested.Capabilities.Extensions["future"]) != `{"n":2}` {
+						t.Fatal("requested admission changed")
 					}
 				} else if err != nil {
 					t.Fatal(err)
@@ -323,8 +374,7 @@ func TestInitializeExtensionsConcurrentAdmission(t *testing.T) {
 			if transport.calls.Load() != wantCalls {
 				t.Fatalf("sends=%d want=%d", transport.calls.Load(), wantCalls)
 			}
-			want := capabilityParams(t, `{"extensions":{"future":{"n":1}},"requestAttestation":true}`)
-			if _, err := client.Initialize(ctx, want); err != nil {
+			if _, err := client.Initialize(ctx, capabilityParams(t, declaration)); err != nil {
 				t.Fatal(err)
 			}
 		})
@@ -332,11 +382,7 @@ func TestInitializeExtensionsConcurrentAdmission(t *testing.T) {
 }
 
 func TestInitializeExtensionsResponseFailureRetry(t *testing.T) {
-	for _, response := range []codex.Response{
-		{Error: &codex.Error{Code: -32600, Message: "denied"}},
-		{Result: json.RawMessage(`{"userAgent":"test"}`)},
-		{Result: json.RawMessage(`null`)},
-	} {
+	for _, response := range []codex.Response{{Error: &codex.Error{Code: -32600, Message: "denied"}}, {Result: json.RawMessage(`{"userAgent":"test"}`)}, {Result: json.RawMessage(`null`)}} {
 		client, mock := capabilityClient(t)
 		mock.SetResponse("initialize", response)
 		params := capabilityParams(t, `{"extensions":{"openai/form":{}},"requestAttestation":true}`)
@@ -358,174 +404,13 @@ func TestInitializeExtensionsResponseFailureRetry(t *testing.T) {
 	}
 }
 
-func TestInitializeExtensionsSnapshotOwnership(t *testing.T) {
-	client, mock := capabilityClient(t)
-	params := capabilityParams(t, `{"extensions":{"future":{"nested":[{"n":9007199254740993},null,true]}}}`)
-	if _, err := client.Initialize(context.Background(), params); err != nil {
-		t.Fatal(err)
-	}
-	params.Capabilities.Extensions["future"].(map[string]interface{})["nested"].([]interface{})[0].(map[string]interface{})["n"] = 0
-	snapshot, ok := client.InitializedParams()
-	if !ok {
-		t.Fatal("not initialized")
-	}
-	nested := snapshot.Capabilities.Extensions["future"].(map[string]interface{})["nested"].([]interface{})
-	if got := nested[0].(map[string]interface{})["n"]; got != json.Number("9007199254740993") {
-		t.Fatalf("number changed: %v", got)
-	}
-	nested[0].(map[string]interface{})["n"] = 1
-	delete(snapshot.Capabilities.Extensions, "future")
-	want := capabilityParams(t, `{"extensions":{"future":{"nested":[{"n":9007199254740993},null,true]}}}`)
-	if _, err := client.Initialize(context.Background(), want); err != nil {
-		t.Fatal(err)
-	}
-	_, err := client.Initialize(context.Background(), params)
-	var mismatch *codex.InitializeParamsMismatchError
-	if !errors.As(err, &mismatch) {
-		t.Fatalf("want mismatch, got %v", err)
-	}
-	delete(mismatch.Existing.Capabilities.Extensions, "future")
-	mismatch.Requested.Capabilities.Extensions["other"] = true
-	if _, err := client.Initialize(context.Background(), want); err != nil {
-		t.Fatal(err)
-	}
-	if _, present := params.Capabilities.Extensions["other"]; present {
-		t.Fatal("requested diagnostic aliases caller")
-	}
-	if mock.CallCount() != 1 {
-		t.Fatalf("calls=%d", mock.CallCount())
-	}
-}
-
-func TestInitializeExtensionsEquivalentGoValues(t *testing.T) {
-	client, _ := capabilityClient(t)
-	params := capabilityParams(t, `{"extensions":{"future":{"n":2,"a":["x",null]}}}`)
-	if _, err := client.Initialize(context.Background(), params); err != nil {
-		t.Fatal(err)
-	}
-	params.Capabilities.Extensions = map[string]interface{}{"future": json.RawMessage(`{"a":["x",null],"n":2}`)}
-	if _, err := client.Initialize(context.Background(), params); err != nil {
-		t.Fatal(err)
-	}
-	params.Capabilities.Extensions = map[string]interface{}{"future": map[string]interface{}{"n": float64(2), "a": []interface{}{"x", nil}}}
-	if _, err := client.Initialize(context.Background(), params); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestInitializeExtensionsOwnSerializableStructs(t *testing.T) {
-	type settings struct {
-		private bool
-		Values  map[string]interface{} `json:"values"`
-	}
-	client, _ := capabilityClient(t)
-	values := map[string]interface{}{"n": 2}
-	params := capabilityParams(t, `{}`)
-	params.Capabilities.Extensions = map[string]interface{}{"future": settings{private: true, Values: values}}
-	if _, err := client.Initialize(context.Background(), params); err != nil {
-		t.Fatal(err)
-	}
-	values["n"] = 3
-	want := capabilityParams(t, `{"extensions":{"future":{"values":{"n":2}}}}`)
-	if _, err := client.Initialize(context.Background(), want); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestInitializeInvalidExtensionsDoNotLatch(t *testing.T) {
-	for _, value := range []interface{}{make(chan int), json.RawMessage(`{`), json.Number("invalid")} {
-		client, mock := capabilityClient(t)
-		params := capabilityParams(t, `{"requestAttestation":true}`)
-		params.Capabilities.Extensions = map[string]interface{}{"bad": value}
-		if _, err := client.Initialize(context.Background(), params); err == nil {
-			t.Fatal("invalid extension accepted")
-		}
-		if _, ok := client.InitializedParams(); ok {
-			t.Fatal("failed request latched")
-		}
-		if mock.CallCount() != 0 {
-			t.Fatal("invalid JSON reached transport")
-		}
-		params.Capabilities.Extensions = map[string]interface{}{"future": nil}
-		if _, err := client.Initialize(context.Background(), params); err != nil {
-			t.Fatal(err)
-		}
-	}
-}
-
-type failingCapabilitySettings struct {
-	calls   *int
-	failure error
-	values  map[string]interface{}
-}
-
-func (s failingCapabilitySettings) MarshalJSON() ([]byte, error) {
-	*s.calls++
-	if *s.calls == 1 {
-		return nil, s.failure
-	}
-	return json.Marshal(s.values)
-}
-
-func TestInitializeExtensionSnapshotErrorRequiresExplicitRetry(t *testing.T) {
-	client, mock := capabilityClient(t)
-	calls := 0
-	failure := errors.New("snapshot failed")
-	values := map[string]interface{}{"n": 2}
-	params := capabilityParams(t, `{}`)
-	params.Capabilities.Extensions = map[string]interface{}{"future": failingCapabilitySettings{calls: &calls, failure: failure, values: values}}
-	if _, err := client.Initialize(context.Background(), params); !errors.Is(err, failure) {
-		t.Fatalf("snapshot failure=%v", err)
-	}
-	if calls != 1 || mock.CallCount() != 0 {
-		t.Fatalf("marshal calls=%d transport calls=%d", calls, mock.CallCount())
-	}
-	if _, ok := client.InitializedParams(); ok {
-		t.Fatal("snapshot failure latched")
-	}
-	if _, err := client.Initialize(context.Background(), params); err != nil {
-		t.Fatal(err)
-	}
-	values["n"] = 99
-	want := capabilityParams(t, `{"extensions":{"future":{"n":2}}}`)
-	if _, err := client.Initialize(context.Background(), want); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestInitializeExtensionSnapshotDepthFailureDoesNotDispatch(t *testing.T) {
-	var nested interface{} = true
-	for i := 0; i < 10001; i++ {
-		nested = []interface{}{nested}
-	}
-	client, mock := capabilityClient(t)
-	params := capabilityParams(t, `{}`)
-	params.Capabilities.Extensions = map[string]interface{}{"future": nested}
-	if _, err := json.Marshal(params.Capabilities.Extensions); err != nil {
-		t.Fatalf("fixture must be serializable: %v", err)
-	}
-	if _, err := client.Initialize(context.Background(), params); err == nil {
-		t.Fatal("snapshot depth failure ignored")
-	}
-	if _, ok := client.InitializedParams(); ok {
-		t.Fatal("snapshot depth failure latched")
-	}
-	if mock.CallCount() != 0 {
-		t.Fatal("snapshot depth failure dispatched")
-	}
-	params.Capabilities.Extensions = map[string]interface{}{"future": true}
-	if _, err := client.Initialize(context.Background(), params); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func BenchmarkInitializeExtensions(b *testing.B) {
 	for _, size := range []int{1, 1000} {
 		for _, cached := range []bool{false, true} {
 			b.Run(strconv.Itoa(size)+"/cached="+strconv.FormatBool(cached), func(b *testing.B) {
-				params := codex.InitializeParams{ClientInfo: codex.ClientInfo{Name: "test", Version: "1"}, Capabilities: &codex.InitializeCapabilities{Extensions: make(map[string]interface{}, size)}}
+				params := codex.InitializeParams{ClientInfo: codex.ClientInfo{Name: "test", Version: "1"}, Capabilities: &codex.InitializeCapabilities{Extensions: make(map[string]json.RawMessage, size)}}
 				for i := 0; i < size; i++ {
-					params.Capabilities.Extensions[strconv.Itoa(i)] = map[string]interface{}{"nested": []interface{}{json.Number("9007199254740993"), true, "setting", nil}}
+					params.Capabilities.Extensions[strconv.Itoa(i)] = json.RawMessage(`{"nested":[9007199254740993,true,"setting",null]}`)
 				}
 				newClient := func() *codex.Client {
 					mock := NewMockTransport()

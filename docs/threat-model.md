@@ -107,7 +107,10 @@ gateway OAuth choices. The client owns the serialized extension settings before
 waiting on another initialization; ProcessOptions resolution also owns those
 settings. Returned initialized parameters and mismatch diagnostics are separate
 snapshots. Snapshot errors fail admission before dispatch or child launch;
-process startup rechecks cancellation after caller-controlled serialization.
+process startup rechecks cancellation after parameter preparation. Extension
+values use raw JSON, so exact numbers are preserved while capabilities,
+initialize parameters and caller-defined wrappers retain ordinary Go decoding,
+including partial updates and retained references when a type error occurs.
 JSON numbers retain their exact spelling, object key order is ignored,
 and array order remains significant when checking handshake identity. An absent,
 null or empty root extension object declares no extensions; a named null setting

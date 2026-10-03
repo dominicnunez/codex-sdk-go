@@ -59,6 +59,9 @@ JSON. Keep reference models independent and verify new regressions against the
 prior revision instead of copying a helper without its calling boundary.
 For map-valued fields, preserve ordered duplicate object merges and null resets,
 including decoding into receivers that already contain map entries.
+Compare receiver updates and retained references on type errors as well as on
+success. Include envelopes and user-defined wrappers: a custom decoder error
+can stop outer traversal and change error precedence, field context and offsets.
 
 ### Approval Flow
 Server→client requests for user approval (command exec, file write, etc.) flow through `Transport.OnRequest`. Each approval type has `*Params` and `*Response` types matching specs.
@@ -77,7 +80,7 @@ complete copy boundary rather than a partial field list; verify mutation in both
 directions, nil/empty values and representative snapshot cost.
 For initialization extensions, own serialized JSON before waiting or child
 launch. A snapshot error must fail admission; do not retain a mutable Go value
-as fallback. Recheck process cancellation after caller-controlled snapshotting.
+as fallback. Recheck process cancellation after parameter preparation.
 
 ### Login Packages
 Codex OAuth login flow lives in `login/`. Credential persistence, token claims, redaction, and `chatgptAuthTokens` payload helpers live in `login/auth/`.

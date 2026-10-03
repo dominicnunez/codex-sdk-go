@@ -2,6 +2,7 @@ package appserver
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -242,7 +243,7 @@ func resolveProcessInitializeParams(opts *ProcessOptions) (InitializeParams, err
 
 func cloneInitializeParams(params InitializeParams) (InitializeParams, error) {
 	cp := params
-	var extensions map[string]interface{}
+	var extensions map[string]json.RawMessage
 	if params.Capabilities != nil {
 		var err error
 		extensions, err = jsonvalue.CloneObject(params.Capabilities.Extensions)
