@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 )
 
 // ThreadItem is a discriminated union for thread item variants.
@@ -216,7 +217,7 @@ func (McpToolCallThreadItem) threadItem() {}
 
 func (m *McpToolCallThreadItem) MarshalJSON() ([]byte, error) {
 	type Alias McpToolCallThreadItem
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{
@@ -241,7 +242,7 @@ func (DynamicToolCallThreadItem) threadItem() {}
 
 func (d *DynamicToolCallThreadItem) MarshalJSON() ([]byte, error) {
 	type Alias DynamicToolCallThreadItem
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{

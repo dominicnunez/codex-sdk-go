@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/deepcopy"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 )
 
 type requestPreparer interface {
@@ -42,7 +43,7 @@ func validateRequiredJSONObjectField(field string, value interface{}) error {
 		return invalidParamsError("%s must not be null", field)
 	}
 
-	encoded, err := json.Marshal(value)
+	encoded, err := jsonencode.Marshal(value)
 	if err != nil {
 		return err
 	}

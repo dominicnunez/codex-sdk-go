@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 )
 
 // TurnService handles turn-related operations
@@ -88,7 +89,7 @@ func (p TurnStartParams) MarshalJSON() ([]byte, error) {
 	if p.SandboxPolicy != nil {
 		wire.SandboxPolicy = &SandboxPolicyWrapper{Value: *p.SandboxPolicy}
 	}
-	return json.Marshal(wire)
+	return jsonencode.Marshal(wire)
 }
 
 // unmarshalUserInputSlice unmarshals a slice of raw JSON messages into UserInput values.

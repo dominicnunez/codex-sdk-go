@@ -1,10 +1,11 @@
-// Package jsondecode bounds native JSON numeric conversion diagnostics at
+// Package jsondecode bounds native JSON numeric diagnostics at
 // audited SDK decoding boundaries before their callers wrap the error.
 package jsondecode
 
 import (
 	"encoding"
 	"encoding/json"
+	"errors"
 	"reflect"
 	"strings"
 
@@ -21,6 +22,18 @@ func Unmarshal(data []byte, dest any) error {
 // to arbitrary callback errors: their concrete type does not prove provenance.
 func NativeError(err error) error {
 	typed, ok := err.(*json.UnmarshalTypeError) //nolint:errorlint // Only direct native errors can be copied without discarding an existing error chain.
+	if !ok && err != nil {
+		// The caller owns a native decoder. This formatter has no original
+		// structured metadata or cause; retain a bounded formatted-literal
+		// preview without keeping the full native error behind a wrapper.
+		const prefix = "json: invalid number literal, trying to unmarshal "
+		const suffix = " into Number"
+		message := err.Error()
+		if len(message) > 2048 && strings.HasPrefix(message, prefix) && strings.HasSuffix(message, suffix) {
+			literal := message[len(prefix) : len(message)-len(suffix)]
+			return errors.New(prefix + diagnostic.Display(literal) + suffix)
+		}
+	}
 	// The bounded 256-byte quoted preview is always below this retained-value
 	// limit, even with worst-case escaping. Nested SDK decoders therefore leave
 	// an already bounded error alone instead of repeatedly quoting its preview.
@@ -37,11 +50,11 @@ func NativeError(err error) error {
 
 // UnmarshalStandard preserves unrestricted generic delegation. Only a static
 // destination graph with no custom codecs or interface slots proves that its
-// type error came from standard decoding rather than application code.
+// error came from standard decoding rather than application code.
 func UnmarshalStandard(data []byte, dest any) error {
 	err := json.Unmarshal(data, dest)
-	if _, ok := err.(*json.UnmarshalTypeError); !ok { //nolint:errorlint // Wrapped custom errors must retain their original chain and identity.
-		return err
+	if err == nil {
+		return nil
 	}
 	if !standardType(reflect.TypeOf(dest), make(map[reflect.Type]bool)) {
 		return err

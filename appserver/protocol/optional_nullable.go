@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 )
 
 // OptionalNullable distinguishes an absent field from explicit null and a value.
@@ -19,7 +20,7 @@ type OptionalNullable[T any] struct {
 func (v OptionalNullable[T]) IsZero() bool { return !v.Present }
 
 func (v OptionalNullable[T]) MarshalJSON() ([]byte, error) {
-	return json.Marshal(v.Value)
+	return jsonencode.Marshal(v.Value)
 }
 
 func (v *OptionalNullable[T]) UnmarshalJSON(data []byte) error {
