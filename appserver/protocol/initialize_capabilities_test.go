@@ -84,6 +84,10 @@ func TestInitializeCapabilityIdentity(t *testing.T) {
 		{"empty extension declaration", `{"extensions":{"openai/form":{}}}`, `{"extensions":{"openai/form":{}}}`, true},
 		{"named null present", `{"extensions":{"future":null}}`, `{}`, false},
 		{"duplicate null then object", `{"extensions":null,"extensions":{"openai/form":{}}}`, `{"extensions":{"openai/form":{}}}`, true},
+		{"duplicate object merge", `{"extensions":{"a":1},"extensions":{"b":2}}`, `{"extensions":{"a":1,"b":2}}`, true},
+		{"duplicate object overlap", `{"extensions":{"a":{"x":1},"b":true},"extensions":{"a":{"y":2}}}`, `{"extensions":{"a":{"y":2},"b":true}}`, true},
+		{"duplicate alias merge", `{"Extensions":{"a":1},"extensions":{"b":2}}`, `{"extensions":{"a":1,"b":2}}`, true},
+		{"duplicate null settings", `{"extensions":{"a":{},"b":true},"extensions":{"a":null}}`, `{"extensions":{"a":null,"b":true}}`, true},
 		{"duplicate object null object", `{"extensions":{"old":true},"extensions":null,"extensions":{"new":true}}`, `{"extensions":{"new":true}}`, true},
 		{"empty root", `{"extensions":{}}`, `{"extensions":null}`, true},
 		{"absent root", `{"extensions":null}`, `{}`, true},
@@ -115,6 +119,102 @@ func TestInitializeCapabilityIdentity(t *testing.T) {
 			}
 			if mock.CallCount() != 1 {
 				t.Fatalf("calls=%d", mock.CallCount())
+			}
+		})
+	}
+}
+
+func TestInitializeCapabilityDecodeIntoExistingSettings(t *testing.T) {
+	for _, tc := range []struct{ declaration, expected string }{
+		{`{"extensions":{"b":2},"extensions":{"c":3}}`, `{"a":1,"b":2,"c":3}`},
+		{`{"extensions":{"b":2},"extensions":null,"extensions":{"c":3}}`, `{"c":3}`},
+		{`{"extensions":{"b":2},"extensions":null}`, `null`},
+		{`{}`, `{"a":1}`},
+	} {
+		t.Run(tc.declaration, func(t *testing.T) {
+			capabilities := capabilityParams(t, `{"extensions":{"a":1}}`).Capabilities
+			if err := json.Unmarshal([]byte(tc.declaration), capabilities); err != nil {
+				t.Fatal(err)
+			}
+			data, err := json.Marshal(capabilities.Extensions)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(data) != tc.expected {
+				t.Fatalf("settings=%s want=%s", data, tc.expected)
+			}
+		})
+	}
+}
+
+func TestInitializeCapabilitiesDecodeReference(t *testing.T) {
+	// The standard map field is the compatibility reference. Small integer fixtures
+	// compare serialized values independently of float64 versus json.Number storage.
+	type reference struct {
+		Extensions map[string]interface{} `json:"extensions"`
+	}
+	for _, declaration := range []string{
+		`{}`, `{"extensions":null}`, `{"extensions":{}}`,
+		`{"extensions":{"b":2},"extensions":{"c":3}}`,
+		`{"Extensions":{"b":2},"extensions":null,"extensions":{"c":3}}`,
+		`{"extensions":{"a":{"x":1}},"extensions":{"a":{"y":2}}}`,
+	} {
+		t.Run(declaration, func(t *testing.T) {
+			capabilities := capabilityParams(t, `{"extensions":{"a":1}}`).Capabilities
+			want := reference{Extensions: map[string]interface{}{"a": float64(1)}}
+			if err := json.Unmarshal([]byte(declaration), &want); err != nil {
+				t.Fatal(err)
+			}
+			if err := capabilities.UnmarshalJSON([]byte(declaration)); err != nil {
+				t.Fatal(err)
+			}
+			gotJSON, err := json.Marshal(capabilities.Extensions)
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantJSON, err := json.Marshal(want.Extensions)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(gotJSON, wantJSON) {
+				t.Fatalf("settings=%s want=%s", gotJSON, wantJSON)
+			}
+		})
+	}
+	for _, declaration := range []string{
+		`{"extensions":[],"extensions":{"a":1}}`,
+		`{"extensions":false,"Extensions":{"a":1}}`,
+		`{"extensions":{"a":1},"extensions":"invalid","extensions":{"b":2}}`,
+		`{"extensions":{"a":1}} {}`, `{"extensions":`, `{"extensions":{}},`,
+	} {
+		t.Run(declaration, func(t *testing.T) {
+			var want reference
+			wantErr := json.Unmarshal([]byte(declaration), &want)
+			if wantErr == nil {
+				t.Fatal("reference must reject fixture")
+			}
+			for _, direct := range []bool{false, true} {
+				var capabilities codex.InitializeCapabilities
+				var err error
+				if direct {
+					err = capabilities.UnmarshalJSON([]byte(declaration))
+				} else {
+					err = json.Unmarshal([]byte(declaration), &capabilities)
+				}
+				var wantType, gotType *json.UnmarshalTypeError
+				var wantSyntax, gotSyntax *json.SyntaxError
+				switch {
+				case errors.As(wantErr, &wantType):
+					if !errors.As(err, &gotType) || gotType.Field != wantType.Field || gotType.Offset != wantType.Offset {
+						t.Fatalf("direct=%v got=%v want=%v", direct, err, wantErr)
+					}
+				case errors.As(wantErr, &wantSyntax):
+					if !errors.As(err, &gotSyntax) || gotSyntax.Offset != wantSyntax.Offset {
+						t.Fatalf("direct=%v got=%v want=%v", direct, err, wantErr)
+					}
+				default:
+					t.Fatalf("unexpected reference error: %v", wantErr)
+				}
 			}
 		})
 	}

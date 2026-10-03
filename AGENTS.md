@@ -57,6 +57,8 @@ When replacing shared decoders, compare the complete public error contract,
 including outer wrappers, error precedence and direct receiver calls with invalid
 JSON. Keep reference models independent and verify new regressions against the
 prior revision instead of copying a helper without its calling boundary.
+For map-valued fields, preserve ordered duplicate object merges and null resets,
+including decoding into receivers that already contain map entries.
 
 ### Approval Flow
 Server→client requests for user approval (command exec, file write, etc.) flow through `Transport.OnRequest`. Each approval type has `*Params` and `*Response` types matching specs.

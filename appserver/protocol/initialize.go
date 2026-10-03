@@ -44,22 +44,17 @@ type InitializeCapabilities struct {
 
 // UnmarshalJSON preserves extension numbers without rounding them through float64.
 func (c *InitializeCapabilities) UnmarshalJSON(data []byte) error {
+	if !json.Valid(data) {
+		var raw json.RawMessage
+		return json.Unmarshal(data, &raw)
+	}
 	type wire InitializeCapabilities
 	decoded := wire(*c)
-	w := struct {
-		*wire
-		Extensions json.RawMessage `json:"extensions"`
-	}{wire: &decoded}
-	if err := json.Unmarshal(data, &w); err != nil {
+	decoded.Extensions = cloneArbitraryValue(decoded.Extensions)
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	if err := decoder.Decode(&decoded); err != nil {
 		return err
-	}
-	if len(w.Extensions) != 0 {
-		decoded.Extensions = cloneArbitraryValue(decoded.Extensions)
-		decoder := json.NewDecoder(bytes.NewReader(w.Extensions))
-		decoder.UseNumber()
-		if err := decoder.Decode(&decoded.Extensions); err != nil {
-			return err
-		}
 	}
 	*c = InitializeCapabilities(decoded)
 	return nil
