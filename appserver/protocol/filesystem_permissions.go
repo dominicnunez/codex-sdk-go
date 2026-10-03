@@ -99,7 +99,7 @@ func (w *FileSystemPathWrapper) UnmarshalJSON(data []byte) error {
 		v := new(SpecialFileSystemPath)
 		value, dest, required = v, v, []string{"value"}
 	default:
-		return fmt.Errorf("invalid filesystem path type %q", tag.Type)
+		return fmt.Errorf("invalid filesystem path type %s", quotedValueDiagnostic(string(tag.Type)))
 	}
 	if err := unmarshalInboundObject(data, dest, required, required); err != nil {
 		return err
@@ -200,7 +200,7 @@ func (w *FileSystemSpecialPathWrapper) UnmarshalJSON(data []byte) error {
 		v := new(UnknownFileSystemSpecialPath)
 		value, dest, required = v, v, []string{"path"}
 	default:
-		return fmt.Errorf("invalid filesystem special path kind %q", tag.Kind)
+		return fmt.Errorf("invalid filesystem special path kind %s", quotedValueDiagnostic(string(tag.Kind)))
 	}
 	if dest != nil {
 		if err := unmarshalInboundObject(data, dest, required, required); err != nil {

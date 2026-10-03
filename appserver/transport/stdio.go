@@ -10,6 +10,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/diagnostic"
 )
 
 // pendingReq holds a pending request's response channel and original ID.
@@ -198,7 +200,7 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 	}
 	if _, exists := t.pendingReqs[normalizedID]; exists {
 		t.mu.Unlock()
-		return Response{}, NewTransportError("send failed", fmt.Errorf("duplicate request ID: %v", req.ID.Value))
+		return Response{}, duplicateRequestIDError(req.ID)
 	}
 	t.mu.Unlock()
 	if err := ctx.Err(); err != nil {
@@ -218,7 +220,7 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 	}
 	if _, exists := t.pendingReqs[normalizedID]; exists {
 		t.mu.Unlock()
-		return Response{}, NewTransportError("send failed", fmt.Errorf("duplicate request ID: %v", req.ID.Value))
+		return Response{}, duplicateRequestIDError(req.ID)
 	}
 	respChan := make(chan pendingReqResult, 1)
 	pending := pendingReq{ch: respChan, id: req.ID}
@@ -258,6 +260,18 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 			return t.finishPendingRequest(normalizedID, pending, t.transportStopError("send failed"))
 		}
 	}
+}
+
+func duplicateRequestIDError(id RequestID) error {
+	switch value := id.Value.(type) {
+	case string:
+		return NewTransportError("send failed", fmt.Errorf("duplicate request ID: %s", diagnostic.Display(value)))
+	case json.Number:
+		return NewTransportError("send failed", fmt.Errorf("duplicate request ID: %s", diagnostic.Display(value.String())))
+	}
+	// Other accepted numeric primitives have bounded displays. Normalization
+	// computes the pending key; it does not replace the original RequestID.Value.
+	return NewTransportError("send failed", fmt.Errorf("duplicate request ID: %v", id.Value))
 }
 
 // Acceptance and abandonment share the pending-map lock. An accepted result

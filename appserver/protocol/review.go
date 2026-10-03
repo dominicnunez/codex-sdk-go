@@ -239,7 +239,7 @@ func validateReviewTargetVariantFields(data []byte, wantType string, requiredFie
 		return err
 	}
 	if typeStr != wantType {
-		return fmt.Errorf("review target: type %q does not match %q", typeStr, wantType)
+		return fmt.Errorf("review target: type %s does not match %q", quotedValueDiagnostic(typeStr), wantType)
 	}
 
 	return nil

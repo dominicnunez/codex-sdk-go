@@ -269,7 +269,7 @@ func validateNetworkPolicyRuleAction(action NetworkPolicyRuleAction) error {
 	case NetworkPolicyRuleActionAllow, NetworkPolicyRuleActionDeny:
 		return nil
 	default:
-		return fmt.Errorf("invalid network policy action %q", action)
+		return fmt.Errorf("invalid network policy action %s", quotedValueDiagnostic(string(action)))
 	}
 }
 

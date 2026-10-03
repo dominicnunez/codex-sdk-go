@@ -663,7 +663,7 @@ func validateThreadUnsubscribeStatus(status ThreadUnsubscribeStatus) error {
 	case ThreadUnsubscribeStatusNotLoaded, ThreadUnsubscribeStatusNotSubscribed, ThreadUnsubscribeStatusUnsubscribed:
 		return nil
 	default:
-		return fmt.Errorf("invalid status %q", status)
+		return fmt.Errorf("invalid status %s", quotedValueDiagnostic(string(status)))
 	}
 }
 

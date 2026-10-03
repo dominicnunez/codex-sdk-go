@@ -332,7 +332,7 @@ func (r *RateLimitSnapshot) UnmarshalJSON(data []byte) error {
 			RateLimitReachedTypeWorkspaceOwnerUsageLimitReached,
 			RateLimitReachedTypeWorkspaceMemberUsageLimitReached:
 		default:
-			return fmt.Errorf("invalid rateLimits.rateLimitReachedType %q", *decoded.RateLimitReachedType)
+			return fmt.Errorf("invalid rateLimits.rateLimitReachedType %s", quotedValueDiagnostic(string(*decoded.RateLimitReachedType)))
 		}
 	}
 	*r = RateLimitSnapshot(decoded)
@@ -545,7 +545,7 @@ func (p *ChatgptLoginAccountParams) marshalWire() ([]byte, error) {
 		switch *p.AppBrand {
 		case LoginAppBrandCodex, LoginAppBrandChatGPT:
 		default:
-			return nil, fmt.Errorf("invalid appBrand %q", *p.AppBrand)
+			return nil, fmt.Errorf("invalid appBrand %s", quotedValueDiagnostic(string(*p.AppBrand)))
 		}
 	}
 	w := ChatgptLoginAccountParams{
@@ -877,7 +877,7 @@ func (r *CancelLoginAccountResponse) UnmarshalJSON(data []byte) error {
 	switch decoded.Status {
 	case CancelLoginAccountStatusCanceled, CancelLoginAccountStatusNotFound:
 	default:
-		return fmt.Errorf("invalid status %q", decoded.Status)
+		return fmt.Errorf("invalid status %s", quotedValueDiagnostic(string(decoded.Status)))
 	}
 	*r = CancelLoginAccountResponse(decoded)
 	return nil

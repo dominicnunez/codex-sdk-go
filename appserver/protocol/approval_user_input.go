@@ -85,7 +85,7 @@ func (r ToolRequestUserInputResponse) validate() error {
 	}
 	for questionID, answer := range r.Answers {
 		if answer.Answers == nil {
-			return fmt.Errorf("answers[%q].answers: missing answers", questionID)
+			return fmt.Errorf("answers[%s].answers: missing answers", quotedValueDiagnostic(questionID))
 		}
 	}
 	return nil

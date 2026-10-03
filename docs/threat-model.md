@@ -118,13 +118,17 @@ error parity for payloads that newly fail the array contract.
 These admission checks neither authorize the reported data nor bound the number
 of valid elements or callback-owned copies.
 
-Absolute-path validation errors quote at most 256 source bytes and report the
-omitted byte count for larger paths. The bound applies before escaping and
-wrapping, across shared inbound and outbound path validators, so rejected paths
-cannot amplify retained diagnostics in proportion to their full size. Short
-diagnostics, field context and error classification remain intact. Validation
-and decoding may still allocate for the complete path; this is not a total
-response-size or heap budget, and valid long paths are not truncated.
+SDK-generated previews of rejected paths, string enums, discriminators, app and
+answer-map keys, and request identifiers quote at most 256 source bytes and
+report the omitted byte count. The bound applies before escaping and wrapping,
+across protocol validation and transport duplicate-ID errors. Short diagnostics,
+field context, error classification and validation precedence remain intact;
+duplicate-ID errors retain their existing unquoted short display. Validation
+and decoding may still allocate for the complete input. Accepted long values,
+unknown raw variants and failed receivers' existing partial updates are not
+truncated. Structured RPC messages and underlying JSON numeric-overflow error
+metadata are outside this preview control and can retain full values. This is
+not a total response-size, diagnostic-size or heap budget.
 
 Terminal transport cleanup clears requests awaiting handler registration and
 drains abandoned inbound requests and outbound envelopes. Queue admission is
