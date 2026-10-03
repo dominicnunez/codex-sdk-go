@@ -93,20 +93,53 @@ func (p ExternalAgentConfigDetectParams) prepareRequest() (interface{}, error) {
 
 // ExternalAgentConfigDetectResponse contains the result of config detection.
 type ExternalAgentConfigDetectResponse struct {
-	Items      []ExternalAgentConfigMigrationItem        `json:"items"`
+	Items []ExternalAgentConfigMigrationItem `json:"items"`
+	// Connectors retains its legacy public type. Detection admits both source
+	// variants from ExternalAgentDetectedConnectorSource at this envelope owner.
 	Connectors []ExternalAgentImportedConnectorCandidate `json:"connectors,omitempty"`
 }
 
 func (r *ExternalAgentConfigDetectResponse) UnmarshalJSON(data []byte) error {
-	if err := validateRequiredObjectFields(data, "items"); err != nil {
-		return err
-	}
 	type wire ExternalAgentConfigDetectResponse
-	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	var decoded struct {
+		wire
+		Connectors []detectedConnector `json:"connectors"`
+	}
+	if err := unmarshalResponseObject(data, &decoded, []string{"items"}, []string{"items", "connectors"}); err != nil {
 		return err
 	}
-	*r = ExternalAgentConfigDetectResponse(decoded)
+	if decoded.Connectors != nil {
+		decoded.wire.Connectors = make([]ExternalAgentImportedConnectorCandidate, len(decoded.Connectors))
+		for i, connector := range decoded.Connectors {
+			decoded.wire.Connectors[i] = ExternalAgentImportedConnectorCandidate{Name: connector.Name, SessionCount: connector.SessionCount, Source: ExternalAgentImportedConnectorSource(connector.Source)}
+		}
+	}
+	*r = ExternalAgentConfigDetectResponse(decoded.wire)
+	return nil
+}
+
+// Detection and import history have different source enums despite the legacy
+// shared public field type. Do not validate detected records as imported ones.
+type detectedConnector struct {
+	Name         string                  `json:"name"`
+	SessionCount uint32                  `json:"sessionCount"`
+	Source       detectedConnectorSource `json:"source"`
+}
+
+type detectedConnectorSource string
+
+func (v *detectedConnectorSource) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "detectedConnector.source", map[detectedConnectorSource]struct{}{"remoteMcpServersConfig": {}, "sessionToolUse": {}}, v)
+}
+
+func (v *detectedConnector) UnmarshalJSON(data []byte) error {
+	type wire detectedConnector
+	var decoded wire
+	required := []string{"name", "sessionCount", "source"}
+	if err := unmarshalSyncedInbound(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*v = detectedConnector(decoded)
 	return nil
 }
 

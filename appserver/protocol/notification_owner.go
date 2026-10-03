@@ -101,10 +101,17 @@ func (n *TurnModerationMetadataNotification) UnmarshalJSON(data []byte) error {
 
 func (n *ModelSafetyBufferingUpdatedNotification) UnmarshalJSON(data []byte) error {
 	type wire ModelSafetyBufferingUpdatedNotification
-	decoded, err := decodeOwnedNotification[wire](data, []string{"model", "reasons", "showBufferingUi", "threadId", "turnId", "useCases"})
-	if err != nil {
+	var decoded struct {
+		wire
+		Reasons  nonNullStringList `json:"reasons"`
+		UseCases nonNullStringList `json:"useCases"`
+	}
+	required := []string{"model", "reasons", "showBufferingUi", "threadId", "turnId", "useCases"}
+	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
-	*n = ModelSafetyBufferingUpdatedNotification(decoded)
+	decoded.wire.Reasons = []string(decoded.Reasons)
+	decoded.wire.UseCases = []string(decoded.UseCases)
+	*n = ModelSafetyBufferingUpdatedNotification(decoded.wire)
 	return nil
 }

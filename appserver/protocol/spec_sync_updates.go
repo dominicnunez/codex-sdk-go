@@ -17,7 +17,7 @@ type AppsReadParams struct {
 type AppToolSummary struct {
 	Description    string  `json:"description"`
 	DisabledReason *string `json:"disabledReason,omitempty"`
-	IsEnabled      bool    `json:"isEnabled,omitempty"`
+	IsEnabled      bool    `json:"isEnabled"`
 	IsReadOnly     bool    `json:"isReadOnly,omitempty"`
 	Name           string  `json:"name"`
 	Title          *string `json:"title,omitempty"`
