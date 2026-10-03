@@ -37,24 +37,38 @@ var errConversationUninitialized = errors.New("conversation must be created with
 // Concurrent Turn or TurnStreamed calls on the same Conversation are
 // not supported — the second call returns errTurnInProgress.
 type Conversation struct {
-	process   *Process
-	threadID  string
-	state     *conversationState
-	release   func()
-	cleanup   *runtime.Cleanup
-	closeOnce sync.Once
+	process    *Process
+	threadID   string
+	generation uint64
+	state      *conversationState
+	release    func()
+	cleanup    *runtime.Cleanup
+	closeOnce  sync.Once
 }
 
 type conversationState struct {
 	mu             sync.Mutex
 	thread         Thread
+	hasSnapshot    bool
 	activeTurn     bool
 	closed         bool
 	hasStartedTurn bool
 }
 
 func newConversationState(thread Thread) *conversationState {
-	return &conversationState{thread: cloneThreadState(thread)}
+	return &conversationState{thread: cloneThreadState(thread), hasSnapshot: true}
+}
+
+func (s *conversationState) initializeFromStart(thread Thread) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	// A close can coalesce away the pending initial publication before delivery.
+	// Seed the successful start response before exposing the handle, preserving
+	// closed state and any newer snapshot that was already delivered.
+	if !s.hasSnapshot {
+		s.thread = cloneThreadState(thread)
+		s.hasSnapshot = true
+	}
 }
 
 func (s *conversationState) snapshot() Thread {
@@ -70,6 +84,7 @@ func (s *conversationState) storeSnapshot(thread Thread) {
 		return
 	}
 	s.thread = cloneThreadState(thread)
+	s.hasSnapshot = true
 	s.mu.Unlock()
 }
 
@@ -107,12 +122,6 @@ func (s *conversationState) markTurnStarted() {
 	s.mu.Unlock()
 }
 
-func (s *conversationState) applyCompletedThread(thread Thread) {
-	s.mu.Lock()
-	s.thread = cloneThreadState(thread)
-	s.mu.Unlock()
-}
-
 func (s *conversationState) close() {
 	s.mu.Lock()
 	s.closed = true
@@ -134,13 +143,6 @@ func (c *Conversation) Thread() Thread {
 		return Thread{}
 	}
 	return c.state.snapshot()
-}
-
-func (c *Conversation) applyCompletedThread(thread Thread) {
-	if c == nil || c.state == nil {
-		return
-	}
-	c.state.applyCompletedThread(thread)
 }
 
 func (c *Conversation) ensureInitialized() error {
@@ -216,22 +218,20 @@ func (p *Process) StartConversation(ctx context.Context, opts ConversationOption
 	}
 	applyThreadStartOptions(&params, opts.Instructions, opts.Model, opts.Personality, opts.ApprovalPolicy)
 
-	resp, err := p.Client.Thread.Start(ctx, params)
+	state := &conversationState{}
+	resp, generation, unsubscribe, err := p.Client.Thread.StartWithStateListener(ctx, params, state.storeSnapshot, state.close)
 	if err != nil {
 		return nil, fmt.Errorf("thread/start: %w", err)
 	}
 
-	state := newConversationState(resp.Thread)
+	state.initializeFromStart(resp.Thread)
 	conv := &Conversation{
 		process:  p,
 		threadID: resp.Thread.ID,
 		state:    state,
 	}
-	unsubscribe := p.Client.AddThreadStateListener(resp.Thread.ID, state.storeSnapshot, state.close)
+	conv.generation = generation
 	conv.release = unsubscribe
-	if snapshot, ok := p.Client.ThreadStateSnapshot(resp.Thread.ID); ok {
-		state.storeSnapshot(snapshot)
-	}
 	cleanup := runtime.AddCleanup(conv, func(unsub func()) {
 		if unsub != nil {
 			unsub()
@@ -254,9 +254,9 @@ func (c *Conversation) buildTurnLifecycleParams(opts TurnOptions, thread Thread,
 		turnParams:                c.buildTurnParams(opts),
 		thread:                    thread,
 		threadID:                  c.threadID,
+		threadGeneration:          c.generation,
 		allowMissingInitialTurnID: allowMissingInitialTurnID,
 		onStart:                   c.state.markTurnStarted,
-		onComplete:                c.applyCompletedThread,
 	}
 }
 
@@ -277,7 +277,7 @@ func (c *Conversation) Turn(ctx context.Context, opts TurnOptions) (*RunResult, 
 		return nil, err
 	}
 
-	thread, allowMissingInitialTurnID, err := c.state.startTurn()
+	thread, allowMissingInitialTurnID, err := c.startTurn()
 	if err != nil {
 		return nil, err
 	}
@@ -321,7 +321,7 @@ func (c *Conversation) turnStreamedLifecycle(ctx context.Context, opts TurnOptio
 		return
 	}
 
-	thread, allowMissingInitialTurnID, err := c.state.startTurn()
+	thread, allowMissingInitialTurnID, err := c.startTurn()
 	if err != nil {
 		streamSendErr(g, err)
 		return
@@ -332,4 +332,13 @@ func (c *Conversation) turnStreamedLifecycle(ctx context.Context, opts TurnOptio
 	}()
 
 	executeStreamedTurn(ctx, c.buildTurnLifecycleParams(opts, thread, allowMissingInitialTurnID), g, s)
+}
+
+func (c *Conversation) startTurn() (Thread, bool, error) {
+	// This is the cache admission point. A closure after it may leave an already
+	// admitted operation running, but its completion cannot reopen the cache.
+	if c.generation == 0 || c.process.Client.ThreadStateGeneration(c.threadID) != c.generation {
+		return Thread{}, false, errConversationClosed
+	}
+	return c.state.startTurn()
 }

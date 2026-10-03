@@ -60,7 +60,31 @@ originating RPC or notification method, or `CacheThreadState` for a direct cache
 update and `AddThreadStateListener` for initial replay. A panic during replay
 still returns the unsubscribe function. Callbacks run outside the cache lock;
 unsubscribing affects future deliveries, while an already selected callback may
-still run. Callbacks must return promptly because delivery is synchronous.
+still run. Each recipient runs serially in cache commit order. Idle delivery runs
+on the publishing call; concurrent or reentrant writes to a busy recipient can
+return before delivery. Pending updates coalesce to the latest snapshot. Closure
+supersedes older pending updates and precedes a later reopened snapshot; repeated
+close/reopen transitions while busy may coalesce to one closure and the latest
+update. Callbacks must return promptly, since an earlier blocked callback can
+delay later recipients selected by the same publication.
+
+`ThreadStateGeneration` checks the current
+open incarnation, returning zero when absent or closed. `CompleteThreadTurn`
+atomically appends to that incarnation's latest metadata, returning an independent
+historical snapshot; closure, eviction or recreation causes publication to be
+skipped. Each successful call appends once, without turn-ID deduplication. These
+helpers support runtime snapshot ownership; generations are local best-effort
+cache state, not remote revisions, durable identity or authorization.
+
+`Thread.StartWithStateListener` couples a successful start response's cache
+publication, generation and listener registration before eviction or callbacks.
+It returns the response, that publication's generation and unsubscribe function;
+initial callback diagnostics use `thread/start`. Request failures admit no new
+subscription or publication, and both nil callbacks create no subscription.
+Ordinary `Thread.Start` retains its existing signature and behavior. Runtime
+Conversations use the coupled helper so cache pressure cannot discard the newly
+started thread before observation, while a close during startup remains terminal
+for the returned handle even if the cache is explicitly reopened afterward.
 
 ## Login variants
 

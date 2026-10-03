@@ -199,9 +199,9 @@ type turnLifecycleParams struct {
 	turnParams                TurnStartParams
 	thread                    Thread
 	threadID                  string
+	threadGeneration          uint64
 	allowMissingInitialTurnID bool
-	onStart                   func()       // called after turn/start returns a valid turn ID; nil = no-op
-	onComplete                func(Thread) // called with the completed thread snapshot; nil = no-op
+	onStart                   func() // called after turn/start returns a valid turn ID; nil = no-op
 	collector                 *StreamCollector
 }
 
@@ -446,21 +446,13 @@ func waitForTurnCompletion(ctx context.Context, done <-chan TurnCompletedNotific
 }
 
 func completeTurnLifecycle(p turnLifecycleParams, completed Turn, items []ThreadItemWrapper) *RunResult {
-	thread := p.thread
 	if p.client != nil {
-		if snapshot, ok := p.client.ThreadStateSnapshot(p.threadID); ok {
-			thread = snapshot
+		turn := turnWithItems(completed, items)
+		if thread, ok := p.client.CompleteThreadTurn(p.threadID, p.threadGeneration, turn); ok {
+			return runResultWithThread(thread, turn, items)
 		}
 	}
-
-	result := buildRunResult(thread, completed, items)
-	if p.client != nil {
-		p.client.CacheThreadState(result.Thread)
-	}
-	if p.onComplete != nil {
-		p.onComplete(result.Thread)
-	}
-	return result
+	return buildRunResult(p.thread, completed, items)
 }
 
 func sendTurnCompletion(done chan<- TurnCompletedNotification, n TurnCompletedNotification) {
@@ -491,6 +483,9 @@ func finishCompletedTurnLifecycle(p turnLifecycleParams, completed TurnCompleted
 // collects items, and waits for completion or context cancellation.
 // Listeners are filtered by threadID and active turnID to avoid cross-turn contamination.
 func executeTurn(ctx context.Context, p turnLifecycleParams) (*RunResult, error) {
+	if p.threadGeneration == 0 {
+		p.threadGeneration = p.client.ThreadStateGeneration(p.threadID)
+	}
 	var (
 		items              []ThreadItemWrapper
 		itemsMu            sync.Mutex
@@ -578,6 +573,9 @@ func executeTurn(ctx context.Context, p turnLifecycleParams) (*RunResult, error)
 // executeStreamedTurn runs the streaming lifecycle: registers filtered listeners,
 // starts the turn, and sends events on ch until completion or context cancellation.
 func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, g *guardedChan, s *Stream) {
+	if p.threadGeneration == 0 {
+		p.threadGeneration = p.client.ThreadStateGeneration(p.threadID)
+	}
 	var (
 		items              []ThreadItemWrapper
 		itemsMu            sync.Mutex
