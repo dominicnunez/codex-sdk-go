@@ -35,6 +35,7 @@ import codex "github.com/dominicnunez/codex-sdk-go/appserver/protocol"
 ## Documentation
 
 - [Protocol guide](docs/protocol.md) — service methods, inputs, notifications, approvals, and login variants
+- [Configuration guide](docs/guides/configuration.md) — single and multiple workspace login restrictions and JSON composition
 - [Spec-sync maintenance](docs/spec-sync.md) — automated schema updates and superseded-PR handling
 - [Threat model](docs/threat-model.md) — trust boundaries, implemented controls, residual risks, and severity calibration
 

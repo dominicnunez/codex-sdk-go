@@ -110,6 +110,14 @@ not a general guarantee for all optional protocol fields.
 
 [Apps configuration decoding](../appserver/protocol/config_apps.go) retains connector defaults, per-tool and per-account approval settings, and omitted model-facing tool surfaces returned by `config/read`. It validates enum values and preserves explicit disabled settings. These values describe server configuration; the SDK does not apply them as an authorization decision, enforce tool exposure, or authenticate the account-link IDs. Codex and the embedding application remain responsible for actual enforcement.
 
+[Workspace restriction decoding](../appserver/protocol/config_workspace.go)
+retains a single workspace ID or a list without narrowing a list to its first ID.
+Null and absence use the existing unspecified-value convention; an explicit empty
+list retains its array shape. The SDK exposes these peer-provided login
+restrictions as configuration data. It does not authenticate the IDs or enforce
+workspace membership in its independent OAuth login helpers. Codex and the
+embedding application own enforcement and the meaning of an empty restriction.
+
 ## Thread state, completion, and cancellation
 
 An accepted turn-start response does not complete a runtime turn. If the peer
