@@ -460,7 +460,14 @@ func (c *Client) addNotificationListener(method string, handler NotificationHand
 		listeners := c.internalListeners[method]
 		for i, l := range listeners {
 			if l.id == id {
-				c.internalListeners[method] = append(listeners[:i], listeners[i+1:]...)
+				copy(listeners[i:], listeners[i+1:])
+				listeners[len(listeners)-1] = internalListener{}
+				listeners = listeners[:len(listeners)-1]
+				if len(listeners) == 0 {
+					delete(c.internalListeners, method)
+				} else {
+					c.internalListeners[method] = listeners
+				}
 				break
 			}
 		}

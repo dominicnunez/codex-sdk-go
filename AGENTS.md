@@ -73,6 +73,8 @@ For callback fanout, isolate each recipient at the owning boundary, including
 initial replay and direct service/cache calls. Verify committed state reaches
 later SDK consumers after a callback or error reporter panics, and that replay
 failure still returns registration cleanup. Preserve the diagnostic origin.
+For listener removal, clear vacated backing slots and discard empty registries;
+preserve independent dispatch snapshots and trace lifecycle unsubscription.
 For peer-controlled JSON selection, check temporary allocations across ignored
 fields, duplicate selected fields, identity length and nesting depth. Preserve
 the actual duplicate, alias, null and malformed-prefix rules; measure complete

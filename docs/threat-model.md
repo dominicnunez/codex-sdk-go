@@ -88,6 +88,13 @@ returns. Accepted response outcomes and the separate notification EOF-drain
 policy remain intact. Releasing transport references is not secure erasure or
 a guarantee that application-owned or actively executing data has been freed.
 
+Client listener unsubscription clears vacated callback slots in both notification
+and thread-state registries and deletes empty registration entries. Completed or
+canceled turn lifecycles release their registrations; conversation handles require
+Close or eventual runtime cleanup. A dispatch snapshot admitted before removal
+may still invoke its callbacks and retain captured data until fanout finishes.
+This is reference release, not secure erasure or cancellation of admitted callbacks.
+
 The stream collector copies a retained suffix when trimming oversized plan text
 or command delta history and clears evicted delta/raw-chunk backing slots. Its
 existing byte/count limits therefore release the discarded text references in

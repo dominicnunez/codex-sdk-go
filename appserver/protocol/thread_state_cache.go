@@ -168,7 +168,9 @@ func (c *Client) addThreadStateListener(threadID string, onUpdate func(Thread), 
 			if listener.id != id {
 				continue
 			}
-			c.threadStateListeners[threadID] = append(listeners[:i], listeners[i+1:]...)
+			copy(listeners[i:], listeners[i+1:])
+			listeners[len(listeners)-1] = threadStateListener{}
+			c.threadStateListeners[threadID] = listeners[:len(listeners)-1]
 			if len(c.threadStateListeners[threadID]) == 0 {
 				delete(c.threadStateListeners, threadID)
 			}
