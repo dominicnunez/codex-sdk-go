@@ -197,6 +197,14 @@ Callback host, authorization/token endpoints, redirect URI, and HTTP client are 
 
 [Token requests](../login/token.go) use the caller's context, bound token-response reads to 1 MiB, and omit non-success response bodies from errors because they may echo credentials. The configured HTTP client's TLS, redirect, and timeout behavior still matters. A malicious configured endpoint, permissive custom HTTP transport, or unsafe URL logger can disclose codes, verifiers, or refresh tokens.
 
+Both authorization-code exchange and refresh reject nonpositive lifetimes and
+`expires_in` values above 9,223,372,036 seconds before multiplying into a signed
+nanosecond duration or publishing credentials. Accepted lifetimes preserve their
+intended expiration from the local clock; unsupported values return no partial
+credentials, and lifetime errors omit token fields. This prevents arithmetic
+overflow, not false lifetime claims from a trusted endpoint or verification of
+token validity. Stored credentials may already be expired and still need refresh.
+
 [JWT claim extraction](../login/auth/jwt.go) decodes the payload without signature, issuer, audience, or expiry verification. Account/plan fields are useful metadata from a trusted token source; they must not authorize a user, tenant, routing choice, or backend action on their own. Gateway OAuth methods and explicit-login capability settings in [gateway_oauth.go](../appserver/protocol/gateway_oauth.go) and [initialize.go](../appserver/protocol/initialize.go) convey app-server protocol choices. They do not independently establish consent, account ownership, or secure provider routing.
 
 Initialization retains attestation, MCP extension and legacy form opt-ins as part

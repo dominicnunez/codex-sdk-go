@@ -127,3 +127,5 @@ as fallback. Recheck process cancellation after parameter preparation.
 
 ### Login Packages
 Codex OAuth login flow lives in `login/`. Credential persistence, token claims, redaction, and `chatgptAuthTokens` payload helpers live in `login/auth/`.
+For provider-controlled lifetimes, check the target unit's range before arithmetic
+at the shared token-response boundary; verify all grants and no partial credentials.
