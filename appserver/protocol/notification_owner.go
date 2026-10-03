@@ -1,5 +1,12 @@
 package protocol
 
+import (
+	"bytes"
+	"encoding/json"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+)
+
 // These synced notifications use exact schema properties, matching transport
 // ownership and the other typed notification decoders.
 func decodeOwnedNotification[T any](data []byte, required []string) (T, error) {
@@ -90,13 +97,54 @@ func (n *StrictReviewRequiredNotification) UnmarshalJSON(data []byte) error {
 
 func (n *TurnModerationMetadataNotification) UnmarshalJSON(data []byte) error {
 	type wire TurnModerationMetadataNotification
-	var decoded wire
+	var decoded struct {
+		wire
+		Metadata moderationMetadataValue `json:"metadata"`
+	}
 	// metadata is open JSON and may be null; only its presence is required.
 	if err := unmarshalInboundObject(data, &decoded, []string{"metadata", "threadId", "turnId"}, []string{"threadId", "turnId"}); err != nil {
 		return err
 	}
-	*n = TurnModerationMetadataNotification(decoded)
+	metadata, err := decoded.Metadata.value()
+	if err != nil {
+		return err
+	}
+	decoded.wire.Metadata = metadata
+	*n = TurnModerationMetadataNotification(decoded.wire)
 	return nil
+}
+
+// Consecutive object occurrences retain the legacy map merge. A different JSON
+// kind, including null, replaces the value and resets that accumulation.
+// Raw members retain their numeric tokens rather than converting to float64.
+type moderationMetadataValue struct {
+	raw    json.RawMessage
+	object map[string]json.RawMessage
+}
+
+func (m *moderationMetadataValue) UnmarshalJSON(data []byte) error {
+	incoming := bytes.TrimSpace(data)
+	if len(incoming) > 0 && incoming[0] == '{' && (m.object != nil || len(m.raw) > 0 && m.raw[0] == '{') {
+		if m.object == nil {
+			if err := jsondecode.Unmarshal(m.raw, &m.object); err != nil {
+				return err
+			}
+			m.raw = nil
+		}
+		// Accumulate once and encode once after envelope admission, rather than
+		// repeatedly decoding and encoding the growing object for each duplicate.
+		return jsondecode.Unmarshal(incoming, &m.object)
+	}
+	m.object = nil
+	m.raw = append(json.RawMessage(nil), incoming...)
+	return nil
+}
+
+func (m *moderationMetadataValue) value() (json.RawMessage, error) {
+	if m.object != nil {
+		return json.Marshal(m.object)
+	}
+	return m.raw, nil
 }
 
 func (n *ModelSafetyBufferingUpdatedNotification) UnmarshalJSON(data []byte) error {

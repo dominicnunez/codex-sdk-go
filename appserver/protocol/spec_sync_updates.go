@@ -506,9 +506,10 @@ type StrictReviewRequiredNotification struct {
 	TurnID      string `json:"turnId"`
 }
 type TurnModerationMetadataNotification struct {
-	Metadata map[string]interface{} `json:"metadata"`
-	ThreadID string                 `json:"threadId"`
-	TurnID   string                 `json:"turnId"`
+	// Metadata owns arbitrary JSON, including null, arrays and exact numeric tokens.
+	Metadata json.RawMessage `json:"metadata"`
+	ThreadID string          `json:"threadId"`
+	TurnID   string          `json:"turnId"`
 }
 type ProjectChangeType string
 

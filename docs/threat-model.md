@@ -78,6 +78,20 @@ These limits do not constitute a total transport or process heap budget. Frame p
 
 Typed decoders validate required fields, selected non-null fields, enums, unions, and request-specific constraints. [Object validation](../appserver/protocol/json_validation.go) and [schema coverage tests](../appserver/protocol/spec_coverage_test.go) help preserve the wire contract. Validation is not universal semantic authorization or a guarantee of canonical JSON: some semantic leaf types use ordinary `encoding/json`, which can allocate when unquoting escaped field names or decoding known duplicate values, and duplicate-member rejection is not a general SDK control. Selected fallback item/turn payloads, unknown variants, open JSON metadata, application configuration maps, and attachments intentionally retain their semantic data. Consumers must validate any additional security meaning before acting on it.
 
+[Moderation metadata admission](../appserver/protocol/notification_owner.go)
+requires the schema's metadata member but accepts every present JSON value,
+including null and numeric tokens outside float64 precision or range. The
+exported field owns raw JSON rather than an object-only map. Consecutive duplicate
+objects merge their top-level members, while another value kind resets that
+accumulation. The decoder accumulates duplicate objects before one final
+serialization; it does not repeatedly serialize the growing object. Each typed
+replacement or append recipient independently decodes and owns its metadata
+bytes. This prevents representation loss and recipient mutation from changing
+another recipient's data; it does not interpret moderation evidence or grant
+authority. Payload copying and duplicate-object accumulation remain proportional
+to admitted semantic data, with no additional metadata byte quota. Application
+retention and any later decoding or numeric conversion are separate contracts.
+
 [Synced record admission](../appserver/protocol/synced_record_validation.go)
 validates app, workspace-message, token-usage, goal, section and import records
 at their shared decoding owners before typed service success or callback

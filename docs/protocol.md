@@ -52,6 +52,34 @@ defer unsubscribe()
 
 The typed surface also covers thread reverts and queue changes, project updates, strict-review requirements, external-agent import progress, moderation metadata, and model safety-buffering changes. Use raw notification handlers only when intentionally handling a future method that the SDK does not yet type.
 
+`TurnModerationMetadataNotification.Metadata` is an owned `json.RawMessage`,
+matching the schema's arbitrary JSON value. It preserves objects, arrays,
+scalars, explicit null and numeric tokens without converting them to float64.
+Metadata must be present when decoding. Consecutive duplicate metadata objects
+merge their top-level members; null or another JSON kind resets the accumulated
+object. Successful decoding replaces a reused receiver, and failed admission
+leaves it unchanged. Each typed recipient receives its own metadata bytes.
+
+This changes the Go field from `map[string]interface{}` to `json.RawMessage`.
+To construct object metadata, marshal a map into the field. To inspect it,
+decode the field into the application type appropriate to that value. Use
+`json.Decoder.UseNumber` when decoding into an interface if numeric precision
+must be retained. For example:
+
+```go
+var object map[string]json.RawMessage
+if err := json.Unmarshal(n.Metadata, &object); err != nil {
+	// This notification's metadata may be an array or scalar instead.
+	return
+}
+```
+
+The notification retains plain struct marshalling, so anonymous application
+wrappers keep their additional fields. Its existing `UnmarshalJSON` method still
+follows Go method promotion; use a named notification field when decoding an
+outer application envelope. Constructed metadata must contain valid JSON;
+nil encodes as null, while a nonnil empty or malformed raw value fails encoding.
+
 `AddThreadStateListener` receives independent cached snapshots and thread closure
 updates, including an immediate replay when state is already cached. Each listener
 panic is recovered separately and reported through `WithHandlerErrorCallback`;
