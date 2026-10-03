@@ -69,5 +69,10 @@ Server→client requests for user approval (command exec, file write, etc.) flow
 ### Runtime Packages
 Protocol types and generated schema coverage stay in `appserver/protocol/`. Process management, single-turn `Run`, streamed run helpers, and conversation helpers live in `appserver/`. Stdio framing lives in `appserver/transport/`.
 
+When adding reference-valued protocol fields, trace ownership through cache,
+conversation, collector, emitted events and final result views. Use the existing
+complete copy boundary rather than a partial field list; verify mutation in both
+directions, nil/empty values and representative snapshot cost.
+
 ### Login Packages
 Codex OAuth login flow lives in `login/`. Credential persistence, token claims, redaction, and `chatgptAuthTokens` payload helpers live in `login/auth/`.

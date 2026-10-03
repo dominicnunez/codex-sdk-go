@@ -2,6 +2,7 @@ package appserver
 
 import (
 	"encoding/json"
+	"reflect"
 	"strings"
 	"sync"
 	"unicode/utf8"
@@ -147,6 +148,9 @@ func (c *StreamCollector) Process(event Event, err error) {
 		return
 	}
 	if event == nil {
+		return
+	}
+	if value := reflect.ValueOf(event); value.Kind() == reflect.Pointer && value.IsNil() {
 		return
 	}
 
@@ -316,8 +320,12 @@ func (c *StreamCollector) mergePlanDeltaLocked(p *PlanDelta) {
 }
 
 func (c *StreamCollector) ingestStartedItemLocked(threadID string, turnID string, item ThreadItem) {
+	item = collectorItemPointer(item)
 	switch v := item.(type) {
 	case *CommandExecutionThreadItem:
+		if v == nil {
+			return
+		}
 		updateLifecycleStateLocked(c.commandExecutions, threadID, turnID, v.ID, func(_ string, lc *CommandExecutionLifecycle) {
 			setLifecycleScope(&lc.ItemID, &lc.ThreadID, &lc.TurnID, v.ID, threadID, turnID)
 			lc.Started = true
@@ -325,6 +333,9 @@ func (c *StreamCollector) ingestStartedItemLocked(threadID string, turnID string
 			lc.StartedItem = cloneCommandExecutionItem(v)
 		})
 	case *McpToolCallThreadItem:
+		if v == nil {
+			return
+		}
 		updateLifecycleStateLocked(c.mcpToolCalls, threadID, turnID, v.ID, func(_ string, lc *McpToolCallLifecycle) {
 			setLifecycleScope(&lc.ItemID, &lc.ThreadID, &lc.TurnID, v.ID, threadID, turnID)
 			lc.Started = true
@@ -332,12 +343,18 @@ func (c *StreamCollector) ingestStartedItemLocked(threadID string, turnID string
 			lc.StartedItem = cloneMcpToolCallItem(v)
 		})
 	case *WebSearchThreadItem:
+		if v == nil {
+			return
+		}
 		updateLifecycleStateLocked(c.webSearches, threadID, turnID, v.ID, func(_ string, lc *WebSearchLifecycle) {
 			setLifecycleScope(&lc.ItemID, &lc.ThreadID, &lc.TurnID, v.ID, threadID, turnID)
 			lc.Started = true
 			lc.StartedItem = cloneWebSearchItem(v)
 		})
 	case *FileChangeThreadItem:
+		if v == nil {
+			return
+		}
 		updateLifecycleStateLocked(c.fileChanges, threadID, turnID, v.ID, func(_ string, lc *FileChangeLifecycle) {
 			setLifecycleScope(&lc.ItemID, &lc.ThreadID, &lc.TurnID, v.ID, threadID, turnID)
 			lc.Started = true
@@ -348,10 +365,17 @@ func (c *StreamCollector) ingestStartedItemLocked(threadID string, turnID string
 }
 
 func (c *StreamCollector) ingestCompletedItemLocked(threadID string, turnID string, item ThreadItem) {
+	item = collectorItemPointer(item)
 	switch v := item.(type) {
 	case *PlanThreadItem:
+		if v == nil {
+			return
+		}
 		c.setLatestPlanTextLocked(v.ID, v.Text)
 	case *CommandExecutionThreadItem:
+		if v == nil {
+			return
+		}
 		key := updateLifecycleStateLocked(c.commandExecutions, threadID, turnID, v.ID, func(key string, lc *CommandExecutionLifecycle) {
 			setLifecycleScope(&lc.ItemID, &lc.ThreadID, &lc.TurnID, v.ID, threadID, turnID)
 			lc.Completed = true
@@ -367,6 +391,9 @@ func (c *StreamCollector) ingestCompletedItemLocked(threadID string, turnID stri
 		delete(c.commandOutputDeltaBytes, key)
 		delete(c.commandOutputBytes, key)
 	case *McpToolCallThreadItem:
+		if v == nil {
+			return
+		}
 		updateLifecycleStateLocked(c.mcpToolCalls, threadID, turnID, v.ID, func(_ string, lc *McpToolCallLifecycle) {
 			setLifecycleScope(&lc.ItemID, &lc.ThreadID, &lc.TurnID, v.ID, threadID, turnID)
 			lc.Completed = true
@@ -374,18 +401,43 @@ func (c *StreamCollector) ingestCompletedItemLocked(threadID string, turnID stri
 			lc.CompletedItem = cloneMcpToolCallItem(v)
 		})
 	case *WebSearchThreadItem:
+		if v == nil {
+			return
+		}
 		updateLifecycleStateLocked(c.webSearches, threadID, turnID, v.ID, func(_ string, lc *WebSearchLifecycle) {
 			setLifecycleScope(&lc.ItemID, &lc.ThreadID, &lc.TurnID, v.ID, threadID, turnID)
 			lc.Completed = true
 			lc.CompletedItem = cloneWebSearchItem(v)
 		})
 	case *FileChangeThreadItem:
+		if v == nil {
+			return
+		}
 		updateLifecycleStateLocked(c.fileChanges, threadID, turnID, v.ID, func(_ string, lc *FileChangeLifecycle) {
 			setLifecycleScope(&lc.ItemID, &lc.ThreadID, &lc.TurnID, v.ID, threadID, turnID)
 			lc.Completed = true
 			lc.Status = Ptr(v.Status)
 			lc.CompletedItem = cloneFileChangeItem(v)
 		})
+	}
+}
+
+// The public union accepts both pointer and value forms. Canonicalize supported
+// values only for dispatch; each stored lifecycle owns a separate deep copy.
+func collectorItemPointer(item ThreadItem) ThreadItem {
+	switch value := item.(type) {
+	case CommandExecutionThreadItem:
+		return &value
+	case McpToolCallThreadItem:
+		return &value
+	case WebSearchThreadItem:
+		return &value
+	case FileChangeThreadItem:
+		return &value
+	case PlanThreadItem:
+		return &value
+	default:
+		return item
 	}
 }
 
@@ -426,51 +478,19 @@ func countLifecycleItemIDs[T any](states map[string]T, itemID func(T) string) ma
 }
 
 func cloneCommandExecutionItem(in *CommandExecutionThreadItem) *CommandExecutionThreadItem {
-	if in == nil {
-		return nil
-	}
-	cp := *in
-	if in.CommandActions != nil {
-		cp.CommandActions = cloneCommandActions(in.CommandActions)
-	}
-	cp.AggregatedOutput = cloneStringPtr(in.AggregatedOutput)
-	cp.DurationMs = clonePtr(in.DurationMs)
-	cp.ExitCode = clonePtr(in.ExitCode)
-	cp.ProcessId = cloneStringPtr(in.ProcessId)
-	return &cp
+	return cloneArbitraryValue(in)
 }
 
 func cloneMcpToolCallItem(in *McpToolCallThreadItem) *McpToolCallThreadItem {
-	if in == nil {
-		return nil
-	}
-	cp := *in
-	cp.Arguments = cloneJSONValue(in.Arguments)
-	cp.Result = cloneMcpToolCallResult(in.Result)
-	cp.Error = cloneMcpToolCallError(in.Error)
-	cp.DurationMs = clonePtr(in.DurationMs)
-	return &cp
+	return cloneArbitraryValue(in)
 }
 
 func cloneWebSearchItem(in *WebSearchThreadItem) *WebSearchThreadItem {
-	if in == nil {
-		return nil
-	}
-	cp := *in
-	if in.Action != nil {
-		action := cloneWebSearchActionWrapper(*in.Action)
-		cp.Action = &action
-	}
-	return &cp
+	return cloneArbitraryValue(in)
 }
 
 func cloneFileChangeItem(in *FileChangeThreadItem) *FileChangeThreadItem {
-	if in == nil {
-		return nil
-	}
-	cp := *in
-	cp.Changes = cloneFileUpdateChanges(in.Changes)
-	return &cp
+	return cloneArbitraryValue(in)
 }
 
 func cloneThreadTokenUsage(v *ThreadTokenUsage) *ThreadTokenUsage {

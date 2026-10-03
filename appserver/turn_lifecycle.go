@@ -677,7 +677,7 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, g *guardedC
 	// Wait for turn completion or context cancellation.
 	select {
 	case completed := <-turnDone:
-		emit(&TurnCompleted{Turn: completed.Turn, ThreadID: completed.ThreadID})
+		emit(&TurnCompleted{Turn: cloneTurn(completed.Turn), ThreadID: completed.ThreadID})
 
 		result, err := finishCompletedTurnLifecycle(p, completed, snapshotCollectedItems(&itemsMu, &items))
 		if err != nil {
@@ -767,7 +767,7 @@ func registerItemListeners(p turnLifecycleParams, on func(string, NotificationHa
 		}
 		dispatchTurnScoped(n.TurnID, func() {
 			itemsMu.Lock()
-			*items = append(*items, n.Item)
+			*items = append(*items, cloneThreadItemWrapper(n.Item))
 			itemsMu.Unlock()
 			if c, ok := n.Item.Value.(*CollabAgentToolCallThreadItem); ok {
 				emit(newCollabEvent(CollabToolCallCompletedPhase, c))
