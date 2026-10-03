@@ -86,6 +86,9 @@ can stop outer traversal and change error precedence, field context and offsets.
 
 ### Approval Flow
 Server→client requests for user approval (command exec, file write, etc.) flow through `Transport.OnRequest`. Each approval type has `*Params` and `*Response` types matching specs.
+Classify path fields by their schema, not their names: opaque legacy strings
+remain request evidence, while AbsolutePathBuf fields have separate validation.
+Do not resolve or normalize approval metadata before the application sees it.
 
 ### Test Infrastructure
 - `MockTransport`: instant responses, records calls, supports injection

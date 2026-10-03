@@ -40,18 +40,6 @@ func (p *CommandExecutionRequestApprovalParams) UnmarshalJSON(data []byte) error
 	}); err != nil {
 		return err
 	}
-	var err error
-	decoded.Cwd, err = validateInboundAbsolutePathPointerField("cwd", decoded.Cwd)
-	if err != nil {
-		return err
-	}
-	if decoded.CommandActions != nil {
-		for i := range *decoded.CommandActions {
-			if err := validateCommandActionWrapperPaths(&(*decoded.CommandActions)[i], decoded.Cwd, fmt.Sprintf("commandActions[%d]", i)); err != nil {
-				return err
-			}
-		}
-	}
 	if decoded.ProposedNetworkPolicyAmendments != nil {
 		for i, amendment := range *decoded.ProposedNetworkPolicyAmendments {
 			if err := validateNetworkPolicyAmendment(amendment); err != nil {
@@ -208,30 +196,6 @@ func (w *CommandActionWrapper) UnmarshalJSON(data []byte) error {
 		w.Value = &unknown
 	}
 
-	return nil
-}
-
-func validateCommandActionWrapperPaths(w *CommandActionWrapper, cwd *string, field string) error {
-	switch value := w.Value.(type) {
-	case *ReadCommandAction:
-		path, err := validateApprovalPathField(value.Path, cwd, field+".path")
-		if err != nil {
-			return err
-		}
-		value.Path = path
-	case *ListFilesCommandAction:
-		path, err := validateApprovalPathPointerField(value.Path, cwd, field+".path")
-		if err != nil {
-			return err
-		}
-		value.Path = path
-	case *SearchCommandAction:
-		path, err := validateApprovalPathPointerField(value.Path, cwd, field+".path")
-		if err != nil {
-			return err
-		}
-		value.Path = path
-	}
 	return nil
 }
 
@@ -469,16 +433,6 @@ func (p *ExecCommandApprovalParams) UnmarshalJSON(data []byte) error {
 	}); err != nil {
 		return err
 	}
-	validatedCwd, err := validateInboundAbsolutePathField("cwd", decoded.Cwd)
-	if err != nil {
-		return err
-	}
-	decoded.Cwd = validatedCwd
-	for i := range decoded.ParsedCmd {
-		if err := validateParsedCommandWrapperPaths(&decoded.ParsedCmd[i], decoded.Cwd, fmt.Sprintf("parsedCmd[%d]", i)); err != nil {
-			return err
-		}
-	}
 	*p = ExecCommandApprovalParams(decoded)
 	return nil
 }
@@ -628,30 +582,6 @@ func (w *ParsedCommandWrapper) UnmarshalJSON(data []byte) error {
 		w.Value = &unknown
 	}
 
-	return nil
-}
-
-func validateParsedCommandWrapperPaths(w *ParsedCommandWrapper, cwd string, field string) error {
-	switch value := w.Value.(type) {
-	case *ReadParsedCommand:
-		path, err := validateApprovalPathField(value.Path, &cwd, field+".path")
-		if err != nil {
-			return err
-		}
-		value.Path = path
-	case *ListFilesParsedCommand:
-		path, err := validateApprovalPathPointerField(value.Path, &cwd, field+".path")
-		if err != nil {
-			return err
-		}
-		value.Path = path
-	case *SearchParsedCommand:
-		path, err := validateApprovalPathPointerField(value.Path, &cwd, field+".path")
-		if err != nil {
-			return err
-		}
-		value.Path = path
-	}
 	return nil
 }
 

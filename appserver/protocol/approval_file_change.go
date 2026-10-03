@@ -31,11 +31,6 @@ func (p *ApplyPatchApprovalParams) UnmarshalJSON(data []byte) error {
 	}); err != nil {
 		return err
 	}
-	var err error
-	decoded.GrantRoot, err = validateInboundAbsolutePathPointerField("grantRoot", decoded.GrantRoot)
-	if err != nil {
-		return err
-	}
 	*p = ApplyPatchApprovalParams(decoded)
 	return nil
 }
@@ -423,30 +418,8 @@ func (p *FileChangeRequestApprovalParams) UnmarshalJSON(data []byte) error {
 	}); err != nil {
 		return err
 	}
-	var err error
-	decoded.GrantRoot, err = validateInboundAbsolutePathPointerField("grantRoot", decoded.GrantRoot)
-	if err != nil {
-		return err
-	}
 	*p = FileChangeRequestApprovalParams(decoded)
 	return nil
-}
-
-func validateApprovalPathField(value string, cwd *string, field string) (string, error) {
-	if cwd == nil {
-		return validateInboundAbsolutePathField(field, value)
-	}
-	return validateInboundPathFieldWithBase(field, value, *cwd)
-}
-
-func validateApprovalPathPointerField(value *string, cwd *string, field string) (*string, error) {
-	if value == nil {
-		return nil, nil //nolint:nilnil // nil pointer is the valid absence case for optional approval path fields.
-	}
-	if cwd == nil {
-		return validateInboundAbsolutePathPointerField(field, value)
-	}
-	return validateInboundPathPointerFieldWithBase(field, value, *cwd)
 }
 
 // FileChangeRequestApprovalResponse represents the response to a file change approval request.
