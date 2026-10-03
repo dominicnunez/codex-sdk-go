@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 )
 
 // AdditionalFileSystemPermissions requests or grants extra filesystem access.
@@ -100,7 +101,7 @@ func (r PermissionsRequestApprovalResponse) marshalWire() ([]byte, error) {
 	type wire PermissionsRequestApprovalResponse
 	payload := wire(r)
 	payload.Permissions = normalized
-	return json.Marshal(payload)
+	return jsonencode.Marshal(payload)
 }
 
 // McpServerElicitationMode indicates how an MCP server wants user input collected.

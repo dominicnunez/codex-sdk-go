@@ -164,9 +164,32 @@ and identity. `OptionalNullable[T]` only normalizes native type errors when the
 entire static destination graph lacks custom JSON/text decoders and interface
 slots. Extension-bearing graphs pass errors through, even if a native numeric
 failure occurs in another field. Application-selected envelope labels and
-structured RPC data are also outside these bounds. Malformed `json.Number`
-literal formatting uses a different standard error mechanism and remains outside
-the numeric-conversion metadata control.
+structured RPC data are also outside these bounds.
+
+Native malformed `json.Number` formatter errors have a separate control. At
+audited SDK decoding owners and codec-free `OptionalNullable[T]` destinations,
+and at all SDK-owned protocol JSON serialization calls (including request
+preparation, request/results, inner codecs and wire-only representations),
+formatter messages exceeding 2,048 bytes retain a quoted preview of at
+most 256 bytes of the already formatted literal plus an omitted-byte count.
+Inner SDK marshalers apply this before Go adds its `json.MarshalerError` wrapper.
+The replacement retains no original error as a cause; ordinary short errors,
+JSON admission, partial receiver updates and valid long numeric tokens are
+unchanged, including empty constructed Numbers encoding as zero.
+Union interface embedding can supply application fields without a custom JSON
+codec, including inside accepted concrete variants such as sub-agent session
+sources and scheduled-task summaries. Inner SDK serializers apply the policy
+uniformly. Existing concrete-variant admission rules remain unchanged.
+
+Application JSON/Text marshaler error chains pass through unchanged. Generic
+decoding with interface slots or application codecs also passes errors through,
+including reused interfaces containing a Number, because error text alone cannot
+distinguish a native decoder failure from an application-owned error. Plain
+caller-owned `encoding/json` operations, application handler errors, structured
+RPC data and other formatter families such as invalid numeric `,string` values
+remain outside this control. Standard parsing and native number formatting still
+allocate temporary full input or quoted-error copies; this bounds retained native
+diagnostics and subsequent SDK wrapping, not total operation allocation.
 
 Terminal transport cleanup clears requests awaiting handler registration and
 drains abandoned inbound requests and outbound envelopes. Queue admission is

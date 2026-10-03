@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
@@ -634,7 +635,7 @@ func (s AppTemplateSummary) MarshalJSON() ([]byte, error) {
 		return nil, errors.New("missing plugin.appTemplate.materializedAppIds")
 	}
 	type wire AppTemplateSummary
-	return json.Marshal(wire(s))
+	return jsonencode.Marshal(wire(s))
 }
 
 func (s *AppTemplateSummary) UnmarshalJSON(data []byte) error {
@@ -691,7 +692,7 @@ func (HourlyScheduledTaskSchedule) isScheduledTaskSchedule() {}
 
 func (s HourlyScheduledTaskSchedule) MarshalJSON() ([]byte, error) {
 	type wire HourlyScheduledTaskSchedule
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 		wire
 	}{"hourly", wire(s)})
@@ -722,7 +723,7 @@ func (DailyScheduledTaskSchedule) isScheduledTaskSchedule() {}
 
 func (s DailyScheduledTaskSchedule) MarshalJSON() ([]byte, error) {
 	type wire DailyScheduledTaskSchedule
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 		wire
 	}{"daily", wire(s)})
@@ -753,7 +754,7 @@ func (WeekdaysScheduledTaskSchedule) isScheduledTaskSchedule() {}
 
 func (s WeekdaysScheduledTaskSchedule) MarshalJSON() ([]byte, error) {
 	type wire WeekdaysScheduledTaskSchedule
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 		wire
 	}{"weekdays", wire(s)})
@@ -788,7 +789,7 @@ func (s WeeklyScheduledTaskSchedule) MarshalJSON() ([]byte, error) {
 		return nil, errors.New("missing plugin.scheduledTask.schedule.days")
 	}
 	type wire WeeklyScheduledTaskSchedule
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 		wire
 	}{"weekly", wire(s)})
@@ -858,7 +859,7 @@ func (s ScheduledTaskSummary) MarshalJSON() ([]byte, error) {
 		return nil, errors.New("missing plugin.scheduledTask.schedule")
 	}
 	type wire ScheduledTaskSummary
-	return json.Marshal(wire(s))
+	return jsonencode.Marshal(wire(s))
 }
 
 func (s *ScheduledTaskSummary) UnmarshalJSON(data []byte) error {

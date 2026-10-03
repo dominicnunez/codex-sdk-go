@@ -82,6 +82,11 @@ successful normalization.
 For typed JSON diagnostics, establish native error ownership from the decoding
 destination and caller before normalization. Preserve application custom-codec
 error identity; a concrete error type or message prefix does not prove origin.
+For serialization diagnostics, use the shared internal JSON encoder at every
+SDK-owned protocol marshaling boundary, before enclosing JSON codecs wrap errors.
+Private marker methods do not seal exported interfaces against embedding. Trace
+unrestricted nested interface fields inside accepted concrete union branches;
+root type switches alone do not prove the encoded graph cannot contain Numbers.
 For callback fanout, isolate each recipient at the owning boundary, including
 initial replay and direct service/cache calls. Verify committed state reaches
 later SDK consumers after a callback or error reporter panics, and that replay

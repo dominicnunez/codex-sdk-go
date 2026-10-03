@@ -2,10 +2,10 @@ package protocol
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 )
 
 type ThreadPredictionResult interface{ isThreadPredictionResult() }
@@ -19,7 +19,7 @@ func (*CompletedThreadPredictionResult) isThreadPredictionResult() {}
 func (*FailedThreadPredictionResult) isThreadPredictionResult()    {}
 func (v CompletedThreadPredictionResult) MarshalJSON() ([]byte, error) {
 	type wire CompletedThreadPredictionResult
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 		wire
 	}{"completed", wire(v)})
@@ -54,7 +54,7 @@ func (w ThreadPredictionResultWrapper) MarshalJSON() ([]byte, error) {
 	if isNilInterfaceValue(w.Value) {
 		return nil, fmt.Errorf("missing ThreadPredictionResult")
 	}
-	return json.Marshal(w.Value)
+	return jsonencode.Marshal(w.Value)
 }
 
 type ThreadPredictionUpdatedNotification struct {

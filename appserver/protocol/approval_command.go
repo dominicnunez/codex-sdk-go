@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
@@ -72,7 +73,7 @@ type ReadCommandAction struct {
 func (r *ReadCommandAction) commandAction() {}
 
 func (r *ReadCommandAction) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type    string `json:"type"`
 		Command string `json:"command"`
 		Name    string `json:"name"`
@@ -99,7 +100,7 @@ func (l *ListFilesCommandAction) MarshalJSON() ([]byte, error) {
 		Command string  `json:"command"`
 		Path    *string `json:"path,omitempty"`
 	}
-	return json.Marshal(listJSON{
+	return jsonencode.Marshal(listJSON{
 		Type:    "listFiles",
 		Command: l.Command,
 		Path:    l.Path,
@@ -122,7 +123,7 @@ func (s *SearchCommandAction) MarshalJSON() ([]byte, error) {
 		Path    *string `json:"path,omitempty"`
 		Query   *string `json:"query,omitempty"`
 	}
-	return json.Marshal(searchJSON{
+	return jsonencode.Marshal(searchJSON{
 		Type:    "search",
 		Command: s.Command,
 		Path:    s.Path,
@@ -138,7 +139,7 @@ type UnknownCommandAction struct {
 func (u *UnknownCommandAction) commandAction() {}
 
 func (u *UnknownCommandAction) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type    string `json:"type"`
 		Command string `json:"command"`
 	}{
@@ -202,7 +203,7 @@ func (w *CommandActionWrapper) UnmarshalJSON(data []byte) error {
 
 // MarshalJSON implements custom marshaling for CommandActionWrapper.
 func (w CommandActionWrapper) MarshalJSON() ([]byte, error) {
-	return json.Marshal(w.Value)
+	return jsonencode.Marshal(w.Value)
 }
 
 // NetworkApprovalContext provides context for network-related approval requests.
@@ -319,9 +320,9 @@ func (w CommandExecutionApprovalDecisionWrapper) MarshalJSON() ([]byte, error) {
 	case nil:
 		return []byte("null"), nil
 	case string:
-		return json.Marshal(v)
+		return jsonencode.Marshal(v)
 	case AcceptWithExecpolicyAmendmentDecision:
-		return json.Marshal(struct {
+		return jsonencode.Marshal(struct {
 			AcceptWithExecpolicyAmendment struct {
 				ExecpolicyAmendment []string `json:"execpolicy_amendment"`
 			} `json:"acceptWithExecpolicyAmendment"`
@@ -333,7 +334,7 @@ func (w CommandExecutionApprovalDecisionWrapper) MarshalJSON() ([]byte, error) {
 			},
 		})
 	case ApplyNetworkPolicyAmendmentDecision:
-		return json.Marshal(struct {
+		return jsonencode.Marshal(struct {
 			ApplyNetworkPolicyAmendment struct {
 				NetworkPolicyAmendment NetworkPolicyAmendment `json:"network_policy_amendment"`
 			} `json:"applyNetworkPolicyAmendment"`
@@ -458,7 +459,7 @@ type ReadParsedCommand struct {
 func (r *ReadParsedCommand) parsedCommand() {}
 
 func (r *ReadParsedCommand) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 		Cmd  string `json:"cmd"`
 		Name string `json:"name"`
@@ -485,7 +486,7 @@ func (l *ListFilesParsedCommand) MarshalJSON() ([]byte, error) {
 		Cmd  string  `json:"cmd"`
 		Path *string `json:"path,omitempty"`
 	}
-	return json.Marshal(listJSON{
+	return jsonencode.Marshal(listJSON{
 		Type: "list_files",
 		Cmd:  l.Cmd,
 		Path: l.Path,
@@ -508,7 +509,7 @@ func (s *SearchParsedCommand) MarshalJSON() ([]byte, error) {
 		Path  *string `json:"path,omitempty"`
 		Query *string `json:"query,omitempty"`
 	}
-	return json.Marshal(searchJSON{
+	return jsonencode.Marshal(searchJSON{
 		Type:  "search",
 		Cmd:   s.Cmd,
 		Path:  s.Path,
@@ -524,7 +525,7 @@ type UnknownParsedCommand struct {
 func (u *UnknownParsedCommand) parsedCommand() {}
 
 func (u *UnknownParsedCommand) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 		Cmd  string `json:"cmd"`
 	}{
@@ -588,7 +589,7 @@ func (w *ParsedCommandWrapper) UnmarshalJSON(data []byte) error {
 
 // MarshalJSON implements custom marshaling for ParsedCommandWrapper.
 func (w ParsedCommandWrapper) MarshalJSON() ([]byte, error) {
-	return json.Marshal(w.Value)
+	return jsonencode.Marshal(w.Value)
 }
 
 // ExecCommandApprovalResponse represents the response to an exec command approval request (legacy).

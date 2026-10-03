@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
@@ -75,7 +76,7 @@ type AddFileChange struct {
 func (a *AddFileChange) fileChange() {}
 
 func (a *AddFileChange) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type    string `json:"type"`
 		Content string `json:"content"`
 	}{
@@ -92,7 +93,7 @@ type DeleteFileChange struct {
 func (d *DeleteFileChange) fileChange() {}
 
 func (d *DeleteFileChange) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type    string `json:"type"`
 		Content string `json:"content"`
 	}{
@@ -115,7 +116,7 @@ func (u *UpdateFileChange) MarshalJSON() ([]byte, error) {
 		UnifiedDiff string  `json:"unified_diff"`
 		MovePath    *string `json:"move_path,omitempty"`
 	}
-	return json.Marshal(updateJSON{
+	return jsonencode.Marshal(updateJSON{
 		Type:        fileChangeTypeUpdate,
 		UnifiedDiff: u.UnifiedDiff,
 		MovePath:    u.MovePath,
@@ -170,7 +171,7 @@ func (w *FileChangeWrapper) UnmarshalJSON(data []byte) error {
 
 // MarshalJSON implements custom marshaling for FileChangeWrapper.
 func (w FileChangeWrapper) MarshalJSON() ([]byte, error) {
-	return json.Marshal(w.Value)
+	return jsonencode.Marshal(w.Value)
 }
 
 // ApplyPatchApprovalResponse represents the response to an applyPatchApproval request.
@@ -298,9 +299,9 @@ func (w ReviewDecisionWrapper) MarshalJSON() ([]byte, error) {
 		if v == "denied" {
 			return nil, errors.New("denied decision requires a rejection reason")
 		}
-		return json.Marshal(v)
+		return jsonencode.Marshal(v)
 	case ApprovedExecpolicyAmendmentDecision:
-		return json.Marshal(struct {
+		return jsonencode.Marshal(struct {
 			ApprovedExecpolicyAmendment struct {
 				ProposedExecpolicyAmendment []string `json:"proposed_execpolicy_amendment"`
 			} `json:"approved_execpolicy_amendment"`
@@ -312,7 +313,7 @@ func (w ReviewDecisionWrapper) MarshalJSON() ([]byte, error) {
 			},
 		})
 	case NetworkPolicyAmendmentDecision:
-		return json.Marshal(struct {
+		return jsonencode.Marshal(struct {
 			NetworkPolicyAmendment struct {
 				NetworkPolicyAmendment NetworkPolicyAmendment `json:"network_policy_amendment"`
 			} `json:"network_policy_amendment"`
@@ -324,7 +325,7 @@ func (w ReviewDecisionWrapper) MarshalJSON() ([]byte, error) {
 			},
 		})
 	case DeniedReviewDecision:
-		return json.Marshal(struct {
+		return jsonencode.Marshal(struct {
 			Denied DeniedReviewDecision `json:"denied"`
 		}{Denied: v})
 	case UnknownReviewDecision:

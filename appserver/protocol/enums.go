@@ -1,10 +1,10 @@
 package protocol
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 )
 
 // This file contains typed string enums defined in the protocol spec that are
@@ -524,7 +524,7 @@ func (r ReasoningEffort) MarshalJSON() ([]byte, error) {
 	if r == "" {
 		return nil, fmt.Errorf("reasoningEffort must not be empty")
 	}
-	return json.Marshal(string(r))
+	return jsonencode.Marshal(string(r))
 }
 
 func (r *ReasoningEffort) UnmarshalJSON(data []byte) error {

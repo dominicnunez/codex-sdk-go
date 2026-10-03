@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 )
 
 // ThreadItem is a discriminated union for thread item variants.
@@ -24,17 +25,17 @@ func (UserMessageThreadItem) threadItem() {}
 func (u *UserMessageThreadItem) MarshalJSON() ([]byte, error) {
 	items := make([]json.RawMessage, len(u.Content))
 	for i, input := range u.Content {
-		b, err := json.Marshal(input)
+		b, err := jsonencode.Marshal(input)
 		if err != nil {
 			return nil, err
 		}
 		items[i] = b
 	}
-	contentBytes, err := json.Marshal(items)
+	contentBytes, err := jsonencode.Marshal(items)
 	if err != nil {
 		return nil, err
 	}
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type     string          `json:"type"`
 		ID       string          `json:"id"`
 		Content  json.RawMessage `json:"content"`
@@ -61,7 +62,7 @@ func (AgentMessageThreadItem) threadItem() {}
 
 func (a *AgentMessageThreadItem) MarshalJSON() ([]byte, error) {
 	type Alias AgentMessageThreadItem
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{
@@ -80,7 +81,7 @@ func (PlanThreadItem) threadItem() {}
 
 func (p *PlanThreadItem) MarshalJSON() ([]byte, error) {
 	type Alias PlanThreadItem
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{
@@ -100,7 +101,7 @@ func (ReasoningThreadItem) threadItem() {}
 
 func (r *ReasoningThreadItem) MarshalJSON() ([]byte, error) {
 	type Alias ReasoningThreadItem
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{
@@ -129,7 +130,7 @@ func (CommandExecutionThreadItem) threadItem() {}
 
 func (c *CommandExecutionThreadItem) MarshalJSON() ([]byte, error) {
 	type Alias CommandExecutionThreadItem
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{
@@ -149,7 +150,7 @@ func (FileChangeThreadItem) threadItem() {}
 
 func (f *FileChangeThreadItem) MarshalJSON() ([]byte, error) {
 	type Alias FileChangeThreadItem
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{
@@ -216,7 +217,7 @@ func (McpToolCallThreadItem) threadItem() {}
 
 func (m *McpToolCallThreadItem) MarshalJSON() ([]byte, error) {
 	type Alias McpToolCallThreadItem
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{
@@ -241,7 +242,7 @@ func (DynamicToolCallThreadItem) threadItem() {}
 
 func (d *DynamicToolCallThreadItem) MarshalJSON() ([]byte, error) {
 	type Alias DynamicToolCallThreadItem
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{
@@ -267,7 +268,7 @@ func (CollabAgentToolCallThreadItem) threadItem() {}
 
 func (c *CollabAgentToolCallThreadItem) MarshalJSON() ([]byte, error) {
 	type Alias CollabAgentToolCallThreadItem
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{
@@ -301,7 +302,7 @@ func (SubAgentActivityThreadItem) threadItem() {}
 
 func (s *SubAgentActivityThreadItem) MarshalJSON() ([]byte, error) {
 	type Alias SubAgentActivityThreadItem
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{Type: "subAgentActivity", Alias: (*Alias)(s)})
@@ -317,7 +318,7 @@ func (SleepThreadItem) threadItem() {}
 
 func (s *SleepThreadItem) MarshalJSON() ([]byte, error) {
 	type Alias SleepThreadItem
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{Type: "sleep", Alias: (*Alias)(s)})
@@ -335,7 +336,7 @@ func (WebSearchThreadItem) threadItem() {}
 
 func (w *WebSearchThreadItem) MarshalJSON() ([]byte, error) {
 	type Alias WebSearchThreadItem
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{
@@ -354,7 +355,7 @@ func (ImageViewThreadItem) threadItem() {}
 
 func (i *ImageViewThreadItem) MarshalJSON() ([]byte, error) {
 	type Alias ImageViewThreadItem
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{
@@ -373,7 +374,7 @@ func (EnteredReviewModeThreadItem) threadItem() {}
 
 func (e *EnteredReviewModeThreadItem) MarshalJSON() ([]byte, error) {
 	type Alias EnteredReviewModeThreadItem
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{
@@ -392,7 +393,7 @@ func (ExitedReviewModeThreadItem) threadItem() {}
 
 func (e *ExitedReviewModeThreadItem) MarshalJSON() ([]byte, error) {
 	type Alias ExitedReviewModeThreadItem
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{
@@ -409,7 +410,7 @@ type ContextCompactionThreadItem struct {
 func (ContextCompactionThreadItem) threadItem() {}
 
 func (c *ContextCompactionThreadItem) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 		ID   string `json:"id"`
 	}{
@@ -446,7 +447,7 @@ func (u *UnknownThreadItem) MarshalJSON() ([]byte, error) {
 		Raw  json.RawMessage `json:"raw"`
 	}
 
-	return json.Marshal(fallbackThreadItem{
+	return jsonencode.Marshal(fallbackThreadItem{
 		Type: u.Type,
 		Raw:  u.Raw,
 	})
@@ -615,7 +616,7 @@ func (w *ThreadItemWrapper) UnmarshalJSON(data []byte) error {
 }
 
 func (w ThreadItemWrapper) MarshalJSON() ([]byte, error) {
-	return json.Marshal(w.Value)
+	return jsonencode.Marshal(w.Value)
 }
 
 // IsCollabToolCall returns true if the item is a CollabAgentToolCallThreadItem.

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 )
 
 // UnmarshalJSON retains both workspace restriction branches without changing
@@ -70,7 +71,7 @@ func (c Config) MarshalJSON() ([]byte, error) {
 	} else if c.ForcedChatgptWorkspaceID != nil {
 		workspace = c.ForcedChatgptWorkspaceID
 	}
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		configWithoutMethods
 		Workspace any `json:"forced_chatgpt_workspace_id,omitempty"`
 	}{configWithoutMethods: configWithoutMethods(c), Workspace: workspace})

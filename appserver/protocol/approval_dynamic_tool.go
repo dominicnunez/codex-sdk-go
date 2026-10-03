@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 )
 
 // DynamicToolCallParams represents parameters for a dynamic tool call.
@@ -89,7 +90,7 @@ type InputTextDynamicToolCallOutputContentItem struct {
 func (i *InputTextDynamicToolCallOutputContentItem) dynamicToolCallOutputContentItem() {}
 
 func (i *InputTextDynamicToolCallOutputContentItem) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 		Text string `json:"text"`
 	}{
@@ -122,7 +123,7 @@ type InputImageDynamicToolCallOutputContentItem struct {
 func (i *InputImageDynamicToolCallOutputContentItem) dynamicToolCallOutputContentItem() {}
 
 func (i *InputImageDynamicToolCallOutputContentItem) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type     string `json:"type"`
 		ImageURL string `json:"imageUrl"`
 	}{
@@ -155,7 +156,7 @@ type InputAudioDynamicToolCallOutputContentItem struct {
 func (i *InputAudioDynamicToolCallOutputContentItem) dynamicToolCallOutputContentItem() {}
 
 func (i *InputAudioDynamicToolCallOutputContentItem) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type     string `json:"type"`
 		AudioURL string `json:"audioUrl"`
 	}{Type: "inputAudio", AudioURL: i.AudioURL})
@@ -212,7 +213,7 @@ func (w *DynamicToolCallOutputContentItemWrapper) UnmarshalJSON(data []byte) err
 
 // MarshalJSON implements custom marshaling for DynamicToolCallOutputContentItemWrapper.
 func (w DynamicToolCallOutputContentItemWrapper) MarshalJSON() ([]byte, error) {
-	return json.Marshal(w.Value)
+	return jsonencode.Marshal(w.Value)
 }
 
 func (w DynamicToolCallOutputContentItemWrapper) validateForResponse() error {

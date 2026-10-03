@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 )
 
 // TurnService handles turn-related operations
@@ -88,7 +89,7 @@ func (p TurnStartParams) MarshalJSON() ([]byte, error) {
 	if p.SandboxPolicy != nil {
 		wire.SandboxPolicy = &SandboxPolicyWrapper{Value: *p.SandboxPolicy}
 	}
-	return json.Marshal(wire)
+	return jsonencode.Marshal(wire)
 }
 
 // unmarshalUserInputSlice unmarshals a slice of raw JSON messages into UserInput values.
@@ -296,7 +297,7 @@ func (t *TextUserInput) userInput() {}
 
 func (t *TextUserInput) MarshalJSON() ([]byte, error) {
 	type Alias TextUserInput
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{
@@ -319,7 +320,7 @@ func (i *ImageUserInput) MarshalJSON() ([]byte, error) {
 		return nil, errors.New("image input requires url or fileId")
 	}
 	type Alias ImageUserInput
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{
@@ -351,7 +352,7 @@ func (l *LocalImageUserInput) userInput() {}
 
 func (l *LocalImageUserInput) MarshalJSON() ([]byte, error) {
 	type Alias LocalImageUserInput
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{
@@ -369,7 +370,7 @@ func (a *AudioUserInput) userInput() {}
 
 func (a *AudioUserInput) MarshalJSON() ([]byte, error) {
 	type Alias AudioUserInput
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{Type: "audio", Alias: (*Alias)(a)})
@@ -384,7 +385,7 @@ func (l *LocalAudioUserInput) userInput() {}
 
 func (l *LocalAudioUserInput) MarshalJSON() ([]byte, error) {
 	type Alias LocalAudioUserInput
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{Type: "localAudio", Alias: (*Alias)(l)})
@@ -400,7 +401,7 @@ func (s *SkillUserInput) userInput() {}
 
 func (s *SkillUserInput) MarshalJSON() ([]byte, error) {
 	type Alias SkillUserInput
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{
@@ -419,7 +420,7 @@ func (m *MentionUserInput) userInput() {}
 
 func (m *MentionUserInput) MarshalJSON() ([]byte, error) {
 	type Alias MentionUserInput
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{

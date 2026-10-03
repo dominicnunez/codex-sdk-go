@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
@@ -110,9 +111,9 @@ func (a AskForApprovalWrapper) MarshalJSON() ([]byte, error) {
 	}
 	switch v := value.(type) {
 	case approvalPolicyLiteral:
-		return json.Marshal(string(v))
+		return jsonencode.Marshal(string(v))
 	case ApprovalPolicyGranular:
-		return json.Marshal(v)
+		return jsonencode.Marshal(v)
 	case UnknownAskForApproval:
 		return v.MarshalJSON()
 	default:

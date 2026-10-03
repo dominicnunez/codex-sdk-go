@@ -1,10 +1,10 @@
 package protocol
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 )
 
 // MigrationDetails lists the external-agent resources selected for migration.
@@ -105,7 +105,7 @@ func (m PluginsMigration) MarshalJSON() ([]byte, error) {
 		return nil, fmt.Errorf("migration.pluginNames must not be null")
 	}
 	type wire PluginsMigration
-	return json.Marshal(wire(m))
+	return jsonencode.Marshal(wire(m))
 }
 
 // SessionMigration identifies an external session selected for migration.

@@ -1,10 +1,10 @@
 package protocol
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 )
 
 func validateEnumValue[T ~string](field string, value T, allowed map[T]struct{}) error {
@@ -47,5 +47,5 @@ func marshalEnumString[T ~string](field string, value T, allowed map[T]struct{})
 	if err := validateEnumValue(field, value, allowed); err != nil {
 		return nil, err
 	}
-	return json.Marshal(string(value))
+	return jsonencode.Marshal(string(value))
 }

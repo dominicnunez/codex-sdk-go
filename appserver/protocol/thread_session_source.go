@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
@@ -202,9 +203,9 @@ func (s SessionSourceWrapper) MarshalJSON() ([]byte, error) {
 	}
 	switch v := s.Value.(type) {
 	case sessionSourceLiteral:
-		return json.Marshal(string(v))
+		return jsonencode.Marshal(string(v))
 	case SessionSourceSubAgent:
-		return json.Marshal(v)
+		return jsonencode.Marshal(v)
 	case UnknownSessionSource:
 		return v.MarshalJSON()
 	default:

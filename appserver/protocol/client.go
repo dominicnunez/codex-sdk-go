@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
@@ -56,7 +57,7 @@ func marshalForWire(v interface{}) ([]byte, error) {
 		}
 		return wm.marshalWire()
 	}
-	return json.Marshal(v)
+	return jsonencode.Marshal(v)
 }
 
 func isNilWireMarshaler(wm wireMarshaler) bool {
