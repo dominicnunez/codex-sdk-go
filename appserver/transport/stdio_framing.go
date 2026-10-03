@@ -161,8 +161,8 @@ type oversizedFrameInfo struct {
 }
 
 // normalizeID normalizes request IDs to a string key for map matching.
-// JSON unmarshals all numbers as float64, so we format integer-valued
-// floats without decimals for consistent lookups.
+// Wire IDs decode as int64; compatible caller-provided numeric forms normalize
+// to the same integer spelling. Pending keys separately prefix the type family.
 func normalizeID(id interface{}) (string, error) {
 	normalizedID, _, err := normalizeRequestID(id)
 	return normalizedID, err

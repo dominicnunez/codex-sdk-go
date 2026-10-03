@@ -57,7 +57,8 @@ func canonicalInt64RequestID(value interface{}) (int64, bool, error) {
 		}
 		return intID, true, nil
 	case float64:
-		if math.IsNaN(v) || math.IsInf(v, 0) || math.Trunc(v) != v || v < math.MinInt64 || v > math.MaxInt64 {
+		// MaxInt64 rounds to 2^63 as a float; the upper bound must be exclusive.
+		if math.IsNaN(v) || math.IsInf(v, 0) || math.Trunc(v) != v || v < math.MinInt64 || v >= 0x1p63 {
 			return 0, true, fmt.Errorf("%w: %v", errUnexpectedIDType, v)
 		}
 		return int64(v), true, nil
