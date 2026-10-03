@@ -97,7 +97,7 @@ func validateCommandExecOutputStream(stream CommandExecOutputStream) error {
 	case CommandExecOutputStreamStdout, CommandExecOutputStreamStderr:
 		return nil
 	default:
-		return fmt.Errorf("invalid stream %q", stream)
+		return fmt.Errorf("invalid stream %s", quotedValueDiagnostic(string(stream)))
 	}
 }
 

@@ -391,7 +391,7 @@ func validateCommandExecutionApprovalDecisionWrapper(decision CommandExecutionAp
 			CommandExecutionApprovalDecisionCancel:
 			return nil
 		default:
-			return fmt.Errorf("invalid decision %q", value)
+			return fmt.Errorf("invalid decision %s", quotedValueDiagnostic(value))
 		}
 	case AcceptWithExecpolicyAmendmentDecision:
 		if value.ExecpolicyAmendment == nil {

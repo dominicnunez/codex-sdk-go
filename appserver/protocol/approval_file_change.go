@@ -376,7 +376,7 @@ func validateReviewDecisionWrapper(decision ReviewDecisionWrapper) error {
 		case ReviewDecisionApproved, ReviewDecisionApprovedForSession, ReviewDecisionApprovedMCPPolicyAmendment, ReviewDecisionAbort:
 			return nil
 		default:
-			return fmt.Errorf("invalid decision %q", value)
+			return fmt.Errorf("invalid decision %s", quotedValueDiagnostic(value))
 		}
 	case ApprovedExecpolicyAmendmentDecision:
 		if value.ProposedExecpolicyAmendment == nil {

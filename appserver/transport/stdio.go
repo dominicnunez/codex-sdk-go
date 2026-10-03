@@ -10,6 +10,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/diagnostic"
 )
 
 // pendingReq holds a pending request's response channel and original ID.
@@ -198,7 +200,7 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 	}
 	if _, exists := t.pendingReqs[normalizedID]; exists {
 		t.mu.Unlock()
-		return Response{}, NewTransportError("send failed", fmt.Errorf("duplicate request ID: %v", req.ID.Value))
+		return Response{}, duplicateRequestIDError(req.ID)
 	}
 	t.mu.Unlock()
 	if err := ctx.Err(); err != nil {
@@ -218,7 +220,7 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 	}
 	if _, exists := t.pendingReqs[normalizedID]; exists {
 		t.mu.Unlock()
-		return Response{}, NewTransportError("send failed", fmt.Errorf("duplicate request ID: %v", req.ID.Value))
+		return Response{}, duplicateRequestIDError(req.ID)
 	}
 	respChan := make(chan pendingReqResult, 1)
 	pending := pendingReq{ch: respChan, id: req.ID}
@@ -258,6 +260,14 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 			return t.finishPendingRequest(normalizedID, pending, t.transportStopError("send failed"))
 		}
 	}
+}
+
+func duplicateRequestIDError(id RequestID) error {
+	if value, ok := id.Value.(string); ok {
+		return NewTransportError("send failed", fmt.Errorf("duplicate request ID: %s", diagnostic.Display(value)))
+	}
+	// The admission owner already normalized non-string IDs to int64.
+	return NewTransportError("send failed", fmt.Errorf("duplicate request ID: %v", id.Value))
 }
 
 // Acceptance and abandonment share the pending-map lock. An accepted result

@@ -815,7 +815,7 @@ func validateScheduledTaskScheduleType(data []byte, expected string) error {
 		return err
 	}
 	if typeName != expected {
-		return fmt.Errorf("invalid scheduled task schedule type %q; want %q", typeName, expected)
+		return fmt.Errorf("invalid scheduled task schedule type %s; want %q", quotedValueDiagnostic(typeName), expected)
 	}
 	return nil
 }
@@ -836,7 +836,7 @@ func unmarshalScheduledTaskSchedule(data []byte) (ScheduledTaskSchedule, error) 
 	case "weekly":
 		schedule = &WeeklyScheduledTaskSchedule{}
 	default:
-		return nil, fmt.Errorf("unknown scheduled task schedule type: %q", typeName)
+		return nil, fmt.Errorf("unknown scheduled task schedule type: %s", quotedValueDiagnostic(typeName))
 	}
 	if err := json.Unmarshal(data, schedule); err != nil {
 		return nil, err

@@ -44,7 +44,7 @@ func (w *ThreadPredictionResultWrapper) UnmarshalJSON(data []byte) error {
 		}
 		w.Value = &v
 	default:
-		return fmt.Errorf("unknown ThreadPredictionResult type %q", tag)
+		return fmt.Errorf("unknown ThreadPredictionResult type %s", quotedValueDiagnostic(tag))
 	}
 	return nil
 }

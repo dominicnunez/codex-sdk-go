@@ -30,7 +30,7 @@ func (c *AppsConfig) UnmarshalJSON(data []byte) error {
 		}
 		var app AppConfig
 		if err := json.Unmarshal(raw, &app); err != nil {
-			return fmt.Errorf("app %q: %w", key, err)
+			return fmt.Errorf("app %s: %w", quotedValueDiagnostic(key), err)
 		}
 		decoded.Apps[key] = app
 	}

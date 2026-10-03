@@ -105,7 +105,7 @@ func (r *ConsumeAccountRateLimitResetCreditResponse) UnmarshalJSON(data []byte) 
 	switch decoded.Outcome {
 	case ConsumeAccountRateLimitResetCreditOutcomeReset, ConsumeAccountRateLimitResetCreditOutcomeNothingToReset, ConsumeAccountRateLimitResetCreditOutcomeNoCredit, ConsumeAccountRateLimitResetCreditOutcomeAlreadyRedeemed:
 	default:
-		return fmt.Errorf("invalid reset credit outcome %q", decoded.Outcome)
+		return fmt.Errorf("invalid reset credit outcome %s", quotedValueDiagnostic(string(decoded.Outcome)))
 	}
 	*r = ConsumeAccountRateLimitResetCreditResponse(decoded)
 	return nil

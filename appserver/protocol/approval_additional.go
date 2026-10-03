@@ -88,7 +88,7 @@ func (r PermissionsRequestApprovalResponse) validate() error {
 	case PermissionGrantScopeTurn, PermissionGrantScopeSession:
 		return nil
 	default:
-		return fmt.Errorf("invalid scope %q", *r.Scope)
+		return fmt.Errorf("invalid scope %s", quotedValueDiagnostic(string(*r.Scope)))
 	}
 }
 
@@ -195,7 +195,7 @@ func validateMcpServerElicitationVariant(data []byte, mode McpServerElicitationM
 		required := []string{"elicitationId", "message", "mode", "url"}
 		return validateInboundObjectFields(data, required, required)
 	default:
-		return fmt.Errorf("unsupported elicitation mode %q", mode)
+		return fmt.Errorf("unsupported elicitation mode %s", quotedValueDiagnostic(string(mode)))
 	}
 }
 
@@ -220,6 +220,6 @@ func (r McpServerElicitationRequestResponse) validate() error {
 	case McpServerElicitationActionAccept, McpServerElicitationActionDecline, McpServerElicitationActionCancel:
 		return nil
 	default:
-		return fmt.Errorf("invalid action %q", r.Action)
+		return fmt.Errorf("invalid action %s", quotedValueDiagnostic(string(r.Action)))
 	}
 }

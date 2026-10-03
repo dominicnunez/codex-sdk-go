@@ -106,7 +106,7 @@ func (i *InputTextDynamicToolCallOutputContentItem) UnmarshalJSON(data []byte) e
 		return err
 	}
 	if decoded.Type != "inputText" {
-		return fmt.Errorf("invalid dynamic tool output content item type %q", decoded.Type)
+		return fmt.Errorf("invalid dynamic tool output content item type %s", quotedValueDiagnostic(decoded.Type))
 	}
 	i.Text = decoded.Text
 	return nil
@@ -139,7 +139,7 @@ func (i *InputImageDynamicToolCallOutputContentItem) UnmarshalJSON(data []byte) 
 		return err
 	}
 	if decoded.Type != "inputImage" {
-		return fmt.Errorf("invalid dynamic tool output content item type %q", decoded.Type)
+		return fmt.Errorf("invalid dynamic tool output content item type %s", quotedValueDiagnostic(decoded.Type))
 	}
 	i.ImageURL = decoded.ImageURL
 	return nil
@@ -169,7 +169,7 @@ func (i *InputAudioDynamicToolCallOutputContentItem) UnmarshalJSON(data []byte) 
 		return err
 	}
 	if decoded.Type != "inputAudio" {
-		return fmt.Errorf("invalid dynamic tool output content item type %q", decoded.Type)
+		return fmt.Errorf("invalid dynamic tool output content item type %s", quotedValueDiagnostic(decoded.Type))
 	}
 	i.AudioURL = decoded.AudioURL
 	return nil
@@ -236,7 +236,7 @@ func (w DynamicToolCallOutputContentItemWrapper) validateForResponse() error {
 		if value == nil {
 			return errors.New("missing content item")
 		}
-		return fmt.Errorf("unsupported content item type %q", value.Type)
+		return fmt.Errorf("unsupported content item type %s", quotedValueDiagnostic(value.Type))
 	default:
 		return fmt.Errorf("unsupported content item type %T", w.Value)
 	}

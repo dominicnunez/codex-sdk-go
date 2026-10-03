@@ -95,12 +95,12 @@ func canonicalInt64RequestID(value interface{}) (int64, bool, error) {
 
 func parseJSONRequestID(raw string) (int64, error) {
 	if raw == "" || strings.TrimSpace(raw) != raw {
-		return 0, fmt.Errorf("%w: %q", errUnexpectedIDType, raw)
+		return 0, fmt.Errorf("%w: %s", errUnexpectedIDType, quotedValueDiagnostic(raw))
 	}
 
 	intID, err := strconv.ParseInt(raw, 10, 64)
 	if err != nil {
-		return 0, fmt.Errorf("%w: %q", errUnexpectedIDType, raw)
+		return 0, fmt.Errorf("%w: %s", errUnexpectedIDType, quotedValueDiagnostic(raw))
 	}
 	return intID, nil
 }
