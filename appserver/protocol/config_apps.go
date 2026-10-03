@@ -3,6 +3,8 @@ package protocol
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // AppsConfig holds global defaults and settings keyed by connector ID.
@@ -17,19 +19,19 @@ func (c *AppsConfig) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(data, &fields); err != nil {
+	if err := jsondecode.Unmarshal(data, &fields); err != nil {
 		return err
 	}
 	decoded := AppsConfig{Apps: make(map[string]AppConfig)}
 	for key, raw := range fields {
 		if key == "_default" {
-			if err := json.Unmarshal(raw, &decoded.Default); err != nil {
+			if err := jsondecode.Unmarshal(raw, &decoded.Default); err != nil {
 				return fmt.Errorf("apps defaults: %w", err)
 			}
 			continue
 		}
 		var app AppConfig
-		if err := json.Unmarshal(raw, &app); err != nil {
+		if err := jsondecode.Unmarshal(raw, &app); err != nil {
 			return fmt.Errorf("app %s: %w", quotedValueDiagnostic(key), err)
 		}
 		decoded.Apps[key] = app
@@ -103,7 +105,7 @@ func (c *AppToolsConfig) UnmarshalJSON(data []byte) error {
 	}
 	type wire AppToolsConfig
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*c = AppToolsConfig(decoded)
@@ -135,7 +137,7 @@ func (c *AppLinksConfig) UnmarshalJSON(data []byte) error {
 	}
 	type wire AppLinksConfig
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*c = AppLinksConfig(decoded)

@@ -2,8 +2,9 @@ package protocol
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // Streaming Notifications
@@ -203,7 +204,7 @@ func (c *Client) OnAgentMessageDelta(handler func(AgentMessageDeltaNotification)
 	}
 	c.OnNotification(notifyAgentMessageDelta, func(ctx context.Context, notif Notification) {
 		var n AgentMessageDeltaNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyAgentMessageDelta, fmt.Errorf("unmarshal %s: %w", notifyAgentMessageDelta, err))
 			return
 		}
@@ -219,7 +220,7 @@ func (c *Client) OnFileChangeOutputDelta(handler func(FileChangeOutputDeltaNotif
 	}
 	c.OnNotification(notifyFileChangeOutputDelta, func(ctx context.Context, notif Notification) {
 		var n FileChangeOutputDeltaNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyFileChangeOutputDelta, fmt.Errorf("unmarshal %s: %w", notifyFileChangeOutputDelta, err))
 			return
 		}
@@ -235,7 +236,7 @@ func (c *Client) OnFileChangePatchUpdated(handler func(FileChangePatchUpdatedNot
 	}
 	c.OnNotification(notifyFileChangePatchUpdated, func(ctx context.Context, notif Notification) {
 		var n FileChangePatchUpdatedNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyFileChangePatchUpdated, fmt.Errorf("unmarshal %s: %w", notifyFileChangePatchUpdated, err))
 			return
 		}
@@ -251,7 +252,7 @@ func (c *Client) OnPlanDelta(handler func(PlanDeltaNotification)) {
 	}
 	c.OnNotification(notifyPlanDelta, func(ctx context.Context, notif Notification) {
 		var n PlanDeltaNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyPlanDelta, fmt.Errorf("unmarshal %s: %w", notifyPlanDelta, err))
 			return
 		}
@@ -267,7 +268,7 @@ func (c *Client) OnReasoningTextDelta(handler func(ReasoningTextDeltaNotificatio
 	}
 	c.OnNotification(notifyReasoningTextDelta, func(ctx context.Context, notif Notification) {
 		var n ReasoningTextDeltaNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyReasoningTextDelta, fmt.Errorf("unmarshal %s: %w", notifyReasoningTextDelta, err))
 			return
 		}
@@ -283,7 +284,7 @@ func (c *Client) OnReasoningSummaryTextDelta(handler func(ReasoningSummaryTextDe
 	}
 	c.OnNotification(notifyReasoningSummaryTextDelta, func(ctx context.Context, notif Notification) {
 		var n ReasoningSummaryTextDeltaNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyReasoningSummaryTextDelta, fmt.Errorf("unmarshal %s: %w", notifyReasoningSummaryTextDelta, err))
 			return
 		}
@@ -299,7 +300,7 @@ func (c *Client) OnReasoningSummaryPartAdded(handler func(ReasoningSummaryPartAd
 	}
 	c.OnNotification(notifyReasoningSummaryPartAdded, func(ctx context.Context, notif Notification) {
 		var n ReasoningSummaryPartAddedNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyReasoningSummaryPartAdded, fmt.Errorf("unmarshal %s: %w", notifyReasoningSummaryPartAdded, err))
 			return
 		}
@@ -315,7 +316,7 @@ func (c *Client) OnItemStarted(handler func(ItemStartedNotification)) {
 	}
 	c.OnNotification(notifyItemStarted, func(ctx context.Context, notif Notification) {
 		var n ItemStartedNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyItemStarted, fmt.Errorf("unmarshal %s: %w", notifyItemStarted, err))
 			return
 		}
@@ -331,7 +332,7 @@ func (c *Client) OnItemCompleted(handler func(ItemCompletedNotification)) {
 	}
 	c.OnNotification(notifyItemCompleted, func(ctx context.Context, notif Notification) {
 		var n ItemCompletedNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyItemCompleted, fmt.Errorf("unmarshal %s: %w", notifyItemCompleted, err))
 			return
 		}
@@ -349,7 +350,7 @@ func (c *Client) OnCollabToolCallStarted(handler func(ItemStartedNotification, *
 	}
 	return c.addNotificationListener(notifyItemStarted, func(_ context.Context, notif Notification) {
 		var n ItemStartedNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyItemStarted, fmt.Errorf("unmarshal %s: %w", notifyItemStarted, err))
 			return
 		}
@@ -369,7 +370,7 @@ func (c *Client) OnCollabToolCallCompleted(handler func(ItemCompletedNotificatio
 	}
 	return c.addNotificationListener(notifyItemCompleted, func(_ context.Context, notif Notification) {
 		var n ItemCompletedNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyItemCompleted, fmt.Errorf("unmarshal %s: %w", notifyItemCompleted, err))
 			return
 		}

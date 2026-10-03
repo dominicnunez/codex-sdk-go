@@ -3,6 +3,8 @@ package protocol
 import (
 	"bytes"
 	"encoding/json"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // OptionalNullable distinguishes an absent field from explicit null and a value.
@@ -37,7 +39,7 @@ func (v *OptionalNullable[T]) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		*strings = []string(list)
-	} else if err := json.Unmarshal(data, target); err != nil {
+	} else if err := jsondecode.UnmarshalStandard(data, target); err != nil {
 		return err
 	}
 	v.Present, v.Value = true, target

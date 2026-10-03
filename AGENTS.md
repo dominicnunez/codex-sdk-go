@@ -79,6 +79,9 @@ bound allocation amplification or error retention inside the decoder.
 For identifier errors, trace the original display value separately from the
 canonical matching key: accepted alternate spellings can remain large after
 successful normalization.
+For typed JSON diagnostics, establish native error ownership from the decoding
+destination and caller before normalization. Preserve application custom-codec
+error identity; a concrete error type or message prefix does not prove origin.
 For callback fanout, isolate each recipient at the owning boundary, including
 initial replay and direct service/cache calls. Verify committed state reaches
 later SDK consumers after a callback or error reporter panics, and that replay

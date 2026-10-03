@@ -2,9 +2,10 @@ package auth
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 const openAIAuthClaim = "https://api.openai.com/auth"
@@ -26,7 +27,7 @@ func ExtractTokenClaims(accessToken string) (TokenClaims, error) {
 	}
 
 	var claims map[string]any
-	if err := json.Unmarshal(payload, &claims); err != nil {
+	if err := jsondecode.Unmarshal(payload, &claims); err != nil {
 		return TokenClaims{}, fmt.Errorf("parse access token claims: %w", err)
 	}
 

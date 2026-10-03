@@ -3,6 +3,8 @@ package protocol
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // This file contains typed string enums defined in the protocol spec that are
@@ -527,7 +529,7 @@ func (r ReasoningEffort) MarshalJSON() ([]byte, error) {
 
 func (r *ReasoningEffort) UnmarshalJSON(data []byte) error {
 	var value string
-	if err := json.Unmarshal(data, &value); err != nil {
+	if err := jsondecode.Unmarshal(data, &value); err != nil {
 		return err
 	}
 	if value == "" {

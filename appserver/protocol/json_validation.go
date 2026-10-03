@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
@@ -134,10 +135,10 @@ func (s *inboundObjectDecodeState) deferString(name string, raw []byte) (bool, e
 	} else if raw[0] != '"' {
 		// Decode the prefix before reporting this occurrence's type failure.
 		if previous, exists := s.selectedStrings[name]; exists {
-			_ = json.Unmarshal(previous, value.Addr().Interface())
+			_ = jsondecode.Unmarshal(previous, value.Addr().Interface())
 			delete(s.selectedStrings, name)
 		}
-		return true, json.Unmarshal(raw, value.Addr().Interface())
+		return true, jsondecode.Unmarshal(raw, value.Addr().Interface())
 	}
 	if s.selectedStrings == nil {
 		s.selectedStrings = make(map[string][]byte)
@@ -149,7 +150,7 @@ func (s *inboundObjectDecodeState) deferString(name string, raw []byte) (bool, e
 func (s *inboundObjectDecodeState) flushStrings() {
 	for name, raw := range s.selectedStrings {
 		field := s.fields[name]
-		if err := json.Unmarshal(raw, s.dest.FieldByIndex(field.index).Addr().Interface()); err != nil && s.err == nil {
+		if err := jsondecode.Unmarshal(raw, s.dest.FieldByIndex(field.index).Addr().Interface()); err != nil && s.err == nil {
 			s.err = err
 		}
 	}
@@ -314,7 +315,7 @@ func resolveInboundObjectDestination(
 
 	destValue := value.Elem()
 	if destValue.Kind() != reflect.Struct {
-		return reflect.Value{}, nil, true, json.Unmarshal(data, dest)
+		return reflect.Value{}, nil, true, jsondecode.Unmarshal(data, dest)
 	}
 
 	return destValue, inboundObjectFields(destValue.Type()), false, nil
@@ -362,7 +363,7 @@ func decodeInboundObjectField(
 	if !ok {
 		return nil
 	}
-	return json.Unmarshal(raw, destValue.FieldByIndex(field.index).Addr().Interface())
+	return jsondecode.Unmarshal(raw, destValue.FieldByIndex(field.index).Addr().Interface())
 }
 
 func validateRequiredInboundObjectFields(required inboundRequiredFields, validation objectValidationErrors) error {

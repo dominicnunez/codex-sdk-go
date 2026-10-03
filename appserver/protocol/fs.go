@@ -2,8 +2,9 @@ package protocol
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // FsReadFileParams reads a file from the host filesystem.
@@ -22,7 +23,7 @@ func (r *FsReadFileResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire FsReadFileResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	if err := validateInboundBase64Field("dataBase64", decoded.DataBase64); err != nil {
@@ -70,7 +71,7 @@ func (r *FsGetMetadataResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire FsGetMetadataResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = FsGetMetadataResponse(decoded)
@@ -95,7 +96,7 @@ func (e *FsReadDirectoryEntry) UnmarshalJSON(data []byte) error {
 	}
 	type wire FsReadDirectoryEntry
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*e = FsReadDirectoryEntry(decoded)
@@ -113,7 +114,7 @@ func (r *FsReadDirectoryResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire FsReadDirectoryResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = FsReadDirectoryResponse(decoded)
@@ -157,7 +158,7 @@ func (r *FsWatchResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire FsWatchResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	validatedPath, err := validateInboundAbsolutePathField("fs.watch.path", decoded.Path)
@@ -292,7 +293,7 @@ func (c *Client) OnFsChanged(handler func(FsChangedNotification)) {
 	}
 	c.OnNotification(notifyFsChanged, func(ctx context.Context, notif Notification) {
 		var n FsChangedNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyFsChanged, fmt.Errorf("unmarshal %s: %w", notifyFsChanged, err))
 			return
 		}

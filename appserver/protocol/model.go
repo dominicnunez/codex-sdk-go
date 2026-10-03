@@ -2,8 +2,9 @@ package protocol
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // ModelListParams are parameters for listing available models.
@@ -31,7 +32,7 @@ func (r *ModelListResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire ModelListResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = ModelListResponse(decoded)
@@ -127,7 +128,7 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 	}
 	type wire Model
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	// Keep the existing wire type's stdlib error context for established fields.
@@ -135,7 +136,7 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 	var lists struct {
 		AdditionalSpeedTiers nonNullStringList `json:"additionalSpeedTiers"`
 	}
-	if err := json.Unmarshal(data, &lists); err != nil {
+	if err := jsondecode.Unmarshal(data, &lists); err != nil {
 		return err
 	}
 	decoded.AdditionalSpeedTiers = []string(lists.AdditionalSpeedTiers)
@@ -157,7 +158,7 @@ func (n *ModelAvailabilityNux) UnmarshalJSON(data []byte) error {
 	}
 	type wire ModelAvailabilityNux
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*n = ModelAvailabilityNux(decoded)
@@ -179,7 +180,7 @@ func (i *ModelUpgradeInfo) UnmarshalJSON(data []byte) error {
 	}
 	type wire ModelUpgradeInfo
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*i = ModelUpgradeInfo(decoded)
@@ -200,7 +201,7 @@ func (o *ReasoningEffortOption) UnmarshalJSON(data []byte) error {
 	}
 	type wire ReasoningEffortOption
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*o = ReasoningEffortOption(decoded)
@@ -299,7 +300,7 @@ func (c *Client) OnModelRerouted(handler func(ModelReroutedNotification)) {
 	}
 	c.OnNotification(notifyModelRerouted, func(ctx context.Context, notif Notification) {
 		var n ModelReroutedNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyModelRerouted, fmt.Errorf("unmarshal %s: %w", notifyModelRerouted, err))
 			return
 		}
@@ -315,7 +316,7 @@ func (c *Client) OnModelVerification(handler func(ModelVerificationNotification)
 	}
 	c.OnNotification(notifyModelVerification, func(ctx context.Context, notif Notification) {
 		var n ModelVerificationNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyModelVerification, fmt.Errorf("unmarshal %s: %w", notifyModelVerification, err))
 			return
 		}

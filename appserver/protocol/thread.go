@@ -3,6 +3,8 @@ package protocol
 import (
 	"encoding/json"
 	"errors"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // Thread represents a conversation thread with all its metadata
@@ -71,7 +73,7 @@ func (t *Thread) UnmarshalJSON(data []byte) error {
 	}
 
 	var wire threadWire
-	if err := json.Unmarshal(data, &wire); err != nil {
+	if err := jsondecode.Unmarshal(data, &wire); err != nil {
 		return err
 	}
 
@@ -172,7 +174,7 @@ func (t *Turn) UnmarshalJSON(data []byte) error {
 	type wire Turn
 	var decoded wire
 	decoded.ItemsView = TurnItemsViewFull
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*t = Turn(decoded)

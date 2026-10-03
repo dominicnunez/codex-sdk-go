@@ -126,9 +126,28 @@ field context, error classification and validation precedence remain intact;
 duplicate-ID errors retain their existing unquoted short display. Validation
 and decoding may still allocate for the complete input. Accepted long values,
 unknown raw variants and failed receivers' existing partial updates are not
-truncated. Structured RPC messages and underlying JSON numeric-overflow error
-metadata are outside this preview control and can retain full values. This is
-not a total response-size, diagnostic-size or heap budget.
+truncated. Structured RPC messages remain semantic error data and can retain
+full values. This is not a total response-size, diagnostic-size or heap budget.
+
+At audited SDK-owned protocol, runtime, token-response and JWT-claim decoding
+boundaries, native JSON numeric conversion errors retain at most 2,048 bytes in
+`json.UnmarshalTypeError.Value`. Descriptions exceeding that threshold keep a
+quoted 256-byte source preview and omitted-byte count before SDK wrapping or
+runtime fallback copies. The bounded error keeps the concrete type, target type,
+offset, struct and field context; short diagnostics, error precedence and partial
+receiver updates remain unchanged. Normalization copies metadata without keeping
+the discarded full error as a cause. Standard JSON decoding and numeric parsing
+can still allocate temporary full-token copies; accepted raw or `json.Number`
+values remain complete.
+
+Unrestricted application decoding and callback errors retain their ownership
+and identity. `OptionalNullable[T]` only normalizes native type errors when the
+entire static destination graph lacks custom JSON/text decoders and interface
+slots. Extension-bearing graphs pass errors through, even if a native numeric
+failure occurs in another field. Application-selected envelope labels and
+structured RPC data are also outside these bounds. Malformed `json.Number`
+literal formatting uses a different standard error mechanism and remains outside
+the numeric-conversion metadata control.
 
 Terminal transport cleanup clears requests awaiting handler registration and
 drains abandoned inbound requests and outbound envelopes. Queue admission is

@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // UnmarshalJSON retains both workspace restriction branches without changing
@@ -22,7 +24,7 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 		*Config
 		Workspace workspaceRestrictionDecoder `json:"forced_chatgpt_workspace_id"`
 	}{Config: (*Config)(c), Workspace: workspaceRestrictionDecoder{single: &c.ForcedChatgptWorkspaceID, multiple: &c.ForcedChatgptWorkspaceIDs}}
-	err := json.Unmarshal(data, &wire)
+	err := jsondecode.Unmarshal(data, &wire)
 	// The shadow wire's anonymous embedding adds a synthetic Config path and
 	// erases its name. Restore the direct Config field context.
 	var typeError *json.UnmarshalTypeError
@@ -87,14 +89,14 @@ func (w *workspaceRestrictionDecoder) UnmarshalJSON(data []byte) error {
 	}
 	if len(data) > 0 && data[0] == '[' {
 		var values nonNullStringList
-		if err := json.Unmarshal(data, &values); err != nil {
+		if err := jsondecode.Unmarshal(data, &values); err != nil {
 			return fmt.Errorf("forced_chatgpt_workspace_id: %w", err)
 		}
 		list := []string(values)
 		*w.single, *w.multiple = nil, &list
 		return nil
 	}
-	if err := json.Unmarshal(data, w.single); err != nil {
+	if err := jsondecode.Unmarshal(data, w.single); err != nil {
 		return err
 	}
 	*w.multiple = nil

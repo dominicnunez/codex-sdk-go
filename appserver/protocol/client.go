@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
@@ -486,7 +487,7 @@ func addTypedNotificationListener[T any](c *Client, method string, handler func(
 	}
 	return c.addNotificationListener(method, func(_ context.Context, notif Notification) {
 		var typed T
-		if err := json.Unmarshal(notif.Params, &typed); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &typed); err != nil {
 			c.reportHandlerError(method, fmt.Errorf("unmarshal %s: %w", method, err))
 			return
 		}
@@ -610,7 +611,7 @@ func methodNotFoundResponse(id RequestID) Response {
 // from the snapshot taken in handleRequest, so no additional lock is needed.
 func handleApproval[P any, R any](ctx context.Context, req Request, handler func(context.Context, P) (R, error)) (Response, error) {
 	var params P
-	if err := json.Unmarshal(req.Params, &params); err != nil {
+	if err := jsondecode.Unmarshal(req.Params, &params); err != nil {
 		return Response{}, fmt.Errorf("unmarshal %s params: %w", req.Method, errors.Join(errInvalidParams, err))
 	}
 
@@ -690,7 +691,7 @@ func (c *Client) sendRequest(ctx context.Context, method string, params interfac
 	if isEmptyResponseResult(resp.Result) {
 		return fmt.Errorf("%s: %w", method, ErrEmptyResult)
 	}
-	if err := json.Unmarshal(resp.Result, result); err != nil {
+	if err := jsondecode.Unmarshal(resp.Result, result); err != nil {
 		return fmt.Errorf("unmarshal response result for %s: %w", method, err)
 	}
 	if err := validateDecodedResponse(result); err != nil {

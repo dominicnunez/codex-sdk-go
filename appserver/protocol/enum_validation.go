@@ -3,6 +3,8 @@ package protocol
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 func validateEnumValue[T ~string](field string, value T, allowed map[T]struct{}) error {
@@ -28,7 +30,7 @@ func validateStringEnumValue(field string, value string, allowed map[string]stru
 
 func unmarshalEnumString[T ~string](data []byte, field string, allowed map[T]struct{}, dest *T) error {
 	var value string
-	if err := json.Unmarshal(data, &value); err != nil {
+	if err := jsondecode.Unmarshal(data, &value); err != nil {
 		return err
 	}
 

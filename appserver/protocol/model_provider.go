@@ -2,7 +2,8 @@ package protocol
 
 import (
 	"context"
-	"encoding/json"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // ModelProviderCapabilitiesReadParams reads capabilities for the active model provider.
@@ -21,7 +22,7 @@ func (r *ModelProviderCapabilitiesReadResponse) UnmarshalJSON(data []byte) error
 	}
 	type wire ModelProviderCapabilitiesReadResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = ModelProviderCapabilitiesReadResponse(decoded)

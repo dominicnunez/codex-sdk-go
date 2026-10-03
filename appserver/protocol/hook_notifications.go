@@ -2,8 +2,9 @@ package protocol
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // HookEventName identifies when a hook ran.
@@ -429,7 +430,7 @@ func (c *Client) OnHookStarted(handler func(HookStartedNotification)) {
 	}
 	c.OnNotification(notifyHookStarted, func(ctx context.Context, notif Notification) {
 		var params HookStartedNotification
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyHookStarted, fmt.Errorf("unmarshal %s: %w", notifyHookStarted, err))
 			return
 		}
@@ -445,7 +446,7 @@ func (c *Client) OnHookCompleted(handler func(HookCompletedNotification)) {
 	}
 	c.OnNotification(notifyHookCompleted, func(ctx context.Context, notif Notification) {
 		var params HookCompletedNotification
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyHookCompleted, fmt.Errorf("unmarshal %s: %w", notifyHookCompleted, err))
 			return
 		}
@@ -461,7 +462,7 @@ func (c *Client) OnItemGuardianApprovalReviewStarted(handler func(ItemGuardianAp
 	}
 	c.OnNotification(notifyItemGuardianApprovalReviewStarted, func(ctx context.Context, notif Notification) {
 		var params ItemGuardianApprovalReviewStartedNotification
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyItemGuardianApprovalReviewStarted, fmt.Errorf("unmarshal %s: %w", notifyItemGuardianApprovalReviewStarted, err))
 			return
 		}
@@ -477,7 +478,7 @@ func (c *Client) OnItemGuardianApprovalReviewCompleted(handler func(ItemGuardian
 	}
 	c.OnNotification(notifyItemGuardianApprovalReviewCompleted, func(ctx context.Context, notif Notification) {
 		var params ItemGuardianApprovalReviewCompletedNotification
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyItemGuardianApprovalReviewCompleted, fmt.Errorf("unmarshal %s: %w", notifyItemGuardianApprovalReviewCompleted, err))
 			return
 		}

@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // AppsReadParams contains parameters for app/read.
@@ -556,7 +558,7 @@ func setTypedNotificationHandler[T any](c *Client, method string, handler func(T
 	}
 	c.OnNotification(method, func(_ context.Context, notif Notification) {
 		var params T
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(method, fmt.Errorf("unmarshal %s: %w", method, err))
 			return
 		}

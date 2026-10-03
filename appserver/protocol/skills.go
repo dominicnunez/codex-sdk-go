@@ -2,8 +2,9 @@ package protocol
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // SkillScope defines the scope of a skill (user, repo, system, admin)
@@ -55,7 +56,7 @@ func (d *SkillToolDependency) UnmarshalJSON(data []byte) error {
 	}
 	type wire SkillToolDependency
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*d = SkillToolDependency(decoded)
@@ -73,7 +74,7 @@ func (d *SkillDependencies) UnmarshalJSON(data []byte) error {
 	}
 	type wire SkillDependencies
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*d = SkillDependencies(decoded)
@@ -99,7 +100,7 @@ func (m *SkillMetadata) UnmarshalJSON(data []byte) error {
 	}
 	type wire SkillMetadata
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	validatedPath, err := validateInboundAbsolutePathField("skill.path", decoded.Path)
@@ -123,7 +124,7 @@ func (e *SkillErrorInfo) UnmarshalJSON(data []byte) error {
 	}
 	type wire SkillErrorInfo
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	validatedPath, err := validateInboundAbsolutePathField("skill.error.path", decoded.Path)
@@ -188,7 +189,7 @@ func (e *SkillsListEntry) UnmarshalJSON(data []byte) error {
 	}
 	type wire SkillsListEntry
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	validatedCwd, err := validateInboundAbsolutePathField("skills.cwd", decoded.Cwd)
@@ -211,7 +212,7 @@ func (r *SkillsListResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire SkillsListResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = SkillsListResponse(decoded)
@@ -248,7 +249,7 @@ func (r *SkillsConfigWriteResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire SkillsConfigWriteResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = SkillsConfigWriteResponse(decoded)
@@ -293,7 +294,7 @@ func (c *Client) OnSkillsChanged(handler func(SkillsChangedNotification)) {
 	}
 	c.OnNotification(notifySkillsChanged, func(ctx context.Context, notif Notification) {
 		var params SkillsChangedNotification
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifySkillsChanged, fmt.Errorf("unmarshal %s: %w", notifySkillsChanged, err))
 			return
 		}

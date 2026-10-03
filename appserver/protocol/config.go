@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
@@ -94,7 +95,7 @@ type ReasoningSummaryWrapper struct {
 
 func (w *ReasoningSummaryWrapper) UnmarshalJSON(data []byte) error {
 	var mode ReasoningSummaryMode
-	if err := json.Unmarshal(data, &mode); err != nil {
+	if err := jsondecode.Unmarshal(data, &mode); err != nil {
 		return fmt.Errorf("unsupported ReasoningSummary type: %w", err)
 	}
 	w.Value = mode
@@ -151,7 +152,7 @@ func (c *ConfigLayer) UnmarshalJSON(data []byte) error {
 	}
 	type wire ConfigLayer
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*c = ConfigLayer(decoded)
@@ -170,7 +171,7 @@ func (m *ConfigLayerMetadata) UnmarshalJSON(data []byte) error {
 	}
 	type wire ConfigLayerMetadata
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*m = ConfigLayerMetadata(decoded)
@@ -196,7 +197,7 @@ func (s *MdmConfigLayerSource) UnmarshalJSON(data []byte) error {
 	}
 	type wire MdmConfigLayerSource
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*s = MdmConfigLayerSource(decoded)
@@ -224,7 +225,7 @@ func (s *SystemConfigLayerSource) UnmarshalJSON(data []byte) error {
 	}
 	type wire SystemConfigLayerSource
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	validatedFile, err := validateInboundAbsolutePathField("config.layer.system.file", decoded.File)
@@ -257,7 +258,7 @@ func (s *UserConfigLayerSource) UnmarshalJSON(data []byte) error {
 	}
 	type wire UserConfigLayerSource
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	validatedFile, err := validateInboundAbsolutePathField("config.layer.user.file", decoded.File)
@@ -290,7 +291,7 @@ func (s *ProjectConfigLayerSource) UnmarshalJSON(data []byte) error {
 	}
 	type wire ProjectConfigLayerSource
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	validatedFolder, err := validateInboundAbsolutePathField("config.layer.project.dotCodexFolder", decoded.DotCodexFolder)
@@ -333,7 +334,7 @@ func (s *LegacyManagedConfigTomlFromFileConfigLayerSource) UnmarshalJSON(data []
 	}
 	type wire LegacyManagedConfigTomlFromFileConfigLayerSource
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	validatedFile, err := validateInboundAbsolutePathField("config.layer.legacyManagedConfigTomlFromFile.file", decoded.File)
@@ -394,32 +395,32 @@ func (w *ConfigLayerSourceWrapper) UnmarshalJSON(data []byte) error {
 	}
 
 	var typeStr string
-	if err := json.Unmarshal(obj["type"], &typeStr); err != nil {
+	if err := jsondecode.Unmarshal(obj["type"], &typeStr); err != nil {
 		return err
 	}
 
 	switch typeStr {
 	case "mdm":
 		var v MdmConfigLayerSource
-		if err := json.Unmarshal(data, &v); err != nil {
+		if err := jsondecode.Unmarshal(data, &v); err != nil {
 			return fmt.Errorf("config layer source %q: %w", typeStr, err)
 		}
 		w.Value = v
 	case "system":
 		var v SystemConfigLayerSource
-		if err := json.Unmarshal(data, &v); err != nil {
+		if err := jsondecode.Unmarshal(data, &v); err != nil {
 			return fmt.Errorf("config layer source %q: %w", typeStr, err)
 		}
 		w.Value = v
 	case "user":
 		var v UserConfigLayerSource
-		if err := json.Unmarshal(data, &v); err != nil {
+		if err := jsondecode.Unmarshal(data, &v); err != nil {
 			return fmt.Errorf("config layer source %q: %w", typeStr, err)
 		}
 		w.Value = v
 	case "project":
 		var v ProjectConfigLayerSource
-		if err := json.Unmarshal(data, &v); err != nil {
+		if err := jsondecode.Unmarshal(data, &v); err != nil {
 			return fmt.Errorf("config layer source %q: %w", typeStr, err)
 		}
 		w.Value = v
@@ -427,7 +428,7 @@ func (w *ConfigLayerSourceWrapper) UnmarshalJSON(data []byte) error {
 		w.Value = SessionFlagsConfigLayerSource{}
 	case "legacyManagedConfigTomlFromFile":
 		var v LegacyManagedConfigTomlFromFileConfigLayerSource
-		if err := json.Unmarshal(data, &v); err != nil {
+		if err := jsondecode.Unmarshal(data, &v); err != nil {
 			return fmt.Errorf("config layer source %q: %w", typeStr, err)
 		}
 		w.Value = v
@@ -562,7 +563,7 @@ func (r *ConfigWriteResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire ConfigWriteResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	validatedFilePath, err := validateInboundAbsolutePathField("config.write.filePath", decoded.FilePath)
@@ -590,7 +591,7 @@ func (m *OverriddenMetadata) UnmarshalJSON(data []byte) error {
 	}
 	type wire OverriddenMetadata
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*m = OverriddenMetadata(decoded)
@@ -703,7 +704,7 @@ func (c *Client) OnConfigWarning(handler func(ConfigWarningNotification)) {
 	}
 	c.OnNotification(notifyConfigWarning, func(ctx context.Context, notif Notification) {
 		var n ConfigWarningNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyConfigWarning, fmt.Errorf("unmarshal %s: %w", notifyConfigWarning, err))
 			return
 		}

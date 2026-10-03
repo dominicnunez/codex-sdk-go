@@ -2,8 +2,9 @@ package protocol
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // AuthMode represents the authentication mode
@@ -47,7 +48,7 @@ type AccountUpdatedNotification struct {
 func (n *AccountUpdatedNotification) UnmarshalJSON(data []byte) error {
 	type wire AccountUpdatedNotification
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	if err := validateOptionalAuthModeField("account.authMode", decoded.AuthMode); err != nil {
@@ -103,7 +104,7 @@ func (c *Client) OnAccountUpdated(handler func(AccountUpdatedNotification)) {
 	}
 	c.OnNotification(notifyAccountUpdated, func(ctx context.Context, notif Notification) {
 		var n AccountUpdatedNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyAccountUpdated, fmt.Errorf("unmarshal %s: %w", notifyAccountUpdated, err))
 			return
 		}
@@ -119,7 +120,7 @@ func (c *Client) OnAccountLoginCompleted(handler func(AccountLoginCompletedNotif
 	}
 	c.OnNotification(notifyAccountLoginCompleted, func(ctx context.Context, notif Notification) {
 		var n AccountLoginCompletedNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyAccountLoginCompleted, fmt.Errorf("unmarshal %s: %w", notifyAccountLoginCompleted, err))
 			return
 		}
@@ -135,7 +136,7 @@ func (c *Client) OnAccountRateLimitsUpdated(handler func(AccountRateLimitsUpdate
 	}
 	c.OnNotification(notifyAccountRateLimitsUpdated, func(ctx context.Context, notif Notification) {
 		var n AccountRateLimitsUpdatedNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyAccountRateLimitsUpdated, fmt.Errorf("unmarshal %s: %w", notifyAccountRateLimitsUpdated, err))
 			return
 		}

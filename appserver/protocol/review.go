@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
@@ -81,7 +82,7 @@ func (b *BaseBranchReviewTarget) UnmarshalJSON(data []byte) error {
 	}
 	type wire BaseBranchReviewTarget
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*b = BaseBranchReviewTarget(decoded)
@@ -110,7 +111,7 @@ func (c *CommitReviewTarget) UnmarshalJSON(data []byte) error {
 	}
 	type wire CommitReviewTarget
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*c = CommitReviewTarget(decoded)
@@ -137,7 +138,7 @@ func (c *CustomReviewTarget) UnmarshalJSON(data []byte) error {
 	}
 	type wire CustomReviewTarget
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*c = CustomReviewTarget(decoded)
@@ -181,25 +182,25 @@ func (w *ReviewTargetWrapper) UnmarshalJSON(data []byte) error {
 	switch typeStr {
 	case reviewTargetTypeUncommittedChanges:
 		var target UncommittedChangesReviewTarget
-		if err := json.Unmarshal(data, &target); err != nil {
+		if err := jsondecode.Unmarshal(data, &target); err != nil {
 			return err
 		}
 		w.Value = &target
 	case reviewTargetTypeBaseBranch:
 		var target BaseBranchReviewTarget
-		if err := json.Unmarshal(data, &target); err != nil {
+		if err := jsondecode.Unmarshal(data, &target); err != nil {
 			return err
 		}
 		w.Value = &target
 	case reviewTargetTypeCommit:
 		var target CommitReviewTarget
-		if err := json.Unmarshal(data, &target); err != nil {
+		if err := jsondecode.Unmarshal(data, &target); err != nil {
 			return err
 		}
 		w.Value = &target
 	case reviewTargetTypeCustom:
 		var target CustomReviewTarget
-		if err := json.Unmarshal(data, &target); err != nil {
+		if err := jsondecode.Unmarshal(data, &target); err != nil {
 			return err
 		}
 		w.Value = &target
@@ -267,7 +268,7 @@ func (r *ReviewStartResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire ReviewStartResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = ReviewStartResponse(decoded)

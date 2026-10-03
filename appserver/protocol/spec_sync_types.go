@@ -3,6 +3,8 @@ package protocol
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 type CommandExecutionApprovalKind string
@@ -296,7 +298,7 @@ type InputImageFunctionCallOutputContentItem struct {
 func (v *InputImageFunctionCallOutputContentItem) UnmarshalJSON(data []byte) error {
 	type wire InputImageFunctionCallOutputContentItem
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	if decoded.ImageURL == "" && decoded.FileID == nil {
@@ -380,25 +382,25 @@ func (w *FunctionCallOutputContentItemWrapper) UnmarshalJSON(data []byte) error 
 	switch tag {
 	case "input_text":
 		var v InputTextFunctionCallOutputContentItem
-		if err := json.Unmarshal(data, &v); err != nil {
+		if err := jsondecode.Unmarshal(data, &v); err != nil {
 			return err
 		}
 		w.Value = &v
 	case "input_image":
 		var v InputImageFunctionCallOutputContentItem
-		if err := json.Unmarshal(data, &v); err != nil {
+		if err := jsondecode.Unmarshal(data, &v); err != nil {
 			return err
 		}
 		w.Value = &v
 	case "input_audio":
 		var v InputAudioFunctionCallOutputContentItem
-		if err := json.Unmarshal(data, &v); err != nil {
+		if err := jsondecode.Unmarshal(data, &v); err != nil {
 			return err
 		}
 		w.Value = &v
 	case "encrypted_content":
 		var v EncryptedContentFunctionCallOutputContentItem
-		if err := json.Unmarshal(data, &v); err != nil {
+		if err := jsondecode.Unmarshal(data, &v); err != nil {
 			return err
 		}
 		w.Value = &v
@@ -554,19 +556,19 @@ func (w *ThreadRealtimeBemItemPresentationWrapper) UnmarshalJSON(data []byte) er
 	switch tag {
 	case "wholeItem":
 		var v WholeItemThreadRealtimeBemItemPresentation
-		if err := json.Unmarshal(data, &v); err != nil {
+		if err := jsondecode.Unmarshal(data, &v); err != nil {
 			return err
 		}
 		w.Value = &v
 	case "inlineMarkdown":
 		var v InlineMarkdownThreadRealtimeBemItemPresentation
-		if err := json.Unmarshal(data, &v); err != nil {
+		if err := jsondecode.Unmarshal(data, &v); err != nil {
 			return err
 		}
 		w.Value = &v
 	case "inlineVisualization":
 		var v InlineVisualizationThreadRealtimeBemItemPresentation
-		if err := json.Unmarshal(data, &v); err != nil {
+		if err := jsondecode.Unmarshal(data, &v); err != nil {
 			return err
 		}
 		w.Value = &v
@@ -664,25 +666,25 @@ func (w *ThreadRealtimeItemWrapper) UnmarshalJSON(data []byte) error {
 	switch tag {
 	case "realtimeSessionStarted":
 		var v RealtimeSessionStartedThreadRealtimeItem
-		if err := json.Unmarshal(data, &v); err != nil {
+		if err := jsondecode.Unmarshal(data, &v); err != nil {
 			return err
 		}
 		w.Value = &v
 	case "transcriptSegment":
 		var v TranscriptSegmentThreadRealtimeItem
-		if err := json.Unmarshal(data, &v); err != nil {
+		if err := jsondecode.Unmarshal(data, &v); err != nil {
 			return err
 		}
 		w.Value = &v
 	case "bemItemPromoted":
 		var v BemItemPromotedThreadRealtimeItem
-		if err := json.Unmarshal(data, &v); err != nil {
+		if err := jsondecode.Unmarshal(data, &v); err != nil {
 			return err
 		}
 		w.Value = &v
 	case "realtimeSessionClosed":
 		var v RealtimeSessionClosedThreadRealtimeItem
-		if err := json.Unmarshal(data, &v); err != nil {
+		if err := jsondecode.Unmarshal(data, &v); err != nil {
 			return err
 		}
 		w.Value = &v

@@ -2,7 +2,8 @@ package protocol
 
 import (
 	"context"
-	"encoding/json"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 const methodPluginReconcile = "plugin/reconcile"
@@ -27,7 +28,7 @@ func (p *PluginReconcileChangedPlugin) UnmarshalJSON(data []byte) error {
 	}
 	type wire PluginReconcileChangedPlugin
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*p = PluginReconcileChangedPlugin(decoded)
@@ -48,7 +49,7 @@ func (r *PluginReconcileResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire PluginReconcileResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = PluginReconcileResponse(decoded)

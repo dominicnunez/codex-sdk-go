@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // RealtimeConversationVersion identifies the realtime protocol version.
@@ -201,7 +203,7 @@ func (c *Client) OnThreadRealtimeStarted(handler func(ThreadRealtimeStartedNotif
 	}
 	c.OnNotification(notifyRealtimeStarted, func(ctx context.Context, notif Notification) {
 		var params ThreadRealtimeStartedNotification
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyRealtimeStarted, fmt.Errorf("unmarshal %s: %w", notifyRealtimeStarted, err))
 			return
 		}
@@ -217,7 +219,7 @@ func (c *Client) OnThreadRealtimeClosed(handler func(ThreadRealtimeClosedNotific
 	}
 	c.OnNotification(notifyRealtimeClosed, func(ctx context.Context, notif Notification) {
 		var params ThreadRealtimeClosedNotification
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyRealtimeClosed, fmt.Errorf("unmarshal %s: %w", notifyRealtimeClosed, err))
 			return
 		}
@@ -233,7 +235,7 @@ func (c *Client) OnThreadRealtimeError(handler func(ThreadRealtimeErrorNotificat
 	}
 	c.OnNotification(notifyRealtimeError, func(ctx context.Context, notif Notification) {
 		var params ThreadRealtimeErrorNotification
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyRealtimeError, fmt.Errorf("unmarshal %s: %w", notifyRealtimeError, err))
 			return
 		}
@@ -249,7 +251,7 @@ func (c *Client) OnThreadRealtimeItemAdded(handler func(ThreadRealtimeItemAddedN
 	}
 	c.OnNotification(notifyRealtimeItemAdded, func(ctx context.Context, notif Notification) {
 		var params ThreadRealtimeItemAddedNotification
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyRealtimeItemAdded, fmt.Errorf("unmarshal %s: %w", notifyRealtimeItemAdded, err))
 			return
 		}
@@ -265,7 +267,7 @@ func (c *Client) OnThreadRealtimeOutputAudioDelta(handler func(ThreadRealtimeOut
 	}
 	c.OnNotification(notifyRealtimeOutputAudioDelta, func(ctx context.Context, notif Notification) {
 		var params ThreadRealtimeOutputAudioDeltaNotification
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyRealtimeOutputAudioDelta, fmt.Errorf("unmarshal %s: %w", notifyRealtimeOutputAudioDelta, err))
 			return
 		}
@@ -281,7 +283,7 @@ func (c *Client) OnThreadRealtimeSdp(handler func(ThreadRealtimeSdpNotification)
 	}
 	c.OnNotification(notifyRealtimeSdp, func(ctx context.Context, notif Notification) {
 		var params ThreadRealtimeSdpNotification
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyRealtimeSdp, fmt.Errorf("unmarshal %s: %w", notifyRealtimeSdp, err))
 			return
 		}
@@ -297,7 +299,7 @@ func (c *Client) OnThreadRealtimeTranscriptDelta(handler func(ThreadRealtimeTran
 	}
 	c.OnNotification(notifyRealtimeTranscriptDelta, func(ctx context.Context, notif Notification) {
 		var params ThreadRealtimeTranscriptDeltaNotification
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyRealtimeTranscriptDelta, fmt.Errorf("unmarshal %s: %w", notifyRealtimeTranscriptDelta, err))
 			return
 		}
@@ -313,7 +315,7 @@ func (c *Client) OnThreadRealtimeTranscriptDone(handler func(ThreadRealtimeTrans
 	}
 	c.OnNotification(notifyRealtimeTranscriptDone, func(ctx context.Context, notif Notification) {
 		var params ThreadRealtimeTranscriptDoneNotification
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyRealtimeTranscriptDone, fmt.Errorf("unmarshal %s: %w", notifyRealtimeTranscriptDone, err))
 			return
 		}

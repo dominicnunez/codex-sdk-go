@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
@@ -72,7 +73,7 @@ func (s *SubAgentSourceThreadSpawn) UnmarshalJSON(data []byte) error {
 	}
 	type wire SubAgentSourceThreadSpawn
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*s = SubAgentSourceThreadSpawn(decoded)
@@ -93,7 +94,7 @@ func (s *SubAgentSourceOther) UnmarshalJSON(data []byte) error {
 
 	type wire SubAgentSourceOther
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 
@@ -138,7 +139,7 @@ type SessionSourceWrapper struct {
 func (s *SessionSourceWrapper) UnmarshalJSON(data []byte) error {
 	// Try string literal first
 	var literal string
-	if err := json.Unmarshal(data, &literal); err == nil {
+	if err := jsondecode.Unmarshal(data, &literal); err == nil {
 		s.Value = sessionSourceLiteral(literal)
 		return nil
 	}
@@ -165,7 +166,7 @@ func (s *SessionSourceWrapper) UnmarshalJSON(data []byte) error {
 func unmarshalSubAgentSource(data json.RawMessage) (SubAgentSource, error) {
 	// Try string literal first
 	var literal string
-	if err := json.Unmarshal(data, &literal); err == nil {
+	if err := jsondecode.Unmarshal(data, &literal); err == nil {
 		return subAgentSourceLiteral(literal), nil
 	}
 
@@ -177,7 +178,7 @@ func unmarshalSubAgentSource(data json.RawMessage) (SubAgentSource, error) {
 
 	if _, ok := keys["thread_spawn"]; ok {
 		var ts SubAgentSourceThreadSpawn
-		if err := json.Unmarshal(data, &ts); err != nil {
+		if err := jsondecode.Unmarshal(data, &ts); err != nil {
 			return nil, fmt.Errorf("unmarshal thread_spawn: %w", err)
 		}
 		return ts, nil
@@ -185,7 +186,7 @@ func unmarshalSubAgentSource(data json.RawMessage) (SubAgentSource, error) {
 
 	if _, ok := keys["other"]; ok {
 		var other SubAgentSourceOther
-		if err := json.Unmarshal(data, &other); err != nil {
+		if err := jsondecode.Unmarshal(data, &other); err != nil {
 			return nil, fmt.Errorf("unmarshal other: %w", err)
 		}
 		return other, nil

@@ -3,6 +3,8 @@ package protocol
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // SandboxPolicy represents sandbox access policy
@@ -106,7 +108,7 @@ func (w *ReadOnlyAccessWrapper) UnmarshalJSON(data []byte) error {
 		if err := validateRequiredTaggedObjectFields(data); err != nil {
 			return err
 		}
-		if err := json.Unmarshal(data, &v); err != nil {
+		if err := jsondecode.Unmarshal(data, &v); err != nil {
 			return err
 		}
 		w.Value, err = validateInboundReadOnlyAccessField("readOnlyAccess", v)
@@ -198,7 +200,7 @@ func (s *SandboxPolicyWrapper) UnmarshalJSON(data []byte) error {
 		if err := validateRequiredTaggedObjectFields(data); err != nil {
 			return err
 		}
-		if err := json.Unmarshal(data, &policy); err != nil {
+		if err := jsondecode.Unmarshal(data, &policy); err != nil {
 			return err
 		}
 		s.Value, err = validateInboundSandboxPolicyField("sandboxPolicy", policy)
@@ -210,7 +212,7 @@ func (s *SandboxPolicyWrapper) UnmarshalJSON(data []byte) error {
 		if err := validateRequiredTaggedObjectFields(data); err != nil {
 			return err
 		}
-		if err := json.Unmarshal(data, &policy); err != nil {
+		if err := jsondecode.Unmarshal(data, &policy); err != nil {
 			return err
 		}
 		s.Value = policy
@@ -219,7 +221,7 @@ func (s *SandboxPolicyWrapper) UnmarshalJSON(data []byte) error {
 		if err := validateRequiredTaggedObjectFields(data); err != nil {
 			return err
 		}
-		if err := json.Unmarshal(data, &policy); err != nil {
+		if err := jsondecode.Unmarshal(data, &policy); err != nil {
 			return err
 		}
 		var validated SandboxPolicy

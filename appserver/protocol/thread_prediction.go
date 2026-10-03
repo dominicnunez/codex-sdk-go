@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 type ThreadPredictionResult interface{ isThreadPredictionResult() }
@@ -33,13 +35,13 @@ func (w *ThreadPredictionResultWrapper) UnmarshalJSON(data []byte) error {
 	switch tag {
 	case "completed":
 		var v CompletedThreadPredictionResult
-		if err := json.Unmarshal(data, &v); err != nil {
+		if err := jsondecode.Unmarshal(data, &v); err != nil {
 			return err
 		}
 		w.Value = &v
 	case "failed":
 		var v FailedThreadPredictionResult
-		if err := json.Unmarshal(data, &v); err != nil {
+		if err := jsondecode.Unmarshal(data, &v); err != nil {
 			return err
 		}
 		w.Value = &v
@@ -77,7 +79,7 @@ func (c *Client) OnThreadPredictionUpdated(handler func(ThreadPredictionUpdatedN
 	}
 	c.OnNotification(notifyThreadPredictionUpdated, func(_ context.Context, notif Notification) {
 		var v ThreadPredictionUpdatedNotification
-		if err := json.Unmarshal(notif.Params, &v); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &v); err != nil {
 			c.reportHandlerError(notifyThreadPredictionUpdated, fmt.Errorf("unmarshal %s: %w", notifyThreadPredictionUpdated, err))
 			return
 		}

@@ -3,6 +3,7 @@ package protocol
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
@@ -364,7 +365,7 @@ func (w *PatchChangeKindWrapper) UnmarshalJSON(data []byte) error {
 		return nil
 	case "update":
 		var u UpdatePatchChangeKind
-		if err := json.Unmarshal(data, &u); err != nil {
+		if err := jsondecode.Unmarshal(data, &u); err != nil {
 			return err
 		}
 		w.Value = &u
@@ -507,21 +508,21 @@ func (w *WebSearchActionWrapper) UnmarshalJSON(data []byte) error {
 	switch typeStr {
 	case "search":
 		var s SearchWebSearchAction
-		if err := json.Unmarshal(data, &s); err != nil {
+		if err := jsondecode.Unmarshal(data, &s); err != nil {
 			return err
 		}
 		w.Value = &s
 		return nil
 	case "openPage":
 		var o OpenPageWebSearchAction
-		if err := json.Unmarshal(data, &o); err != nil {
+		if err := jsondecode.Unmarshal(data, &o); err != nil {
 			return err
 		}
 		w.Value = &o
 		return nil
 	case "findInPage":
 		var f FindInPageWebSearchAction
-		if err := json.Unmarshal(data, &f); err != nil {
+		if err := jsondecode.Unmarshal(data, &f); err != nil {
 			return err
 		}
 		w.Value = &f
@@ -543,7 +544,7 @@ func unmarshalRequiredEventObject(data []byte, dest interface{}, requiredFields 
 	if err := validateRequiredObjectFields(data, requiredFields...); err != nil {
 		return err
 	}
-	if err := json.Unmarshal(data, dest); err != nil {
+	if err := jsondecode.Unmarshal(data, dest); err != nil {
 		return fmt.Errorf("unmarshal required event object: %w", err)
 	}
 	return nil

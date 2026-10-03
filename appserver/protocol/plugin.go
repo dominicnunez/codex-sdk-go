@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
@@ -190,7 +191,7 @@ func (p *PluginInterface) UnmarshalJSON(data []byte) error {
 	}
 
 	var wire pluginInterfaceWire
-	if err := json.Unmarshal(data, &wire); err != nil {
+	if err := jsondecode.Unmarshal(data, &wire); err != nil {
 		return err
 	}
 	if wire.Capabilities == nil {
@@ -260,7 +261,7 @@ func (p *PluginSource) UnmarshalJSON(data []byte) error {
 	}
 
 	var wire pluginSourceWire
-	if err := json.Unmarshal(data, &wire); err != nil {
+	if err := jsondecode.Unmarshal(data, &wire); err != nil {
 		return err
 	}
 	if wire.Type == nil {
@@ -338,7 +339,7 @@ func (p *PluginSummary) UnmarshalJSON(data []byte) error {
 	}
 
 	var wire pluginSummaryWire
-	if err := json.Unmarshal(data, &wire); err != nil {
+	if err := jsondecode.Unmarshal(data, &wire); err != nil {
 		return err
 	}
 	switch {
@@ -409,7 +410,7 @@ func (p *PluginMarketplaceEntry) UnmarshalJSON(data []byte) error {
 	}
 	type wire PluginMarketplaceEntry
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	validatedPath, err := validateInboundAbsolutePathPointerField("plugin.marketplace.path", decoded.Path)
@@ -506,7 +507,7 @@ func validateMarketplaceLoadError(record []byte) error {
 		return validation.missing("message")
 	}
 	var path string
-	if err := json.Unmarshal(pathRaw, &path); err != nil {
+	if err := jsondecode.Unmarshal(pathRaw, &path); err != nil {
 		return err
 	}
 	_, err = validateInboundAbsolutePathField("marketplacePath", path)
@@ -519,7 +520,7 @@ func (r *PluginListResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire PluginListResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	if err := validateOptionalStringArrays(data, "featuredPluginIds"); err != nil {
@@ -538,7 +539,7 @@ func (r *PluginInstalledResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire PluginInstalledResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	if err := validateMarketplaceLoadErrors(data); err != nil {
@@ -576,7 +577,7 @@ func (a *AppSummary) UnmarshalJSON(data []byte) error {
 	}
 
 	var wire appSummaryWire
-	if err := json.Unmarshal(data, &wire); err != nil {
+	if err := jsondecode.Unmarshal(data, &wire); err != nil {
 		return err
 	}
 	switch {
@@ -705,7 +706,7 @@ func (s *HourlyScheduledTaskSchedule) UnmarshalJSON(data []byte) error {
 	if err := validateRequiredTaggedObjectFields(data, "intervalHours"); err != nil {
 		return err
 	}
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*s = HourlyScheduledTaskSchedule(decoded)
@@ -736,7 +737,7 @@ func (s *DailyScheduledTaskSchedule) UnmarshalJSON(data []byte) error {
 	if err := validateRequiredTaggedObjectFields(data, "time"); err != nil {
 		return err
 	}
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*s = DailyScheduledTaskSchedule(decoded)
@@ -767,7 +768,7 @@ func (s *WeekdaysScheduledTaskSchedule) UnmarshalJSON(data []byte) error {
 	if err := validateRequiredTaggedObjectFields(data, "time"); err != nil {
 		return err
 	}
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*s = WeekdaysScheduledTaskSchedule(decoded)
@@ -802,7 +803,7 @@ func (s *WeeklyScheduledTaskSchedule) UnmarshalJSON(data []byte) error {
 	if err := validateRequiredTaggedObjectFields(data, "days", "time"); err != nil {
 		return err
 	}
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*s = WeeklyScheduledTaskSchedule(decoded)
@@ -838,7 +839,7 @@ func unmarshalScheduledTaskSchedule(data []byte) (ScheduledTaskSchedule, error) 
 	default:
 		return nil, fmt.Errorf("unknown scheduled task schedule type: %s", quotedValueDiagnostic(typeName))
 	}
-	if err := json.Unmarshal(data, schedule); err != nil {
+	if err := jsondecode.Unmarshal(data, schedule); err != nil {
 		return nil, err
 	}
 	return schedule, nil
@@ -900,7 +901,7 @@ func (s *SkillSummary) UnmarshalJSON(data []byte) error {
 	}
 
 	var wire skillSummaryWire
-	if err := json.Unmarshal(data, &wire); err != nil {
+	if err := jsondecode.Unmarshal(data, &wire); err != nil {
 		return err
 	}
 
@@ -959,7 +960,7 @@ func (p *PluginDetail) UnmarshalJSON(data []byte) error {
 	}
 
 	var wire pluginDetailWire
-	if err := json.Unmarshal(data, &wire); err != nil {
+	if err := jsondecode.Unmarshal(data, &wire); err != nil {
 		return err
 	}
 	switch {
@@ -1009,7 +1010,7 @@ func (r *PluginReadResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire PluginReadResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = PluginReadResponse(decoded)
@@ -1043,7 +1044,7 @@ func (r *PluginInstallResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire PluginInstallResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	if err := validatePluginAuthPolicyField("plugin.install.authPolicy", decoded.AuthPolicy); err != nil {

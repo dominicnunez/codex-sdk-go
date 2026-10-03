@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // jsonrpcVersion is the protocol version string for JSON-RPC 2.0.
@@ -114,7 +116,7 @@ func (r *RequestID) UnmarshalJSON(data []byte) error {
 
 	if data[0] == '"' {
 		var value string
-		if err := json.Unmarshal(data, &value); err != nil {
+		if err := jsondecode.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		r.Value = value

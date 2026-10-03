@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
@@ -138,7 +139,7 @@ func (w *FileChangeWrapper) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		var add AddFileChange
-		if err := json.Unmarshal(data, &add); err != nil {
+		if err := jsondecode.Unmarshal(data, &add); err != nil {
 			return err
 		}
 		w.Value = &add
@@ -147,7 +148,7 @@ func (w *FileChangeWrapper) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		var del DeleteFileChange
-		if err := json.Unmarshal(data, &del); err != nil {
+		if err := jsondecode.Unmarshal(data, &del); err != nil {
 			return err
 		}
 		w.Value = &del
@@ -156,7 +157,7 @@ func (w *FileChangeWrapper) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		var upd UpdateFileChange
-		if err := json.Unmarshal(data, &upd); err != nil {
+		if err := jsondecode.Unmarshal(data, &upd); err != nil {
 			return err
 		}
 		w.Value = &upd
@@ -239,7 +240,7 @@ func (u UnknownReviewDecision) MarshalJSON() ([]byte, error) {
 func (w *ReviewDecisionWrapper) UnmarshalJSON(data []byte) error {
 	// Try string first
 	var str string
-	if err := json.Unmarshal(data, &str); err == nil {
+	if err := jsondecode.Unmarshal(data, &str); err == nil {
 		w.Value = str
 		return nil
 	}
@@ -252,7 +253,7 @@ func (w *ReviewDecisionWrapper) UnmarshalJSON(data []byte) error {
 
 	if raw, ok := keys["approved_execpolicy_amendment"]; ok {
 		var inner ApprovedExecpolicyAmendmentDecision
-		if err := json.Unmarshal(raw, &inner); err != nil {
+		if err := jsondecode.Unmarshal(raw, &inner); err != nil {
 			return fmt.Errorf("unable to unmarshal approved_execpolicy_amendment: %w", err)
 		}
 		w.Value = inner
@@ -261,7 +262,7 @@ func (w *ReviewDecisionWrapper) UnmarshalJSON(data []byte) error {
 
 	if raw, ok := keys["network_policy_amendment"]; ok {
 		var inner NetworkPolicyAmendmentDecision
-		if err := json.Unmarshal(raw, &inner); err != nil {
+		if err := jsondecode.Unmarshal(raw, &inner); err != nil {
 			return fmt.Errorf("unable to unmarshal network_policy_amendment: %w", err)
 		}
 		w.Value = inner
@@ -270,7 +271,7 @@ func (w *ReviewDecisionWrapper) UnmarshalJSON(data []byte) error {
 
 	if raw, ok := keys["denied"]; ok {
 		var inner DeniedReviewDecision
-		if err := json.Unmarshal(raw, &inner); err != nil {
+		if err := jsondecode.Unmarshal(raw, &inner); err != nil {
 			return fmt.Errorf("unable to unmarshal denied: %w", err)
 		}
 		if err := validateRequiredObjectFields(raw, "rejection"); err != nil {

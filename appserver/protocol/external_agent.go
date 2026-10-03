@@ -2,8 +2,9 @@ package protocol
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // ExternalAgentConfigMigrationItemType represents the type of external agent config migration item.
@@ -54,7 +55,7 @@ func (i *ExternalAgentConfigMigrationItem) UnmarshalJSON(data []byte) error {
 	}
 	type wire ExternalAgentConfigMigrationItem
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	if decoded.Cwd != nil && *decoded.Cwd != "" {
@@ -194,7 +195,7 @@ func (r *ExternalAgentConfigImportResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire ExternalAgentConfigImportResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = ExternalAgentConfigImportResponse(decoded)
@@ -242,7 +243,7 @@ func (c *Client) OnExternalAgentConfigImportCompleted(handler func(ExternalAgent
 	}
 	c.OnNotification(notifyExternalAgentConfigImportCompleted, func(ctx context.Context, notif Notification) {
 		var params ExternalAgentConfigImportCompletedNotification
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyExternalAgentConfigImportCompleted, fmt.Errorf("unmarshal %s: %w", notifyExternalAgentConfigImportCompleted, err))
 			return
 		}

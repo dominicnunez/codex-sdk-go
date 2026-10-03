@@ -8,6 +8,8 @@ import (
 	"iter"
 	"sync"
 	"sync/atomic"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // streamChannelBuffer is the capacity of the bounded event queue between the
@@ -327,7 +329,7 @@ func streamSendErr(g *guardedChan, err error) {
 
 func decodeStreamNotification[N any](params json.RawMessage, method string, threadID string, reportErr func(string, error), threadIDOf func(N) string) (N, bool) {
 	var n N
-	if err := json.Unmarshal(params, &n); err != nil {
+	if err := jsondecode.Unmarshal(params, &n); err != nil {
 		reportErr(method, fmt.Errorf("unmarshal %s: %w", method, err))
 		return n, false
 	}

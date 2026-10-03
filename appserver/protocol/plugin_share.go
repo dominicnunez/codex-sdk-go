@@ -2,8 +2,9 @@ package protocol
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // PluginHookSummary describes a hook bundled with a plugin.
@@ -143,7 +144,7 @@ func (p *PluginSharePrincipal) UnmarshalJSON(data []byte) error {
 	}
 
 	var wire pluginSharePrincipalWire
-	if err := json.Unmarshal(data, &wire); err != nil {
+	if err := jsondecode.Unmarshal(data, &wire); err != nil {
 		return err
 	}
 	switch {
@@ -189,7 +190,7 @@ func (c *PluginShareContext) UnmarshalJSON(data []byte) error {
 	}
 
 	var wire pluginShareContextWire
-	if err := json.Unmarshal(data, &wire); err != nil {
+	if err := jsondecode.Unmarshal(data, &wire); err != nil {
 		return err
 	}
 	if wire.RemotePluginID == nil {

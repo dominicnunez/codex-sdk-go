@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
@@ -49,7 +50,7 @@ func (a *ApprovalPolicyGranular) UnmarshalJSON(data []byte) error {
 	}
 	type wire ApprovalPolicyGranular
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*a = ApprovalPolicyGranular(decoded)
@@ -79,7 +80,7 @@ type AskForApprovalWrapper struct {
 func (a *AskForApprovalWrapper) UnmarshalJSON(data []byte) error {
 	// Try string literal first
 	var literal string
-	if err := json.Unmarshal(data, &literal); err == nil {
+	if err := jsondecode.Unmarshal(data, &literal); err == nil {
 		a.Value = approvalPolicyLiteral(literal)
 		return nil
 	}
@@ -89,7 +90,7 @@ func (a *AskForApprovalWrapper) UnmarshalJSON(data []byte) error {
 	if rawObj, err := jsonobject.SelectFields(data, "granular"); err == nil {
 		if _, hasKey := rawObj["granular"]; hasKey {
 			var granular ApprovalPolicyGranular
-			if err := json.Unmarshal(data, &granular); err != nil {
+			if err := jsondecode.Unmarshal(data, &granular); err != nil {
 				return fmt.Errorf("unmarshal approval policy granular: %w", err)
 			}
 			a.Value = granular
