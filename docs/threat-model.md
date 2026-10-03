@@ -71,6 +71,18 @@ These limits do not constitute a total transport or process heap budget. Frame p
 
 Typed decoders validate required fields, selected non-null fields, enums, unions, and request-specific constraints. [Object validation](../appserver/protocol/json_validation.go) and [schema coverage tests](../appserver/protocol/spec_coverage_test.go) help preserve the wire contract. Validation is not universal semantic authorization or a guarantee of canonical JSON: some semantic leaf types use ordinary `encoding/json`, which can allocate when unquoting escaped field names or decoding known duplicate values, and duplicate-member rejection is not a general SDK control. Selected fallback item/turn payloads, unknown variants, open JSON metadata, application configuration maps, and attachments intentionally retain their semantic data. Consumers must validate any additional security meaning before acting on it.
 
+For an outbound request admitted to the serialized write queue, accepting its
+correlated result and abandoning it on cancellation or transport failure share
+one synchronized ownership boundary. An accepted response survives later EOF,
+read/write failure or explicit close, including when the writer has transmitted
+the delimiter but has not returned. Writer completion without a usable response
+does not establish success. Invalid serialization and failed queue admission
+remain failures. Peer errors and correlated malformed-response errors still
+reach the protocol client's error handling. Notifications and internal replies
+have no correlated inbound outcome and continue to wait for actual write
+completion. An arbitrary caller-provided writer may block inside Write; the SDK
+bounds caller waiting and queued work but cannot forcibly stop that writer.
+
 ## Prompt injection, approvals, and tool results
 
 A repository file, retrieved resource, MCP tool response, attachment, or model message may try to persuade an application to authorize commands, disclose secrets, or render executable content. The SDK exposes these values and protocol operations; it does not classify their trustworthiness or implement prompt-injection prevention. Treat text and structured metadata as data, including image identifiers, MCP UI resource URIs, prediction text, and plugin metadata.
@@ -84,6 +96,10 @@ The SDK does not fetch or render MCP app UI metadata, execute attachment payload
 [Apps configuration decoding](../appserver/protocol/config_apps.go) retains connector defaults, per-tool and per-account approval settings, and omitted model-facing tool surfaces returned by `config/read`. It validates enum values and preserves explicit disabled settings. These values describe server configuration; the SDK does not apply them as an authorization decision, enforce tool exposure, or authenticate the account-link IDs. Codex and the embedding application remain responsible for actual enforcement.
 
 ## Thread state, completion, and cancellation
+
+An accepted turn-start response does not complete a runtime turn. If the peer
+terminates without a matching terminal notification, Run and RunStreamed still
+wait for the caller's context to end; callers must bound that context as needed.
 
 A stale or unrelated notification could contaminate a turn result. [Turn lifecycle handling](../appserver/turn_lifecycle.go) registers listeners before starting a turn, filters thread/turn identities, bounds pending start notifications, and checks terminal status. Its ordering assumptions must also hold for custom transports. Matching IDs prevent accidental cross-talk; a malicious connected peer can still claim those IDs, so correlation does not authenticate completion or independently prove an external effect.
 

@@ -31,6 +31,14 @@ This SDK uses **stdlib only** — no external dependencies. Do NOT introduce any
 - Runtime transports are provided by callers or companion packages
 
 ### Client Pattern
+
+For transport completion changes, trace serialization and queue admission through
+writer return, response publication and termination. Acceptance and abandonment
+must share an ownership boundary; a channel peek cannot cover a separate claim
+and publication. Verify accepted outcomes and absent-response failures with both
+writer-pending and simultaneously ready terminal signals. Preserve actual-write
+completion for notifications and internal replies.
+
 `Client` wraps a `Transport` and provides typed methods for every JSON-RPC request. Timeout handling, error classification (`RPCError`, `TimeoutError`, `CanceledError`, `TransportError`), and notification dispatch all live here.
 
 ### Notification Handlers

@@ -41,13 +41,28 @@ func (t *StdioTransport) writeAll(data []byte) error {
 }
 
 func (t *StdioTransport) enqueueWrite(ctx context.Context, msg interface{}, op string, watchReaderStop bool) error {
-	if err := ctx.Err(); err != nil {
+	env, err := t.queueWrite(ctx, msg, op, watchReaderStop)
+	if err != nil {
 		return err
+	}
+	return t.waitWrite(ctx, env, op, watchReaderStop)
+}
+
+func (t *StdioTransport) queueWrite(ctx context.Context, msg interface{}, op string, watchReaderStop bool) (writeEnvelope, error) {
+	if err := ctx.Err(); err != nil {
+		return writeEnvelope{}, err
 	}
 
 	data, err := marshalStdioFrame(msg)
 	if err != nil {
-		return NewTransportError("marshal message", err)
+		return writeEnvelope{}, NewTransportError("marshal message", err)
+	}
+	return t.queuePayload(ctx, data, op, watchReaderStop)
+}
+
+func (t *StdioTransport) queuePayload(ctx context.Context, data []byte, op string, watchReaderStop bool) (writeEnvelope, error) {
+	if err := ctx.Err(); err != nil {
+		return writeEnvelope{}, err
 	}
 	env := writeEnvelope{
 		payload: data,
@@ -60,23 +75,27 @@ func (t *StdioTransport) enqueueWrite(ctx context.Context, msg interface{}, op s
 	if watchReaderStop {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return writeEnvelope{}, ctx.Err()
 		case <-t.ctx.Done():
-			return t.transportStopError(op)
+			return writeEnvelope{}, t.transportStopError(op)
 		case <-t.readerStopped:
-			return t.transportStopError(op)
+			return writeEnvelope{}, t.transportStopError(op)
 		case t.writeQueue <- env:
 		}
 	} else {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return writeEnvelope{}, ctx.Err()
 		case <-t.ctx.Done():
-			return NewTransportError(op, errTransportClosed)
+			return writeEnvelope{}, NewTransportError(op, errTransportClosed)
 		case t.writeQueue <- env:
 		}
 	}
 
+	return env, nil
+}
+
+func (t *StdioTransport) waitWrite(ctx context.Context, env writeEnvelope, op string, watchReaderStop bool) error {
 	if watchReaderStop {
 		select {
 		case err := <-env.done:

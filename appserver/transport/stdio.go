@@ -181,7 +181,6 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 		return Response{}, err
 	}
 	defer cancel()
-
 	t.mu.Lock()
 	if err := t.closedTransportErrorLocked("send failed"); err != nil {
 		t.mu.Unlock()
@@ -198,6 +197,26 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 		t.mu.Unlock()
 		return Response{}, NewTransportError("send failed", fmt.Errorf("duplicate request ID: %v", req.ID.Value))
 	}
+	t.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return Response{}, err
+	}
+	// Invalid outbound JSON cannot acquire a correlated request outcome.
+	// Serialize outside the mutex so large payloads do not block inbound work.
+	data, err := marshalStdioFrame(req)
+	if err != nil {
+		return Response{}, NewTransportError("marshal message", err)
+	}
+	t.mu.Lock()
+	// Shutdown or another caller may have admitted this ID during serialization.
+	if err := t.closedTransportErrorLocked("send failed"); err != nil {
+		t.mu.Unlock()
+		return Response{}, err
+	}
+	if _, exists := t.pendingReqs[normalizedID]; exists {
+		t.mu.Unlock()
+		return Response{}, NewTransportError("send failed", fmt.Errorf("duplicate request ID: %v", req.ID.Value))
+	}
 	respChan := make(chan pendingReqResult, 1)
 	pending := pendingReq{ch: respChan, id: req.ID}
 	t.pendingReqs[normalizedID] = pending
@@ -208,26 +227,50 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 		t.cleanupPendingReq(normalizedID, pending)
 	}()
 
-	if err := t.enqueueWrite(ctx, req, "send failed", true); err != nil {
+	env, err := t.queuePayload(ctx, data, "send failed", true)
+	if err != nil {
+		// No outbound envelope was admitted. A speculative inbound match must
+		// not turn failed admission into a successful request.
 		return Response{}, err
 	}
 
-	// Wait for response or context cancellation
-	select {
-	case result := <-respChan:
-		return responseFromPendingResult(result)
-	case <-ctx.Done():
-		return Response{}, ctx.Err()
-	case <-t.readerStopped:
-		// Prefer a response already delivered to this request over the generic
-		// reader-stopped error; both can become ready at nearly the same time.
+	// A correlated response establishes the request outcome independently of
+	// the writer's return. Notifications and internal responses still wait for
+	// write completion because they have no correlated inbound outcome.
+	writeDone := env.done
+	for {
 		select {
 		case result := <-respChan:
 			return responseFromPendingResult(result)
-		default:
+		case err := <-writeDone:
+			if err != nil {
+				return t.finishPendingRequest(normalizedID, pending, t.normalizeWriteCompletionError("send failed", err))
+			}
+			writeDone = nil
+		case <-ctx.Done():
+			return t.finishPendingRequest(normalizedID, pending, ctx.Err())
+		case <-t.readerStopped:
+			return t.finishPendingRequest(normalizedID, pending, t.transportStopError("send failed"))
+		case <-t.ctx.Done():
+			return t.finishPendingRequest(normalizedID, pending, t.transportStopError("send failed"))
 		}
-		return Response{}, t.transportStopError("send failed")
 	}
+}
+
+// Acceptance and abandonment share the pending-map lock. An accepted result
+// wins over later termination; abandoning a request prevents later publication.
+func (t *StdioTransport) finishPendingRequest(id string, pending pendingReq, err error) (Response, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	select {
+	case result := <-pending.ch:
+		return responseFromPendingResult(result)
+	default:
+	}
+	if current, ok := t.pendingReqs[id]; ok && current.ch == pending.ch {
+		delete(t.pendingReqs, id)
+	}
+	return Response{}, err
 }
 
 // Notify transmits a JSON-RPC notification (fire-and-forget).
@@ -581,23 +624,24 @@ func (t *StdioTransport) failPendingIDWithError(id RequestID, code int, message 
 	if err != nil {
 		return
 	}
-	pending, ok := t.claimPendingReq(normalizedID)
-	if ok {
-		pending.ch <- pendingErrorResult(pending.id, code, message)
-	}
+	t.publishPendingResult(normalizedID, func(pending pendingReq) pendingReqResult {
+		return pendingErrorResult(pending.id, code, message)
+	})
 }
 
-func (t *StdioTransport) claimPendingReq(normalizedID string) (pendingReq, bool) {
+func (t *StdioTransport) publishPendingResult(normalizedID string, result func(pendingReq) pendingReqResult) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if t.closed {
-		return pendingReq{}, false
+		return
 	}
 	pending, ok := t.pendingReqs[normalizedID]
 	if ok {
+		// Each request has one buffered slot and only this owner may publish.
+		// Publishing under the lock closes the claim-to-publication gap.
+		pending.ch <- result(pending)
 		delete(t.pendingReqs, normalizedID)
 	}
-	return pending, ok
 }
 
 func pendingErrorResult(id RequestID, code int, message string) pendingReqResult {
@@ -652,19 +696,16 @@ func (t *StdioTransport) rejectRequestForOverload(req Request) {
 }
 
 // handleResponse routes an incoming response to the pending request channel.
-// It claims the channel under the lock via delete, then sends outside the
-// lock. The delete-then-unlock-then-send pattern ensures exclusive access
-// to the channel without holding the mutex during the send.
+// It atomically publishes and removes the request under the pending-map lock.
 func (t *StdioTransport) handleResponse(resp Response) {
 	// Normalize ID for matching
 	normalizedID, err := normalizePendingRequestID(resp.ID.Value)
 	if err != nil {
 		return
 	}
-	pending, ok := t.claimPendingReq(normalizedID)
-	if ok {
-		pending.ch <- pendingReqResult{resp: resp} // safe: buffer 1, only one sender claims via delete
-	}
+	t.publishPendingResult(normalizedID, func(pendingReq) pendingReqResult {
+		return pendingReqResult{resp: resp}
+	})
 }
 
 func (t *StdioTransport) cleanupPendingReq(normalizedID string, pending pendingReq) {
