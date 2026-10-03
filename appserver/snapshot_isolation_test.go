@@ -41,7 +41,7 @@ func TestCollectorItemMetadataOwnership(t *testing.T) {
 }
 
 const ownershipCommandJSON = `{"type":"commandExecution","id":"command","command":"pwd","commandActions":[],"cwd":"/workspace","source":"agent","status":"completed","pluginId":"original","scriptPath":"/workspace/script"}`
-const ownershipMCPJSON = `{"type":"mcpToolCall","id":"mcp","server":"server","tool":"tool","status":"completed","arguments":{"nested":["original"]},"pluginId":"original","readOnlyHint":true,"mcpAppResourceUri":"ui://original","appContext":{"connectorId":"original","actionName":"original","appName":"original","linkId":"original","resourceUri":"ui://original"},"mcpAppUi":{"preferredModelDisplayMode":"inline","resourceUri":"ui://original"},"result":{"content":[],"structuredContent":{"nested":["original"]}}}`
+const ownershipMCPJSON = `{"type":"mcpToolCall","id":"mcp","server":"server","tool":"tool","status":"completed","arguments":{"nested":["original"]},"pluginId":"original","readOnlyHint":true,"mcpAppResourceUri":"ui://original","appContext":{"connectorId":"original","actionName":"original","appName":"original","linkId":"original","resourceUri":"ui://original"},"mcpAppUi":{"preferredModelDisplayMode":"inline","resourceUri":"ui://original"},"result":{"content":[],"structuredContent":{"nested":["original"]},"_meta":{"ui":{"resourceUri":"ui://original"}}}}`
 const ownershipDynamicJSON = `{"type":"dynamicToolCall","id":"dynamic","tool":"tool","namespace":"original","status":"completed","arguments":{},"contentItems":[],"success":true}`
 const ownershipCollabJSON = `{"type":"collabAgentToolCall","id":"collab","tool":"spawnAgent","status":"completed","agentsStates":{"agent":{"status":"completed","message":"original"}},"receiverThreadIds":["agent"],"senderThreadId":"thread-1"}`
 
@@ -50,6 +50,9 @@ func ownershipWireItems(t *testing.T) []codex.ThreadItemWrapper {
 	var items []codex.ThreadItemWrapper
 	if err := json.Unmarshal([]byte(`[`+ownershipCommandJSON+`,`+ownershipMCPJSON+`,`+ownershipDynamicJSON+`,`+ownershipCollabJSON+`]`), &items); err != nil {
 		t.Fatal(err)
+	}
+	if string(items[1].Value.(*codex.McpToolCallThreadItem).Result.Meta) != `{"ui":{"resourceUri":"ui://original"}}` {
+		t.Fatal("wire metadata was discarded")
 	}
 	return items
 }
@@ -64,6 +67,7 @@ func mutateWireItemMetadata(items []codex.ThreadItemWrapper) {
 	*mcp.AppContext.ActionName = "mutated"
 	mcp.McpAppUI.ResourceURI = "mutated"
 	mcp.Arguments.(map[string]any)["nested"].([]any)[0] = "mutated"
+	mcp.Result.Meta[0] = '!'
 	*items[2].Value.(*codex.DynamicToolCallThreadItem).Namespace = "mutated"
 	*items[3].Value.(*codex.CollabAgentToolCallThreadItem).AgentsStates["agent"].Message = "mutated"
 }
@@ -140,6 +144,7 @@ func TestStreamEventsCollectorAndResultOwnership(t *testing.T) {
 						*item.PluginID = "event mutation"
 					case *codex.McpToolCallThreadItem:
 						item.AppContext.ConnectorID = "event mutation"
+						item.Result.Meta[0] = '!'
 					case *codex.DynamicToolCallThreadItem:
 						*item.Namespace = "event mutation"
 					case *codex.CollabAgentToolCallThreadItem:
@@ -190,7 +195,7 @@ func TestStreamEventsCollectorAndResultOwnership(t *testing.T) {
 			t.Fatal("result views or repeated Result share references")
 		}
 		summary := collector.Summary()
-		if *summary.CommandExecutions["command"].CompletedItem.PluginID != "original" || summary.McpToolCalls["mcp"].CompletedItem.AppContext.ConnectorID != "original" {
+		if *summary.CommandExecutions["command"].CompletedItem.PluginID != "original" || summary.McpToolCalls["mcp"].CompletedItem.AppContext.ConnectorID != "original" || string(summary.McpToolCalls["mcp"].CompletedItem.Result.Meta) != `{"ui":{"resourceUri":"ui://original"}}` {
 			cancel()
 			t.Fatal("event mutation reached collector")
 		}

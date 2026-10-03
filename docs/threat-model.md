@@ -93,6 +93,21 @@ Filesystem approval scope retains structured read, write and deny entries, path/
 
 The SDK does not fetch or render MCP app UI metadata, execute attachment payloads, or provide an HTML sanitizer. An application that renders model text, links, images, or tool metadata must use appropriate escaping and destination checks. Exposing SDK service methods through HTTP or another remote interface requires a separate authorization boundary.
 
+Typed MCP results preserve arbitrary `_meta` JSON, including explicit null and
+precise numbers, through item decoding and owned runtime snapshots. Config and
+catalog responses retain approval-review routing, desktop settings, model service
+tiers, plugin availability and sharing metadata, hook handler details, and token
+cache-write counts. These are peer-provided descriptions, not local authorization
+or billing evidence. Plugin schedules are decoded as data; the SDK does not run
+their prompts. External config imports return the required import ID so callers
+can correlate progress and completion; that ID does not authenticate the peer or
+prove that an import completed.
+New nullable collection fields retain absence, explicit null and present empty
+values separately. Their exported presence and value state can be copied without
+sharing collection storage. Nullable scalar and struct-pointer fields retain the
+SDK's existing nil-as-unspecified convention; exact null/absence preservation is
+not a general guarantee for all optional protocol fields.
+
 [Apps configuration decoding](../appserver/protocol/config_apps.go) retains connector defaults, per-tool and per-account approval settings, and omitted model-facing tool surfaces returned by `config/read`. It validates enum values and preserves explicit disabled settings. These values describe server configuration; the SDK does not apply them as an authorization decision, enforce tool exposure, or authenticate the account-link IDs. Codex and the embedding application remain responsible for actual enforcement.
 
 ## Thread state, completion, and cancellation

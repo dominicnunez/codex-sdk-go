@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 )
 
 // HookTrustStatus is the trust state of a configured hook.
@@ -39,21 +40,26 @@ type HookErrorInfo struct {
 
 // HookMetadata describes a configured hook.
 type HookMetadata struct {
-	Command       *string         `json:"command,omitempty"`
-	CurrentHash   string          `json:"currentHash"`
-	DisplayOrder  int64           `json:"displayOrder"`
-	Enabled       bool            `json:"enabled"`
-	EventName     HookEventName   `json:"eventName"`
-	HandlerType   HookHandlerType `json:"handlerType"`
-	IsManaged     bool            `json:"isManaged"`
-	Key           string          `json:"key"`
-	Matcher       *string         `json:"matcher,omitempty"`
-	PluginID      *string         `json:"pluginId,omitempty"`
-	Source        HookSource      `json:"source"`
-	SourcePath    string          `json:"sourcePath"`
-	StatusMessage *string         `json:"statusMessage,omitempty"`
-	TimeoutSec    uint64          `json:"timeoutSec"`
-	TrustStatus   HookTrustStatus `json:"trustStatus"`
+	// A nil limit uses the server default; zero disables context spilling.
+	AdditionalContextLimit *uint           `json:"additionalContextLimit,omitempty"`
+	Async                  *bool           `json:"async,omitempty"`
+	Command                *string         `json:"command,omitempty"`
+	CurrentHash            string          `json:"currentHash"`
+	DisplayOrder           int64           `json:"displayOrder"`
+	Enabled                bool            `json:"enabled"`
+	EventName              HookEventName   `json:"eventName"`
+	HandlerType            HookHandlerType `json:"handlerType"`
+	IsManaged              bool            `json:"isManaged"`
+	Key                    string          `json:"key"`
+	Matcher                *string         `json:"matcher,omitempty"`
+	PluginID               *string         `json:"pluginId,omitempty"`
+	Server                 *string         `json:"server,omitempty"`
+	Source                 HookSource      `json:"source"`
+	SourcePath             string          `json:"sourcePath"`
+	StatusMessage          *string         `json:"statusMessage,omitempty"`
+	TimeoutSec             uint64          `json:"timeoutSec"`
+	Tool                   *string         `json:"tool,omitempty"`
+	TrustStatus            HookTrustStatus `json:"trustStatus"`
 }
 
 func (m *HookMetadata) UnmarshalJSON(data []byte) error {
@@ -75,6 +81,17 @@ func (m *HookMetadata) UnmarshalJSON(data []byte) error {
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
+	switch decoded.HandlerType {
+	case HookHandlerTypeCommand:
+		if err := validateInboundObjectFields(data, []string{"command"}, []string{"command", "async"}); err != nil {
+			return err
+		}
+	case HookHandlerTypeMcpTool:
+		fields := []string{"server", "tool"}
+		if err := validateInboundObjectFields(data, fields, fields); err != nil {
+			return err
+		}
+	}
 	validatedSourcePath, err := validateInboundAbsolutePathField("hook.sourcePath", decoded.SourcePath)
 	if err != nil {
 		return err
@@ -82,6 +99,21 @@ func (m *HookMetadata) UnmarshalJSON(data []byte) error {
 	decoded.SourcePath = validatedSourcePath
 	*m = HookMetadata(decoded)
 	return nil
+}
+
+func (m HookMetadata) MarshalJSON() ([]byte, error) {
+	switch m.HandlerType {
+	case HookHandlerTypeCommand:
+		if m.Command == nil {
+			return nil, fmt.Errorf("hook.command must not be null")
+		}
+	case HookHandlerTypeMcpTool:
+		if m.Server == nil || m.Tool == nil {
+			return nil, fmt.Errorf("MCP hook server and tool must not be null")
+		}
+	}
+	type wire HookMetadata
+	return json.Marshal(wire(m))
 }
 
 // HooksListEntry groups hooks, warnings, and errors for a cwd.

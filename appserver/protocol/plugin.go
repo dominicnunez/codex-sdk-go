@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 )
 
 // PluginAuthPolicy controls when plugin auth is requested.
@@ -59,6 +60,49 @@ func validateOptionalPluginAvailabilityField(field string, value *PluginAvailabi
 	return validateOptionalEnumValue(field, value, validPluginAvailabilities)
 }
 
+// PluginDisabledReason explains why a remote plugin is unavailable.
+type PluginDisabledReason string
+
+const (
+	PluginDisabledReasonDisabledByAdmin        PluginDisabledReason = "disabled_by_admin"
+	PluginDisabledReasonPlanNotEligible        PluginDisabledReason = "plan_not_eligible"
+	PluginDisabledReasonRequiredAppUnavailable PluginDisabledReason = "required_app_unavailable"
+	PluginDisabledReasonUnknown                PluginDisabledReason = "unknown"
+)
+
+var validPluginDisabledReasons = map[PluginDisabledReason]struct{}{
+	PluginDisabledReasonDisabledByAdmin: {}, PluginDisabledReasonPlanNotEligible: {},
+	PluginDisabledReasonRequiredAppUnavailable: {}, PluginDisabledReasonUnknown: {},
+}
+
+func (r *PluginDisabledReason) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "plugin.disabledReason", validPluginDisabledReasons, r)
+}
+
+func (r PluginDisabledReason) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("plugin.disabledReason", r, validPluginDisabledReasons)
+}
+
+// PluginInstallPolicySource identifies the source of a plugin install policy.
+type PluginInstallPolicySource string
+
+const (
+	PluginInstallPolicySourceWorkspaceSetting     PluginInstallPolicySource = "WORKSPACE_SETTING"
+	PluginInstallPolicySourceImplicitCanonicalApp PluginInstallPolicySource = "IMPLICIT_CANONICAL_APP"
+)
+
+var validPluginInstallPolicySources = map[PluginInstallPolicySource]struct{}{
+	PluginInstallPolicySourceWorkspaceSetting: {}, PluginInstallPolicySourceImplicitCanonicalApp: {},
+}
+
+func (s *PluginInstallPolicySource) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "plugin.installPolicySource", validPluginInstallPolicySources, s)
+}
+
+func (s PluginInstallPolicySource) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("plugin.installPolicySource", s, validPluginInstallPolicySources)
+}
+
 // PluginListMarketplaceKind filters plugin/list marketplaces.
 type PluginListMarketplaceKind string
 
@@ -108,7 +152,9 @@ type PluginInterface struct {
 	DeveloperName     *string  `json:"developerName,omitempty"`
 	DisplayName       *string  `json:"displayName,omitempty"`
 	Logo              *string  `json:"logo,omitempty"`
+	LogoDark          *string  `json:"logoDark,omitempty"`
 	LogoURL           *string  `json:"logoUrl,omitempty"`
+	LogoURLDark       *string  `json:"logoUrlDark,omitempty"`
 	LongDescription   *string  `json:"longDescription,omitempty"`
 	PrivacyPolicyURL  *string  `json:"privacyPolicyUrl,omitempty"`
 	ScreenshotURLs    []string `json:"screenshotUrls"`
@@ -129,7 +175,9 @@ func (p *PluginInterface) UnmarshalJSON(data []byte) error {
 		DeveloperName     *string   `json:"developerName"`
 		DisplayName       *string   `json:"displayName"`
 		Logo              *string   `json:"logo"`
+		LogoDark          *string   `json:"logoDark"`
 		LogoURL           *string   `json:"logoUrl"`
+		LogoURLDark       *string   `json:"logoUrlDark"`
 		LongDescription   *string   `json:"longDescription"`
 		PrivacyPolicyURL  *string   `json:"privacyPolicyUrl"`
 		ScreenshotURLs    *[]string `json:"screenshotUrls"`
@@ -171,6 +219,12 @@ func (p *PluginInterface) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	p.Logo = validatedLogo
+	validatedLogoDark, err := validateInboundAbsolutePathPointerField("plugin.interface.logoDark", wire.LogoDark)
+	if err != nil {
+		return err
+	}
+	p.LogoDark = validatedLogoDark
+	p.LogoURLDark = wire.LogoURLDark
 	p.LongDescription = wire.LongDescription
 	p.PrivacyPolicyURL = wire.PrivacyPolicyURL
 	p.ScreenshotURLs = *wire.ScreenshotURLs
@@ -237,43 +291,54 @@ func (p *PluginSource) UnmarshalJSON(data []byte) error {
 
 // PluginSummary contains marketplace plugin summary metadata.
 type PluginSummary struct {
-	AuthPolicy     PluginAuthPolicy    `json:"authPolicy"`
-	Availability   *PluginAvailability `json:"availability,omitempty"`
-	Enabled        bool                `json:"enabled"`
-	ID             string              `json:"id"`
-	InstallPolicy  PluginInstallPolicy `json:"installPolicy"`
-	Installed      bool                `json:"installed"`
-	Interface      *PluginInterface    `json:"interface,omitempty"`
-	Keywords       []string            `json:"keywords,omitempty"`
-	LocalVersion   *string             `json:"localVersion,omitempty"`
-	Name           string              `json:"name"`
-	RemotePluginID *string             `json:"remotePluginId,omitempty"`
-	ShareContext   *PluginShareContext `json:"shareContext,omitempty"`
-	Source         PluginSource        `json:"source"`
+	DisabledReason                   *PluginDisabledReason      `json:"disabledReason,omitempty"`
+	EligiblePlanTypes                OptionalNullable[[]string] `json:"eligiblePlanTypes,omitzero"`
+	InstallPolicySource              *PluginInstallPolicySource `json:"installPolicySource,omitempty"`
+	InstalledAt                      *int64                     `json:"installedAt,omitempty"`
+	MustShowInstallationInterstitial *bool                      `json:"mustShowInstallationInterstitial,omitempty"`
+	Version                          *string                    `json:"version,omitempty"`
+	AuthPolicy                       PluginAuthPolicy           `json:"authPolicy"`
+	Availability                     *PluginAvailability        `json:"availability,omitempty"`
+	Enabled                          bool                       `json:"enabled"`
+	ID                               string                     `json:"id"`
+	InstallPolicy                    PluginInstallPolicy        `json:"installPolicy"`
+	Installed                        bool                       `json:"installed"`
+	Interface                        *PluginInterface           `json:"interface,omitempty"`
+	Keywords                         []string                   `json:"keywords,omitempty"`
+	LocalVersion                     *string                    `json:"localVersion,omitempty"`
+	Name                             string                     `json:"name"`
+	RemotePluginID                   *string                    `json:"remotePluginId,omitempty"`
+	ShareContext                     *PluginShareContext        `json:"shareContext,omitempty"`
+	Source                           PluginSource               `json:"source"`
 }
 
 func (p *PluginSummary) UnmarshalJSON(data []byte) error {
 	type pluginSummaryWire struct {
-		AuthPolicy     *PluginAuthPolicy    `json:"authPolicy"`
-		Availability   *PluginAvailability  `json:"availability"`
-		Enabled        *bool                `json:"enabled"`
-		ID             *string              `json:"id"`
-		InstallPolicy  *PluginInstallPolicy `json:"installPolicy"`
-		Installed      *bool                `json:"installed"`
-		Interface      *PluginInterface     `json:"interface"`
-		Keywords       []string             `json:"keywords"`
-		LocalVersion   *string              `json:"localVersion"`
-		Name           *string              `json:"name"`
-		RemotePluginID *string              `json:"remotePluginId"`
-		ShareContext   *PluginShareContext  `json:"shareContext"`
-		Source         *PluginSource        `json:"source"`
+		DisabledReason                   *PluginDisabledReason      `json:"disabledReason"`
+		EligiblePlanTypes                OptionalNullable[[]string] `json:"eligiblePlanTypes"`
+		InstallPolicySource              *PluginInstallPolicySource `json:"installPolicySource"`
+		InstalledAt                      *int64                     `json:"installedAt"`
+		MustShowInstallationInterstitial *bool                      `json:"mustShowInstallationInterstitial"`
+		Version                          *string                    `json:"version"`
+		AuthPolicy                       *PluginAuthPolicy          `json:"authPolicy"`
+		Availability                     *PluginAvailability        `json:"availability"`
+		Enabled                          *bool                      `json:"enabled"`
+		ID                               *string                    `json:"id"`
+		InstallPolicy                    *PluginInstallPolicy       `json:"installPolicy"`
+		Installed                        *bool                      `json:"installed"`
+		Interface                        *PluginInterface           `json:"interface"`
+		Keywords                         []string                   `json:"keywords"`
+		LocalVersion                     *string                    `json:"localVersion"`
+		Name                             *string                    `json:"name"`
+		RemotePluginID                   *string                    `json:"remotePluginId"`
+		ShareContext                     *PluginShareContext        `json:"shareContext"`
+		Source                           *PluginSource              `json:"source"`
 	}
 
 	var wire pluginSummaryWire
 	if err := json.Unmarshal(data, &wire); err != nil {
 		return err
 	}
-
 	switch {
 	case wire.AuthPolicy == nil:
 		return errors.New("missing plugin.summary.authPolicy")
@@ -292,6 +357,12 @@ func (p *PluginSummary) UnmarshalJSON(data []byte) error {
 	}
 
 	p.AuthPolicy = *wire.AuthPolicy
+	p.DisabledReason = wire.DisabledReason
+	p.EligiblePlanTypes = wire.EligiblePlanTypes
+	p.InstallPolicySource = wire.InstallPolicySource
+	p.InstalledAt = wire.InstalledAt
+	p.MustShowInstallationInterstitial = wire.MustShowInstallationInterstitial
+	p.Version = wire.Version
 	p.Availability = wire.Availability
 	p.Enabled = *wire.Enabled
 	p.ID = *wire.ID
@@ -410,6 +481,7 @@ type PluginReadParams struct {
 
 // AppSummary is experimental app metadata included with plugin responses.
 type AppSummary struct {
+	Category    *string `json:"category,omitempty"`
 	Description *string `json:"description,omitempty"`
 	ID          string  `json:"id"`
 	InstallURL  *string `json:"installUrl,omitempty"`
@@ -419,6 +491,7 @@ type AppSummary struct {
 
 func (a *AppSummary) UnmarshalJSON(data []byte) error {
 	type appSummaryWire struct {
+		Category    *string `json:"category"`
 		Description *string `json:"description"`
 		ID          *string `json:"id"`
 		InstallURL  *string `json:"installUrl"`
@@ -435,15 +508,298 @@ func (a *AppSummary) UnmarshalJSON(data []byte) error {
 		return errors.New("missing plugin.app.id")
 	case wire.Name == nil:
 		return errors.New("missing plugin.app.name")
-	case wire.NeedsAuth == nil:
-		return errors.New("missing plugin.app.needsAuth")
 	}
 
 	a.Description = wire.Description
+	a.Category = wire.Category
 	a.ID = *wire.ID
 	a.InstallURL = wire.InstallURL
 	a.Name = *wire.Name
-	a.NeedsAuth = *wire.NeedsAuth
+	a.NeedsAuth = wire.NeedsAuth != nil && *wire.NeedsAuth
+	return nil
+}
+
+// AppTemplateUnavailableReason explains why an app template cannot be used.
+type AppTemplateUnavailableReason string
+
+const (
+	AppTemplateUnavailableReasonNotConfiguredForWorkspace AppTemplateUnavailableReason = "NOT_CONFIGURED_FOR_WORKSPACE"
+	AppTemplateUnavailableReasonNoActiveWorkspace         AppTemplateUnavailableReason = "NO_ACTIVE_WORKSPACE"
+)
+
+var validAppTemplateUnavailableReasons = map[AppTemplateUnavailableReason]struct{}{
+	AppTemplateUnavailableReasonNotConfiguredForWorkspace: {}, AppTemplateUnavailableReasonNoActiveWorkspace: {},
+}
+
+func (r *AppTemplateUnavailableReason) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "plugin.appTemplate.reason", validAppTemplateUnavailableReasons, r)
+}
+
+func (r AppTemplateUnavailableReason) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("plugin.appTemplate.reason", r, validAppTemplateUnavailableReasons)
+}
+
+// AppTemplateSummary describes an app template bundled with a plugin.
+type AppTemplateSummary struct {
+	CanonicalConnectorID *string                       `json:"canonicalConnectorId,omitempty"`
+	Category             *string                       `json:"category,omitempty"`
+	Description          *string                       `json:"description,omitempty"`
+	LogoURL              *string                       `json:"logoUrl,omitempty"`
+	LogoURLDark          *string                       `json:"logoUrlDark,omitempty"`
+	MaterializedAppIDs   []string                      `json:"materializedAppIds"`
+	Name                 string                        `json:"name"`
+	Reason               *AppTemplateUnavailableReason `json:"reason,omitempty"`
+	TemplateID           string                        `json:"templateId"`
+}
+
+func (s AppTemplateSummary) MarshalJSON() ([]byte, error) {
+	if s.MaterializedAppIDs == nil {
+		return nil, errors.New("missing plugin.appTemplate.materializedAppIds")
+	}
+	type wire AppTemplateSummary
+	return json.Marshal(wire(s))
+}
+
+func (s *AppTemplateSummary) UnmarshalJSON(data []byte) error {
+	type wire AppTemplateSummary
+	var decoded struct {
+		wire
+		MaterializedAppIDs nonNullStringList `json:"materializedAppIds"`
+	}
+	required := []string{"materializedAppIds", "name", "templateId"}
+	if err := unmarshalResponseObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	decoded.wire.MaterializedAppIDs = []string(decoded.MaterializedAppIDs)
+	*s = AppTemplateSummary(decoded.wire)
+	return nil
+}
+
+// ScheduledTaskWeekday is an iCalendar weekday identifier.
+type ScheduledTaskWeekday string
+
+const (
+	ScheduledTaskWeekdayMonday    ScheduledTaskWeekday = "MO"
+	ScheduledTaskWeekdayTuesday   ScheduledTaskWeekday = "TU"
+	ScheduledTaskWeekdayWednesday ScheduledTaskWeekday = "WE"
+	ScheduledTaskWeekdayThursday  ScheduledTaskWeekday = "TH"
+	ScheduledTaskWeekdayFriday    ScheduledTaskWeekday = "FR"
+	ScheduledTaskWeekdaySaturday  ScheduledTaskWeekday = "SA"
+	ScheduledTaskWeekdaySunday    ScheduledTaskWeekday = "SU"
+)
+
+var validScheduledTaskWeekdays = map[ScheduledTaskWeekday]struct{}{
+	ScheduledTaskWeekdayMonday: {}, ScheduledTaskWeekdayTuesday: {}, ScheduledTaskWeekdayWednesday: {},
+	ScheduledTaskWeekdayThursday: {}, ScheduledTaskWeekdayFriday: {}, ScheduledTaskWeekdaySaturday: {}, ScheduledTaskWeekdaySunday: {},
+}
+
+func (d *ScheduledTaskWeekday) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "plugin.scheduledTask.schedule.days", validScheduledTaskWeekdays, d)
+}
+
+func (d ScheduledTaskWeekday) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("plugin.scheduledTask.schedule.days", d, validScheduledTaskWeekdays)
+}
+
+// ScheduledTaskSchedule is the schedule union for a plugin task.
+type ScheduledTaskSchedule interface{ isScheduledTaskSchedule() }
+
+// HourlyScheduledTaskSchedule runs at a fixed hourly interval, optionally on selected days.
+type HourlyScheduledTaskSchedule struct {
+	Days          OptionalNullable[[]ScheduledTaskWeekday] `json:"days,omitzero"`
+	IntervalHours uint32                                   `json:"intervalHours"`
+}
+
+func (HourlyScheduledTaskSchedule) isScheduledTaskSchedule() {}
+
+func (s HourlyScheduledTaskSchedule) MarshalJSON() ([]byte, error) {
+	type wire HourlyScheduledTaskSchedule
+	return json.Marshal(struct {
+		Type string `json:"type"`
+		wire
+	}{"hourly", wire(s)})
+}
+
+func (s *HourlyScheduledTaskSchedule) UnmarshalJSON(data []byte) error {
+	type wire HourlyScheduledTaskSchedule
+	var decoded wire
+	if err := validateScheduledTaskScheduleType(data, "hourly"); err != nil {
+		return err
+	}
+	if err := validateRequiredTaggedObjectFields(data, "intervalHours"); err != nil {
+		return err
+	}
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*s = HourlyScheduledTaskSchedule(decoded)
+	return nil
+}
+
+// DailyScheduledTaskSchedule runs daily at the specified time.
+type DailyScheduledTaskSchedule struct {
+	Time string `json:"time"`
+}
+
+func (DailyScheduledTaskSchedule) isScheduledTaskSchedule() {}
+
+func (s DailyScheduledTaskSchedule) MarshalJSON() ([]byte, error) {
+	type wire DailyScheduledTaskSchedule
+	return json.Marshal(struct {
+		Type string `json:"type"`
+		wire
+	}{"daily", wire(s)})
+}
+
+func (s *DailyScheduledTaskSchedule) UnmarshalJSON(data []byte) error {
+	type wire DailyScheduledTaskSchedule
+	var decoded wire
+	if err := validateScheduledTaskScheduleType(data, "daily"); err != nil {
+		return err
+	}
+	if err := validateRequiredTaggedObjectFields(data, "time"); err != nil {
+		return err
+	}
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*s = DailyScheduledTaskSchedule(decoded)
+	return nil
+}
+
+// WeekdaysScheduledTaskSchedule runs each weekday at the specified time.
+type WeekdaysScheduledTaskSchedule struct {
+	Time string `json:"time"`
+}
+
+func (WeekdaysScheduledTaskSchedule) isScheduledTaskSchedule() {}
+
+func (s WeekdaysScheduledTaskSchedule) MarshalJSON() ([]byte, error) {
+	type wire WeekdaysScheduledTaskSchedule
+	return json.Marshal(struct {
+		Type string `json:"type"`
+		wire
+	}{"weekdays", wire(s)})
+}
+
+func (s *WeekdaysScheduledTaskSchedule) UnmarshalJSON(data []byte) error {
+	type wire WeekdaysScheduledTaskSchedule
+	var decoded wire
+	if err := validateScheduledTaskScheduleType(data, "weekdays"); err != nil {
+		return err
+	}
+	if err := validateRequiredTaggedObjectFields(data, "time"); err != nil {
+		return err
+	}
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*s = WeekdaysScheduledTaskSchedule(decoded)
+	return nil
+}
+
+// WeeklyScheduledTaskSchedule runs on the specified days and time.
+type WeeklyScheduledTaskSchedule struct {
+	Days []ScheduledTaskWeekday `json:"days"`
+	Time string                 `json:"time"`
+}
+
+func (WeeklyScheduledTaskSchedule) isScheduledTaskSchedule() {}
+
+func (s WeeklyScheduledTaskSchedule) MarshalJSON() ([]byte, error) {
+	if s.Days == nil {
+		return nil, errors.New("missing plugin.scheduledTask.schedule.days")
+	}
+	type wire WeeklyScheduledTaskSchedule
+	return json.Marshal(struct {
+		Type string `json:"type"`
+		wire
+	}{"weekly", wire(s)})
+}
+
+func (s *WeeklyScheduledTaskSchedule) UnmarshalJSON(data []byte) error {
+	type wire WeeklyScheduledTaskSchedule
+	var decoded wire
+	if err := validateScheduledTaskScheduleType(data, "weekly"); err != nil {
+		return err
+	}
+	if err := validateRequiredTaggedObjectFields(data, "days", "time"); err != nil {
+		return err
+	}
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*s = WeeklyScheduledTaskSchedule(decoded)
+	return nil
+}
+
+func validateScheduledTaskScheduleType(data []byte, expected string) error {
+	typeName, err := decodeRequiredObjectTypeField(data, "scheduled task schedule")
+	if err != nil {
+		return err
+	}
+	if typeName != expected {
+		return fmt.Errorf("invalid scheduled task schedule type %q; want %q", typeName, expected)
+	}
+	return nil
+}
+
+func unmarshalScheduledTaskSchedule(data []byte) (ScheduledTaskSchedule, error) {
+	typeName, err := decodeRequiredObjectTypeField(data, "scheduled task schedule")
+	if err != nil {
+		return nil, err
+	}
+	var schedule ScheduledTaskSchedule
+	switch typeName {
+	case "hourly":
+		schedule = &HourlyScheduledTaskSchedule{}
+	case "daily":
+		schedule = &DailyScheduledTaskSchedule{}
+	case "weekdays":
+		schedule = &WeekdaysScheduledTaskSchedule{}
+	case "weekly":
+		schedule = &WeeklyScheduledTaskSchedule{}
+	default:
+		return nil, fmt.Errorf("unknown scheduled task schedule type: %q", typeName)
+	}
+	if err := json.Unmarshal(data, schedule); err != nil {
+		return nil, err
+	}
+	return schedule, nil
+}
+
+// ScheduledTaskSummary describes a scheduled task bundled with a plugin.
+type ScheduledTaskSummary struct {
+	Key      string                `json:"key"`
+	Name     string                `json:"name"`
+	Prompt   string                `json:"prompt"`
+	Schedule ScheduledTaskSchedule `json:"schedule"`
+}
+
+func (s ScheduledTaskSummary) MarshalJSON() ([]byte, error) {
+	if isNilInterfaceValue(s.Schedule) {
+		return nil, errors.New("missing plugin.scheduledTask.schedule")
+	}
+	type wire ScheduledTaskSummary
+	return json.Marshal(wire(s))
+}
+
+func (s *ScheduledTaskSummary) UnmarshalJSON(data []byte) error {
+	var wire struct {
+		Key      string          `json:"key"`
+		Name     string          `json:"name"`
+		Prompt   string          `json:"prompt"`
+		Schedule json.RawMessage `json:"schedule"`
+	}
+	required := []string{"key", "name", "prompt", "schedule"}
+	if err := unmarshalResponseObject(data, &wire, required, required); err != nil {
+		return err
+	}
+	schedule, err := unmarshalScheduledTaskSchedule(wire.Schedule)
+	if err != nil {
+		return err
+	}
+	*s = ScheduledTaskSummary{Key: wire.Key, Name: wire.Name, Prompt: wire.Prompt, Schedule: schedule}
 	return nil
 }
 
@@ -496,28 +852,34 @@ func (s *SkillSummary) UnmarshalJSON(data []byte) error {
 
 // PluginDetail contains full plugin details.
 type PluginDetail struct {
-	Apps            []AppSummary        `json:"apps"`
-	Description     *string             `json:"description,omitempty"`
-	Hooks           []PluginHookSummary `json:"hooks"`
-	MarketplaceName string              `json:"marketplaceName"`
-	MarketplacePath *string             `json:"marketplacePath,omitempty"`
-	McpServers      []string            `json:"mcpServers"`
-	Skills          []SkillSummary      `json:"skills"`
-	Summary         PluginSummary       `json:"summary"`
-	OnboardingSkill *SkillSummary       `json:"onboardingSkill,omitempty"`
+	AppTemplates    []AppTemplateSummary                     `json:"appTemplates"`
+	ScheduledTasks  OptionalNullable[[]ScheduledTaskSummary] `json:"scheduledTasks,omitzero"`
+	ShareURL        *string                                  `json:"shareUrl,omitempty"`
+	Apps            []AppSummary                             `json:"apps"`
+	Description     *string                                  `json:"description,omitempty"`
+	Hooks           []PluginHookSummary                      `json:"hooks"`
+	MarketplaceName string                                   `json:"marketplaceName"`
+	MarketplacePath *string                                  `json:"marketplacePath,omitempty"`
+	McpServers      []string                                 `json:"mcpServers"`
+	Skills          []SkillSummary                           `json:"skills"`
+	Summary         PluginSummary                            `json:"summary"`
+	OnboardingSkill *SkillSummary                            `json:"onboardingSkill,omitempty"`
 }
 
 func (p *PluginDetail) UnmarshalJSON(data []byte) error {
 	type pluginDetailWire struct {
-		Apps            *[]AppSummary        `json:"apps"`
-		Description     *string              `json:"description"`
-		Hooks           *[]PluginHookSummary `json:"hooks"`
-		MarketplaceName *string              `json:"marketplaceName"`
-		MarketplacePath *string              `json:"marketplacePath"`
-		McpServers      *[]string            `json:"mcpServers"`
-		Skills          *[]SkillSummary      `json:"skills"`
-		Summary         *PluginSummary       `json:"summary"`
-		OnboardingSkill *SkillSummary        `json:"onboardingSkill"`
+		AppTemplates    *[]AppTemplateSummary                    `json:"appTemplates"`
+		ScheduledTasks  OptionalNullable[[]ScheduledTaskSummary] `json:"scheduledTasks"`
+		ShareURL        *string                                  `json:"shareUrl"`
+		Apps            *[]AppSummary                            `json:"apps"`
+		Description     *string                                  `json:"description"`
+		Hooks           *[]PluginHookSummary                     `json:"hooks"`
+		MarketplaceName *string                                  `json:"marketplaceName"`
+		MarketplacePath *string                                  `json:"marketplacePath"`
+		McpServers      *[]string                                `json:"mcpServers"`
+		Skills          *[]SkillSummary                          `json:"skills"`
+		Summary         *PluginSummary                           `json:"summary"`
+		OnboardingSkill *SkillSummary                            `json:"onboardingSkill"`
 	}
 
 	var wire pluginDetailWire
@@ -537,9 +899,14 @@ func (p *PluginDetail) UnmarshalJSON(data []byte) error {
 		return errors.New("missing plugin.skills")
 	case wire.Summary == nil:
 		return errors.New("missing plugin.summary")
+	case wire.AppTemplates == nil:
+		return errors.New("missing plugin.appTemplates")
 	}
 
 	p.Apps = *wire.Apps
+	p.AppTemplates = *wire.AppTemplates
+	p.ScheduledTasks = wire.ScheduledTasks
+	p.ShareURL = wire.ShareURL
 	p.Description = wire.Description
 	p.Hooks = *wire.Hooks
 	p.MarketplaceName = *wire.MarketplaceName

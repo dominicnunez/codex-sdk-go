@@ -26,10 +26,11 @@ func TestFuzzyFileSearchParamsResponse(t *testing.T) {
 			resp: codex.FuzzyFileSearchResponse{
 				Files: []codex.FuzzyFileSearchResult{
 					{
-						Path:     "/home/user/project/main.go",
-						FileName: "main.go",
-						Root:     "/home/user/project",
-						Score:    100,
+						Path:      "/home/user/project/main.go",
+						FileName:  "main.go",
+						MatchType: codex.FuzzyFileSearchMatchTypeFile,
+						Root:      "/home/user/project",
+						Score:     100,
 					},
 				},
 			},
@@ -44,11 +45,12 @@ func TestFuzzyFileSearchParamsResponse(t *testing.T) {
 			resp: codex.FuzzyFileSearchResponse{
 				Files: []codex.FuzzyFileSearchResult{
 					{
-						Path:     "/home/user/project/test_file.go",
-						FileName: "test_file.go",
-						Root:     "/home/user/project",
-						Score:    95,
-						Indices:  &[]uint32{0, 1, 2, 3},
+						Path:      "/home/user/project/test_file.go",
+						FileName:  "test_file.go",
+						MatchType: codex.FuzzyFileSearchMatchTypeFile,
+						Root:      "/home/user/project",
+						Score:     95,
+						Indices:   &[]uint32{0, 1, 2, 3},
 					},
 				},
 			},
@@ -188,17 +190,19 @@ func TestFuzzyFileSearchSessionUpdatedNotification(t *testing.T) {
 		"query":     "main",
 		"files": []interface{}{
 			map[string]interface{}{
-				"path":      "/project/main.go",
-				"file_name": "main.go",
-				"root":      "/project",
-				"score":     float64(100), // JSON numbers are float64
+				"path":       "/project/main.go",
+				"file_name":  "main.go",
+				"match_type": "file",
+				"root":       "/project",
+				"score":      float64(100), // JSON numbers are float64
 			},
 			map[string]interface{}{
-				"path":      "/project/cmd/main.go",
-				"file_name": "main.go",
-				"root":      "/project",
-				"score":     float64(85),
-				"indices":   []interface{}{float64(0), float64(1), float64(2), float64(3)},
+				"path":       "/project/cmd/main.go",
+				"file_name":  "main.go",
+				"match_type": "file",
+				"root":       "/project",
+				"score":      float64(85),
+				"indices":    []interface{}{float64(0), float64(1), float64(2), float64(3)},
 			},
 		},
 	}
@@ -299,10 +303,11 @@ func TestFuzzyFileSearchServiceSearch(t *testing.T) {
 			response: map[string]interface{}{
 				"files": []interface{}{
 					map[string]interface{}{
-						"path":      "/home/user/project/main.go",
-						"file_name": "main.go",
-						"root":      "/home/user/project",
-						"score":     float64(100),
+						"path":       "/home/user/project/main.go",
+						"file_name":  "main.go",
+						"match_type": "file",
+						"root":       "/home/user/project",
+						"score":      float64(100),
 					},
 				},
 			},
@@ -318,17 +323,19 @@ func TestFuzzyFileSearchServiceSearch(t *testing.T) {
 			response: map[string]interface{}{
 				"files": []interface{}{
 					map[string]interface{}{
-						"path":      "/project/test_a.go",
-						"file_name": "test_a.go",
-						"root":      "/project",
-						"score":     float64(95),
-						"indices":   []interface{}{float64(0), float64(1), float64(2), float64(3)},
+						"path":       "/project/test_a.go",
+						"file_name":  "test_a.go",
+						"match_type": "file",
+						"root":       "/project",
+						"score":      float64(95),
+						"indices":    []interface{}{float64(0), float64(1), float64(2), float64(3)},
 					},
 					map[string]interface{}{
-						"path":      "/project/test_b.go",
-						"file_name": "test_b.go",
-						"root":      "/project",
-						"score":     float64(80),
+						"path":       "/project/test_b.go",
+						"file_name":  "test_b.go",
+						"match_type": "file",
+						"root":       "/project",
+						"score":      float64(80),
 					},
 				},
 			},

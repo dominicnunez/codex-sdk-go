@@ -164,6 +164,8 @@ func (n *ThreadStatusChangedNotification) UnmarshalJSON(data []byte) error {
 
 // TokenUsageBreakdown contains token usage metrics
 type TokenUsageBreakdown struct {
+	// Missing cache-write counts default to zero; all counters marshal explicitly.
+	CacheWriteInputTokens int64 `json:"cacheWriteInputTokens"`
 	CachedInputTokens     int64 `json:"cachedInputTokens"`
 	InputTokens           int64 `json:"inputTokens"`
 	OutputTokens          int64 `json:"outputTokens"`
@@ -175,7 +177,8 @@ func (b *TokenUsageBreakdown) UnmarshalJSON(data []byte) error {
 	type wire TokenUsageBreakdown
 	var decoded wire
 	required := []string{"cachedInputTokens", "inputTokens", "outputTokens", "reasoningOutputTokens", "totalTokens"}
-	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+	nonNull := []string{"cachedInputTokens", "inputTokens", "outputTokens", "reasoningOutputTokens", "totalTokens", "cacheWriteInputTokens"}
+	if err := unmarshalInboundObject(data, &decoded, required, nonNull); err != nil {
 		return err
 	}
 	*b = TokenUsageBreakdown(decoded)

@@ -44,17 +44,39 @@ func (r *FuzzyFileSearchResponse) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// FuzzyFileSearchMatchType distinguishes file and directory matches.
+type FuzzyFileSearchMatchType string
+
+const (
+	FuzzyFileSearchMatchTypeFile      FuzzyFileSearchMatchType = "file"
+	FuzzyFileSearchMatchTypeDirectory FuzzyFileSearchMatchType = "directory"
+)
+
+var validFuzzyFileSearchMatchTypes = map[FuzzyFileSearchMatchType]struct{}{
+	FuzzyFileSearchMatchTypeFile:      {},
+	FuzzyFileSearchMatchTypeDirectory: {},
+}
+
+func (m FuzzyFileSearchMatchType) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("fuzzyFileSearch.match_type", m, validFuzzyFileSearchMatchTypes)
+}
+
+func (m *FuzzyFileSearchMatchType) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "fuzzyFileSearch.match_type", validFuzzyFileSearchMatchTypes, m)
+}
+
 // FuzzyFileSearchResult represents a single file search result.
 type FuzzyFileSearchResult struct {
-	Path     string    `json:"path"`
-	FileName string    `json:"file_name"`
-	Root     string    `json:"root"`
-	Score    uint32    `json:"score"`
-	Indices  *[]uint32 `json:"indices,omitempty"`
+	Path      string                   `json:"path"`
+	FileName  string                   `json:"file_name"`
+	Root      string                   `json:"root"`
+	Score     uint32                   `json:"score"`
+	Indices   *[]uint32                `json:"indices,omitempty"`
+	MatchType FuzzyFileSearchMatchType `json:"match_type"`
 }
 
 func (r *FuzzyFileSearchResult) UnmarshalJSON(data []byte) error {
-	if err := validateRequiredObjectFields(data, "path", "file_name", "root", "score"); err != nil {
+	if err := validateRequiredObjectFields(data, "path", "file_name", "root", "score", "match_type"); err != nil {
 		return err
 	}
 	type wire FuzzyFileSearchResult

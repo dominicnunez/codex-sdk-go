@@ -166,24 +166,26 @@ func (p *PluginSharePrincipal) UnmarshalJSON(data []byte) error {
 
 // PluginShareContext contains remote sharing metadata for a plugin.
 type PluginShareContext struct {
-	CreatorAccountUserID *string                     `json:"creatorAccountUserId,omitempty"`
-	CreatorName          *string                     `json:"creatorName,omitempty"`
-	Discoverability      *PluginShareDiscoverability `json:"discoverability,omitempty"`
-	RemotePluginID       string                      `json:"remotePluginId"`
-	RemoteVersion        *string                     `json:"remoteVersion,omitempty"`
-	SharePrincipals      []PluginSharePrincipal      `json:"sharePrincipals,omitempty"`
-	ShareURL             *string                     `json:"shareUrl,omitempty"`
+	CanPublishToWorkspace *bool                       `json:"canPublishToWorkspace,omitempty"`
+	CreatorAccountUserID  *string                     `json:"creatorAccountUserId,omitempty"`
+	CreatorName           *string                     `json:"creatorName,omitempty"`
+	Discoverability       *PluginShareDiscoverability `json:"discoverability,omitempty"`
+	RemotePluginID        string                      `json:"remotePluginId"`
+	RemoteVersion         *string                     `json:"remoteVersion,omitempty"`
+	SharePrincipals       []PluginSharePrincipal      `json:"sharePrincipals,omitempty"`
+	ShareURL              *string                     `json:"shareUrl,omitempty"`
 }
 
 func (c *PluginShareContext) UnmarshalJSON(data []byte) error {
 	type pluginShareContextWire struct {
-		CreatorAccountUserID *string                     `json:"creatorAccountUserId"`
-		CreatorName          *string                     `json:"creatorName"`
-		Discoverability      *PluginShareDiscoverability `json:"discoverability"`
-		RemotePluginID       *string                     `json:"remotePluginId"`
-		RemoteVersion        *string                     `json:"remoteVersion"`
-		SharePrincipals      []PluginSharePrincipal      `json:"sharePrincipals"`
-		ShareURL             *string                     `json:"shareUrl"`
+		CanPublishToWorkspace *bool                       `json:"canPublishToWorkspace"`
+		CreatorAccountUserID  *string                     `json:"creatorAccountUserId"`
+		CreatorName           *string                     `json:"creatorName"`
+		Discoverability       *PluginShareDiscoverability `json:"discoverability"`
+		RemotePluginID        *string                     `json:"remotePluginId"`
+		RemoteVersion         *string                     `json:"remoteVersion"`
+		SharePrincipals       []PluginSharePrincipal      `json:"sharePrincipals"`
+		ShareURL              *string                     `json:"shareUrl"`
 	}
 
 	var wire pluginShareContextWire
@@ -195,6 +197,7 @@ func (c *PluginShareContext) UnmarshalJSON(data []byte) error {
 	}
 
 	c.CreatorAccountUserID = wire.CreatorAccountUserID
+	c.CanPublishToWorkspace = wire.CanPublishToWorkspace
 	c.CreatorName = wire.CreatorName
 	c.Discoverability = wire.Discoverability
 	c.RemotePluginID = *wire.RemotePluginID
