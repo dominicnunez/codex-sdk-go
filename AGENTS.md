@@ -31,6 +31,8 @@ with JSON member checks. Trace aliases, duplicate/reset and reused receiver
 behavior; presence state must preserve the shared deep-copy contract.
 Check scalar zero values separately from nullability: schema defaults must not
 silently omit counters, and nonnil optional pointers must retain false or zero.
+Test constructed union branches separately from decoded values, including
+pointers to nil slices. Nullability must not erase an explicitly selected branch.
 
 ## Architecture
 
