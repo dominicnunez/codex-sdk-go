@@ -78,6 +78,25 @@ These limits do not constitute a total transport or process heap budget. Frame p
 
 Typed decoders validate required fields, selected non-null fields, enums, unions, and request-specific constraints. [Object validation](../appserver/protocol/json_validation.go) and [schema coverage tests](../appserver/protocol/spec_coverage_test.go) help preserve the wire contract. Validation is not universal semantic authorization or a guarantee of canonical JSON: some semantic leaf types use ordinary `encoding/json`, which can allocate when unquoting escaped field names or decoding known duplicate values, and duplicate-member rejection is not a general SDK control. Selected fallback item/turn payloads, unknown variants, open JSON metadata, application configuration maps, and attachments intentionally retain their semantic data. Consumers must validate any additional security meaning before acting on it.
 
+[Synced record admission](../appserver/protocol/synced_record_validation.go)
+validates app, workspace-message, token-usage, goal, section and import records
+at their shared decoding owners before typed service success or callback
+publication. Required arrays reject null elements, and schema enums distinguish
+detected connector sources from imported sources even though the detection
+response retains its legacy public field type. App-tool enabled state defaults
+to true when omitted and retains explicit false during serialization; this
+metadata does not grant tool authority. These owners use exact schema property
+names, accept valid empty and zero values, and retain failures from invalid
+recognized duplicates. A failed decode leaves the record receiver unchanged;
+a successful decode replaces it and resets omitted optional fields. These
+rules differ from ordinary Go JSON receiver merging. Errors use the existing
+strict field decoder's diagnostics and can stop traversal of a containing
+application wrapper. [Scratch-state reuse](../appserver/protocol/synced_object_decode.go)
+retains only schema/type metadata between decodes and clears payload references
+and admission flags before reuse; it does not bound the number of valid records
+in an admitted payload. Generic raw notification handlers remain responsible
+for their own decoding and validation.
+
 Terminal transport cleanup clears requests awaiting handler registration and
 drains abandoned inbound requests and outbound envelopes. Queue admission is
 coordinated with cleanup, including blocked producers and registration replay,

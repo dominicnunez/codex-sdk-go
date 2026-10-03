@@ -33,6 +33,10 @@ Check scalar zero values separately from nullability: schema defaults must not
 silently omit counters, and nonnil optional pointers must retain false or zero.
 Test constructed union branches separately from decoded values, including
 pointers to nil slices. Nullability must not erase an explicitly selected branch.
+For record admission, trace reused public types into each carrier's actual
+schema: legacy shared fields may have different enums in different contexts.
+Materialize behavioral defaults and verify explicit values survive serialization;
+a decoder default and an omitting encoder can silently change a round trip.
 
 ## Architecture
 
