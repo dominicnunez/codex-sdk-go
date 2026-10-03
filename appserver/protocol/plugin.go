@@ -446,8 +446,22 @@ type MarketplaceLoadErrorInfo struct {
 	Message         string `json:"message"`
 }
 
+func (r *MarketplaceLoadErrorInfo) UnmarshalJSON(data []byte) error {
+	type wire MarketplaceLoadErrorInfo
+	var decoded wire
+	required := []string{"marketplacePath", "message"}
+	if err := unmarshalSyncedInbound(data, &decoded, required, required); err != nil {
+		return err
+	}
+	*r = MarketplaceLoadErrorInfo(decoded)
+	return nil
+}
+
 func (r *PluginListResponse) UnmarshalJSON(data []byte) error {
 	if err := validateRequiredObjectFields(data, "marketplaces"); err != nil {
+		return err
+	}
+	if err := validateObjectFields(data, nil, []string{"featuredPluginIds", "marketplaceLoadErrors"}); err != nil {
 		return err
 	}
 	type wire PluginListResponse
@@ -455,12 +469,22 @@ func (r *PluginListResponse) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	var lists struct {
+		FeaturedPluginIDs nonNullStringList `json:"featuredPluginIds"`
+	}
+	if err := json.Unmarshal(data, &lists); err != nil {
+		return err
+	}
+	decoded.FeaturedPluginIDs = []string(lists.FeaturedPluginIDs)
 	*r = PluginListResponse(decoded)
 	return nil
 }
 
 func (r *PluginInstalledResponse) UnmarshalJSON(data []byte) error {
 	if err := validateRequiredObjectFields(data, "marketplaces"); err != nil {
+		return err
+	}
+	if err := validateObjectFields(data, nil, []string{"marketplaceLoadErrors"}); err != nil {
 		return err
 	}
 	type wire PluginInstalledResponse
