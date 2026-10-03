@@ -7,6 +7,8 @@ import (
 	pathpkg "path"
 	"reflect"
 	"strings"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/deepcopy"
 )
 
 type requestPreparer interface {
@@ -256,10 +258,7 @@ func normalizeAdditionalFileSystemPermissionsField(value *AdditionalFileSystemPe
 	// LegacyAppPathString permits relative as well as absolute paths. Preserve
 	// these strings verbatim; newer AbsolutePathBuf fields are normalized at
 	// their individual request boundaries.
-	normalized := *value
-	normalized.Read = append([]string(nil), value.Read...)
-	normalized.Write = append([]string(nil), value.Write...)
-	return &normalized
+	return deepcopy.Value(value)
 }
 
 func normalizeRequestPermissionProfileField(value RequestPermissionProfile) RequestPermissionProfile {

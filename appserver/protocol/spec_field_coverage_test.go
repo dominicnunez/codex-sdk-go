@@ -651,6 +651,16 @@ func testStructFields(t *testing.T) {
 	// in the ItemStartedNotification spec, not as separate spec files.
 	specFile := "schema/json/v2/ItemStartedNotification.json"
 	variantRegistry := []definitionVariantEntry{
+		{"schema/json/PermissionsRequestApprovalParams.json", "FileSystemPath", "PathFileSystemPath", reflect.TypeOf(PathFileSystemPath{})},
+		{"schema/json/PermissionsRequestApprovalParams.json", "FileSystemPath", "GlobPatternFileSystemPath", reflect.TypeOf(GlobPatternFileSystemPath{})},
+		{"schema/json/PermissionsRequestApprovalParams.json", "FileSystemPath", "SpecialFileSystemPath", reflect.TypeOf(SpecialFileSystemPath{})},
+		{"schema/json/PermissionsRequestApprovalParams.json", "FileSystemSpecialPath", "RootFileSystemSpecialPath", reflect.TypeOf(RootFileSystemSpecialPath{})},
+		{"schema/json/PermissionsRequestApprovalParams.json", "FileSystemSpecialPath", "MinimalFileSystemSpecialPath", reflect.TypeOf(MinimalFileSystemSpecialPath{})},
+		{"schema/json/PermissionsRequestApprovalParams.json", "FileSystemSpecialPath", "KindFileSystemSpecialPath", reflect.TypeOf(ProjectRootsFileSystemSpecialPath{})},
+		{"schema/json/PermissionsRequestApprovalParams.json", "FileSystemSpecialPath", "TmpdirFileSystemSpecialPath", reflect.TypeOf(TmpdirFileSystemSpecialPath{})},
+		{"schema/json/PermissionsRequestApprovalParams.json", "FileSystemSpecialPath", "SlashTmpFileSystemSpecialPath", reflect.TypeOf(SlashTmpFileSystemSpecialPath{})},
+		// The schema's explicit unknown special variant has no title.
+		{"schema/json/PermissionsRequestApprovalParams.json", "FileSystemSpecialPath", "", reflect.TypeOf(UnknownFileSystemSpecialPath{})},
 		{specFile, "ThreadItem", "UserMessageThreadItem", reflect.TypeOf(UserMessageThreadItem{})},
 		{specFile, "ThreadItem", "AgentMessageThreadItem", reflect.TypeOf(AgentMessageThreadItem{})},
 		{specFile, "ThreadItem", "PlanThreadItem", reflect.TypeOf(PlanThreadItem{})},
@@ -686,7 +696,7 @@ func testStructFields(t *testing.T) {
 			for _, prop := range properties {
 				// Skip the "type" discriminator field — it's handled by MarshalJSON/UnmarshalJSON,
 				// not stored as a struct field.
-				if prop == "type" {
+				if prop == "type" || (entry.defName == "FileSystemSpecialPath" && prop == "kind") {
 					continue
 				}
 
@@ -763,6 +773,10 @@ func testStructFields(t *testing.T) {
 	}
 
 	definitionStructs := []definitionStructEntry{
+		{"schema/json/PermissionsRequestApprovalParams.json", "AdditionalFileSystemPermissions", reflect.TypeOf(AdditionalFileSystemPermissions{})},
+		{"schema/json/PermissionsRequestApprovalParams.json", "FileSystemSandboxEntry", reflect.TypeOf(FileSystemSandboxEntry{})},
+		{"schema/json/PermissionsRequestApprovalParams.json", "RequestPermissionProfile", reflect.TypeOf(RequestPermissionProfile{})},
+		{"schema/json/PermissionsRequestApprovalResponse.json", "GrantedPermissionProfile", reflect.TypeOf(GrantedPermissionProfile{})},
 		{"schema/json/v2/AppsListResponse.json", "AppInfo", reflect.TypeOf(AppInfo{})},
 		{"schema/json/v2/AppsListResponse.json", "AppBranding", reflect.TypeOf(AppBranding{})},
 		{"schema/json/v2/AppsListResponse.json", "AppMetadata", reflect.TypeOf(AppMetadata{})},
@@ -824,6 +838,11 @@ func testEnumValues(t *testing.T) {
 	// Each entry picks one canonical spec file that defines the enum
 	// (many are duplicated across specs; we only need to check once).
 	registry := []enumEntry{
+		{
+			specPath: "schema/json/PermissionsRequestApprovalParams.json",
+			defName:  "FileSystemAccessMode",
+			goValues: enumStrings(FileSystemAccessModeRead, FileSystemAccessModeWrite, FileSystemAccessModeDeny),
+		},
 		{
 			specPath: "schema/json/v2/ConfigReadResponse.json",
 			defName:  "ToolExposureSurface",

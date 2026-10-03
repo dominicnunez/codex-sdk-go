@@ -7,8 +7,10 @@ import (
 
 // AdditionalFileSystemPermissions requests or grants extra filesystem access.
 type AdditionalFileSystemPermissions struct {
-	Read  []string `json:"read,omitempty"`
-	Write []string `json:"write,omitempty"`
+	Entries          *[]FileSystemSandboxEntry `json:"entries,omitempty"`
+	GlobScanMaxDepth *uint64                   `json:"globScanMaxDepth,omitempty"`
+	Read             []string                  `json:"read,omitempty"`
+	Write            []string                  `json:"write,omitempty"`
 }
 
 // AdditionalNetworkPermissions requests or grants extra network access.
