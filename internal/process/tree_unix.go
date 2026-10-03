@@ -64,6 +64,7 @@ func (Tree) WaitForExit(waitDone <-chan struct{}, process *os.Process, gracePeri
 			select {
 			case <-waitDone:
 				parentExited = true
+				waitDone = nil
 			default:
 			}
 		}
@@ -78,6 +79,9 @@ func (Tree) WaitForExit(waitDone <-chan struct{}, process *os.Process, gracePeri
 		select {
 		case <-waitDone:
 			parentExited = true
+			// A closed parent channel stays ready forever. Disable this local
+			// select arm so surviving descendants are polled at the ticker rate.
+			waitDone = nil
 		case <-ticker.C:
 		}
 	}
