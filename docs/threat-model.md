@@ -160,9 +160,11 @@ can still allocate temporary full-token copies; accepted raw or `json.Number`
 values remain complete.
 
 Unrestricted application decoding and callback errors retain their ownership
-and identity. `OptionalNullable[T]` only normalizes native type errors when the
+and identity. `OptionalNullable[T]` only normalizes native diagnostics when the
 entire static destination graph lacks custom JSON/text decoders and interface
-slots. Extension-bearing graphs pass errors through, even if a native numeric
+slots. Only the exact `json:"-"` tag excludes a field from this ownership check;
+dash-named fields with tag options remain active. Extension-bearing graphs pass
+errors through, even if a native numeric
 failure occurs in another field. Application-selected envelope labels and
 structured RPC data are also outside these bounds.
 
@@ -181,15 +183,29 @@ codec, including inside accepted concrete variants such as sub-agent session
 sources and scheduled-task summaries. Inner SDK serializers apply the policy
 uniformly. Existing concrete-variant admission rules remain unchanged.
 
+Native invalid-use-of-`,string` formatter errors use the same retained-message
+threshold and formatted-literal preview policy at audited native decoding owners
+and codec-free generic destinations. This includes numeric, boolean and string
+targets. The quoted-literal boundary is parsed without unquoting or copying its
+full content, preserving the target-type suffix even when a named generic type
+contains delimiter text. Normalization runs after standard decoding; saved-error
+versus immediate-error precedence, partial updates, duplicates, null behavior,
+short errors and successful native admission remain unchanged. Some tagged
+`json.Number` strings use a permissive standard-library shortcut; this diagnostic
+control adds no admission check to that path. Current typed SDK schema and
+provider destinations do not use `,string`; the demonstrated route is a
+caller-selected generic destination.
+
 Application JSON/Text marshaler error chains pass through unchanged. Generic
 decoding with interface slots or application codecs also passes errors through,
 including reused interfaces containing a Number, because error text alone cannot
 distinguish a native decoder failure from an application-owned error. Plain
 caller-owned `encoding/json` operations, application handler errors, structured
-RPC data and other formatter families such as invalid numeric `,string` values
-remain outside this control. Standard parsing and native number formatting still
-allocate temporary full input or quoted-error copies; this bounds retained native
-diagnostics and subsequent SDK wrapping, not total operation allocation.
+RPC data, application-defined type/envelope labels and unrelated parser or
+unknown-field diagnostics remain outside these preview controls. Standard
+parsing, unquoting and native formatting still allocate temporary full input or
+quoted-error copies; this bounds retained native literal diagnostics and
+subsequent wrapping, not total operation allocation.
 
 Terminal transport cleanup clears requests awaiting handler registration and
 drains abandoned inbound requests and outbound envelopes. Queue admission is
