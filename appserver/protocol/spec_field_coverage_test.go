@@ -773,6 +773,7 @@ func testStructFields(t *testing.T) {
 	}
 
 	definitionStructs := []definitionStructEntry{
+		{"schema/json/v1/InitializeParams.json", "InitializeCapabilities", reflect.TypeOf(InitializeCapabilities{})},
 		{"schema/json/PermissionsRequestApprovalParams.json", "AdditionalFileSystemPermissions", reflect.TypeOf(AdditionalFileSystemPermissions{})},
 		{"schema/json/PermissionsRequestApprovalParams.json", "FileSystemSandboxEntry", reflect.TypeOf(FileSystemSandboxEntry{})},
 		{"schema/json/PermissionsRequestApprovalParams.json", "RequestPermissionProfile", reflect.TypeOf(RequestPermissionProfile{})},

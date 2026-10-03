@@ -16,6 +16,8 @@ import (
 
 	"github.com/dominicnunez/codex-sdk-go/appserver/protocol"
 	codextransport "github.com/dominicnunez/codex-sdk-go/appserver/transport"
+	"github.com/dominicnunez/codex-sdk-go/internal/deepcopy"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonvalue"
 	processctl "github.com/dominicnunez/codex-sdk-go/internal/process"
 )
 
@@ -232,13 +234,11 @@ func resolveProcessInitializeParams(opts *ProcessOptions) InitializeParams {
 }
 
 func cloneInitializeParams(params InitializeParams) InitializeParams {
-	cp := params
-	cp.ClientInfo = params.ClientInfo
-	cp.ClientInfo.Title = cloneStringPtr(params.ClientInfo.Title)
+	cp := deepcopy.Value(params)
 	if params.Capabilities != nil {
-		capabilities := *params.Capabilities
-		capabilities.OptOutNotificationMethods = append([]string(nil), params.Capabilities.OptOutNotificationMethods...)
-		cp.Capabilities = &capabilities
+		if extensions, err := jsonvalue.CloneObject(params.Capabilities.Extensions); err == nil {
+			cp.Capabilities.Extensions = extensions
+		}
 	}
 	return cp
 }

@@ -1,9 +1,14 @@
 package protocol
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"reflect"
 	"slices"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonvalue"
 )
 
 // ClientInfo represents information about the client application.
@@ -19,10 +24,44 @@ type InitializeCapabilities struct {
 	ExperimentalAPI bool `json:"experimentalApi"`
 	// ExplicitGatewayOAuth uses explicit gateway OAuth login instead of automatic browser authorization.
 	ExplicitGatewayOAuth bool `json:"explicitGatewayOauth,omitempty"`
+	// Extensions declares MCP extension settings. Empty maps declare no extensions.
+	// Values must be JSON-serializable. Initialize snapshots their JSON representation;
+	// returned settings use maps, slices, primitives and json.Number values. Handshake
+	// identity ignores object key order but retains array order and number spelling.
+	// Absent, null and empty root maps declare no extensions; named null settings
+	// and empty settings objects still declare their extension names.
+	Extensions map[string]interface{} `json:"extensions,omitempty"`
+	// McpServerOpenaiFormElicitation is the legacy openai/form opt-in.
+	McpServerOpenaiFormElicitation bool `json:"mcpServerOpenaiFormElicitation,omitempty"`
+	// RequestAttestation opts into attestation/generate requests.
+	RequestAttestation bool `json:"requestAttestation,omitempty"`
 
 	// OptOutNotificationMethods are exact notification method names that should be suppressed
 	// for this connection (for example "codex/event/session_configured").
 	OptOutNotificationMethods []string `json:"optOutNotificationMethods,omitempty"`
+}
+
+// UnmarshalJSON preserves extension numbers without rounding them through float64.
+func (c *InitializeCapabilities) UnmarshalJSON(data []byte) error {
+	type wire InitializeCapabilities
+	decoded := wire(*c)
+	w := struct {
+		*wire
+		Extensions json.RawMessage `json:"extensions"`
+	}{wire: &decoded}
+	if err := json.Unmarshal(data, &w); err != nil {
+		return err
+	}
+	if len(w.Extensions) != 0 {
+		decoded.Extensions = cloneArbitraryValue(decoded.Extensions)
+		decoder := json.NewDecoder(bytes.NewReader(w.Extensions))
+		decoder.UseNumber()
+		if err := decoder.Decode(&decoded.Extensions); err != nil {
+			return err
+		}
+	}
+	*c = InitializeCapabilities(decoded)
+	return nil
 }
 
 // InitializeParams are the parameters for the initialize request.
@@ -76,6 +115,12 @@ func cloneInitializeCapabilities(capabilities *InitializeCapabilities) *Initiali
 		return nil
 	}
 	cp := *capabilities
+	if extensions, err := jsonvalue.CloneObject(capabilities.Extensions); err == nil {
+		cp.Extensions = extensions
+	} else {
+		// Preserve invalid values for sendRequest to report its serialization error.
+		cp.Extensions = cloneArbitraryValue(capabilities.Extensions)
+	}
 	cp.OptOutNotificationMethods = append([]string(nil), capabilities.OptOutNotificationMethods...)
 	return &cp
 }
@@ -88,11 +133,19 @@ func cloneInitializeParams(params InitializeParams) InitializeParams {
 }
 
 func normalizeInitializeParams(params InitializeParams) InitializeParams {
-	cp := cloneInitializeParams(params)
+	return normalizeOwnedInitializeParams(cloneInitializeParams(params))
+}
+
+// The input owns all references. Only normalization's capability fields need
+// separate containers to preserve the admitted parameters for diagnostics.
+func normalizeOwnedInitializeParams(params InitializeParams) InitializeParams {
+	cp := params
 	if cp.Capabilities != nil {
+		capabilities := *cp.Capabilities
+		cp.Capabilities = &capabilities
 		cp.Capabilities.OptOutNotificationMethods = normalizeNotificationMethodSet(cp.Capabilities.OptOutNotificationMethods)
 	}
-	if cp.Capabilities != nil && !cp.Capabilities.ExperimentalAPI && !cp.Capabilities.ExplicitGatewayOAuth && len(cp.Capabilities.OptOutNotificationMethods) == 0 {
+	if cp.Capabilities != nil && !cp.Capabilities.ExperimentalAPI && !cp.Capabilities.ExplicitGatewayOAuth && !cp.Capabilities.McpServerOpenaiFormElicitation && !cp.Capabilities.RequestAttestation && len(cp.Capabilities.Extensions) == 0 && len(cp.Capabilities.OptOutNotificationMethods) == 0 {
 		cp.Capabilities = nil
 	}
 	return cp
@@ -108,10 +161,8 @@ func normalizeNotificationMethodSet(methods []string) []string {
 	return slices.Compact(normalized)
 }
 
-func initializeParamsEqual(a, b InitializeParams) bool {
-	a = normalizeInitializeParams(a)
-	b = normalizeInitializeParams(b)
-
+// Both inputs have been admitted as owned JSON settings and normalized.
+func normalizedInitializeParamsEqual(a, b InitializeParams) bool {
 	if a.ClientInfo.Name != b.ClientInfo.Name || a.ClientInfo.Version != b.ClientInfo.Version {
 		return false
 	}
@@ -124,8 +175,20 @@ func initializeParamsEqual(a, b InitializeParams) bool {
 	default:
 		return a.Capabilities.ExperimentalAPI == b.Capabilities.ExperimentalAPI &&
 			a.Capabilities.ExplicitGatewayOAuth == b.Capabilities.ExplicitGatewayOAuth &&
+			a.Capabilities.McpServerOpenaiFormElicitation == b.Capabilities.McpServerOpenaiFormElicitation &&
+			a.Capabilities.RequestAttestation == b.Capabilities.RequestAttestation &&
+			extensionsEqual(a.Capabilities.Extensions, b.Capabilities.Extensions) &&
 			slices.Equal(a.Capabilities.OptOutNotificationMethods, b.Capabilities.OptOutNotificationMethods)
 	}
+}
+
+// Admission already converted settings to owned JSON containers and json.Number.
+// Comparing those trees ignores object key order while preserving number spelling.
+func extensionsEqual(a, b map[string]interface{}) bool {
+	if len(a) == 0 || len(b) == 0 {
+		return len(a) == 0 && len(b) == 0
+	}
+	return reflect.DeepEqual(a, b)
 }
 
 func equalStringPtr(a, b *string) bool {
@@ -161,7 +224,8 @@ func (c *Client) Initialize(ctx context.Context, params InitializeParams) (Initi
 		return InitializeResponse{}, err
 	}
 
-	requested := normalizeInitializeParams(params)
+	admitted := cloneInitializeParams(params)
+	requested := normalizeOwnedInitializeParams(admitted)
 
 	for {
 		c.initializeMu.Lock()
@@ -169,10 +233,10 @@ func (c *Client) Initialize(ctx context.Context, params InitializeParams) (Initi
 			existing := c.initializeParams
 			resp := c.initializeResp
 			c.initializeMu.Unlock()
-			if !initializeParamsEqual(existing, requested) {
+			if !normalizedInitializeParamsEqual(existing, requested) {
 				return InitializeResponse{}, &InitializeParamsMismatchError{
 					Existing:  cloneInitializeParams(existing),
-					Requested: cloneInitializeParams(params),
+					Requested: cloneInitializeParams(admitted),
 				}
 			}
 			return resp, nil

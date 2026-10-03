@@ -101,6 +101,20 @@ Callback host, authorization/token endpoints, redirect URI, and HTTP client are 
 
 [JWT claim extraction](../login/auth/jwt.go) decodes the payload without signature, issuer, audience, or expiry verification. Account/plan fields are useful metadata from a trusted token source; they must not authorize a user, tenant, routing choice, or backend action on their own. Gateway OAuth methods and explicit-login capability settings in [gateway_oauth.go](../appserver/protocol/gateway_oauth.go) and [initialize.go](../appserver/protocol/initialize.go) convey app-server protocol choices. They do not independently establish consent, account ownership, or secure provider routing.
 
+Initialization retains attestation, MCP extension and legacy form opt-ins as part
+of the connection's handshake identity, independently of experimental API and
+gateway OAuth choices. The client owns the serialized extension settings before
+waiting on another initialization; ProcessOptions resolution also owns those
+settings. Returned initialized parameters and mismatch diagnostics are separate
+snapshots. JSON numbers retain their exact spelling, object key order is ignored,
+and array order remains significant when checking handshake identity. An absent,
+null or empty root extension object declares no extensions; a named null setting
+or empty settings object still declares that extension. Failed requests and
+invalid responses do not latch the handshake, and failure of the subsequent
+`initialized` notification permits a notification retry without renegotiating
+the latched session. These declarations convey choices to the app-server; the
+SDK does not independently enforce the server's attestation or elicitation policy.
+
 ## Secrets, persistence, and disclosure
 
 [Credential storage](../login/auth/store.go) validates required credential fields, writes a temporary file in the destination directory, and replaces the target by rename. It requests directory mode `0700` and file mode `0600`, with a directory-mode check on non-Windows systems. Credentials remain plaintext. Windows mode bits do not establish a restrictive ACL, and loading does not independently validate ownership, permissions, symlinks, or a maximum file size. The application must choose a protected storage location and appropriate platform access controls; this is not a keychain or encrypted vault.
