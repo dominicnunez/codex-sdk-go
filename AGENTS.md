@@ -29,6 +29,8 @@ fields absent from the current schema.
 For nullable collections, distinguish absent, null, empty and populated values
 with JSON member checks. Trace aliases, duplicate/reset and reused receiver
 behavior; presence state must preserve the shared deep-copy contract.
+Check scalar zero values separately from nullability: schema defaults must not
+silently omit counters, and nonnil optional pointers must retain false or zero.
 
 ## Architecture
 

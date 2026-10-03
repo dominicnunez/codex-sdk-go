@@ -164,7 +164,8 @@ func (n *ThreadStatusChangedNotification) UnmarshalJSON(data []byte) error {
 
 // TokenUsageBreakdown contains token usage metrics
 type TokenUsageBreakdown struct {
-	CacheWriteInputTokens int64 `json:"cacheWriteInputTokens,omitempty"`
+	// Missing cache-write counts default to zero; all counters marshal explicitly.
+	CacheWriteInputTokens int64 `json:"cacheWriteInputTokens"`
 	CachedInputTokens     int64 `json:"cachedInputTokens"`
 	InputTokens           int64 `json:"inputTokens"`
 	OutputTokens          int64 `json:"outputTokens"`

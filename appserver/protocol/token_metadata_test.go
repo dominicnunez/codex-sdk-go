@@ -29,5 +29,38 @@ func TestTokenCacheWriteMetadata(t *testing.T) {
 		if (err != nil) != (extra == `,"cacheWriteInputTokens":null`) {
 			t.Fatalf("extra=%s, err=%v", extra, err)
 		}
+		if err == nil {
+			want := `0`
+			if extra == `,"cacheWriteInputTokens":-1` {
+				want = `-1`
+			}
+			requireJSONMember(t, value, "cacheWriteInputTokens", true, want)
+			requireJSONMember(t, &value, "cacheWriteInputTokens", true, want)
+		}
+	}
+}
+
+func TestTokenCounterZeroWireContract(t *testing.T) {
+	mock := NewMockTransport()
+	client := codex.NewClient(mock)
+	defer client.Close()
+	var got *codex.ThreadTokenUsageUpdatedNotification
+	client.OnThreadTokenUsageUpdated(func(n codex.ThreadTokenUsageUpdatedNotification) { got = &n })
+	const counters = `"cachedInputTokens":0,"inputTokens":0,"outputTokens":0,"reasoningOutputTokens":0,"totalTokens":0`
+	for _, extra := range []string{``, `,"cacheWriteInputTokens":0`} {
+		got = nil
+		usage := `{` + counters + extra + `}`
+		mock.InjectServerNotification(context.Background(), codex.Notification{
+			Method: "thread/tokenUsage/updated",
+			Params: json.RawMessage(`{"threadId":"thread-a","turnId":"turn-a","tokenUsage":{"last":` + usage + `,"total":` + usage + `}}`),
+		})
+		if got == nil {
+			t.Fatal("zero usage notification not delivered")
+		}
+		for _, value := range []codex.TokenUsageBreakdown{got.TokenUsage.Last, got.TokenUsage.Total, {}} {
+			for _, field := range []string{"cacheWriteInputTokens", "cachedInputTokens", "inputTokens", "outputTokens", "reasoningOutputTokens", "totalTokens"} {
+				requireJSONMember(t, value, field, true, `0`)
+			}
+		}
 	}
 }
