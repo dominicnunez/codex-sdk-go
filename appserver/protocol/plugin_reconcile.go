@@ -52,6 +52,9 @@ func (r *PluginReconcileResponse) UnmarshalJSON(data []byte) error {
 	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	if err := validateOptionalStringArrays(data, "failedMaterializationRemotePluginIds", "failedRemotePluginIds"); err != nil {
+		return err
+	}
 	*r = PluginReconcileResponse(decoded)
 	return nil
 }

@@ -126,6 +126,9 @@ func (n *WindowsWorldWritableWarningNotification) UnmarshalJSON(data []byte) err
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
+	if err := validateStringArrays(data, false, "samplePaths"); err != nil {
+		return err
+	}
 	*n = WindowsWorldWritableWarningNotification(decoded)
 	return nil
 }

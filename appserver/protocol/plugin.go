@@ -204,6 +204,9 @@ func (p *PluginInterface) UnmarshalJSON(data []byte) error {
 	if wire.Screenshots == nil {
 		return errors.New("missing plugin.interface.screenshots")
 	}
+	if err := validateOptionalStringArrays(data, "capabilities", "screenshotUrls"); err != nil {
+		return err
+	}
 
 	p.BrandColor = wire.BrandColor
 	p.Capabilities = *wire.Capabilities
@@ -979,6 +982,9 @@ func (p *PluginDetail) UnmarshalJSON(data []byte) error {
 		return errors.New("missing plugin.summary")
 	case wire.AppTemplates == nil:
 		return errors.New("missing plugin.appTemplates")
+	}
+	if err := validateOptionalStringArrays(data, "mcpServers"); err != nil {
+		return err
 	}
 
 	p.Apps = *wire.Apps

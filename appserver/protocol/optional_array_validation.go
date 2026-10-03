@@ -12,7 +12,13 @@ import (
 // by encoding/json. A later duplicate cannot repair a forbidden null array or
 // string element. The containing decoder owns requiredness and receiver updates.
 func validateOptionalStringArrays(data []byte, names ...string) error {
-	return validateOptionalArrays(data, func(raw []byte) error {
+	return validateStringArrays(data, true, names...)
+}
+
+// Requiredness belongs to the containing owner. Match its actual field rules:
+// standard struct decoding accepts folded aliases; exact schema decoders do not.
+func validateStringArrays(data []byte, acceptAliases bool, names ...string) error {
+	return validateArrays(data, func(raw []byte) error {
 		// Whole-input validation already established these value boundaries.
 		// Inspect only top-level elements; the wire decoder owns string types,
 		// unquoting and established type-error context.
@@ -22,7 +28,7 @@ func validateOptionalStringArrays(data []byte, names ...string) error {
 			}
 			return nil
 		})
-	}, names...)
+	}, acceptAliases, names...)
 }
 
 // The caller has validated the whole JSON input and owns array type decoding.
@@ -48,7 +54,11 @@ func validateArrayElements(raw []byte, validate func(int, []byte) error) error {
 }
 
 func validateOptionalArrays(data []byte, elements func([]byte) error, names ...string) error {
-	return validateOptionalFields(data, func(name string, raw []byte) error {
+	return validateArrays(data, elements, true, names...)
+}
+
+func validateArrays(data []byte, elements func([]byte) error, acceptAliases bool, names ...string) error {
+	return validateFields(data, func(name string, raw []byte) error {
 		if isNullJSONValue(raw) {
 			return responseObjectValidationErrors().null(name)
 		}
@@ -56,10 +66,14 @@ func validateOptionalArrays(data []byte, elements func([]byte) error, names ...s
 			return elements(raw)
 		}
 		return nil
-	}, names...)
+	}, acceptAliases, names...)
 }
 
 func validateOptionalFields(data []byte, validate func(string, []byte) error, names ...string) error {
+	return validateFields(data, validate, true, names...)
+}
+
+func validateFields(data []byte, validate func(string, []byte) error, acceptAliases bool, names ...string) error {
 	// Preserve the containing decoder's syntax and non-object error contract.
 	if !json.Valid(data) {
 		return nil
@@ -74,7 +88,11 @@ func validateOptionalFields(data []byte, validate func(string, []byte) error, na
 			return
 		}
 		for i, name := range names {
-			if !jsonobject.FieldMatchesFolded(key, folded[i]) {
+			matched := jsonobject.FieldMatches(key, name)
+			if acceptAliases {
+				matched = jsonobject.FieldMatchesFolded(key, folded[i])
+			}
+			if !matched {
 				continue
 			}
 			if cause := validate(name, raw); cause != nil {

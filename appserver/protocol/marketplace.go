@@ -94,6 +94,9 @@ func (r *MarketplaceUpgradeResponse) UnmarshalJSON(data []byte) error {
 	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	if err := validateOptionalStringArrays(data, "selectedMarketplaces"); err != nil {
+		return err
+	}
 	validatedUpgradedRoots, err := validateInboundAbsolutePathSliceField("marketplace.upgrade.upgradedRoots", decoded.UpgradedRoots)
 	if err != nil {
 		return err
