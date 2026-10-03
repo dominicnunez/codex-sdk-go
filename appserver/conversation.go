@@ -49,13 +49,26 @@ type Conversation struct {
 type conversationState struct {
 	mu             sync.Mutex
 	thread         Thread
+	hasSnapshot    bool
 	activeTurn     bool
 	closed         bool
 	hasStartedTurn bool
 }
 
 func newConversationState(thread Thread) *conversationState {
-	return &conversationState{thread: cloneThreadState(thread)}
+	return &conversationState{thread: cloneThreadState(thread), hasSnapshot: true}
+}
+
+func (s *conversationState) initializeFromStart(thread Thread) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	// A close can coalesce away the pending initial publication before delivery.
+	// Seed the successful start response before exposing the handle, preserving
+	// closed state and any newer snapshot that was already delivered.
+	if !s.hasSnapshot {
+		s.thread = cloneThreadState(thread)
+		s.hasSnapshot = true
+	}
 }
 
 func (s *conversationState) snapshot() Thread {
@@ -71,6 +84,7 @@ func (s *conversationState) storeSnapshot(thread Thread) {
 		return
 	}
 	s.thread = cloneThreadState(thread)
+	s.hasSnapshot = true
 	s.mu.Unlock()
 }
 
@@ -204,18 +218,18 @@ func (p *Process) StartConversation(ctx context.Context, opts ConversationOption
 	}
 	applyThreadStartOptions(&params, opts.Instructions, opts.Model, opts.Personality, opts.ApprovalPolicy)
 
-	resp, err := p.Client.Thread.Start(ctx, params)
+	state := &conversationState{}
+	resp, generation, unsubscribe, err := p.Client.Thread.StartWithStateListener(ctx, params, state.storeSnapshot, state.close)
 	if err != nil {
 		return nil, fmt.Errorf("thread/start: %w", err)
 	}
 
-	state := newConversationState(resp.Thread)
+	state.initializeFromStart(resp.Thread)
 	conv := &Conversation{
 		process:  p,
 		threadID: resp.Thread.ID,
 		state:    state,
 	}
-	generation, unsubscribe := p.Client.AddThreadStateListenerWithGeneration(resp.Thread.ID, state.storeSnapshot, state.close)
 	conv.generation = generation
 	conv.release = unsubscribe
 	cleanup := runtime.AddCleanup(conv, func(unsub func()) {

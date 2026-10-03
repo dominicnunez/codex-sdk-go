@@ -215,8 +215,14 @@ Callbacks must return promptly: panic recovery does not stop blocked callbacks
 or undo their external effects, and an earlier blocked recipient can delay
 drainers already selected for later recipients.
 
-Conversation registration captures its client-cache incarnation together with
-replay admission. New turns check that incarnation against committed cache
+Conversation startup couples successful response publication, listener
+registration and cache-incarnation capture before callbacks or eviction. Failed
+requests create no new subscription or publication. Cache pressure cannot evict
+the new thread before its Conversation pins observation. If closure coalesces
+away the initial pending update, the closed handle retains its owned initial
+response without adopting a reopened incarnation or restoring the cache. Generic
+listener replay follows the same per-recipient delivery admission. New turns
+check that incarnation against committed cache
 state, including closure before the selected Conversation callback executes.
 An already admitted turn may finish after closure or local Close and return its
 owned historical result. Completion atomically appends to the latest metadata

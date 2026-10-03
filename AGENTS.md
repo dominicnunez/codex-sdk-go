@@ -88,6 +88,12 @@ later SDK consumers after a callback or error reporter panics, and that replay
 failure still returns registration cleanup. Preserve the diagnostic origin.
 For listener removal, clear vacated backing slots and discard empty registries;
 preserve independent dispatch snapshots and trace lifecycle unsubscription.
+For cache observation lifecycles, trace successful response publication through
+initial listener registration and pinning, including callbacks and eviction in
+that acquisition interval. Transfer observation ownership atomically: cache
+absence cannot distinguish ordinary eviction from an evicted closure marker.
+Verify failed startup leaves no listener or pin, and retain an owned initial
+response without overwriting newer delivery or reopening a closed handle.
 For peer-controlled JSON selection, check temporary allocations across ignored
 fields, duplicate selected fields, identity length and nesting depth. Preserve
 the actual duplicate, alias, null and malformed-prefix rules; measure complete

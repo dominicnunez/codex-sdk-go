@@ -163,13 +163,25 @@ func (r ThreadStartResponse) validate() error {
 
 // Start initiates a new thread
 func (s *ThreadService) Start(ctx context.Context, params ThreadStartParams) (ThreadStartResponse, error) {
+	response, _, _, err := s.StartWithStateListener(ctx, params, nil, nil)
+	return response, err
+}
+
+// StartWithStateListener starts a thread and atomically registers observation
+// with the successful response's cache publication, before eviction or callbacks.
+// The returned generation belongs to that publication, even if a callback closes
+// or reopens the thread before return. Initial update diagnostics use thread/start;
+// subsequent delivery follows AddThreadStateListener. Both nil callbacks create
+// no subscription. A failed request creates no subscription or publication from
+// this request.
+func (s *ThreadService) StartWithStateListener(ctx context.Context, params ThreadStartParams, onUpdate func(Thread), onClose func()) (ThreadStartResponse, uint64, func(), error) {
 	var response ThreadStartResponse
 	if err := s.client.sendRequest(ctx, methodThreadStart, params, &response); err != nil {
-		return ThreadStartResponse{}, err
+		return ThreadStartResponse{}, 0, func() {}, err
 	}
 	response.Thread = threadWithDisabledPlugins(response.Thread, response.DisabledPluginIDs)
-	s.client.cacheThreadStateForMethod(methodThreadStart, response.Thread)
-	return response, nil
+	generation, unsubscribe := s.client.cacheThreadStateWithListener(methodThreadStart, response.Thread, onUpdate, onClose)
+	return response, generation, unsubscribe, nil
 }
 
 func threadWithDisabledPlugins(thread Thread, pluginIDs []string) Thread {

@@ -130,29 +130,6 @@ func TestThreadStateReentrantClosePrecedesReopen(t *testing.T) {
 	}
 }
 
-func TestThreadStateRegistrationCapturesIncarnationBeforeReplay(t *testing.T) {
-	mock := NewMockTransport()
-	client := codex.NewClient(mock)
-	defer client.Close()
-	client.CacheThreadState(codex.Thread{ID: "thread", Preview: "original"})
-	original := client.ThreadStateGeneration("thread")
-	var received []string
-	generation, remove := client.AddThreadStateListenerWithGeneration("thread", func(thread codex.Thread) {
-		received = append(received, thread.Preview)
-		if thread.Preview == "original" {
-			mock.InjectServerNotification(context.Background(), codex.Notification{Method: "thread/closed", Params: json.RawMessage(`{"threadId":"thread"}`)})
-			client.CacheThreadState(codex.Thread{ID: "thread", Preview: "reopened"})
-		}
-	}, func() { received = append(received, "closed") })
-	defer remove()
-	if generation == 0 || generation != original || generation == client.ThreadStateGeneration("thread") {
-		t.Fatalf("registration generation=%d original=%d current=%d", generation, original, client.ThreadStateGeneration("thread"))
-	}
-	if !reflect.DeepEqual(received, []string{"original", "closed", "reopened"}) {
-		t.Fatalf("registration delivery=%v", received)
-	}
-}
-
 func TestThreadStateCompletionPreservesMetadataAndOwnership(t *testing.T) {
 	mock := NewMockTransport()
 	client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(method string, err error) {
