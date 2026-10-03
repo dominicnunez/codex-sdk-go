@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 	"reflect"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // GetAccountParams are parameters for the account/read method.
@@ -41,7 +43,7 @@ func (r *GetAccountResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire GetAccountResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = GetAccountResponse(decoded)
@@ -71,7 +73,7 @@ func (a *ApiKeyAccount) UnmarshalJSON(data []byte) error {
 	}
 	type wire ApiKeyAccount
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*a = ApiKeyAccount(decoded)
@@ -101,7 +103,7 @@ func (c *ChatgptAccount) UnmarshalJSON(data []byte) error {
 	}
 	type wire ChatgptAccount
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	if err := validatePlanTypeField("account.planType", decoded.PlanType); err != nil {
@@ -209,13 +211,13 @@ func (a *AccountWrapper) UnmarshalJSON(data []byte) error {
 	switch typeStr {
 	case "apiKey":
 		var apiKey ApiKeyAccount
-		if err := json.Unmarshal(data, &apiKey); err != nil {
+		if err := jsondecode.Unmarshal(data, &apiKey); err != nil {
 			return err
 		}
 		a.Value = &apiKey
 	case "chatgpt":
 		var chatgpt ChatgptAccount
-		if err := json.Unmarshal(data, &chatgpt); err != nil {
+		if err := jsondecode.Unmarshal(data, &chatgpt); err != nil {
 			return err
 		}
 		a.Value = &chatgpt
@@ -262,7 +264,7 @@ func (r *GetAccountRateLimitsResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire GetAccountRateLimitsResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = GetAccountRateLimitsResponse(decoded)
@@ -308,7 +310,7 @@ func (s *SpendControlLimitSnapshot) UnmarshalJSON(data []byte) error {
 	}
 	type wire SpendControlLimitSnapshot
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*s = SpendControlLimitSnapshot(decoded)
@@ -318,7 +320,7 @@ func (s *SpendControlLimitSnapshot) UnmarshalJSON(data []byte) error {
 func (r *RateLimitSnapshot) UnmarshalJSON(data []byte) error {
 	type wire RateLimitSnapshot
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	if err := validateOptionalPlanTypeField("rateLimits.planType", decoded.PlanType); err != nil {
@@ -352,7 +354,7 @@ func (c *CreditsSnapshot) UnmarshalJSON(data []byte) error {
 	}
 	type wire CreditsSnapshot
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*c = CreditsSnapshot(decoded)
@@ -423,7 +425,7 @@ func (r *SendAddCreditsNudgeEmailResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire SendAddCreditsNudgeEmailResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	if err := validateAddCreditsNudgeEmailStatusField("addCreditsNudge.status", decoded.Status); err != nil {
@@ -439,7 +441,7 @@ func (w *RateLimitWindow) UnmarshalJSON(data []byte) error {
 	}
 	type wire RateLimitWindow
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*w = RateLimitWindow(decoded)
@@ -691,7 +693,7 @@ func (r *ApiKeyLoginAccountResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire ApiKeyLoginAccountResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = ApiKeyLoginAccountResponse(decoded)
@@ -713,7 +715,7 @@ func (r *ChatgptLoginAccountResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire ChatgptLoginAccountResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = ChatgptLoginAccountResponse(decoded)
@@ -736,7 +738,7 @@ func (r *ChatgptDeviceCodeLoginAccountResponse) UnmarshalJSON(data []byte) error
 	}
 	type wire ChatgptDeviceCodeLoginAccountResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = ChatgptDeviceCodeLoginAccountResponse(decoded)
@@ -756,7 +758,7 @@ func (r *ChatgptAuthTokensLoginAccountResponse) UnmarshalJSON(data []byte) error
 	}
 	type wire ChatgptAuthTokensLoginAccountResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = ChatgptAuthTokensLoginAccountResponse(decoded)
@@ -776,7 +778,7 @@ func (r *AmazonBedrockLoginAccountResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire AmazonBedrockLoginAccountResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = AmazonBedrockLoginAccountResponse(decoded)
@@ -815,38 +817,38 @@ func UnmarshalLoginAccountResponse(data []byte) (LoginAccountResponse, error) {
 	}
 
 	var typeCheck string
-	if err := json.Unmarshal(rawType, &typeCheck); err != nil {
+	if err := jsondecode.Unmarshal(rawType, &typeCheck); err != nil {
 		return nil, fmt.Errorf("invalid login response type: %w", err)
 	}
 
 	switch typeCheck {
 	case "apiKey":
 		var resp ApiKeyLoginAccountResponse
-		if err := json.Unmarshal(trimmed, &resp); err != nil {
+		if err := jsondecode.Unmarshal(trimmed, &resp); err != nil {
 			return nil, err
 		}
 		return &resp, nil
 	case "chatgpt":
 		var resp ChatgptLoginAccountResponse
-		if err := json.Unmarshal(trimmed, &resp); err != nil {
+		if err := jsondecode.Unmarshal(trimmed, &resp); err != nil {
 			return nil, err
 		}
 		return &resp, nil
 	case loginTypeChatgptDeviceCode:
 		var resp ChatgptDeviceCodeLoginAccountResponse
-		if err := json.Unmarshal(trimmed, &resp); err != nil {
+		if err := jsondecode.Unmarshal(trimmed, &resp); err != nil {
 			return nil, err
 		}
 		return &resp, nil
 	case "chatgptAuthTokens":
 		var resp ChatgptAuthTokensLoginAccountResponse
-		if err := json.Unmarshal(trimmed, &resp); err != nil {
+		if err := jsondecode.Unmarshal(trimmed, &resp); err != nil {
 			return nil, err
 		}
 		return &resp, nil
 	case loginTypeAmazonBedrock:
 		var resp AmazonBedrockLoginAccountResponse
-		if err := json.Unmarshal(trimmed, &resp); err != nil {
+		if err := jsondecode.Unmarshal(trimmed, &resp); err != nil {
 			return nil, err
 		}
 		return &resp, nil
@@ -871,7 +873,7 @@ func (r *CancelLoginAccountResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire CancelLoginAccountResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	switch decoded.Status {

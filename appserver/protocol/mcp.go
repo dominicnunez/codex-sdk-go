@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // McpAuthStatus represents the authentication status of an MCP server.
@@ -65,7 +67,7 @@ func (r *Resource) UnmarshalJSON(data []byte) error {
 	}
 	type wire Resource
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = Resource(decoded)
@@ -88,7 +90,7 @@ func (r *ResourceTemplate) UnmarshalJSON(data []byte) error {
 	}
 	type wire ResourceTemplate
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = ResourceTemplate(decoded)
@@ -113,7 +115,7 @@ func (t *Tool) UnmarshalJSON(data []byte) error {
 	}
 	type wire Tool
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*t = Tool(decoded)
@@ -162,7 +164,7 @@ func (s *McpServerStatus) UnmarshalJSON(data []byte) error {
 	}
 	type wire McpServerStatus
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*s = McpServerStatus(decoded)
@@ -197,7 +199,7 @@ func (r *ListMcpServerStatusResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire ListMcpServerStatusResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = ListMcpServerStatusResponse(decoded)
@@ -225,7 +227,7 @@ func (r *McpServerOauthLoginResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire McpServerOauthLoginResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = McpServerOauthLoginResponse(decoded)
@@ -272,7 +274,7 @@ func (r *McpResourceReadResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire McpResourceReadResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = McpResourceReadResponse(decoded)
@@ -302,7 +304,7 @@ func (r *McpServerToolCallResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire McpServerToolCallResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = McpServerToolCallResponse(decoded)
@@ -450,7 +452,7 @@ func (c *Client) OnMcpServerOauthLoginCompleted(handler func(McpServerOauthLogin
 	}
 	c.OnNotification(notifyMcpServerOauthLoginCompleted, func(ctx context.Context, notif Notification) {
 		var params McpServerOauthLoginCompletedNotification
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyMcpServerOauthLoginCompleted, fmt.Errorf("unmarshal %s: %w", notifyMcpServerOauthLoginCompleted, err))
 			return
 		}
@@ -466,7 +468,7 @@ func (c *Client) OnMcpServerStatusUpdated(handler func(McpServerStatusUpdatedNot
 	}
 	c.OnNotification(notifyMcpServerStatusUpdated, func(ctx context.Context, notif Notification) {
 		var params McpServerStatusUpdatedNotification
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyMcpServerStatusUpdated, fmt.Errorf("unmarshal %s: %w", notifyMcpServerStatusUpdated, err))
 			return
 		}
@@ -482,7 +484,7 @@ func (c *Client) OnMcpToolCallProgress(handler func(McpToolCallProgressNotificat
 	}
 	c.OnNotification(notifyMcpToolCallProgress, func(ctx context.Context, notif Notification) {
 		var params McpToolCallProgressNotification
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyMcpToolCallProgress, fmt.Errorf("unmarshal %s: %w", notifyMcpToolCallProgress, err))
 			return
 		}

@@ -2,8 +2,9 @@ package protocol
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 const maxCachedThreadStates = 64
@@ -266,7 +267,7 @@ func (c *Client) notifyThreadClosedListeners(listeners []threadStateListener) {
 func (c *Client) installThreadStateCache() {
 	c.addNotificationListener(notifyThreadSettingsUpdated, func(_ context.Context, notif Notification) {
 		var n ThreadSettingsUpdatedNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyThreadSettingsUpdated, fmt.Errorf("unmarshal %s: %w", notifyThreadSettingsUpdated, err))
 			return
 		}
@@ -277,7 +278,7 @@ func (c *Client) installThreadStateCache() {
 
 	c.addNotificationListener(notifyThreadProjectUpdated, func(_ context.Context, notif Notification) {
 		var n ThreadProjectUpdatedNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyThreadProjectUpdated, fmt.Errorf("unmarshal %s: %w", notifyThreadProjectUpdated, err))
 			return
 		}
@@ -286,7 +287,7 @@ func (c *Client) installThreadStateCache() {
 
 	c.addNotificationListener(notifyThreadStarted, func(_ context.Context, notif Notification) {
 		var n ThreadStartedNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyThreadStarted, fmt.Errorf("unmarshal %s: %w", notifyThreadStarted, err))
 			return
 		}
@@ -295,7 +296,7 @@ func (c *Client) installThreadStateCache() {
 
 	c.addNotificationListener(notifyThreadNameUpdated, func(_ context.Context, notif Notification) {
 		var n ThreadNameUpdatedNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyThreadNameUpdated, fmt.Errorf("unmarshal %s: %w", notifyThreadNameUpdated, err))
 			return
 		}
@@ -306,7 +307,7 @@ func (c *Client) installThreadStateCache() {
 
 	c.addNotificationListener(notifyThreadStatusChanged, func(_ context.Context, notif Notification) {
 		var n ThreadStatusChangedNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyThreadStatusChanged, fmt.Errorf("unmarshal %s: %w", notifyThreadStatusChanged, err))
 			return
 		}
@@ -317,7 +318,7 @@ func (c *Client) installThreadStateCache() {
 
 	c.addNotificationListener(notifyThreadClosed, func(_ context.Context, notif Notification) {
 		var n ThreadClosedNotification
-		if err := json.Unmarshal(notif.Params, &n); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyThreadClosed, fmt.Errorf("unmarshal %s: %w", notifyThreadClosed, err))
 			return
 		}

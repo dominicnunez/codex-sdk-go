@@ -2,8 +2,9 @@ package protocol
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // FuzzyFileSearchParams represents parameters for fuzzy file search.
@@ -37,7 +38,7 @@ func (r *FuzzyFileSearchResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire FuzzyFileSearchResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = FuzzyFileSearchResponse(decoded)
@@ -81,7 +82,7 @@ func (r *FuzzyFileSearchResult) UnmarshalJSON(data []byte) error {
 	}
 	type wire FuzzyFileSearchResult
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = FuzzyFileSearchResult(decoded)
@@ -148,7 +149,7 @@ func (c *Client) OnFuzzyFileSearchSessionCompleted(handler func(FuzzyFileSearchS
 	}
 	c.OnNotification(notifyFuzzyFileSearchSessionCompleted, func(ctx context.Context, notif Notification) {
 		var params FuzzyFileSearchSessionCompletedNotification
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyFuzzyFileSearchSessionCompleted, fmt.Errorf("unmarshal %s: %w", notifyFuzzyFileSearchSessionCompleted, err))
 			return
 		}
@@ -164,7 +165,7 @@ func (c *Client) OnFuzzyFileSearchSessionUpdated(handler func(FuzzyFileSearchSes
 	}
 	c.OnNotification(notifyFuzzyFileSearchSessionUpdated, func(ctx context.Context, notif Notification) {
 		var params FuzzyFileSearchSessionUpdatedNotification
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyFuzzyFileSearchSessionUpdated, fmt.Errorf("unmarshal %s: %w", notifyFuzzyFileSearchSessionUpdated, err))
 			return
 		}

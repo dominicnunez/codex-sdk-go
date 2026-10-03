@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // FileSystemAccessMode controls access to a filesystem entry.
@@ -261,7 +263,7 @@ type permissionPathList []string
 
 func (p *permissionPathList) UnmarshalJSON(data []byte) error {
 	var paths []*string
-	if err := json.Unmarshal(data, &paths); err != nil {
+	if err := jsondecode.Unmarshal(data, &paths); err != nil {
 		return err
 	}
 	var values permissionPathList
@@ -282,7 +284,7 @@ type permissionScanDepth uint64
 
 func (d *permissionScanDepth) UnmarshalJSON(data []byte) error {
 	var value uint64
-	if err := json.Unmarshal(data, &value); err != nil {
+	if err := jsondecode.Unmarshal(data, &value); err != nil {
 		return err
 	}
 	if value == 0 {

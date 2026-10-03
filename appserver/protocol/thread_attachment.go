@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 type ThreadAttachmentAddParams struct {
@@ -193,7 +195,7 @@ func (c *Client) OnThreadAttachmentUpdated(handler func(ThreadAttachmentUpdatedN
 	}
 	c.OnNotification(notifyThreadAttachmentUpdated, func(_ context.Context, notif Notification) {
 		var value ThreadAttachmentUpdatedNotification
-		if err := json.Unmarshal(notif.Params, &value); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &value); err != nil {
 			c.reportHandlerError(notifyThreadAttachmentUpdated, fmt.Errorf("unmarshal %s: %w", notifyThreadAttachmentUpdated, err))
 			return
 		}

@@ -2,8 +2,9 @@ package protocol
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 type GatewayOAuthStatus string
@@ -97,7 +98,7 @@ func (c *Client) OnGatewayOAuthChanged(handler func(GatewayOAuthChangedNotificat
 	}
 	c.OnNotification(notifyGatewayOAuthChanged, func(_ context.Context, notif Notification) {
 		var value GatewayOAuthChangedNotification
-		if err := json.Unmarshal(notif.Params, &value); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &value); err != nil {
 			c.reportHandlerError(notifyGatewayOAuthChanged, fmt.Errorf("unmarshal %s: %w", notifyGatewayOAuthChanged, err))
 			return
 		}

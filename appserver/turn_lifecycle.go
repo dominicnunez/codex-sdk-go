@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/dominicnunez/codex-sdk-go/appserver/protocol"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
@@ -76,7 +77,7 @@ func decodeExactCarrier(params json.RawMessage, dest map[string]any) bool {
 	}
 	for key, value := range dest {
 		if raw, ok := fields[key]; ok {
-			if err := json.Unmarshal(raw, value); err != nil {
+			if err := jsondecode.Unmarshal(raw, value); err != nil {
 				return false
 			}
 		}
@@ -95,7 +96,7 @@ func rawCarrierForThread[T any](params json.RawMessage, threadID string, unmarsh
 
 func unmarshalOrCarrierForThread[N any, C any](params json.RawMessage, threadID string, threadIDOf func(N) string, unmarshalCarrier func(json.RawMessage) (C, bool), carrierThreadIDOf func(C) string) (N, C, bool, error) {
 	var n N
-	if err := json.Unmarshal(params, &n); err != nil {
+	if err := jsondecode.Unmarshal(params, &n); err != nil {
 		carrier, ok := rawCarrierForThread(params, threadID, unmarshalCarrier, carrierThreadIDOf)
 		return n, carrier, ok, err
 	}
@@ -245,7 +246,7 @@ func validateTurnCompletedNotification(n TurnCompletedNotification) error {
 
 func decodeTurnLifecycleThreadNotification[N any](p turnLifecycleParams, method string, params json.RawMessage, threadIDOf func(N) string) (N, bool) {
 	var n N
-	if err := json.Unmarshal(params, &n); err != nil {
+	if err := jsondecode.Unmarshal(params, &n); err != nil {
 		carrier, ok := unmarshalThreadIDCarrier(params)
 		if !ok || carrier.ThreadID != p.threadID {
 			return n, false

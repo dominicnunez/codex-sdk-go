@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // WindowsSandboxSetupMode represents the sandbox setup mode
@@ -70,7 +72,7 @@ func (r *WindowsSandboxReadinessResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire WindowsSandboxReadinessResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = WindowsSandboxReadinessResponse(decoded)
@@ -83,7 +85,7 @@ func (r *WindowsSandboxSetupStartResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire WindowsSandboxSetupStartResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = WindowsSandboxSetupStartResponse(decoded)
@@ -306,7 +308,7 @@ func (c *Client) OnWindowsSandboxSetupCompleted(handler func(WindowsSandboxSetup
 	}
 	c.OnNotification(notifyWindowsSandboxSetupCompleted, func(ctx context.Context, notif Notification) {
 		var params WindowsSandboxSetupCompletedNotification
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyWindowsSandboxSetupCompleted, fmt.Errorf("unmarshal %s: %w", notifyWindowsSandboxSetupCompleted, err))
 			return
 		}
@@ -322,7 +324,7 @@ func (c *Client) OnWindowsWorldWritableWarning(handler func(WindowsWorldWritable
 	}
 	c.OnNotification(notifyWindowsWorldWritableWarning, func(ctx context.Context, notif Notification) {
 		var params WindowsWorldWritableWarningNotification
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyWindowsWorldWritableWarning, fmt.Errorf("unmarshal %s: %w", notifyWindowsWorldWritableWarning, err))
 			return
 		}
@@ -339,7 +341,7 @@ func (c *Client) OnContextCompacted(handler func(ContextCompactedNotification)) 
 	}
 	c.OnNotification(notifyThreadCompacted, func(ctx context.Context, notif Notification) {
 		var params ContextCompactedNotification
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyThreadCompacted, fmt.Errorf("unmarshal %s: %w", notifyThreadCompacted, err))
 			return
 		}
@@ -355,7 +357,7 @@ func (c *Client) OnDeprecationNotice(handler func(DeprecationNoticeNotification)
 	}
 	c.OnNotification(notifyDeprecationNotice, func(ctx context.Context, notif Notification) {
 		var params DeprecationNoticeNotification
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyDeprecationNotice, fmt.Errorf("unmarshal %s: %w", notifyDeprecationNotice, err))
 			return
 		}
@@ -371,7 +373,7 @@ func (c *Client) OnError(handler func(ErrorNotification)) {
 	}
 	c.OnNotification(notifyError, func(ctx context.Context, notif Notification) {
 		var params ErrorNotification
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyError, fmt.Errorf("unmarshal %s: %w", notifyError, err))
 			return
 		}
@@ -387,7 +389,7 @@ func (c *Client) OnWarning(handler func(WarningNotification)) {
 	}
 	c.OnNotification(notifyWarning, func(ctx context.Context, notif Notification) {
 		var params WarningNotification
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyWarning, fmt.Errorf("unmarshal %s: %w", notifyWarning, err))
 			return
 		}
@@ -403,7 +405,7 @@ func (c *Client) OnGuardianWarning(handler func(GuardianWarningNotification)) {
 	}
 	c.OnNotification(notifyGuardianWarning, func(ctx context.Context, notif Notification) {
 		var params GuardianWarningNotification
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyGuardianWarning, fmt.Errorf("unmarshal %s: %w", notifyGuardianWarning, err))
 			return
 		}
@@ -419,7 +421,7 @@ func (c *Client) OnRemoteControlStatusChanged(handler func(RemoteControlStatusCh
 	}
 	c.OnNotification(notifyRemoteControlStatusChanged, func(ctx context.Context, notif Notification) {
 		var params RemoteControlStatusChangedNotification
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyRemoteControlStatusChanged, fmt.Errorf("unmarshal %s: %w", notifyRemoteControlStatusChanged, err))
 			return
 		}
@@ -435,7 +437,7 @@ func (c *Client) OnTerminalInteraction(handler func(TerminalInteractionNotificat
 	}
 	c.OnNotification(notifyTerminalInteraction, func(ctx context.Context, notif Notification) {
 		var params TerminalInteractionNotification
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyTerminalInteraction, fmt.Errorf("unmarshal %s: %w", notifyTerminalInteraction, err))
 			return
 		}

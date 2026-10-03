@@ -2,8 +2,9 @@ package protocol
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // CommandExecTerminalSize represents a PTY size in character cells.
@@ -42,7 +43,7 @@ func (r *CommandExecResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire CommandExecResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = CommandExecResponse(decoded)
@@ -187,7 +188,7 @@ func (c *Client) OnCommandExecutionOutputDelta(handler func(CommandExecutionOutp
 	}
 	c.OnNotification(notifyCommandExecutionOutputDelta, func(ctx context.Context, notif Notification) {
 		var notification CommandExecutionOutputDeltaNotification
-		if err := json.Unmarshal(notif.Params, &notification); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &notification); err != nil {
 			c.reportHandlerError(notifyCommandExecutionOutputDelta, fmt.Errorf("unmarshal %s: %w", notifyCommandExecutionOutputDelta, err))
 			return
 		}
@@ -203,7 +204,7 @@ func (c *Client) OnCommandExecOutputDelta(handler func(CommandExecOutputDeltaNot
 	}
 	c.OnNotification(notifyCommandExecOutputDelta, func(ctx context.Context, notif Notification) {
 		var notification CommandExecOutputDeltaNotification
-		if err := json.Unmarshal(notif.Params, &notification); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &notification); err != nil {
 			c.reportHandlerError(notifyCommandExecOutputDelta, fmt.Errorf("unmarshal %s: %w", notifyCommandExecOutputDelta, err))
 			return
 		}

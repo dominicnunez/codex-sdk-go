@@ -2,7 +2,8 @@ package protocol
 
 import (
 	"context"
-	"encoding/json"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // ExperimentalFeatureStage represents the lifecycle stage of an experimental feature flag
@@ -58,7 +59,7 @@ func (f *ExperimentalFeature) UnmarshalJSON(data []byte) error {
 	}
 	type wire ExperimentalFeature
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*f = ExperimentalFeature(decoded)
@@ -102,7 +103,7 @@ func (r *ExperimentalFeatureEnablementSetResponse) UnmarshalJSON(data []byte) er
 	}
 	type wire ExperimentalFeatureEnablementSetResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = ExperimentalFeatureEnablementSetResponse(decoded)
@@ -115,7 +116,7 @@ func (r *ExperimentalFeatureListResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire ExperimentalFeatureListResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = ExperimentalFeatureListResponse(decoded)

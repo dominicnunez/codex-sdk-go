@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // FunctionCallOutputBody is either plain text or an array of output content items.
@@ -32,12 +34,12 @@ func (b *FunctionCallOutputBody) UnmarshalJSON(data []byte) error {
 	switch data[0] {
 	case '"':
 		var text string
-		if err := json.Unmarshal(data, &text); err != nil {
+		if err := jsondecode.Unmarshal(data, &text); err != nil {
 			return err
 		}
 		decoded.Text = &text
 	case '[':
-		if err := json.Unmarshal(data, &decoded.Content); err != nil {
+		if err := jsondecode.Unmarshal(data, &decoded.Content); err != nil {
 			return err
 		}
 	default:

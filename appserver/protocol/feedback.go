@@ -2,7 +2,8 @@ package protocol
 
 import (
 	"context"
-	"encoding/json"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // FeedbackUploadParams represents parameters for uploading feedback.
@@ -42,7 +43,7 @@ func (r *FeedbackUploadResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire FeedbackUploadResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = FeedbackUploadResponse(decoded)

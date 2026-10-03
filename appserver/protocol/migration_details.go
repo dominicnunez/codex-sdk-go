@@ -3,6 +3,8 @@ package protocol
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // MigrationDetails lists the external-agent resources selected for migration.
@@ -161,7 +163,7 @@ type nonNullStringList []string
 
 func (s *nonNullStringList) UnmarshalJSON(data []byte) error {
 	var decoded []*string
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	if decoded == nil {

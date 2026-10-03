@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // HookTrustStatus is the trust state of a configured hook.
@@ -146,7 +148,7 @@ func (r *HooksListResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire HooksListResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = HooksListResponse(decoded)

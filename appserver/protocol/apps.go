@@ -2,8 +2,9 @@ package protocol
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // AppsListParams contains parameters for the apps/list request.
@@ -26,7 +27,7 @@ func (r *AppsListResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire AppsListResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = AppsListResponse(decoded)
@@ -61,7 +62,7 @@ func (a *AppInfo) UnmarshalJSON(data []byte) error {
 		wire
 		IsEnabled *bool `json:"isEnabled"`
 	}
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	appInfo := AppInfo(decoded.wire)
@@ -96,7 +97,7 @@ func (b *AppBranding) UnmarshalJSON(data []byte) error {
 	}
 	type wire AppBranding
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*b = AppBranding(decoded)
@@ -130,7 +131,7 @@ func (r *AppReview) UnmarshalJSON(data []byte) error {
 	}
 	type wire AppReview
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = AppReview(decoded)
@@ -150,7 +151,7 @@ func (s *AppScreenshot) UnmarshalJSON(data []byte) error {
 	}
 	type wire AppScreenshot
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*s = AppScreenshot(decoded)
@@ -199,7 +200,7 @@ func (c *Client) OnAppListUpdated(handler func(AppListUpdatedNotification)) {
 	}
 	c.OnNotification(notifyAppListUpdated, func(ctx context.Context, notif Notification) {
 		var params AppListUpdatedNotification
-		if err := json.Unmarshal(notif.Params, &params); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyAppListUpdated, fmt.Errorf("unmarshal %s: %w", notifyAppListUpdated, err))
 			return
 		}

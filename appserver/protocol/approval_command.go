@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
@@ -163,7 +164,7 @@ func (w *CommandActionWrapper) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		var read ReadCommandAction
-		if err := json.Unmarshal(data, &read); err != nil {
+		if err := jsondecode.Unmarshal(data, &read); err != nil {
 			return err
 		}
 		w.Value = &read
@@ -172,7 +173,7 @@ func (w *CommandActionWrapper) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		var list ListFilesCommandAction
-		if err := json.Unmarshal(data, &list); err != nil {
+		if err := jsondecode.Unmarshal(data, &list); err != nil {
 			return err
 		}
 		w.Value = &list
@@ -181,7 +182,7 @@ func (w *CommandActionWrapper) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		var search SearchCommandAction
-		if err := json.Unmarshal(data, &search); err != nil {
+		if err := jsondecode.Unmarshal(data, &search); err != nil {
 			return err
 		}
 		w.Value = &search
@@ -190,7 +191,7 @@ func (w *CommandActionWrapper) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		var unknown UnknownCommandAction
-		if err := json.Unmarshal(data, &unknown); err != nil {
+		if err := jsondecode.Unmarshal(data, &unknown); err != nil {
 			return err
 		}
 		w.Value = &unknown
@@ -277,7 +278,7 @@ func (u UnknownCommandExecutionApprovalDecision) MarshalJSON() ([]byte, error) {
 func (w *CommandExecutionApprovalDecisionWrapper) UnmarshalJSON(data []byte) error {
 	// Try string first
 	var str string
-	if err := json.Unmarshal(data, &str); err == nil {
+	if err := jsondecode.Unmarshal(data, &str); err == nil {
 		w.Value = str
 		return nil
 	}
@@ -290,7 +291,7 @@ func (w *CommandExecutionApprovalDecisionWrapper) UnmarshalJSON(data []byte) err
 
 	if raw, ok := keys["acceptWithExecpolicyAmendment"]; ok {
 		var inner AcceptWithExecpolicyAmendmentDecision
-		if err := json.Unmarshal(raw, &inner); err != nil {
+		if err := jsondecode.Unmarshal(raw, &inner); err != nil {
 			return fmt.Errorf("unable to unmarshal acceptWithExecpolicyAmendment: %w", err)
 		}
 		w.Value = inner
@@ -301,7 +302,7 @@ func (w *CommandExecutionApprovalDecisionWrapper) UnmarshalJSON(data []byte) err
 		var inner struct {
 			NetworkPolicyAmendment NetworkPolicyAmendment `json:"network_policy_amendment"`
 		}
-		if err := json.Unmarshal(raw, &inner); err != nil {
+		if err := jsondecode.Unmarshal(raw, &inner); err != nil {
 			return fmt.Errorf("unable to unmarshal applyNetworkPolicyAmendment: %w", err)
 		}
 		w.Value = ApplyNetworkPolicyAmendmentDecision{NetworkPolicyAmendment: inner.NetworkPolicyAmendment}
@@ -549,7 +550,7 @@ func (w *ParsedCommandWrapper) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		var read ReadParsedCommand
-		if err := json.Unmarshal(data, &read); err != nil {
+		if err := jsondecode.Unmarshal(data, &read); err != nil {
 			return err
 		}
 		w.Value = &read
@@ -558,7 +559,7 @@ func (w *ParsedCommandWrapper) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		var list ListFilesParsedCommand
-		if err := json.Unmarshal(data, &list); err != nil {
+		if err := jsondecode.Unmarshal(data, &list); err != nil {
 			return err
 		}
 		w.Value = &list
@@ -567,7 +568,7 @@ func (w *ParsedCommandWrapper) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		var search SearchParsedCommand
-		if err := json.Unmarshal(data, &search); err != nil {
+		if err := jsondecode.Unmarshal(data, &search); err != nil {
 			return err
 		}
 		w.Value = &search
@@ -576,7 +577,7 @@ func (w *ParsedCommandWrapper) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		var unknown UnknownParsedCommand
-		if err := json.Unmarshal(data, &unknown); err != nil {
+		if err := jsondecode.Unmarshal(data, &unknown); err != nil {
 			return err
 		}
 		w.Value = &unknown

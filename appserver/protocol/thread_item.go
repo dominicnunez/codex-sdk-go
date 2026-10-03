@@ -2,6 +2,8 @@ package protocol
 
 import (
 	"encoding/json"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // ThreadItem is a discriminated union for thread item variants.
@@ -485,7 +487,7 @@ func decodeThreadItemIntoWithValidation(
 	if err := validateTaggedObjectFields(data, requiredFields, nonNullFields); err != nil {
 		return nil, err
 	}
-	if err := json.Unmarshal(data, dest); err != nil {
+	if err := jsondecode.Unmarshal(data, dest); err != nil {
 		return nil, err
 	}
 	return dest, nil
@@ -500,7 +502,7 @@ func decodeUserMessageThreadItem(data []byte) (ThreadItem, error) {
 	if err := validateRequiredTaggedObjectFields(data, "id", "content"); err != nil {
 		return nil, err
 	}
-	if err := json.Unmarshal(data, &raw); err != nil {
+	if err := jsondecode.Unmarshal(data, &raw); err != nil {
 		return nil, err
 	}
 	inputs, err := unmarshalUserInputSlice(raw.Content)

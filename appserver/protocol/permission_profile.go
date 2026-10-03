@@ -2,7 +2,8 @@ package protocol
 
 import (
 	"context"
-	"encoding/json"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // PermissionProfileListParams lists available permission profiles.
@@ -25,7 +26,7 @@ func (s *PermissionProfileSummary) UnmarshalJSON(data []byte) error {
 	}
 	type wire PermissionProfileSummary
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*s = PermissionProfileSummary(decoded)
@@ -44,7 +45,7 @@ func (r *PermissionProfileListResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire PermissionProfileListResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = PermissionProfileListResponse(decoded)

@@ -2,8 +2,9 @@ package protocol
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // ProcessOutputStream labels process output streams.
@@ -77,7 +78,7 @@ func (c *Client) OnProcessOutputDelta(handler func(ProcessOutputDeltaNotificatio
 	}
 	c.OnNotification(notifyProcessOutputDelta, func(ctx context.Context, notif Notification) {
 		var notification ProcessOutputDeltaNotification
-		if err := json.Unmarshal(notif.Params, &notification); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &notification); err != nil {
 			c.reportHandlerError(notifyProcessOutputDelta, fmt.Errorf("unmarshal %s: %w", notifyProcessOutputDelta, err))
 			return
 		}
@@ -93,7 +94,7 @@ func (c *Client) OnProcessExited(handler func(ProcessExitedNotification)) {
 	}
 	c.OnNotification(notifyProcessExited, func(ctx context.Context, notif Notification) {
 		var notification ProcessExitedNotification
-		if err := json.Unmarshal(notif.Params, &notification); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &notification); err != nil {
 			c.reportHandlerError(notifyProcessExited, fmt.Errorf("unmarshal %s: %w", notifyProcessExited, err))
 			return
 		}

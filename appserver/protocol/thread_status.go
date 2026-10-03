@@ -3,6 +3,8 @@ package protocol
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // ThreadStatus represents the current status of a thread
@@ -81,7 +83,7 @@ func (t *ThreadStatusWrapper) UnmarshalJSON(data []byte) error {
 		if err := validateRequiredTaggedObjectFields(data, "activeFlags"); err != nil {
 			return err
 		}
-		if err := json.Unmarshal(data, &status); err != nil {
+		if err := jsondecode.Unmarshal(data, &status); err != nil {
 			return err
 		}
 		t.Value = status

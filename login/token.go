@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 	"github.com/dominicnunez/codex-sdk-go/login/auth"
 )
 
@@ -91,7 +92,7 @@ func doTokenRequest(cfg Config, req *http.Request, operation string) (auth.Crede
 	}
 
 	var decoded tokenResponse
-	if err := json.NewDecoder(io.LimitReader(resp.Body, maxTokenResponseBytes)).Decode(&decoded); err != nil {
+	if err := jsondecode.NativeError(json.NewDecoder(io.LimitReader(resp.Body, maxTokenResponseBytes)).Decode(&decoded)); err != nil {
 		return auth.Credentials{}, fmt.Errorf("decode OpenAI Codex token %s response: %w", operation, err)
 	}
 	if strings.TrimSpace(decoded.AccessToken) == "" || strings.TrimSpace(decoded.RefreshToken) == "" || decoded.ExpiresIn <= 0 {

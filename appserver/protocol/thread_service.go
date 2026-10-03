@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // ThreadService provides methods for thread lifecycle management
@@ -78,7 +80,7 @@ func (r *ThreadStartResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire ThreadStartResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	validatedCwd, err := validateInboundAbsolutePathField("cwd", decoded.Cwd)
@@ -236,7 +238,7 @@ func (r *ThreadListResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire ThreadListResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = ThreadListResponse(decoded)
@@ -273,7 +275,7 @@ func (r *ThreadLoadedListResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire ThreadLoadedListResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = ThreadLoadedListResponse(decoded)
@@ -403,7 +405,7 @@ func (r *ThreadResumeResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire ThreadResumeResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	validatedCwd, err := validateInboundAbsolutePathField("cwd", decoded.Cwd)
@@ -482,7 +484,7 @@ func (r *ThreadForkResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire ThreadForkResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	validatedCwd, err := validateInboundAbsolutePathField("cwd", decoded.Cwd)
@@ -673,7 +675,7 @@ func (r *ThreadUnsubscribeResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire ThreadUnsubscribeResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	if err := validateThreadUnsubscribeStatus(decoded.Status); err != nil {

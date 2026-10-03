@@ -3,6 +3,8 @@ package protocol
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // AdditionalFileSystemPermissions requests or grants extra filesystem access.
@@ -170,7 +172,7 @@ func (p *McpServerElicitationRequestParams) UnmarshalJSON(data []byte) error {
 	}
 	switch decoded.Mode {
 	case McpServerElicitationModeForm:
-		if err := json.Unmarshal(schema, &decoded.RequestedSchema); err != nil {
+		if err := jsondecode.Unmarshal(schema, &decoded.RequestedSchema); err != nil {
 			return err
 		}
 	case McpServerElicitationModeOpenAIForm, McpServerElicitationModeOpenAIFormLegacy:

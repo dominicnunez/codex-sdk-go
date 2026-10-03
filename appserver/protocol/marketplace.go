@@ -2,7 +2,8 @@ package protocol
 
 import (
 	"context"
-	"encoding/json"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // MarketplaceAddParams adds a marketplace source.
@@ -25,7 +26,7 @@ func (r *MarketplaceAddResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire MarketplaceAddResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	validatedInstalledRoot, err := validateInboundAbsolutePathField("marketplace.add.installedRoot", decoded.InstalledRoot)
@@ -54,7 +55,7 @@ func (r *MarketplaceRemoveResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire MarketplaceRemoveResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	validatedInstalledRoot, err := validateInboundAbsolutePathPointerField("marketplace.remove.installedRoot", decoded.InstalledRoot)
@@ -90,7 +91,7 @@ func (r *MarketplaceUpgradeResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire MarketplaceUpgradeResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	validatedUpgradedRoots, err := validateInboundAbsolutePathSliceField("marketplace.upgrade.upgradedRoots", decoded.UpgradedRoots)

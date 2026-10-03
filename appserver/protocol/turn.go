@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // TurnService handles turn-related operations
@@ -126,7 +128,7 @@ func (p *TurnStartParams) UnmarshalJSON(data []byte) error {
 	}
 
 	wire := &wireTurnStartParams{}
-	if err := json.Unmarshal(data, wire); err != nil {
+	if err := jsondecode.Unmarshal(data, wire); err != nil {
 		*p = TurnStartParams{}
 		return err
 	}
@@ -180,7 +182,7 @@ func (r *TurnStartResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire TurnStartResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = TurnStartResponse(decoded)
@@ -235,7 +237,7 @@ func (p *TurnSteerParams) UnmarshalJSON(data []byte) error {
 		Alias: (*Alias)(p),
 	}
 
-	if err := json.Unmarshal(data, &aux); err != nil {
+	if err := jsondecode.Unmarshal(data, &aux); err != nil {
 		*p = TurnSteerParams{}
 		return err
 	}
@@ -261,7 +263,7 @@ func (r *TurnSteerResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire TurnSteerResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = TurnSteerResponse(decoded)
@@ -329,7 +331,7 @@ func (i *ImageUserInput) MarshalJSON() ([]byte, error) {
 func (i *ImageUserInput) UnmarshalJSON(data []byte) error {
 	type wire ImageUserInput
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	if decoded.URL == "" && decoded.FileID == nil {
@@ -454,7 +456,7 @@ func UnmarshalUserInput(data []byte) (UserInput, error) {
 		if err := validateRequiredTaggedObjectFields(data, "text"); err != nil {
 			return nil, err
 		}
-		if err := json.Unmarshal(data, &input); err != nil {
+		if err := jsondecode.Unmarshal(data, &input); err != nil {
 			return nil, err
 		}
 		if err := validateOptionalArrays(data, nil, "text_elements"); err != nil {
@@ -464,7 +466,7 @@ func UnmarshalUserInput(data []byte) (UserInput, error) {
 	case "image":
 		var input ImageUserInput
 		// ImageUserInput validates either a URL or a file ID.
-		if err := json.Unmarshal(data, &input); err != nil {
+		if err := jsondecode.Unmarshal(data, &input); err != nil {
 			return nil, err
 		}
 		return &input, nil
@@ -473,7 +475,7 @@ func UnmarshalUserInput(data []byte) (UserInput, error) {
 		if err := validateRequiredTaggedObjectFields(data, "path"); err != nil {
 			return nil, err
 		}
-		if err := json.Unmarshal(data, &input); err != nil {
+		if err := jsondecode.Unmarshal(data, &input); err != nil {
 			return nil, err
 		}
 		return &input, nil
@@ -482,7 +484,7 @@ func UnmarshalUserInput(data []byte) (UserInput, error) {
 		if err := validateRequiredTaggedObjectFields(data, "url"); err != nil {
 			return nil, err
 		}
-		if err := json.Unmarshal(data, &input); err != nil {
+		if err := jsondecode.Unmarshal(data, &input); err != nil {
 			return nil, err
 		}
 		return &input, nil
@@ -491,7 +493,7 @@ func UnmarshalUserInput(data []byte) (UserInput, error) {
 		if err := validateRequiredTaggedObjectFields(data, "path"); err != nil {
 			return nil, err
 		}
-		if err := json.Unmarshal(data, &input); err != nil {
+		if err := jsondecode.Unmarshal(data, &input); err != nil {
 			return nil, err
 		}
 		return &input, nil
@@ -500,7 +502,7 @@ func UnmarshalUserInput(data []byte) (UserInput, error) {
 		if err := validateRequiredTaggedObjectFields(data, "name", "path"); err != nil {
 			return nil, err
 		}
-		if err := json.Unmarshal(data, &input); err != nil {
+		if err := jsondecode.Unmarshal(data, &input); err != nil {
 			return nil, err
 		}
 		return &input, nil
@@ -509,7 +511,7 @@ func UnmarshalUserInput(data []byte) (UserInput, error) {
 		if err := validateRequiredTaggedObjectFields(data, "name", "path"); err != nil {
 			return nil, err
 		}
-		if err := json.Unmarshal(data, &input); err != nil {
+		if err := jsondecode.Unmarshal(data, &input); err != nil {
 			return nil, err
 		}
 		return &input, nil

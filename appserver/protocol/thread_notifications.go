@@ -2,8 +2,9 @@ package protocol
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // ThreadStartedNotification is sent when a thread is started
@@ -229,7 +230,7 @@ func (c *Client) OnThreadStarted(handler func(ThreadStartedNotification)) {
 	}
 	c.OnNotification(notifyThreadStarted, func(ctx context.Context, notif Notification) {
 		var notification ThreadStartedNotification
-		if err := json.Unmarshal(notif.Params, &notification); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &notification); err != nil {
 			c.reportHandlerError(notifyThreadStarted, fmt.Errorf("unmarshal %s: %w", notifyThreadStarted, err))
 			return
 		}
@@ -245,7 +246,7 @@ func (c *Client) OnThreadClosed(handler func(ThreadClosedNotification)) {
 	}
 	c.OnNotification(notifyThreadClosed, func(ctx context.Context, notif Notification) {
 		var notification ThreadClosedNotification
-		if err := json.Unmarshal(notif.Params, &notification); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &notification); err != nil {
 			c.reportHandlerError(notifyThreadClosed, fmt.Errorf("unmarshal %s: %w", notifyThreadClosed, err))
 			return
 		}
@@ -261,7 +262,7 @@ func (c *Client) OnThreadArchived(handler func(ThreadArchivedNotification)) {
 	}
 	c.OnNotification(notifyThreadArchived, func(ctx context.Context, notif Notification) {
 		var notification ThreadArchivedNotification
-		if err := json.Unmarshal(notif.Params, &notification); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &notification); err != nil {
 			c.reportHandlerError(notifyThreadArchived, fmt.Errorf("unmarshal %s: %w", notifyThreadArchived, err))
 			return
 		}
@@ -277,7 +278,7 @@ func (c *Client) OnThreadUnarchived(handler func(ThreadUnarchivedNotification)) 
 	}
 	c.OnNotification(notifyThreadUnarchived, func(ctx context.Context, notif Notification) {
 		var notification ThreadUnarchivedNotification
-		if err := json.Unmarshal(notif.Params, &notification); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &notification); err != nil {
 			c.reportHandlerError(notifyThreadUnarchived, fmt.Errorf("unmarshal %s: %w", notifyThreadUnarchived, err))
 			return
 		}
@@ -293,7 +294,7 @@ func (c *Client) OnThreadGoalUpdated(handler func(ThreadGoalUpdatedNotification)
 	}
 	c.OnNotification(notifyThreadGoalUpdated, func(ctx context.Context, notif Notification) {
 		var notification ThreadGoalUpdatedNotification
-		if err := json.Unmarshal(notif.Params, &notification); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &notification); err != nil {
 			c.reportHandlerError(notifyThreadGoalUpdated, fmt.Errorf("unmarshal %s: %w", notifyThreadGoalUpdated, err))
 			return
 		}
@@ -309,7 +310,7 @@ func (c *Client) OnThreadGoalCleared(handler func(ThreadGoalClearedNotification)
 	}
 	c.OnNotification(notifyThreadGoalCleared, func(ctx context.Context, notif Notification) {
 		var notification ThreadGoalClearedNotification
-		if err := json.Unmarshal(notif.Params, &notification); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &notification); err != nil {
 			c.reportHandlerError(notifyThreadGoalCleared, fmt.Errorf("unmarshal %s: %w", notifyThreadGoalCleared, err))
 			return
 		}
@@ -325,7 +326,7 @@ func (c *Client) OnThreadNameUpdated(handler func(ThreadNameUpdatedNotification)
 	}
 	c.OnNotification(notifyThreadNameUpdated, func(ctx context.Context, notif Notification) {
 		var notification ThreadNameUpdatedNotification
-		if err := json.Unmarshal(notif.Params, &notification); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &notification); err != nil {
 			c.reportHandlerError(notifyThreadNameUpdated, fmt.Errorf("unmarshal %s: %w", notifyThreadNameUpdated, err))
 			return
 		}
@@ -341,7 +342,7 @@ func (c *Client) OnThreadSettingsUpdated(handler func(ThreadSettingsUpdatedNotif
 	}
 	c.OnNotification(notifyThreadSettingsUpdated, func(ctx context.Context, notif Notification) {
 		var notification ThreadSettingsUpdatedNotification
-		if err := json.Unmarshal(notif.Params, &notification); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &notification); err != nil {
 			c.reportHandlerError(notifyThreadSettingsUpdated, fmt.Errorf("unmarshal %s: %w", notifyThreadSettingsUpdated, err))
 			return
 		}
@@ -357,7 +358,7 @@ func (c *Client) OnThreadStatusChanged(handler func(ThreadStatusChangedNotificat
 	}
 	c.OnNotification(notifyThreadStatusChanged, func(ctx context.Context, notif Notification) {
 		var notification ThreadStatusChangedNotification
-		if err := json.Unmarshal(notif.Params, &notification); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &notification); err != nil {
 			c.reportHandlerError(notifyThreadStatusChanged, fmt.Errorf("unmarshal %s: %w", notifyThreadStatusChanged, err))
 			return
 		}
@@ -390,7 +391,7 @@ func (c *Client) OnServerRequestResolved(handler func(ServerRequestResolvedNotif
 	}
 	c.OnNotification(notifyServerRequestResolved, func(ctx context.Context, notif Notification) {
 		var notification ServerRequestResolvedNotification
-		if err := json.Unmarshal(notif.Params, &notification); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &notification); err != nil {
 			c.reportHandlerError(notifyServerRequestResolved, fmt.Errorf("unmarshal %s: %w", notifyServerRequestResolved, err))
 			return
 		}
@@ -406,7 +407,7 @@ func (c *Client) OnThreadTokenUsageUpdated(handler func(ThreadTokenUsageUpdatedN
 	}
 	c.OnNotification(notifyThreadTokenUsageUpdated, func(ctx context.Context, notif Notification) {
 		var notification ThreadTokenUsageUpdatedNotification
-		if err := json.Unmarshal(notif.Params, &notification); err != nil {
+		if err := jsondecode.Unmarshal(notif.Params, &notification); err != nil {
 			c.reportHandlerError(notifyThreadTokenUsageUpdated, fmt.Errorf("unmarshal %s: %w", notifyThreadTokenUsageUpdated, err))
 			return
 		}

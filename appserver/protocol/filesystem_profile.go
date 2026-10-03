@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
@@ -35,7 +36,7 @@ func decodeGuardianPermissionAction(data json.RawMessage, action any) error {
 		return nil
 	}
 	var actionType string
-	if json.Unmarshal(rawType, &actionType) != nil || actionType != "requestPermissions" {
+	if jsondecode.Unmarshal(rawType, &actionType) != nil || actionType != "requestPermissions" {
 		return nil //nolint:nilerr // Other generic action shapes retain their existing decoding contract.
 	}
 	var decoded struct {
@@ -72,7 +73,7 @@ type guardianPermissionAction struct{ Value any }
 
 func (a *guardianPermissionAction) UnmarshalJSON(data []byte) error {
 	var value any
-	if err := json.Unmarshal(data, &value); err != nil {
+	if err := jsondecode.Unmarshal(data, &value); err != nil {
 		return err
 	}
 	if err := decodeGuardianPermissionAction(data, value); err != nil {

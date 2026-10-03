@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 // DynamicToolCallParams represents parameters for a dynamic tool call.
@@ -185,19 +187,19 @@ func (w *DynamicToolCallOutputContentItemWrapper) UnmarshalJSON(data []byte) err
 	switch itemType {
 	case "inputText":
 		var text InputTextDynamicToolCallOutputContentItem
-		if err := json.Unmarshal(data, &text); err != nil {
+		if err := jsondecode.Unmarshal(data, &text); err != nil {
 			return err
 		}
 		w.Value = &text
 	case "inputImage":
 		var image InputImageDynamicToolCallOutputContentItem
-		if err := json.Unmarshal(data, &image); err != nil {
+		if err := jsondecode.Unmarshal(data, &image); err != nil {
 			return err
 		}
 		w.Value = &image
 	case "inputAudio":
 		var audio InputAudioDynamicToolCallOutputContentItem
-		if err := json.Unmarshal(data, &audio); err != nil {
+		if err := jsondecode.Unmarshal(data, &audio); err != nil {
 			return err
 		}
 		w.Value = &audio

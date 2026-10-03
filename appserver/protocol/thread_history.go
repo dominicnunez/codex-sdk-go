@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 const (
@@ -95,7 +97,7 @@ func (p *ThreadItemsListParams) UnmarshalJSON(data []byte) error {
 		SortDirection *SortDirection  `json:"sortDirection,omitempty"`
 	}
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*p = ThreadItemsListParams{ThreadID: decoded.ThreadID, TurnID: decoded.TurnID, Limit: decoded.Limit, SortDirection: decoded.SortDirection}
@@ -103,10 +105,10 @@ func (p *ThreadItemsListParams) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 	if decoded.Cursor[0] == '"' {
-		return json.Unmarshal(decoded.Cursor, &p.Cursor)
+		return jsondecode.Unmarshal(decoded.Cursor, &p.Cursor)
 	}
 	var anchor ThreadItemsListAnchor
-	if err := json.Unmarshal(decoded.Cursor, &anchor); err != nil {
+	if err := jsondecode.Unmarshal(decoded.Cursor, &anchor); err != nil {
 		return err
 	}
 	p.CursorAnchor = &anchor
@@ -133,7 +135,7 @@ func (a *ThreadItemsListAnchor) UnmarshalJSON(data []byte) error {
 		Type   string `json:"type"`
 		ItemID string `json:"itemId"`
 	}
-	if err := json.Unmarshal(data, &wire); err != nil {
+	if err := jsondecode.Unmarshal(data, &wire); err != nil {
 		return err
 	}
 	if wire.Type != "item" {
@@ -182,7 +184,7 @@ func (e *ThreadItemEntry) UnmarshalJSON(data []byte) error {
 	}
 	type wire ThreadItemEntry
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*e = ThreadItemEntry(decoded)
@@ -202,7 +204,7 @@ func (r *ThreadItemsListResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire ThreadItemsListResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = ThreadItemsListResponse(decoded)
@@ -251,7 +253,7 @@ func (r *ThreadTurnsListResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire ThreadTurnsListResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = ThreadTurnsListResponse(decoded)
@@ -295,7 +297,7 @@ func (r *ThreadRevertResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire ThreadRevertResponse
 	var decoded wire
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
 	*r = ThreadRevertResponse(decoded)
