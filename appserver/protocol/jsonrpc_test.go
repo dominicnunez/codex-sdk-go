@@ -350,7 +350,7 @@ func requestIDEqual(a, b codex.RequestID) bool {
 		return false
 	}
 
-	// Handle numeric types (JSON unmarshal gives float64, but we construct with int64)
+	// Compare compatible numeric fixture types; wire request IDs decode as int64.
 	aNum, aIsNum := toInt64(a.Value)
 	bNum, bIsNum := toInt64(b.Value)
 	if aIsNum && bIsNum {
