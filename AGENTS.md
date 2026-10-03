@@ -73,6 +73,9 @@ for every known schema method, and verify that callback finalization survives
 failures in error-reporting hooks as well as in the primary handler.
 For peer-controlled buffers, bound retained data as well as event counts across
 queued, in-flight, fallback and replay ownership.
+For rejected peer values, bound diagnostic previews before quoting and wrapping;
+trace the complete error chain and escaped-value growth. A frame limit does not
+bound allocation amplification or error retention inside the decoder.
 For callback fanout, isolate each recipient at the owning boundary, including
 initial replay and direct service/cache calls. Verify committed state reaches
 later SDK consumers after a callback or error reporter panics, and that replay
