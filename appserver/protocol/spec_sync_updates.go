@@ -510,6 +510,14 @@ type TurnModerationMetadataNotification struct {
 	ThreadID string                 `json:"threadId"`
 	TurnID   string                 `json:"turnId"`
 }
+
+// TurnModerationMetadataJSONNotification represents the complete arbitrary-JSON
+// metadata schema. The original notification retains its object-map API.
+type TurnModerationMetadataJSONNotification struct {
+	Metadata json.RawMessage `json:"metadata"`
+	ThreadID string          `json:"threadId"`
+	TurnID   string          `json:"turnId"`
+}
 type ProjectChangeType string
 
 const (
@@ -611,6 +619,12 @@ func (c *Client) OnTurnModerationMetadata(h func(TurnModerationMetadataNotificat
 	setTypedNotificationHandler(c, notifyTurnModerationMetadata, h)
 }
 
+// OnTurnModerationMetadataJSON sets the handler for arbitrary moderation JSON.
+// It replaces the same notification handler as OnTurnModerationMetadata.
+func (c *Client) OnTurnModerationMetadataJSON(h func(TurnModerationMetadataJSONNotification)) {
+	setTypedNotificationHandler(c, notifyTurnModerationMetadata, h)
+}
+
 // OnProjectChanged sets the handler for project/changed notifications.
 func (c *Client) OnProjectChanged(h func(ProjectChangedNotification)) {
 	setTypedNotificationHandler(c, notifyProjectChanged, h)
@@ -663,6 +677,11 @@ func (c *Client) AddExternalAgentConfigImportProgressListener(h func(ExternalAge
 
 // AddTurnModerationMetadataListener appends a turn moderation-metadata listener.
 func (c *Client) AddTurnModerationMetadataListener(h func(TurnModerationMetadataNotification)) func() {
+	return addTypedNotificationListener(c, notifyTurnModerationMetadata, h)
+}
+
+// AddTurnModerationMetadataJSONListener appends an arbitrary-JSON metadata listener.
+func (c *Client) AddTurnModerationMetadataJSONListener(h func(TurnModerationMetadataJSONNotification)) func() {
 	return addTypedNotificationListener(c, notifyTurnModerationMetadata, h)
 }
 
