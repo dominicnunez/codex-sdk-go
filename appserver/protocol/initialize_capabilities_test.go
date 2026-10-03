@@ -353,6 +353,72 @@ func TestInitializeInvalidExtensionsDoNotLatch(t *testing.T) {
 	}
 }
 
+type failingCapabilitySettings struct {
+	calls   *int
+	failure error
+	values  map[string]interface{}
+}
+
+func (s failingCapabilitySettings) MarshalJSON() ([]byte, error) {
+	*s.calls++
+	if *s.calls == 1 {
+		return nil, s.failure
+	}
+	return json.Marshal(s.values)
+}
+
+func TestInitializeExtensionSnapshotErrorRequiresExplicitRetry(t *testing.T) {
+	client, mock := capabilityClient(t)
+	calls := 0
+	failure := errors.New("snapshot failed")
+	values := map[string]interface{}{"n": 2}
+	params := capabilityParams(t, `{}`)
+	params.Capabilities.Extensions = map[string]interface{}{"future": failingCapabilitySettings{calls: &calls, failure: failure, values: values}}
+	if _, err := client.Initialize(context.Background(), params); !errors.Is(err, failure) {
+		t.Fatalf("snapshot failure=%v", err)
+	}
+	if calls != 1 || mock.CallCount() != 0 {
+		t.Fatalf("marshal calls=%d transport calls=%d", calls, mock.CallCount())
+	}
+	if _, ok := client.InitializedParams(); ok {
+		t.Fatal("snapshot failure latched")
+	}
+	if _, err := client.Initialize(context.Background(), params); err != nil {
+		t.Fatal(err)
+	}
+	values["n"] = 99
+	want := capabilityParams(t, `{"extensions":{"future":{"n":2}}}`)
+	if _, err := client.Initialize(context.Background(), want); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestInitializeExtensionSnapshotDepthFailureDoesNotDispatch(t *testing.T) {
+	var nested interface{} = true
+	for i := 0; i < 10001; i++ {
+		nested = []interface{}{nested}
+	}
+	client, mock := capabilityClient(t)
+	params := capabilityParams(t, `{}`)
+	params.Capabilities.Extensions = map[string]interface{}{"future": nested}
+	if _, err := json.Marshal(params.Capabilities.Extensions); err != nil {
+		t.Fatalf("fixture must be serializable: %v", err)
+	}
+	if _, err := client.Initialize(context.Background(), params); err == nil {
+		t.Fatal("snapshot depth failure ignored")
+	}
+	if _, ok := client.InitializedParams(); ok {
+		t.Fatal("snapshot depth failure latched")
+	}
+	if mock.CallCount() != 0 {
+		t.Fatal("snapshot depth failure dispatched")
+	}
+	params.Capabilities.Extensions = map[string]interface{}{"future": true}
+	if _, err := client.Initialize(context.Background(), params); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func BenchmarkInitializeExtensions(b *testing.B) {
 	for _, size := range []int{1, 1000} {
 		for _, cached := range []bool{false, true} {

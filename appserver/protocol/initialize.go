@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
 	"slices"
 
@@ -114,15 +115,7 @@ func cloneInitializeCapabilities(capabilities *InitializeCapabilities) *Initiali
 	if capabilities == nil {
 		return nil
 	}
-	cp := *capabilities
-	if extensions, err := jsonvalue.CloneObject(capabilities.Extensions); err == nil {
-		cp.Extensions = extensions
-	} else {
-		// Preserve invalid values for sendRequest to report its serialization error.
-		cp.Extensions = cloneArbitraryValue(capabilities.Extensions)
-	}
-	cp.OptOutNotificationMethods = append([]string(nil), capabilities.OptOutNotificationMethods...)
-	return &cp
+	return cloneArbitraryValue(capabilities)
 }
 
 func cloneInitializeParams(params InitializeParams) InitializeParams {
@@ -224,7 +217,22 @@ func (c *Client) Initialize(ctx context.Context, params InitializeParams) (Initi
 		return InitializeResponse{}, err
 	}
 
-	admitted := cloneInitializeParams(params)
+	admitted := params
+	var extensions map[string]interface{}
+	if params.Capabilities != nil {
+		var err error
+		extensions, err = jsonvalue.CloneObject(params.Capabilities.Extensions)
+		if err != nil {
+			return InitializeResponse{}, fmt.Errorf("snapshot initialize extensions: %w", err)
+		}
+		capabilities := *params.Capabilities
+		capabilities.Extensions = nil
+		admitted.Capabilities = &capabilities
+	}
+	admitted = cloneInitializeParams(admitted)
+	if admitted.Capabilities != nil {
+		admitted.Capabilities.Extensions = extensions
+	}
 	requested := normalizeOwnedInitializeParams(admitted)
 
 	for {

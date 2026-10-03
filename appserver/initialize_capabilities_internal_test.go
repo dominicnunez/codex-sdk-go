@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -42,7 +43,10 @@ func TestProcessCapabilitySnapshotAndNotificationRetry(t *testing.T) {
 				t.Fatal(err)
 			}
 			params := InitializeParams{ClientInfo: ClientInfo{Name: "test", Version: "1"}, Capabilities: &capabilities}
-			owned := resolveProcessInitializeParams(&ProcessOptions{InitializeParams: &params})
+			owned, err := resolveProcessInitializeParams(&ProcessOptions{InitializeParams: &params})
+			if err != nil {
+				t.Fatal(err)
+			}
 			// Options may be changed after resolution, before the first handshake.
 			capabilities.RequestAttestation = false
 			capabilities.McpServerOpenaiFormElicitation = false
@@ -115,7 +119,10 @@ func TestProcessOptionsOwnSerializableExtensionValues(t *testing.T) {
 	values := map[string]interface{}{"n": 2}
 	raw := json.RawMessage(`{"n":3}`)
 	params := InitializeParams{Capabilities: &InitializeCapabilities{Extensions: map[string]interface{}{"future": settings{private: true, Values: values}, "raw": raw}}}
-	owned := resolveProcessInitializeParams(&ProcessOptions{InitializeParams: &params})
+	owned, err := resolveProcessInitializeParams(&ProcessOptions{InitializeParams: &params})
+	if err != nil {
+		t.Fatal(err)
+	}
 	values["n"] = 99
 	raw[5] = '9'
 	if got := owned.Capabilities.Extensions["future"].(map[string]interface{})["values"].(map[string]interface{})["n"]; got != json.Number("2") {
@@ -123,5 +130,58 @@ func TestProcessOptionsOwnSerializableExtensionValues(t *testing.T) {
 	}
 	if got := owned.Capabilities.Extensions["raw"].(map[string]interface{})["n"]; got != json.Number("3") {
 		t.Fatalf("raw options retained reference: %v", got)
+	}
+}
+
+type failingProcessSettings struct {
+	calls   *int
+	failure error
+	values  map[string]interface{}
+}
+
+func (s failingProcessSettings) MarshalJSON() ([]byte, error) {
+	*s.calls++
+	if *s.calls == 1 {
+		return nil, s.failure
+	}
+	return json.Marshal(s.values)
+}
+
+func TestProcessRejectsExtensionSnapshotFailureBeforeLaunch(t *testing.T) {
+	calls := 0
+	failure := errors.New("snapshot failed")
+	values := map[string]interface{}{"n": 2}
+	params := InitializeParams{Capabilities: &InitializeCapabilities{Extensions: map[string]interface{}{"future": failingProcessSettings{calls: &calls, failure: failure, values: values}}}}
+	opts := &ProcessOptions{BinaryPath: filepath.Join(t.TempDir(), "absent-codex"), InitializeParams: &params}
+	if _, err := StartProcess(context.Background(), opts); !errors.Is(err, failure) {
+		t.Fatalf("snapshot failure must precede launch: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("marshal calls=%d", calls)
+	}
+	owned, err := resolveProcessInitializeParams(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	values["n"] = 99
+	if got := owned.Capabilities.Extensions["future"].(map[string]interface{})["n"]; got != json.Number("2") {
+		t.Fatalf("retry not owned: %v", got)
+	}
+}
+
+type cancellingProcessSettings struct{ cancel context.CancelFunc }
+
+func (s cancellingProcessSettings) MarshalJSON() ([]byte, error) {
+	s.cancel()
+	return []byte(`{}`), nil
+}
+
+func TestProcessCancellationDuringSnapshotPreventsLaunch(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	params := InitializeParams{Capabilities: &InitializeCapabilities{Extensions: map[string]interface{}{"future": cancellingProcessSettings{cancel: cancel}}}}
+	opts := &ProcessOptions{BinaryPath: filepath.Join(t.TempDir(), "absent-codex"), InitializeParams: &params}
+	if _, err := StartProcess(ctx, opts); !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancelled preparation must precede launch: %v", err)
 	}
 }

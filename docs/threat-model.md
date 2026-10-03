@@ -106,7 +106,9 @@ of the connection's handshake identity, independently of experimental API and
 gateway OAuth choices. The client owns the serialized extension settings before
 waiting on another initialization; ProcessOptions resolution also owns those
 settings. Returned initialized parameters and mismatch diagnostics are separate
-snapshots. JSON numbers retain their exact spelling, object key order is ignored,
+snapshots. Snapshot errors fail admission before dispatch or child launch;
+process startup rechecks cancellation after caller-controlled serialization.
+JSON numbers retain their exact spelling, object key order is ignored,
 and array order remains significant when checking handshake identity. An absent,
 null or empty root extension object declares no extensions; a named null setting
 or empty settings object still declares that extension. Failed requests and

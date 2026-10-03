@@ -73,6 +73,9 @@ When adding reference-valued protocol fields, trace ownership through cache,
 conversation, collector, emitted events and final result views. Use the existing
 complete copy boundary rather than a partial field list; verify mutation in both
 directions, nil/empty values and representative snapshot cost.
+For initialization extensions, own serialized JSON before waiting or child
+launch. A snapshot error must fail admission; do not retain a mutable Go value
+as fallback. Recheck process cancellation after caller-controlled snapshotting.
 
 ### Login Packages
 Codex OAuth login flow lives in `login/`. Credential persistence, token claims, redaction, and `chatgptAuthTokens` payload helpers live in `login/auth/`.
