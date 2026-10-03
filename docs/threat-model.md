@@ -104,6 +104,15 @@ snapshots retained by the application. Untrimmed immutable strings may share
 caller storage, and ingestion can temporarily allocate for the complete input;
 this is not a total collector heap or peak-allocation budget.
 
+Collector lifecycle storage uses distinct thread, turn and item components as a
+tuple, including command output and byte accounting. Summary keys preserve unique
+bare item IDs and unambiguous scoped spellings, with collision-free opaque
+fallbacks when arbitrary ID strings conflict. Identity remains available in each
+lifecycle's fields; presentation keys must not be parsed as authority. Correlation
+separates records but does not authenticate peer-provided IDs or content.
+Latest plan deltas append only within the same full tuple; changing thread, turn
+or item identity replaces that latest text and resets its dropped-byte accounting.
+
 For an outbound request admitted to the serialized write queue, accepting its
 correlated result and abandoning it on cancellation or transport failure share
 one synchronized ownership boundary. An accepted response survives later EOF,

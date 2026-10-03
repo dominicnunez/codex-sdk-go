@@ -118,6 +118,9 @@ directions, nil/empty values and representative snapshot cost.
 For bounded histories, verify backing storage as well as visible lengths: own
 trimmed substrings and clear evicted slice slots. Trace every retention writer,
 completion aggregation and snapshots; distinguish bounded text from full items.
+For opaque identity tuples, verify storage and presentation keys separately.
+Reserve compatible bare keys before fallbacks and test adversarial key spellings,
+insertion-order independence, accounting and completion cleanup for each tuple.
 For initialization extensions, own serialized JSON before waiting or child
 launch. A snapshot error must fail admission; do not retain a mutable Go value
 as fallback. Recheck process cancellation after parameter preparation.

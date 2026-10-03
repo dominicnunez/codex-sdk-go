@@ -3,6 +3,7 @@ package appserver
 import (
 	"encoding/json"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"unicode/utf8"
@@ -92,8 +93,9 @@ type StreamSummary struct {
 	NormalizedErrors        []NormalizedStreamError
 	DroppedNormalizedErrors int
 
-	// Keys use the bare item ID when it is unique in the summary and switch to
-	// thread/turn/item scoping only when duplicate item IDs need disambiguation.
+	// Keys preserve unique bare item IDs and unambiguous thread/turn/item keys.
+	// Collisions use an opaque length-prefixed key with leading @ characters.
+	// Read identity from lifecycle fields rather than parsing presentation keys.
 	CommandExecutions map[string]CommandExecutionLifecycle
 	McpToolCalls      map[string]McpToolCallLifecycle
 	WebSearches       map[string]WebSearchLifecycle
@@ -107,31 +109,32 @@ type StreamCollector struct {
 
 	latestPlanText             *string
 	latestPlanItemID           *string
+	latestPlanScope            lifecycleID
 	latestTokenUsage           *ThreadTokenUsage
 	droppedLatestPlanTextBytes int
 
 	normalizedErrors        []NormalizedStreamError
 	droppedNormalizedErrors int
 
-	commandExecutions       map[string]CommandExecutionLifecycle
-	commandOutputChunks     map[string][]string
-	commandOutputDeltaBytes map[string]int
-	commandOutputBytes      map[string]int
-	mcpToolCalls            map[string]McpToolCallLifecycle
-	webSearches             map[string]WebSearchLifecycle
-	fileChanges             map[string]FileChangeLifecycle
+	commandExecutions       map[lifecycleID]CommandExecutionLifecycle
+	commandOutputChunks     map[lifecycleID][]string
+	commandOutputDeltaBytes map[lifecycleID]int
+	commandOutputBytes      map[lifecycleID]int
+	mcpToolCalls            map[lifecycleID]McpToolCallLifecycle
+	webSearches             map[lifecycleID]WebSearchLifecycle
+	fileChanges             map[lifecycleID]FileChangeLifecycle
 }
 
 // NewStreamCollector constructs a ready-to-use collector.
 func NewStreamCollector() *StreamCollector {
 	return &StreamCollector{
-		commandExecutions:       make(map[string]CommandExecutionLifecycle),
-		commandOutputChunks:     make(map[string][]string),
-		commandOutputDeltaBytes: make(map[string]int),
-		commandOutputBytes:      make(map[string]int),
-		mcpToolCalls:            make(map[string]McpToolCallLifecycle),
-		webSearches:             make(map[string]WebSearchLifecycle),
-		fileChanges:             make(map[string]FileChangeLifecycle),
+		commandExecutions:       make(map[lifecycleID]CommandExecutionLifecycle),
+		commandOutputChunks:     make(map[lifecycleID][]string),
+		commandOutputDeltaBytes: make(map[lifecycleID]int),
+		commandOutputBytes:      make(map[lifecycleID]int),
+		mcpToolCalls:            make(map[lifecycleID]McpToolCallLifecycle),
+		webSearches:             make(map[lifecycleID]WebSearchLifecycle),
+		fileChanges:             make(map[lifecycleID]FileChangeLifecycle),
 	}
 }
 
@@ -196,31 +199,31 @@ func (c *StreamCollector) Summary() StreamSummary {
 		out.LatestTokenUsage = cloneThreadTokenUsage(c.latestTokenUsage)
 	}
 
-	commandExecutionCounts := countLifecycleItemIDs(c.commandExecutions, func(v CommandExecutionLifecycle) string { return v.ItemID })
-	mcpToolCallCounts := countLifecycleItemIDs(c.mcpToolCalls, func(v McpToolCallLifecycle) string { return v.ItemID })
-	webSearchCounts := countLifecycleItemIDs(c.webSearches, func(v WebSearchLifecycle) string { return v.ItemID })
-	fileChangeCounts := countLifecycleItemIDs(c.fileChanges, func(v FileChangeLifecycle) string { return v.ItemID })
+	commandKeys := lifecycleSummaryKeys(c.commandExecutions)
+	mcpKeys := lifecycleSummaryKeys(c.mcpToolCalls)
+	webKeys := lifecycleSummaryKeys(c.webSearches)
+	fileKeys := lifecycleSummaryKeys(c.fileChanges)
 
 	for i, err := range c.normalizedErrors {
 		out.NormalizedErrors[i] = cloneNormalizedStreamError(err)
 	}
 	for k, v := range c.commandExecutions {
-		summaryKey := summaryLifecycleKey(v.ThreadID, v.TurnID, v.ItemID, commandExecutionCounts[v.ItemID] > 1)
+		summaryKey := commandKeys.key(k)
 		out.CommandExecutions[summaryKey] = cloneCommandExecutionLifecycle(
 			v,
 			c.commandOutputChunks[k],
 		)
 	}
-	for _, v := range c.mcpToolCalls {
-		summaryKey := summaryLifecycleKey(v.ThreadID, v.TurnID, v.ItemID, mcpToolCallCounts[v.ItemID] > 1)
+	for k, v := range c.mcpToolCalls {
+		summaryKey := mcpKeys.key(k)
 		out.McpToolCalls[summaryKey] = cloneMcpToolCallLifecycle(v)
 	}
-	for _, v := range c.webSearches {
-		summaryKey := summaryLifecycleKey(v.ThreadID, v.TurnID, v.ItemID, webSearchCounts[v.ItemID] > 1)
+	for k, v := range c.webSearches {
+		summaryKey := webKeys.key(k)
 		out.WebSearches[summaryKey] = cloneWebSearchLifecycle(v)
 	}
-	for _, v := range c.fileChanges {
-		summaryKey := summaryLifecycleKey(v.ThreadID, v.TurnID, v.ItemID, fileChangeCounts[v.ItemID] > 1)
+	for k, v := range c.fileChanges {
+		summaryKey := fileKeys.key(k)
 		out.FileChanges[summaryKey] = cloneFileChangeLifecycle(v)
 	}
 
@@ -305,12 +308,9 @@ func (c *StreamCollector) mergePlanDeltaLocked(p *PlanDelta) {
 	if p == nil {
 		return
 	}
-	if c.latestPlanItemID == nil || *c.latestPlanItemID != p.ItemID {
-		c.setLatestPlanTextLocked(p.ItemID, p.Delta)
-		return
-	}
-	if c.latestPlanText == nil {
-		c.setLatestPlanTextLocked(p.ItemID, p.Delta)
+	id := streamLifecycleKey(p.ThreadID, p.TurnID, p.ItemID)
+	if c.latestPlanText == nil || c.latestPlanScope != id {
+		c.setLatestPlanTextLocked(id, p.Delta)
 		return
 	}
 	c.latestPlanItemID = Ptr(p.ItemID)
@@ -326,7 +326,7 @@ func (c *StreamCollector) ingestStartedItemLocked(threadID string, turnID string
 		if v == nil {
 			return
 		}
-		updateLifecycleStateLocked(c.commandExecutions, threadID, turnID, v.ID, func(_ string, lc *CommandExecutionLifecycle) {
+		updateLifecycleStateLocked(c.commandExecutions, threadID, turnID, v.ID, func(_ lifecycleID, lc *CommandExecutionLifecycle) {
 			setLifecycleScope(&lc.ItemID, &lc.ThreadID, &lc.TurnID, v.ID, threadID, turnID)
 			lc.Started = true
 			lc.Status = Ptr(v.Status)
@@ -336,7 +336,7 @@ func (c *StreamCollector) ingestStartedItemLocked(threadID string, turnID string
 		if v == nil {
 			return
 		}
-		updateLifecycleStateLocked(c.mcpToolCalls, threadID, turnID, v.ID, func(_ string, lc *McpToolCallLifecycle) {
+		updateLifecycleStateLocked(c.mcpToolCalls, threadID, turnID, v.ID, func(_ lifecycleID, lc *McpToolCallLifecycle) {
 			setLifecycleScope(&lc.ItemID, &lc.ThreadID, &lc.TurnID, v.ID, threadID, turnID)
 			lc.Started = true
 			lc.Status = Ptr(v.Status)
@@ -346,7 +346,7 @@ func (c *StreamCollector) ingestStartedItemLocked(threadID string, turnID string
 		if v == nil {
 			return
 		}
-		updateLifecycleStateLocked(c.webSearches, threadID, turnID, v.ID, func(_ string, lc *WebSearchLifecycle) {
+		updateLifecycleStateLocked(c.webSearches, threadID, turnID, v.ID, func(_ lifecycleID, lc *WebSearchLifecycle) {
 			setLifecycleScope(&lc.ItemID, &lc.ThreadID, &lc.TurnID, v.ID, threadID, turnID)
 			lc.Started = true
 			lc.StartedItem = cloneWebSearchItem(v)
@@ -355,7 +355,7 @@ func (c *StreamCollector) ingestStartedItemLocked(threadID string, turnID string
 		if v == nil {
 			return
 		}
-		updateLifecycleStateLocked(c.fileChanges, threadID, turnID, v.ID, func(_ string, lc *FileChangeLifecycle) {
+		updateLifecycleStateLocked(c.fileChanges, threadID, turnID, v.ID, func(_ lifecycleID, lc *FileChangeLifecycle) {
 			setLifecycleScope(&lc.ItemID, &lc.ThreadID, &lc.TurnID, v.ID, threadID, turnID)
 			lc.Started = true
 			lc.Status = Ptr(v.Status)
@@ -371,12 +371,12 @@ func (c *StreamCollector) ingestCompletedItemLocked(threadID string, turnID stri
 		if v == nil {
 			return
 		}
-		c.setLatestPlanTextLocked(v.ID, v.Text)
+		c.setLatestPlanTextLocked(streamLifecycleKey(threadID, turnID, v.ID), v.Text)
 	case *CommandExecutionThreadItem:
 		if v == nil {
 			return
 		}
-		key := updateLifecycleStateLocked(c.commandExecutions, threadID, turnID, v.ID, func(key string, lc *CommandExecutionLifecycle) {
+		key := updateLifecycleStateLocked(c.commandExecutions, threadID, turnID, v.ID, func(key lifecycleID, lc *CommandExecutionLifecycle) {
 			setLifecycleScope(&lc.ItemID, &lc.ThreadID, &lc.TurnID, v.ID, threadID, turnID)
 			lc.Completed = true
 			lc.Status = Ptr(v.Status)
@@ -394,7 +394,7 @@ func (c *StreamCollector) ingestCompletedItemLocked(threadID string, turnID stri
 		if v == nil {
 			return
 		}
-		updateLifecycleStateLocked(c.mcpToolCalls, threadID, turnID, v.ID, func(_ string, lc *McpToolCallLifecycle) {
+		updateLifecycleStateLocked(c.mcpToolCalls, threadID, turnID, v.ID, func(_ lifecycleID, lc *McpToolCallLifecycle) {
 			setLifecycleScope(&lc.ItemID, &lc.ThreadID, &lc.TurnID, v.ID, threadID, turnID)
 			lc.Completed = true
 			lc.Status = Ptr(v.Status)
@@ -404,7 +404,7 @@ func (c *StreamCollector) ingestCompletedItemLocked(threadID string, turnID stri
 		if v == nil {
 			return
 		}
-		updateLifecycleStateLocked(c.webSearches, threadID, turnID, v.ID, func(_ string, lc *WebSearchLifecycle) {
+		updateLifecycleStateLocked(c.webSearches, threadID, turnID, v.ID, func(_ lifecycleID, lc *WebSearchLifecycle) {
 			setLifecycleScope(&lc.ItemID, &lc.ThreadID, &lc.TurnID, v.ID, threadID, turnID)
 			lc.Completed = true
 			lc.CompletedItem = cloneWebSearchItem(v)
@@ -413,7 +413,7 @@ func (c *StreamCollector) ingestCompletedItemLocked(threadID string, turnID stri
 		if v == nil {
 			return
 		}
-		updateLifecycleStateLocked(c.fileChanges, threadID, turnID, v.ID, func(_ string, lc *FileChangeLifecycle) {
+		updateLifecycleStateLocked(c.fileChanges, threadID, turnID, v.ID, func(_ lifecycleID, lc *FileChangeLifecycle) {
 			setLifecycleScope(&lc.ItemID, &lc.ThreadID, &lc.TurnID, v.ID, threadID, turnID)
 			lc.Completed = true
 			lc.Status = Ptr(v.Status)
@@ -441,7 +441,7 @@ func collectorItemPointer(item ThreadItem) ThreadItem {
 	}
 }
 
-func updateLifecycleStateLocked[T any](states map[string]T, threadID string, turnID string, itemID string, update func(string, *T)) string {
+func updateLifecycleStateLocked[T any](states map[lifecycleID]T, threadID string, turnID string, itemID string, update func(lifecycleID, *T)) lifecycleID {
 	key := streamLifecycleKey(threadID, turnID, itemID)
 	state := states[key]
 	update(key, &state)
@@ -455,26 +455,70 @@ func setLifecycleScope(targetItemID *string, targetThreadID *string, targetTurnI
 	*targetTurnID = turnID
 }
 
-func streamLifecycleKey(threadID string, turnID string, itemID string) string {
-	if threadID == "" && turnID == "" {
-		return itemID
-	}
-	return threadID + "\x1f" + turnID + "\x1f" + itemID
+type lifecycleID struct {
+	thread string
+	turn   string
+	item   string
 }
 
-func summaryLifecycleKey(threadID string, turnID string, itemID string, duplicate bool) string {
-	if !duplicate || (threadID == "" && turnID == "") {
-		return itemID
-	}
-	return threadID + "/" + turnID + "/" + itemID
+func streamLifecycleKey(threadID string, turnID string, itemID string) lifecycleID {
+	return lifecycleID{thread: threadID, turn: turnID, item: itemID}
 }
 
-func countLifecycleItemIDs[T any](states map[string]T, itemID func(T) string) map[string]int {
-	counts := make(map[string]int, len(states))
-	for _, state := range states {
-		counts[itemID(state)]++
+type lifecycleKeys struct {
+	itemCounts      map[string]int
+	preferredCounts map[string]int
+}
+
+func lifecycleSummaryKeys[T any](states map[lifecycleID]T) lifecycleKeys {
+	if len(states) <= 1 {
+		return lifecycleKeys{}
 	}
-	return counts
+	itemCounts := make(map[string]int, len(states))
+	for id := range states {
+		itemCounts[id.item]++
+	}
+	if len(itemCounts) == len(states) {
+		return lifecycleKeys{} // Every item ID is already a unique bare key.
+	}
+	preferredCounts := make(map[string]int, len(states))
+	// Bare keys have priority over scoped presentation keys, including the
+	// unscoped member of a repeated item-ID family.
+	for id := range states {
+		if itemCounts[id.item] == 1 || (id.thread == "" && id.turn == "") {
+			preferredCounts[id.item] = -1
+		}
+	}
+	for id := range states {
+		if itemCounts[id.item] == 1 || (id.thread == "" && id.turn == "") {
+			continue
+		}
+		key := id.thread + "/" + id.turn + "/" + id.item
+		if preferredCounts[key] != -1 {
+			preferredCounts[key]++
+		}
+	}
+	return lifecycleKeys{itemCounts: itemCounts, preferredCounts: preferredCounts}
+}
+
+func (keys lifecycleKeys) key(id lifecycleID) string {
+	if keys.itemCounts == nil || keys.itemCounts[id.item] == 1 || (id.thread == "" && id.turn == "") {
+		return id.item
+	}
+	key := id.thread + "/" + id.turn + "/" + id.item
+	if keys.preferredCounts[key] == 1 {
+		return key
+	}
+	// Each encoding starts with a decimal length. Distinct tuples therefore
+	// have disjoint namespaces at every leading-@ depth. Check the complete
+	// reserved set before assigning fallbacks, independent of map iteration.
+	key = "@" + strconv.Itoa(len(id.thread)) + ":" + id.thread +
+		strconv.Itoa(len(id.turn)) + ":" + id.turn +
+		strconv.Itoa(len(id.item)) + ":" + id.item
+	for keys.preferredCounts[key] == -1 || keys.preferredCounts[key] == 1 {
+		key = "@" + key
+	}
+	return key
 }
 
 func cloneCommandExecutionItem(in *CommandExecutionThreadItem) *CommandExecutionThreadItem {
@@ -522,8 +566,9 @@ func cloneCommandExecutionLifecycle(in CommandExecutionLifecycle, outputChunks [
 	return cp
 }
 
-func (c *StreamCollector) setLatestPlanTextLocked(itemID string, text string) {
-	c.latestPlanItemID = Ptr(itemID)
+func (c *StreamCollector) setLatestPlanTextLocked(id lifecycleID, text string) {
+	c.latestPlanItemID = Ptr(id.item)
+	c.latestPlanScope = id
 	retained, droppedBytes := retainSuffixWithinByteLimit(text, streamCollectorPlanTextBytesLimit)
 	c.latestPlanText = Ptr(retained)
 	c.droppedLatestPlanTextBytes = droppedBytes
