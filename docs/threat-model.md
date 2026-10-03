@@ -31,7 +31,7 @@ This document describes the codebase at the revision containing it. Implemented 
 
 4. **Server request to application authority:** Command, file-change, permission, dynamic-tool, elicitation, attestation, and token-refresh requests invoke application callbacks. Schema-valid requests are not automatically authorized. The application must decide which user, workspace, account, command, or resource is permitted, and Codex must enforce its execution and sandbox configuration.
 
-5. **Conversation state to application consumers:** Responses and notifications update cached state. Snapshots and listeners cross an ownership boundary where the recipient may mutate returned values. Clone helpers isolate supported protocol values, including disabled plugin IDs, image file IDs, and MCP app UI metadata. This protects state ownership, not the truthfulness of peer-provided content.
+5. **Conversation state to application consumers:** Responses and notifications update cached state. Snapshots and listeners cross an ownership boundary where the recipient may mutate returned values. Clone helpers isolate supported protocol values, including disabled plugin IDs, image file IDs and detail preferences, and MCP app UI metadata. This protects state ownership, not the truthfulness of peer-provided content.
 
 6. **Browser and network to OAuth login:** The normal login flow generates PKCE and state, publishes an authorization URL through a caller callback, receives a local or manual authorization code, and exchanges it at a configured token endpoint. The browser, local requests, pasted input, endpoint configuration, and HTTP client behavior are separate trust concerns.
 

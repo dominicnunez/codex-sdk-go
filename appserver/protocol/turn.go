@@ -305,8 +305,9 @@ func (t *TextUserInput) MarshalJSON() ([]byte, error) {
 
 // ImageUserInput represents image input
 type ImageUserInput struct {
-	URL    string  `json:"url,omitempty"`
-	FileID *string `json:"fileId,omitempty"`
+	URL    string       `json:"url,omitempty"`
+	FileID *string      `json:"fileId,omitempty"`
+	Detail *ImageDetail `json:"detail,omitempty"`
 }
 
 func (i *ImageUserInput) userInput() {}
@@ -340,7 +341,8 @@ func (i *ImageUserInput) UnmarshalJSON(data []byte) error {
 
 // LocalImageUserInput represents local image input
 type LocalImageUserInput struct {
-	Path string `json:"path"`
+	Path   string       `json:"path"`
+	Detail *ImageDetail `json:"detail,omitempty"`
 }
 
 func (l *LocalImageUserInput) userInput() {}
