@@ -78,6 +78,16 @@ These limits do not constitute a total transport or process heap budget. Frame p
 
 Typed decoders validate required fields, selected non-null fields, enums, unions, and request-specific constraints. [Object validation](../appserver/protocol/json_validation.go) and [schema coverage tests](../appserver/protocol/spec_coverage_test.go) help preserve the wire contract. Validation is not universal semantic authorization or a guarantee of canonical JSON: some semantic leaf types use ordinary `encoding/json`, which can allocate when unquoting escaped field names or decoding known duplicate values, and duplicate-member rejection is not a general SDK control. Selected fallback item/turn payloads, unknown variants, open JSON metadata, application configuration maps, and attachments intentionally retain their semantic data. Consumers must validate any additional security meaning before acting on it.
 
+Terminal transport cleanup clears requests awaiting handler registration and
+drains abandoned inbound requests and outbound envelopes. Queue admission is
+coordinated with cleanup, including blocked producers and registration replay,
+so late sends cannot refill stopped queues. Dequeued work claims execution
+against terminal state before entering a handler or external writer. A callback
+or write already claimed may finish and retains its in-flight payload until it
+returns. Accepted response outcomes and the separate notification EOF-drain
+policy remain intact. Releasing transport references is not secure erasure or
+a guarantee that application-owned or actively executing data has been freed.
+
 For an outbound request admitted to the serialized write queue, accepting its
 correlated result and abandoning it on cancellation or transport failure share
 one synchronized ownership boundary. An accepted response survives later EOF,
