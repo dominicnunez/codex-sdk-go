@@ -78,7 +78,17 @@ decision := codex.ReviewDecisionWrapper{
 
 Use `ReviewDecisionApprovedMCPPolicyAmendment` for the MCP policy-amendment string decision. `item/tool/requestUserInput` requests require `isBlocking`; malformed requests are rejected before invoking the handler.
 
-Legacy additional-filesystem permission paths may be relative and are preserved as supplied. Fields defined by the schema as absolute paths, including request working directories, continue to require normalized absolute values.
+Legacy additional-filesystem permission paths and approval cwd, command-action,
+parsed-command and grantRoot strings are preserved as supplied. They may be
+relative, empty or contain dot segments. The SDK does not resolve them against
+cwd or substitute a normalized path before invoking an approval handler. Parsed
+command paths are best-effort metadata; applications may derive a separate path
+for display or policy without replacing the original request evidence.
+
+Fields defined as AbsolutePathBuf, such as typed thread cwd and filesystem watch
+paths, retain their individual absolute-path validation. Approval handlers own
+authorization and any interpretation of opaque strings; schema-valid metadata is
+not an approval or proof that the server resolves a path in a particular way.
 
 ## Compatibility
 

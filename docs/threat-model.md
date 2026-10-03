@@ -91,6 +91,13 @@ A repository file, retrieved resource, MCP tool response, attachment, or model m
 
 Filesystem approval scope retains structured read, write and deny entries, path/glob/special-location variants, scan depth and legacy path strings. Explicit empty entries remain distinct from absent entries, because the runtime gives present entries precedence over legacy lists. Typed approval requests and guardian permission-review metadata validate the known scope before callback dispatch; invalid programmatic grants fail before a successful response is produced. Normalization clones mutable filesystem scope without resolving paths or expanding patterns. Guardian actions retain their generic map shape, with the known `globScanMaxDepth` represented as `json.Number` to preserve integers beyond float64 precision. These controls preserve the requested and granted scope; Codex and the application remain responsible for interpreting paths, authorizing decisions and enforcing access.
 
+Approval cwd, command-action and legacy parsed-command paths, grantRoot, and
+file-change path strings remain opaque request evidence. The SDK does not resolve
+these values against cwd or substitute normalized paths before callbacks. Actual
+AbsolutePathBuf fields retain their separate typed validation. An application
+must distinguish the schema contracts when deriving display paths or applying
+policy; preserved strings do not authenticate a target or grant filesystem access.
+
 The SDK does not fetch or render MCP app UI metadata, execute attachment payloads, or provide an HTML sanitizer. An application that renders model text, links, images, or tool metadata must use appropriate escaping and destination checks. Exposing SDK service methods through HTTP or another remote interface requires a separate authorization boundary.
 
 Typed MCP results preserve arbitrary `_meta` JSON, including explicit null and
