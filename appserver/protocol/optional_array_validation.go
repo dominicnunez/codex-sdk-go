@@ -16,27 +16,50 @@ func validateOptionalStringArrays(data []byte, names ...string) error {
 		// Whole-input validation already established these value boundaries.
 		// Inspect only top-level elements; the wire decoder owns string types,
 		// unquoting and established type-error context.
-		if len(raw) == 0 || raw[0] != '[' {
-			return nil
-		}
-		for start, index := jsonobject.SkipWhitespace(raw, 1), 0; start < len(raw) && raw[start] != ']'; index++ {
-			end, ok := jsonobject.ValueEnd(raw, start)
-			if !ok {
-				return nil
-			}
-			if isNullJSONValue(raw[start:end]) {
+		return validateArrayElements(raw, func(index int, element []byte) error {
+			if isNullJSONValue(element) {
 				return fmt.Errorf("string at index %d must not be null", index)
 			}
-			start = jsonobject.SkipWhitespace(raw, end)
-			if start < len(raw) && raw[start] == ',' {
-				start = jsonobject.SkipWhitespace(raw, start+1)
-			}
+			return nil
+		})
+	}, names...)
+}
+
+// The caller has validated the whole JSON input and owns array type decoding.
+// Iterate borrowed element spans without copying an additional array graph.
+func validateArrayElements(raw []byte, validate func(int, []byte) error) error {
+	if len(raw) == 0 || raw[0] != '[' {
+		return nil
+	}
+	for start, index := jsonobject.SkipWhitespace(raw, 1), 0; start < len(raw) && raw[start] != ']'; index++ {
+		end, ok := jsonobject.ValueEnd(raw, start)
+		if !ok {
+			return nil
+		}
+		if err := validate(index, raw[start:end]); err != nil {
+			return err
+		}
+		start = jsonobject.SkipWhitespace(raw, end)
+		if start < len(raw) && raw[start] == ',' {
+			start = jsonobject.SkipWhitespace(raw, start+1)
+		}
+	}
+	return nil
+}
+
+func validateOptionalArrays(data []byte, elements func([]byte) error, names ...string) error {
+	return validateOptionalFields(data, func(name string, raw []byte) error {
+		if isNullJSONValue(raw) {
+			return responseObjectValidationErrors().null(name)
+		}
+		if elements != nil {
+			return elements(raw)
 		}
 		return nil
 	}, names...)
 }
 
-func validateOptionalArrays(data []byte, elements func([]byte) error, names ...string) error {
+func validateOptionalFields(data []byte, validate func(string, []byte) error, names ...string) error {
 	// Preserve the containing decoder's syntax and non-object error contract.
 	if !json.Valid(data) {
 		return nil
@@ -54,12 +77,8 @@ func validateOptionalArrays(data []byte, elements func([]byte) error, names ...s
 			if !jsonobject.FieldMatchesFolded(key, folded[i]) {
 				continue
 			}
-			if isNullJSONValue(raw) {
-				err = responseObjectValidationErrors().null(name)
-			} else if elements != nil {
-				if cause := elements(raw); cause != nil {
-					err = fmt.Errorf("%s: %w", name, cause)
-				}
+			if cause := validate(name, raw); cause != nil {
+				err = fmt.Errorf("%s: %w", name, cause)
 			}
 			return
 		}

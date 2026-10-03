@@ -103,17 +103,18 @@ thread lifecycle, reasoning, text-input and workspace-sandbox carriers. Guards
 cover the folded and escaped names accepted by their existing wire decoders;
 invalid earlier occurrences remain failures after valid duplicates. Nullable
 arrays retain their separate schema contracts, and opaque strings do not gain
-path restrictions. Marketplace error records validate their required string
-members and their absolute marketplace paths. Formerly plain concrete variants
-retain valid receiver merging and omitted-field state through their custom
-decoders; fresh response owners retain
-replacement semantics. Any failure returned by a concrete custom decoder,
-including an established sibling type mismatch, can stop an enclosing application
-decoder and supersede an earlier saved outer type error. Go may attribute its
-field context to the enclosing type while its byte offset remains relative to
-the concrete value; callers must not consume a failed decode. Applications
-embedding a type with JSON methods anonymously must implement their envelope methods to
-avoid Go method promotion; named members preserve normal envelope traversal.
+path restrictions. Marketplace error records require their canonical schema
+members, reject nulls through recognized aliases, and validate the same final
+absolute path that the wire decoder publishes. Validation uses existing response,
+Config and union owners after their established decoding and semantic checks.
+The formerly plain concrete representations retain ordinary Go JSON decoding,
+receiver merging, error context and named or anonymous envelope traversal;
+decoding those representations directly does not perform SDK carrier admission.
+Fresh response owners retain replacement semantics. Config retains its existing
+merge and partial-update behavior; callers must not consume a failed decode.
+New admission errors propagate through existing custom decoders and can stop
+outer traversal or precede later service validation. This does not establish
+error parity for payloads that newly fail the array contract.
 These admission checks neither authorize the reported data nor bound the number
 of valid elements or callback-owned copies.
 

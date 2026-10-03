@@ -519,7 +519,14 @@ func decodePlanThreadItem(data []byte) (ThreadItem, error) {
 }
 
 func decodeReasoningThreadItem(data []byte) (ThreadItem, error) {
-	return decodeThreadItemInto(data, &ReasoningThreadItem{}, "id")
+	item, err := decodeThreadItemInto(data, &ReasoningThreadItem{}, "id")
+	if err != nil {
+		return nil, err
+	}
+	if err := validateOptionalStringArrays(data, "content", "summary"); err != nil {
+		return nil, err
+	}
+	return item, nil
 }
 
 func decodeCommandExecutionThreadItem(data []byte) (ThreadItem, error) {

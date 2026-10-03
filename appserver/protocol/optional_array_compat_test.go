@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
-	"strings"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go/appserver/protocol"
@@ -12,8 +11,8 @@ import (
 
 func TestOptionalArrayPlainReceiverCompatibility(t *testing.T) {
 	// Independent, method-free stdlib models retain the original public type
-	// names, field tags and error context. Forbidden null arrays are deliberately
-	// excluded from this valid/established-type-error compatibility comparison.
+	// names, field tags and error context. These public representation types keep
+	// ordinary Go decoding; strict admission belongs to the SDK carrier owners.
 	type ReasoningThreadItem codex.ReasoningThreadItem
 	type TextUserInput codex.TextUserInput
 	type SandboxWorkspaceWrite codex.SandboxWorkspaceWrite
@@ -29,7 +28,7 @@ func TestOptionalArrayPlainReceiverCompatibility(t *testing.T) {
 		{"policy", &codex.SandboxPolicyWorkspaceWrite{WritableRoots: []string{"/tmp/prior"}}, &SandboxPolicyWorkspaceWrite{WritableRoots: []string{"/tmp/prior"}}, []string{`{}`, `null`, `{"WRITABLEROOTS":["/tmp/new"]}`, `{"writableRoots":42,"networkAccess":true}`, `{"networkAccess":42,"writableRoots":["/tmp/new"]}`, `[]`}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			for _, body := range tc.bodies {
+			for _, body := range append(tc.bodies, `{"summary":null,"content":[null],"text_elements":null,"writable_roots":[null],"writableRoots":null}`) {
 				gotErr := json.Unmarshal([]byte(body), tc.actual)
 				wantErr := json.Unmarshal([]byte(body), tc.reference)
 				var wantType *json.UnmarshalTypeError
@@ -62,12 +61,11 @@ func TestOptionalArrayNamedEnvelope(t *testing.T) {
 	if envelope.Before != "b" || envelope.After != "a" || !reflect.DeepEqual(envelope.Item.Summary, []string{"s"}) {
 		t.Fatal("named envelope lost valid sibling data")
 	}
-	prior := envelope.Item.Summary
-	if err := json.Unmarshal([]byte(`{"before":"changed","item":{"summary":null},"after":"unreached"}`), &envelope); err == nil {
-		t.Fatal("enclosing decoder accepted forbidden array")
+	if err := json.Unmarshal([]byte(`{"before":"changed","item":{"summary":null},"after":"a2"}`), &envelope); err != nil {
+		t.Fatal(err)
 	}
-	if envelope.Before != "changed" || envelope.After != "a" || !reflect.DeepEqual(prior, envelope.Item.Summary) {
-		t.Fatal("failed enclosing decode or retained item state differs from documented boundary")
+	if envelope.Before != "changed" || envelope.After != "a2" || envelope.Item.Summary != nil {
+		t.Fatal("plain representation no longer preserves stdlib envelope/null behavior")
 	}
 }
 
@@ -94,16 +92,14 @@ func TestOptionalArrayFailedEnvelopeBoundary(t *testing.T) {
 			if !errors.As(gotErr, &got) || !errors.As(wantErr, &want) {
 				t.Fatalf("actual=%v reference=%v", gotErr, wantErr)
 			}
-			var inner ReasoningThreadItem
-			var innerType *json.UnmarshalTypeError
-			if !errors.As(json.Unmarshal([]byte(item), &inner), &innerType) {
-				t.Fatal("invalid reference item did not fail")
+			if want.Struct == "referenceEnvelope" {
+				want.Struct = "actualEnvelope"
 			}
-			if got.Field != "item."+innerType.Field || got.Struct != "actualEnvelope" || got.Offset != innerType.Offset {
-				t.Fatalf("concrete error composition = %+v, inner=%+v", got, innerType)
+			if !reflect.DeepEqual(got, want) {
+				t.Fatalf("error composition differs from stdlib: got=%+v, want=%+v", got, want)
 			}
-			if actual.After != "" || reference.After != "a" {
-				t.Fatal("failed custom item no longer stops outer traversal as documented")
+			if actual.After != "a" || reference.After != "a" || actual.Before != reference.Before || !reflect.DeepEqual(ReasoningThreadItem(actual.Item), reference.Item) {
+				t.Fatal("partial receiver updates differ from stdlib")
 			}
 			if before == `"bad"` && want.Field != "before" {
 				t.Fatal("stdlib reference no longer retains first outer type error")
@@ -112,13 +108,8 @@ func TestOptionalArrayFailedEnvelopeBoundary(t *testing.T) {
 	}
 	var item codex.ReasoningThreadItem
 	err := json.Unmarshal([]byte(`{"summary":[42,null]}`), &item)
-	if err == nil || !strings.Contains(err.Error(), "index 1") {
-		t.Fatalf("mixed invalid/null list guard = %v", err)
-	}
-	// The new null-admission failure takes precedence in a formerly plain
-	// concrete owner; this is not an established valid-array type-error claim.
 	var typeError *json.UnmarshalTypeError
-	if errors.As(err, &typeError) {
-		t.Fatal("mixed null list unexpectedly reported only the saved scalar mismatch")
+	if !errors.As(err, &typeError) {
+		t.Fatalf("mixed list lost established scalar mismatch: %v", err)
 	}
 }

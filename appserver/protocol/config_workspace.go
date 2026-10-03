@@ -38,7 +38,14 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 	if typeError != nil && typeError.Struct == "" && typeError.Field == "forced_chatgpt_workspace_id" {
 		typeError.Struct = "Config"
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	// This existing Config owner admits the nested variant. Leave its public
+	// representation method-free so application envelopes keep stdlib decoding.
+	return validateOptionalFields(data, func(_ string, raw []byte) error {
+		return validateOptionalStringArrays(raw, "writable_roots")
+	}, "sandbox_workspace_write")
 }
 
 type configWithoutMethods Config

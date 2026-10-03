@@ -86,6 +86,9 @@ func (r *ThreadStartResponse) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	decoded.Cwd = validatedCwd
+	if err := validateOptionalStringArrays(data, "disabledPluginIds", "instructionSources"); err != nil {
+		return err
+	}
 	*r = ThreadStartResponse(decoded)
 	return nil
 }
@@ -103,7 +106,7 @@ func validateThreadLifecycleResponseObject(data []byte) error {
 	); err != nil {
 		return err
 	}
-	return validateOptionalStringArrays(data, "disabledPluginIds", "instructionSources")
+	return nil
 }
 
 func validateThreadLifecycleResponseFields(
@@ -408,6 +411,9 @@ func (r *ThreadResumeResponse) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	decoded.Cwd = validatedCwd
+	if err := validateOptionalStringArrays(data, "disabledPluginIds", "instructionSources"); err != nil {
+		return err
+	}
 	*r = ThreadResumeResponse(decoded)
 	return nil
 }
@@ -484,6 +490,9 @@ func (r *ThreadForkResponse) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	decoded.Cwd = validatedCwd
+	if err := validateOptionalStringArrays(data, "disabledPluginIds", "instructionSources"); err != nil {
+		return err
+	}
 	*r = ThreadForkResponse(decoded)
 	return nil
 }

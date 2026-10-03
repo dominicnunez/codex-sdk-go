@@ -122,10 +122,7 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 	); err != nil {
 		return err
 	}
-	if err := validateObjectFields(data, nil, []string{"additionalSpeedTiers", "serviceTiers", "inputModalities"}); err != nil {
-		return err
-	}
-	if err := validateOptionalArrays(data, nil, "inputModalities", "additionalSpeedTiers", "serviceTiers"); err != nil {
+	if err := validateObjectFields(data, nil, []string{"additionalSpeedTiers", "serviceTiers"}); err != nil {
 		return err
 	}
 	type wire Model
@@ -142,6 +139,9 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	decoded.AdditionalSpeedTiers = []string(lists.AdditionalSpeedTiers)
+	if err := validateOptionalArrays(data, nil, "inputModalities", "additionalSpeedTiers", "serviceTiers"); err != nil {
+		return err
+	}
 	*m = Model(decoded)
 	return nil
 }

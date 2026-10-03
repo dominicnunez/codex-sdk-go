@@ -88,6 +88,7 @@ func TestOptionalPluginResponseArrays(t *testing.T) {
 			invalid := []string{"null", `true`, `{}`, `"text"`, `[null]`, `[42]`}
 			if tc.field == "marketplaceLoadErrors" {
 				invalid = append(invalid, `[{}]`, `[{"message":"missing path"}]`, `[{"marketplacePath":null,"message":"bad path"}]`, `[{"marketplacePath":"/tmp/plugins","message":null}]`, `[{"marketplacePath":"relative","message":"bad path"}]`, `[{"marketplacePath":"","message":"bad path"}]`)
+				invalid = append(invalid, `[{"marketplacePath":"/tmp/plugins","MARKETPLACEPATH":"relative","message":"bad path"}]`, `[{"marketplacePath":"/tmp/plugins","MARKETPLACEPATH":null,"message":"bad path"}]`, `[{"marketplacePath":"/tmp/plugins","message":"bad message","MESSAGE":null}]`)
 			}
 			for _, value := range invalid {
 				for _, suffix := range []string{"", `,"` + tc.field + `":[]`} {
@@ -144,12 +145,8 @@ func TestOptionalArraySiblingOwners(t *testing.T) {
 		{"fork-instructions", string(lifecycle), "instructionSources", `["", "source"]`, func() any { return &codex.ThreadForkResponse{} }},
 		{"reasoning-summary", `{"type":"reasoning","id":"r"}`, "summary", `["", "summary"]`, func() any { return &codex.ThreadItemWrapper{} }},
 		{"reasoning-content", `{"type":"reasoning","id":"r"}`, "content", `["", "content"]`, func() any { return &codex.ThreadItemWrapper{} }},
-		{"reasoning-direct", `{"id":"r"}`, "summary", `["", "summary"]`, func() any { return &codex.ReasoningThreadItem{} }},
 		{"text", `{"type":"text","text":"hello"}`, "text_elements", `[{"byteRange":{"start":0,"end":1}}]`, func() any { return &optionalTextInput{} }},
-		{"text-direct", `{"text":"hello"}`, "text_elements", `[{"byteRange":{"start":0,"end":1}}]`, func() any { return &codex.TextUserInput{} }},
-		{"config-workspace", `{}`, "writable_roots", `["", "relative"]`, func() any { return &codex.SandboxWorkspaceWrite{} }},
 		{"workspace-policy", `{"type":"workspaceWrite"}`, "writableRoots", `["/tmp/project"]`, func() any { return &codex.SandboxPolicyWrapper{} }},
-		{"workspace-direct", `{}`, "writableRoots", `["/tmp/project"]`, func() any { return &codex.SandboxPolicyWorkspaceWrite{} }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			body := func(value, extra string) string {
@@ -191,12 +188,8 @@ func TestOptionalArraySiblingOwners(t *testing.T) {
 			if err := json.Unmarshal([]byte(tc.base), receiver); err != nil {
 				t.Fatal(err)
 			}
-			retains := tc.name == "reasoning-direct" || tc.name == "text-direct" || tc.name == "config-workspace" || tc.name == "workspace-direct"
 			array := optionalArrayValue(t, receiver, tc.field)
-			if retains && !reflect.DeepEqual(before, array.Interface()) {
-				t.Fatal("direct stdlib omission no longer retains prior array")
-			}
-			if !retains && array.Len() != 0 {
+			if array.Len() != 0 {
 				t.Fatal("fresh owner omission retained prior array")
 			}
 			if err := json.Unmarshal([]byte(body("[]", "")), receiver); err != nil {
