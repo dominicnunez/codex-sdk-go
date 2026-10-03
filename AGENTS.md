@@ -51,6 +51,9 @@ must share an ownership boundary; a channel peek cannot cover a separate claim
 and publication. Verify accepted outcomes and absent-response failures with both
 writer-pending and simultaneously ready terminal signals. Preserve actual-write
 completion for notifications and internal replies.
+For terminal payload release, coordinate queue admission and draining at one
+ownership boundary. Trace pre-handler storage, replay and dequeued execution
+claims; preserve accepted outcomes and notification delivery after reader EOF.
 
 `Client` wraps a `Transport` and provides typed methods for every JSON-RPC request. Timeout handling, error classification (`RPCError`, `TimeoutError`, `CanceledError`, `TransportError`), and notification dispatch all live here.
 

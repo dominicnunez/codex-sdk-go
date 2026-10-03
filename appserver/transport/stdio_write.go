@@ -64,6 +64,16 @@ func (t *StdioTransport) queuePayload(ctx context.Context, data []byte, op strin
 	if err := ctx.Err(); err != nil {
 		return writeEnvelope{}, err
 	}
+	// Stop cancels blocked producers before taking the exclusive gate. It then
+	// drains every admitted envelope and rejects subsequent admissions.
+	t.queueAdmissionMu.RLock()
+	defer t.queueAdmissionMu.RUnlock()
+	if t.queuesStopped {
+		if watchReaderStop {
+			return writeEnvelope{}, t.transportStopError(op)
+		}
+		return writeEnvelope{}, NewTransportError(op, errTransportClosed)
+	}
 	env := writeEnvelope{
 		payload: data,
 		done:    make(chan error, 1),
@@ -231,6 +241,14 @@ func (t *StdioTransport) writeLoop() {
 		if !ok {
 			return
 		}
+		// Claim execution at the terminal-state boundary. A write claimed before
+		// stop may finish afterward, but a dequeued abandoned write cannot start.
+		t.mu.Lock()
+		stopped := t.closed || t.ctx.Err() != nil
+		t.mu.Unlock()
+		if stopped {
+			return
+		}
 
 		err := t.writeRawMessage(env.payload)
 		if err != nil {
@@ -239,5 +257,36 @@ func (t *StdioTransport) writeLoop() {
 			return
 		}
 		env.done <- nil
+	}
+}
+
+func (t *StdioTransport) discardQueuedWork() {
+	t.queueAdmissionMu.Lock()
+	defer t.queueAdmissionMu.Unlock()
+	t.queuesStopped = true
+	for {
+		select {
+		case _, ok := <-t.requestQueue:
+			if !ok {
+				goto writes
+			}
+		default:
+			goto writes
+		}
+	}
+writes:
+	for {
+		select {
+		case env, ok := <-t.writeQueue:
+			if !ok {
+				return
+			}
+			select {
+			case env.done <- t.transportStopError("write message"):
+			default:
+			}
+		default:
+			return
+		}
 	}
 }

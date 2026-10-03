@@ -29,6 +29,7 @@ const (
 	requestHandlerResolved requestHandlerResolution = iota
 	requestHandlerQueued
 	requestHandlerQueueFull
+	requestHandlerStopped
 )
 
 // inbound/outbound queue sizing. These are intentionally conservative defaults:
@@ -98,6 +99,8 @@ type StdioTransport struct {
 	criticalNotifQueue  chan bufferedNotification
 	notifQueue          chan bufferedNotification
 	writeQueue          chan writeEnvelope
+	queueAdmissionMu    sync.RWMutex
+	queuesStopped       bool // guarded by queueAdmissionMu
 	readerStopped       chan struct{}
 	once                sync.Once
 	startReadLoopOnce   sync.Once
@@ -392,7 +395,9 @@ func swapPendingHandler[T any](t *StdioTransport, setHandler func(), pendingStor
 }
 
 func replayPending[T any](pending []T, enqueue func(T)) {
-	for _, item := range pending {
+	for i, item := range pending {
+		var zero T
+		pending[i] = zero
 		enqueue(item)
 	}
 }
@@ -666,14 +671,20 @@ func (t *StdioTransport) writeErrorResponse(id RequestID, code int, message stri
 }
 
 func (t *StdioTransport) enqueueRequest(req Request) {
+	t.queueAdmissionMu.RLock()
+	if t.queuesStopped || t.ctx.Err() != nil {
+		t.queueAdmissionMu.RUnlock()
+		return
+	}
 	select {
 	case <-t.ctx.Done():
-		return
 	case t.requestQueue <- req:
-		return
 	default:
+		t.queueAdmissionMu.RUnlock()
 		t.rejectRequestForOverload(req)
+		return
 	}
+	t.queueAdmissionMu.RUnlock()
 }
 
 func pendingRequestTransportError(op string, cause error) error {
@@ -802,11 +813,13 @@ func (t *StdioTransport) stopAfterReaderTermination(scanErr error) {
 func (t *StdioTransport) takeStopResourcesLocked() (map[string]pendingReq, context.CancelFunc, io.Closer) {
 	pending := t.pendingReqs
 	t.pendingReqs = make(map[string]pendingReq)
+	t.pendingReqHandler = nil
 	return pending, t.cancelCtx, t.readerCloser
 }
 
 func (t *StdioTransport) finishTransportStop(cancel context.CancelFunc, readerCloser io.Closer) {
 	cancel()
+	t.discardQueuedWork()
 	t.wakeTurnScopedNotificationWorkers()
 	if readerCloser != nil {
 		_ = readerCloser.Close()
@@ -819,6 +832,8 @@ func (t *StdioTransport) handleRequest(req Request) {
 	if handler == nil {
 		switch resolution {
 		case requestHandlerQueued:
+			return
+		case requestHandlerStopped:
 			return
 		case requestHandlerQueueFull:
 			t.rejectRequestForOverload(req)
@@ -870,6 +885,9 @@ func reportRecoveredPanic(handler func(any), value any) {
 func (t *StdioTransport) resolveRequestHandler(req Request) (RequestHandler, func(any), requestHandlerResolution) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	if t.closed || t.ctx.Err() != nil {
+		return nil, nil, requestHandlerStopped
+	}
 
 	if t.reqHandler != nil {
 		return t.reqHandler, t.panicHandler, requestHandlerResolved
