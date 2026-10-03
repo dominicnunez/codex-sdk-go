@@ -223,14 +223,14 @@ func (s *Stream) Events() iter.Seq2[Event, error] {
 	return s.events
 }
 
-// Result returns the RunResult after the stream has completed.
+// Result returns an independent snapshot of the RunResult after completion.
 // Blocks until the turn finishes. Returns nil if the turn errored
 // (the error was already surfaced through the Events iterator).
 func (s *Stream) Result() *RunResult {
 	<-s.done
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.result
+	return cloneArbitraryValue(s.result)
 }
 
 // RunStreamed executes a single-turn conversation like Run, but yields events

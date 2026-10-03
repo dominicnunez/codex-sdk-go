@@ -104,20 +104,13 @@ type CollabToolCallEvent struct {
 func (*CollabToolCallEvent) streamEvent() {}
 
 func newCollabEvent(phase CollabToolCallPhase, c *CollabAgentToolCallThreadItem) *CollabToolCallEvent {
-	states := make(map[string]CollabAgentState, len(c.AgentsStates))
-	for k, v := range c.AgentsStates {
-		states[k] = v
-	}
-	ids := make([]string, len(c.ReceiverThreadIds))
-	copy(ids, c.ReceiverThreadIds)
-
 	return &CollabToolCallEvent{
 		Phase:             phase,
 		ID:                c.ID,
 		Tool:              c.Tool,
 		Status:            c.Status,
-		AgentsStates:      states,
-		ReceiverThreadIds: ids,
+		AgentsStates:      cloneArbitraryValue(c.AgentsStates),
+		ReceiverThreadIds: cloneArbitraryValue(c.ReceiverThreadIds),
 		SenderThreadId:    c.SenderThreadId,
 		Prompt:            cloneStringPtr(c.Prompt),
 	}

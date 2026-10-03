@@ -164,10 +164,10 @@ func buildRunResult(thread Thread, turn Turn, items []ThreadItemWrapper) *RunRes
 }
 
 func turnWithItems(turn Turn, items []ThreadItemWrapper) Turn {
-	cp := turn
-	cp.Items = cloneThreadItems(items)
-	cp.Error = cloneTurnError(turn.Error)
-	return cp
+	// Select collected items before copying; superseded completion items must
+	// not create an unnecessary second history-sized graph.
+	turn.Items = items
+	return cloneTurn(turn)
 }
 
 // Run executes a single-turn conversation: creates a thread, starts a turn
