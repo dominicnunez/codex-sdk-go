@@ -43,34 +43,34 @@ func (r *ConfigReadResponse) UnmarshalJSON(data []byte) error {
 // Config represents the effective configuration
 type Config struct {
 	// Apps contains experimental connector configuration when provided by the server.
-	Apps                            *AppsConfig                 `json:"apps,omitempty"`
-	BrowserUse                      *BrowserUseConfig           `json:"browser_use,omitempty"`
-	ComputerUse                     *ComputerUseConfig          `json:"computer_use,omitempty"`
-	Analytics                       *AnalyticsConfig            `json:"analytics,omitempty"`
-	ApprovalPolicy                  *AskForApprovalWrapper      `json:"approval_policy,omitempty"`
-	ApprovalsReviewer               *ApprovalsReviewer          `json:"approvals_reviewer,omitempty"`
-	Desktop                         map[string]json.RawMessage  `json:"desktop,omitzero"`
-	CompactPrompt                   *string                     `json:"compact_prompt,omitempty"`
-	DeveloperInstructions           *string                     `json:"developer_instructions,omitempty"`
-	ForcedChatgptWorkspaceID        *string                     `json:"forced_chatgpt_workspace_id,omitempty"`
-	ForcedLoginMethod               *ForcedLoginMethod          `json:"forced_login_method,omitempty"`
-	Instructions                    *string                     `json:"instructions,omitempty"`
-	Model                           *string                     `json:"model,omitempty"`
-	ModelAutoCompactTokenLimit      *int64                      `json:"model_auto_compact_token_limit,omitempty"`
-	ModelAutoCompactTokenLimitScope *AutoCompactTokenLimitScope `json:"model_auto_compact_token_limit_scope,omitempty"`
-	ModelContextWindow              *int64                      `json:"model_context_window,omitempty"`
-	ModelProvider                   *string                     `json:"model_provider,omitempty"`
-	ModelReasoningEffort            *ReasoningEffort            `json:"model_reasoning_effort,omitempty"`
-	ModelReasoningSummary           *ReasoningSummaryWrapper    `json:"model_reasoning_summary,omitempty"`
-	ModelVerbosity                  *Verbosity                  `json:"model_verbosity,omitempty"`
-	Profile                         *string                     `json:"profile,omitempty"`
-	Profiles                        map[string]ProfileV2        `json:"profiles,omitempty"`
-	ReviewModel                     *string                     `json:"review_model,omitempty"`
-	SandboxMode                     *SandboxMode                `json:"sandbox_mode,omitempty"`
-	ServiceTier                     *string                     `json:"service_tier,omitempty"`
-	SandboxWorkspaceWrite           *SandboxWorkspaceWrite      `json:"sandbox_workspace_write,omitempty"`
-	Tools                           *ToolsV2                    `json:"tools,omitempty"`
-	WebSearch                       *WebSearchMode              `json:"web_search,omitempty"`
+	Apps                            *AppsConfig                                  `json:"apps,omitempty"`
+	BrowserUse                      *BrowserUseConfig                            `json:"browser_use,omitempty"`
+	ComputerUse                     *ComputerUseConfig                           `json:"computer_use,omitempty"`
+	Analytics                       *AnalyticsConfig                             `json:"analytics,omitempty"`
+	ApprovalPolicy                  *AskForApprovalWrapper                       `json:"approval_policy,omitempty"`
+	ApprovalsReviewer               *ApprovalsReviewer                           `json:"approvals_reviewer,omitempty"`
+	Desktop                         OptionalNullable[map[string]json.RawMessage] `json:"desktop,omitzero"`
+	CompactPrompt                   *string                                      `json:"compact_prompt,omitempty"`
+	DeveloperInstructions           *string                                      `json:"developer_instructions,omitempty"`
+	ForcedChatgptWorkspaceID        *string                                      `json:"forced_chatgpt_workspace_id,omitempty"`
+	ForcedLoginMethod               *ForcedLoginMethod                           `json:"forced_login_method,omitempty"`
+	Instructions                    *string                                      `json:"instructions,omitempty"`
+	Model                           *string                                      `json:"model,omitempty"`
+	ModelAutoCompactTokenLimit      *int64                                       `json:"model_auto_compact_token_limit,omitempty"`
+	ModelAutoCompactTokenLimitScope *AutoCompactTokenLimitScope                  `json:"model_auto_compact_token_limit_scope,omitempty"`
+	ModelContextWindow              *int64                                       `json:"model_context_window,omitempty"`
+	ModelProvider                   *string                                      `json:"model_provider,omitempty"`
+	ModelReasoningEffort            *ReasoningEffort                             `json:"model_reasoning_effort,omitempty"`
+	ModelReasoningSummary           *ReasoningSummaryWrapper                     `json:"model_reasoning_summary,omitempty"`
+	ModelVerbosity                  *Verbosity                                   `json:"model_verbosity,omitempty"`
+	Profile                         *string                                      `json:"profile,omitempty"`
+	Profiles                        map[string]ProfileV2                         `json:"profiles,omitempty"`
+	ReviewModel                     *string                                      `json:"review_model,omitempty"`
+	SandboxMode                     *SandboxMode                                 `json:"sandbox_mode,omitempty"`
+	ServiceTier                     *string                                      `json:"service_tier,omitempty"`
+	SandboxWorkspaceWrite           *SandboxWorkspaceWrite                       `json:"sandbox_workspace_write,omitempty"`
+	Tools                           *ToolsV2                                     `json:"tools,omitempty"`
+	WebSearch                       *WebSearchMode                               `json:"web_search,omitempty"`
 }
 
 // AnalyticsConfig represents analytics configuration

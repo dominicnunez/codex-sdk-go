@@ -102,6 +102,11 @@ or billing evidence. Plugin schedules are decoded as data; the SDK does not run
 their prompts. External config imports return the required import ID so callers
 can correlate progress and completion; that ID does not authenticate the peer or
 prove that an import completed.
+New nullable collection fields retain absence, explicit null and present empty
+values separately. Their exported presence and value state can be copied without
+sharing collection storage. Nullable scalar and struct-pointer fields retain the
+SDK's existing nil-as-unspecified convention; exact null/absence preservation is
+not a general guarantee for all optional protocol fields.
 
 [Apps configuration decoding](../appserver/protocol/config_apps.go) retains connector defaults, per-tool and per-account approval settings, and omitted model-facing tool surfaces returned by `config/read`. It validates enum values and preserves explicit disabled settings. These values describe server configuration; the SDK does not apply them as an authorization decision, enforce tool exposure, or authenticate the account-link IDs. Codex and the embedding application remain responsible for actual enforcement.
 

@@ -26,6 +26,9 @@ union branches, including nested definitions. Check custom wire structs and
 assignment lists through public calls; type-name coverage cannot detect field
 loss. Preserve present empty values and legacy public fields without requiring
 fields absent from the current schema.
+For nullable collections, distinguish absent, null, empty and populated values
+with JSON member checks. Trace aliases, duplicate/reset and reused receiver
+behavior; presence state must preserve the shared deep-copy contract.
 
 ## Architecture
 

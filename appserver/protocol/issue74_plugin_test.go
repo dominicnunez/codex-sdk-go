@@ -204,10 +204,10 @@ func TestIssue74PluginOptionalAndInvalidMetadata(t *testing.T) {
 				t.Fatal(err)
 			}
 			got := issue74JSON(t, resp.Plugin)
-			if !reflect.DeepEqual(got["scheduledTasks"], value) {
+			if actual, found := got["scheduledTasks"]; !found || !reflect.DeepEqual(actual, value) {
 				t.Errorf("scheduledTasks = %#v; want %#v", got["scheduledTasks"], value)
 			}
-			if !reflect.DeepEqual(got["summary"].(map[string]any)["eligiblePlanTypes"], value) {
+			if actual, found := got["summary"].(map[string]any)["eligiblePlanTypes"]; !found || !reflect.DeepEqual(actual, value) {
 				t.Errorf("eligiblePlanTypes lost empty/null distinction")
 			}
 		})

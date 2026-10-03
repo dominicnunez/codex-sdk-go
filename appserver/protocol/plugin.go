@@ -292,7 +292,7 @@ func (p *PluginSource) UnmarshalJSON(data []byte) error {
 // PluginSummary contains marketplace plugin summary metadata.
 type PluginSummary struct {
 	DisabledReason                   *PluginDisabledReason      `json:"disabledReason,omitempty"`
-	EligiblePlanTypes                []string                   `json:"eligiblePlanTypes,omitzero"`
+	EligiblePlanTypes                OptionalNullable[[]string] `json:"eligiblePlanTypes,omitzero"`
 	InstallPolicySource              *PluginInstallPolicySource `json:"installPolicySource,omitempty"`
 	InstalledAt                      *int64                     `json:"installedAt,omitempty"`
 	MustShowInstallationInterstitial *bool                      `json:"mustShowInstallationInterstitial,omitempty"`
@@ -315,7 +315,7 @@ type PluginSummary struct {
 func (p *PluginSummary) UnmarshalJSON(data []byte) error {
 	type pluginSummaryWire struct {
 		DisabledReason                   *PluginDisabledReason      `json:"disabledReason"`
-		EligiblePlanTypes                nonNullStringList          `json:"eligiblePlanTypes"`
+		EligiblePlanTypes                OptionalNullable[[]string] `json:"eligiblePlanTypes"`
 		InstallPolicySource              *PluginInstallPolicySource `json:"installPolicySource"`
 		InstalledAt                      *int64                     `json:"installedAt"`
 		MustShowInstallationInterstitial *bool                      `json:"mustShowInstallationInterstitial"`
@@ -606,8 +606,8 @@ type ScheduledTaskSchedule interface{ isScheduledTaskSchedule() }
 
 // HourlyScheduledTaskSchedule runs at a fixed hourly interval, optionally on selected days.
 type HourlyScheduledTaskSchedule struct {
-	Days          []ScheduledTaskWeekday `json:"days,omitzero"`
-	IntervalHours uint32                 `json:"intervalHours"`
+	Days          OptionalNullable[[]ScheduledTaskWeekday] `json:"days,omitzero"`
+	IntervalHours uint32                                   `json:"intervalHours"`
 }
 
 func (HourlyScheduledTaskSchedule) isScheduledTaskSchedule() {}
@@ -852,34 +852,34 @@ func (s *SkillSummary) UnmarshalJSON(data []byte) error {
 
 // PluginDetail contains full plugin details.
 type PluginDetail struct {
-	AppTemplates    []AppTemplateSummary   `json:"appTemplates"`
-	ScheduledTasks  []ScheduledTaskSummary `json:"scheduledTasks,omitzero"`
-	ShareURL        *string                `json:"shareUrl,omitempty"`
-	Apps            []AppSummary           `json:"apps"`
-	Description     *string                `json:"description,omitempty"`
-	Hooks           []PluginHookSummary    `json:"hooks"`
-	MarketplaceName string                 `json:"marketplaceName"`
-	MarketplacePath *string                `json:"marketplacePath,omitempty"`
-	McpServers      []string               `json:"mcpServers"`
-	Skills          []SkillSummary         `json:"skills"`
-	Summary         PluginSummary          `json:"summary"`
-	OnboardingSkill *SkillSummary          `json:"onboardingSkill,omitempty"`
+	AppTemplates    []AppTemplateSummary                     `json:"appTemplates"`
+	ScheduledTasks  OptionalNullable[[]ScheduledTaskSummary] `json:"scheduledTasks,omitzero"`
+	ShareURL        *string                                  `json:"shareUrl,omitempty"`
+	Apps            []AppSummary                             `json:"apps"`
+	Description     *string                                  `json:"description,omitempty"`
+	Hooks           []PluginHookSummary                      `json:"hooks"`
+	MarketplaceName string                                   `json:"marketplaceName"`
+	MarketplacePath *string                                  `json:"marketplacePath,omitempty"`
+	McpServers      []string                                 `json:"mcpServers"`
+	Skills          []SkillSummary                           `json:"skills"`
+	Summary         PluginSummary                            `json:"summary"`
+	OnboardingSkill *SkillSummary                            `json:"onboardingSkill,omitempty"`
 }
 
 func (p *PluginDetail) UnmarshalJSON(data []byte) error {
 	type pluginDetailWire struct {
-		AppTemplates    *[]AppTemplateSummary  `json:"appTemplates"`
-		ScheduledTasks  []ScheduledTaskSummary `json:"scheduledTasks"`
-		ShareURL        *string                `json:"shareUrl"`
-		Apps            *[]AppSummary          `json:"apps"`
-		Description     *string                `json:"description"`
-		Hooks           *[]PluginHookSummary   `json:"hooks"`
-		MarketplaceName *string                `json:"marketplaceName"`
-		MarketplacePath *string                `json:"marketplacePath"`
-		McpServers      *[]string              `json:"mcpServers"`
-		Skills          *[]SkillSummary        `json:"skills"`
-		Summary         *PluginSummary         `json:"summary"`
-		OnboardingSkill *SkillSummary          `json:"onboardingSkill"`
+		AppTemplates    *[]AppTemplateSummary                    `json:"appTemplates"`
+		ScheduledTasks  OptionalNullable[[]ScheduledTaskSummary] `json:"scheduledTasks"`
+		ShareURL        *string                                  `json:"shareUrl"`
+		Apps            *[]AppSummary                            `json:"apps"`
+		Description     *string                                  `json:"description"`
+		Hooks           *[]PluginHookSummary                     `json:"hooks"`
+		MarketplaceName *string                                  `json:"marketplaceName"`
+		MarketplacePath *string                                  `json:"marketplacePath"`
+		McpServers      *[]string                                `json:"mcpServers"`
+		Skills          *[]SkillSummary                          `json:"skills"`
+		Summary         *PluginSummary                           `json:"summary"`
+		OnboardingSkill *SkillSummary                            `json:"onboardingSkill"`
 	}
 
 	var wire pluginDetailWire
