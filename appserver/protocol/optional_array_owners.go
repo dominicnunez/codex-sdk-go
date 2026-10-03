@@ -1,6 +1,10 @@
 package protocol
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"errors"
+	"reflect"
+)
 
 // These variants previously used encoding/json directly. Preserve omission,
 // null-object and receiver merge behavior for valid fields, while rejecting
@@ -12,7 +16,7 @@ func (r *ReasoningThreadItem) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	type ReasoningThreadItem reasoningItemWire
-	return json.Unmarshal(data, (*ReasoningThreadItem)(r))
+	return unmarshalArrayVariant(data, (*ReasoningThreadItem)(r), r)
 }
 
 type textInputWire TextUserInput
@@ -22,7 +26,7 @@ func (t *TextUserInput) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	type TextUserInput textInputWire
-	return json.Unmarshal(data, (*TextUserInput)(t))
+	return unmarshalArrayVariant(data, (*TextUserInput)(t), t)
 }
 
 type sandboxWorkspaceWire SandboxWorkspaceWrite
@@ -32,7 +36,7 @@ func (s *SandboxWorkspaceWrite) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	type SandboxWorkspaceWrite sandboxWorkspaceWire
-	return json.Unmarshal(data, (*SandboxWorkspaceWrite)(s))
+	return unmarshalArrayVariant(data, (*SandboxWorkspaceWrite)(s), s)
 }
 
 type workspacePolicyWire SandboxPolicyWorkspaceWrite
@@ -42,5 +46,19 @@ func (s *SandboxPolicyWorkspaceWrite) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	type SandboxPolicyWorkspaceWrite workspacePolicyWire
-	return json.Unmarshal(data, (*SandboxPolicyWorkspaceWrite)(s))
+	return unmarshalArrayVariant(data, (*SandboxPolicyWorkspaceWrite)(s), s)
+}
+
+func unmarshalArrayVariant(data []byte, wire, original any) error {
+	err := json.Unmarshal(data, wire)
+	if err == nil {
+		return nil
+	}
+	var typeError *json.UnmarshalTypeError
+	if errors.As(err, &typeError) && typeError.Field == "" && typeError.Type == reflect.TypeOf(wire).Elem() {
+		// Method-free local types have the public name but a distinct reflect
+		// identity. Preserve the public type in direct root type errors too.
+		typeError.Type = reflect.TypeOf(original).Elem()
+	}
+	return err
 }

@@ -104,11 +104,15 @@ cover the folded and escaped names accepted by their existing wire decoders;
 invalid earlier occurrences remain failures after valid duplicates. Nullable
 arrays retain their separate schema contracts, and opaque strings do not gain
 path restrictions. Marketplace error records validate their required string
-members. Formerly plain concrete variants retain valid receiver merging and
-omitted-field state through their custom decoders; fresh response owners retain
-replacement semantics. A rejected array can stop an enclosing application
-decoder, so callers must not consume a failed decode. Applications embedding a
-type with JSON methods anonymously must implement their envelope methods to
+members and their absolute marketplace paths. Formerly plain concrete variants
+retain valid receiver merging and omitted-field state through their custom
+decoders; fresh response owners retain
+replacement semantics. Any failure returned by a concrete custom decoder,
+including an established sibling type mismatch, can stop an enclosing application
+decoder and supersede an earlier saved outer type error. Go may attribute its
+field context to the enclosing type while its byte offset remains relative to
+the concrete value; callers must not consume a failed decode. Applications
+embedding a type with JSON methods anonymously must implement their envelope methods to
 avoid Go method promotion; named members preserve normal envelope traversal.
 These admission checks neither authorize the reported data nor bound the number
 of valid elements or callback-owned copies.

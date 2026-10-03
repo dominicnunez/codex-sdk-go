@@ -13,14 +13,23 @@ import (
 // string element. The containing decoder owns requiredness and receiver updates.
 func validateOptionalStringArrays(data []byte, names ...string) error {
 	return validateOptionalArrays(data, func(raw []byte) error {
-		var values []*string
-		// The actual wire decoder owns established type-error context. Only
-		// otherwise valid arrays need the extra null-element admission check.
-		if json.Unmarshal(raw, &values) == nil {
-			for i, value := range values {
-				if value == nil {
-					return fmt.Errorf("string at index %d must not be null", i)
-				}
+		// Whole-input validation already established these value boundaries.
+		// Inspect only top-level elements; the wire decoder owns string types,
+		// unquoting and established type-error context.
+		if len(raw) == 0 || raw[0] != '[' {
+			return nil
+		}
+		for start, index := jsonobject.SkipWhitespace(raw, 1), 0; start < len(raw) && raw[start] != ']'; index++ {
+			end, ok := jsonobject.ValueEnd(raw, start)
+			if !ok {
+				return nil
+			}
+			if isNullJSONValue(raw[start:end]) {
+				return fmt.Errorf("string at index %d must not be null", index)
+			}
+			start = jsonobject.SkipWhitespace(raw, end)
+			if start < len(raw) && raw[start] == ',' {
+				start = jsonobject.SkipWhitespace(raw, start+1)
 			}
 		}
 		return nil

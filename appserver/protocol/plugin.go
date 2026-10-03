@@ -456,6 +456,11 @@ func (r *MarketplaceLoadErrorInfo) UnmarshalJSON(data []byte) error {
 	if err := unmarshalSyncedInbound(data, &decoded, required, required); err != nil {
 		return err
 	}
+	path, err := validateInboundAbsolutePathField("marketplacePath", decoded.MarketplacePath)
+	if err != nil {
+		return err
+	}
+	decoded.MarketplacePath = path
 	*r = MarketplaceLoadErrorInfo(decoded)
 	return nil
 }

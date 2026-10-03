@@ -87,7 +87,7 @@ func TestOptionalPluginResponseArrays(t *testing.T) {
 			}
 			invalid := []string{"null", `true`, `{}`, `"text"`, `[null]`, `[42]`}
 			if tc.field == "marketplaceLoadErrors" {
-				invalid = append(invalid, `[{}]`, `[{"message":"missing path"}]`, `[{"marketplacePath":null,"message":"bad path"}]`, `[{"marketplacePath":"/tmp/plugins","message":null}]`)
+				invalid = append(invalid, `[{}]`, `[{"message":"missing path"}]`, `[{"marketplacePath":null,"message":"bad path"}]`, `[{"marketplacePath":"/tmp/plugins","message":null}]`, `[{"marketplacePath":"relative","message":"bad path"}]`, `[{"marketplacePath":"","message":"bad path"}]`)
 			}
 			for _, value := range invalid {
 				for _, suffix := range []string{"", `,"` + tc.field + `":[]`} {
