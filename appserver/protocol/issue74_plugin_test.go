@@ -230,16 +230,23 @@ func TestIssue74PluginOptionalAndInvalidMetadata(t *testing.T) {
 	}
 }
 
-func TestIssue74PluginOptionalNonNullAndPathValidation(t *testing.T) {
-	for _, field := range []string{"availability", "keywords"} {
+func TestIssue74PluginNullStringElements(t *testing.T) {
+	for _, field := range []string{"materializedAppIds", "eligiblePlanTypes"} {
 		t.Run(field, func(t *testing.T) {
 			detail := issue74PluginDetail()
-			detail["summary"].(map[string]any)[field] = nil
+			if field == "materializedAppIds" {
+				detail["appTemplates"].([]any)[0].(map[string]any)[field] = []any{nil}
+			} else {
+				detail["summary"].(map[string]any)[field] = []any{nil}
+			}
 			if _, err := issue74Read(t, detail); err == nil {
-				t.Fatal("explicit null must fail for optional non-null field")
+				t.Fatal("null string element accepted")
 			}
 		})
 	}
+}
+
+func TestIssue74PluginPathValidation(t *testing.T) {
 	for _, path := range []string{"dark.png", "/plugins/../dark.png", "/plugins/dark.png"} {
 		t.Run(path, func(t *testing.T) {
 			detail := issue74PluginDetail()

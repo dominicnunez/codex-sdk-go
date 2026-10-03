@@ -130,6 +130,15 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	// Keep the existing wire type's stdlib error context for established fields.
+	// Validate new string elements separately so null cannot become an empty ID.
+	var lists struct {
+		AdditionalSpeedTiers nonNullStringList `json:"additionalSpeedTiers"`
+	}
+	if err := json.Unmarshal(data, &lists); err != nil {
+		return err
+	}
+	decoded.AdditionalSpeedTiers = []string(lists.AdditionalSpeedTiers)
 	*m = Model(decoded)
 	return nil
 }

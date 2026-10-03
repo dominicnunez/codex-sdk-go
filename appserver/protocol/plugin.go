@@ -315,7 +315,7 @@ type PluginSummary struct {
 func (p *PluginSummary) UnmarshalJSON(data []byte) error {
 	type pluginSummaryWire struct {
 		DisabledReason                   *PluginDisabledReason      `json:"disabledReason"`
-		EligiblePlanTypes                []string                   `json:"eligiblePlanTypes"`
+		EligiblePlanTypes                nonNullStringList          `json:"eligiblePlanTypes"`
 		InstallPolicySource              *PluginInstallPolicySource `json:"installPolicySource"`
 		InstalledAt                      *int64                     `json:"installedAt"`
 		MustShowInstallationInterstitial *bool                      `json:"mustShowInstallationInterstitial"`
@@ -336,10 +336,9 @@ func (p *PluginSummary) UnmarshalJSON(data []byte) error {
 	}
 
 	var wire pluginSummaryWire
-	if err := unmarshalResponseObject(data, &wire, nil, []string{"availability", "keywords"}); err != nil {
+	if err := json.Unmarshal(data, &wire); err != nil {
 		return err
 	}
-
 	switch {
 	case wire.AuthPolicy == nil:
 		return errors.New("missing plugin.summary.authPolicy")
@@ -563,12 +562,16 @@ func (s AppTemplateSummary) MarshalJSON() ([]byte, error) {
 
 func (s *AppTemplateSummary) UnmarshalJSON(data []byte) error {
 	type wire AppTemplateSummary
-	var decoded wire
+	var decoded struct {
+		wire
+		MaterializedAppIDs nonNullStringList `json:"materializedAppIds"`
+	}
 	required := []string{"materializedAppIds", "name", "templateId"}
 	if err := unmarshalResponseObject(data, &decoded, required, required); err != nil {
 		return err
 	}
-	*s = AppTemplateSummary(decoded)
+	decoded.wire.MaterializedAppIDs = []string(decoded.MaterializedAppIDs)
+	*s = AppTemplateSummary(decoded.wire)
 	return nil
 }
 

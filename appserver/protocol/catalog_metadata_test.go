@@ -3,6 +3,7 @@ package protocol_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"reflect"
 	"testing"
 
@@ -105,6 +106,7 @@ func TestCatalogMetadataValidation(t *testing.T) {
 		{``, true},
 		{`,"additionalSpeedTiers":[],"serviceTiers":[],"multiAgentVersion":null`, true},
 		{`,"additionalSpeedTiers":null`, false},
+		{`,"additionalSpeedTiers":[null]`, false},
 		{`,"serviceTiers":null`, false},
 		{`,"serviceTiers":[{"id":"x","name":"X"}]`, false},
 		{`,"serviceTiers":[{"id":"x","name":"X","description":null}]`, false},
@@ -137,4 +139,23 @@ func TestCatalogPresentEmptyMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 	requireWireFields(t, model, `{"serviceTiers":[],"additionalSpeedTiers":[]}`)
+}
+
+func TestModelDecodeErrorCompatibility(t *testing.T) {
+	const body = `{"id":"m","model":"m","displayName":"M","description":7,"hidden":false,"isDefault":false,"defaultReasoningEffort":"medium","supportedReasoningEfforts":[]}`
+	type wire struct {
+		Description string `json:"description"`
+	}
+	var reference wire
+	var model codex.Model
+	var want, got *json.UnmarshalTypeError
+	if err := json.Unmarshal([]byte(body), &reference); !errors.As(err, &want) {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(body), &model); !errors.As(err, &got) {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("error = %+v, want %+v", got, want)
+	}
 }

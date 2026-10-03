@@ -11,7 +11,7 @@ import (
 // fieldInfo describes a single Go struct field's JSON representation.
 type fieldInfo struct {
 	fieldName  string // Go field name
-	isOptional bool   // true when the JSON tag contains "omitempty"
+	isOptional bool   // true when the JSON tag permits omission of zero/empty values
 }
 
 // structJSONFields extracts a map of JSON tag name → fieldInfo from a Go struct type.
@@ -31,7 +31,7 @@ func structJSONFields(t reflect.Type) map[string]fieldInfo {
 		}
 		omitempty := false
 		for _, opt := range parts[1:] {
-			if opt == "omitempty" {
+			if opt == "omitempty" || opt == "omitzero" {
 				omitempty = true
 			}
 		}

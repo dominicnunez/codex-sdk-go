@@ -21,7 +21,7 @@ func (d *MigrationDetails) UnmarshalJSON(data []byte) error {
 	type wire MigrationDetails
 	var decoded struct {
 		wire
-		Memory migrationStringList `json:"memory,omitzero"`
+		Memory nonNullStringList `json:"memory,omitzero"`
 	}
 	nonNull := []string{"commands", "hooks", "mcpServers", "memory", "plugins", "sessions", "skills", "subagents"}
 	if err := unmarshalInboundObject(data, &decoded, nil, nonNull); err != nil {
@@ -87,7 +87,7 @@ func (m *PluginsMigration) UnmarshalJSON(data []byte) error {
 	type wire PluginsMigration
 	var decoded struct {
 		wire
-		PluginNames migrationStringList `json:"pluginNames"`
+		PluginNames nonNullStringList `json:"pluginNames"`
 	}
 	required := []string{"marketplaceName", "pluginNames"}
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
@@ -155,17 +155,23 @@ func (m *SubagentMigration) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type migrationStringList []string
+// nonNullStringList permits a nullable array while rejecting null string items.
+// Containing decoders enforce array-level requiredness and nullability.
+type nonNullStringList []string
 
-func (s *migrationStringList) UnmarshalJSON(data []byte) error {
+func (s *nonNullStringList) UnmarshalJSON(data []byte) error {
 	var decoded []*string
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
-	values := make(migrationStringList, len(decoded))
+	if decoded == nil {
+		*s = nil
+		return nil
+	}
+	values := make(nonNullStringList, len(decoded))
 	for i, value := range decoded {
 		if value == nil {
-			return fmt.Errorf("migration string at index %d must not be null", i)
+			return fmt.Errorf("string at index %d must not be null", i)
 		}
 		values[i] = *value
 	}
