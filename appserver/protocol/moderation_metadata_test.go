@@ -10,11 +10,72 @@ import (
 	"github.com/dominicnunez/codex-sdk-go/appserver/protocol"
 )
 
+func TestModerationMetadataLegacyCompatibility(t *testing.T) {
+	legacy := protocol.TurnModerationMetadataNotification{Metadata: map[string]interface{}{"key": "value"}, ThreadID: "t", TurnID: "u"}
+	legacy.Metadata["other"] = float64(1)
+	var receiver protocol.TurnModerationMetadataNotification
+	if err := json.Unmarshal([]byte(`{"threadId":"t","turnId":"u","metadata":{"a":1},"metadata":{"b":2}}`), &receiver); err != nil {
+		t.Fatal(err)
+	}
+	if receiver.Metadata["a"] != float64(1) || receiver.Metadata["b"] != float64(2) {
+		t.Fatal("legacy object types or duplicate merge changed")
+	}
+	encoded, err := json.Marshal(struct {
+		protocol.TurnModerationMetadataNotification
+		Extra string `json:"extra"`
+	}{legacy, "keep"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var members map[string]json.RawMessage
+	if err := json.Unmarshal(encoded, &members); err != nil {
+		t.Fatal(err)
+	}
+	if string(members["extra"]) != `"keep"` || string(members["metadata"]) != `{"key":"value","other":1}` {
+		t.Fatalf("legacy construction or anonymous marshal changed: %s", encoded)
+	}
+	if err := json.Unmarshal([]byte(`{"threadId":"t","turnId":"u","metadata":[]}`), &receiver); err == nil {
+		t.Fatal("legacy object-only decoder contract changed")
+	}
+	mock := NewMockTransport()
+	reports, legacyCalls, jsonCalls := 0, 0, 0
+	client := protocol.NewClient(mock, protocol.WithHandlerErrorCallback(func(_ string, _ error) { reports++ }))
+	defer client.Close()
+	client.OnTurnModerationMetadata(func(protocol.TurnModerationMetadataNotification) { t.Fatal("replaced legacy handler ran") })
+	client.OnTurnModerationMetadataJSON(func(protocol.TurnModerationMetadataJSONNotification) { jsonCalls++ })
+	removeLegacy := client.AddTurnModerationMetadataListener(func(n protocol.TurnModerationMetadataNotification) {
+		legacyCalls++
+		n.Metadata["key"] = "changed"
+	})
+	defer removeLegacy()
+	removeJSON := client.AddTurnModerationMetadataJSONListener(func(n protocol.TurnModerationMetadataJSONNotification) {
+		jsonCalls++
+		if string(n.Metadata) != `{"key":"value"}` && string(n.Metadata) != `[]` {
+			t.Fatal("legacy callback changed JSON recipient")
+		}
+	})
+	defer removeJSON()
+	for _, metadata := range []string{`{"key":"value"}`, `[]`} {
+		mock.InjectServerNotification(context.Background(), protocol.Notification{Method: "turn/moderationMetadata", Params: json.RawMessage(`{"threadId":"t","turnId":"u","metadata":` + metadata + `}`)})
+	}
+	if legacyCalls != 1 || jsonCalls != 4 || reports != 1 {
+		t.Fatalf("mixed APIs interfered: legacy=%d json=%d reports=%d", legacyCalls, jsonCalls, reports)
+	}
+	client.OnTurnModerationMetadataJSON(nil)
+	removeJSON()
+	removeLegacy()
+	client.OnTurnModerationMetadata(func(protocol.TurnModerationMetadataNotification) { legacyCalls++ })
+	mock.InjectServerNotification(context.Background(), protocol.Notification{Method: "turn/moderationMetadata", Params: json.RawMessage(`{"threadId":"t","turnId":"u","metadata":{}}`)})
+	if legacyCalls != 2 || jsonCalls != 4 {
+		t.Fatal("legacy replacement failed after JSON registration")
+	}
+}
+
 func TestModerationMetadataAcceptsEveryJSONKind(t *testing.T) {
 	for _, metadata := range []string{`null`, `{}`, `{"nested":[true,null,"text"]}`, `[]`, `[1,{"nested":false}]`, `true`, `false`, `1`, `"text"`, `1e400`, `{"number":1e400}`, `9007199254740993`, `{"number":9007199254740993}`} {
 		t.Run(metadata, func(t *testing.T) {
 			payload := []byte(`{"threadId":"t","turnId":"u","metadata":` + metadata + `}`)
-			var notification protocol.TurnModerationMetadataNotification
+			var notification protocol.TurnModerationMetadataJSONNotification
 			if err := json.Unmarshal(payload, &notification); err != nil {
 				t.Fatalf("schema-valid metadata rejected: %v", err)
 			}
@@ -48,17 +109,17 @@ func TestModerationMetadataRecipientOwnership(t *testing.T) {
 		panic("reporter failure")
 	}))
 	defer client.Close()
-	removeFirst := client.AddTurnModerationMetadataListener(func(notification protocol.TurnModerationMetadataNotification) {
+	removeFirst := client.AddTurnModerationMetadataJSONListener(func(notification protocol.TurnModerationMetadataJSONNotification) {
 		notification.Metadata[0] = ' '
 		panic("observer failure")
 	})
 	defer removeFirst()
-	var retained []protocol.TurnModerationMetadataNotification
-	removeSecond := client.AddTurnModerationMetadataListener(func(notification protocol.TurnModerationMetadataNotification) {
+	var retained []protocol.TurnModerationMetadataJSONNotification
+	removeSecond := client.AddTurnModerationMetadataJSONListener(func(notification protocol.TurnModerationMetadataJSONNotification) {
 		retained = append(retained, notification)
 	})
 	defer removeSecond()
-	client.OnTurnModerationMetadata(func(notification protocol.TurnModerationMetadataNotification) {
+	client.OnTurnModerationMetadataJSON(func(notification protocol.TurnModerationMetadataJSONNotification) {
 		retained = append(retained, notification)
 	})
 	input := json.RawMessage(`{"threadId":"t","turnId":"u","metadata":[{"number":9007199254740993}]}`)
@@ -90,7 +151,7 @@ func FuzzModerationMetadataJSONRoundTrip(f *testing.F) {
 		if !json.Valid([]byte(metadata)) {
 			t.Skip()
 		}
-		var notification protocol.TurnModerationMetadataNotification
+		var notification protocol.TurnModerationMetadataJSONNotification
 		if err := json.Unmarshal([]byte(`{"threadId":"t","turnId":"u","metadata":`+metadata+`}`), &notification); err != nil {
 			t.Fatal(err)
 		}
@@ -118,15 +179,15 @@ func FuzzModerationMetadataJSONRoundTrip(f *testing.F) {
 }
 
 func TestModerationMetadataEnvelopeMarshalling(t *testing.T) {
-	notification := protocol.TurnModerationMetadataNotification{Metadata: json.RawMessage(`{"key":"value"}`), ThreadID: "t", TurnID: "u"}
+	notification := protocol.TurnModerationMetadataJSONNotification{Metadata: json.RawMessage(`{"key":"value"}`), ThreadID: "t", TurnID: "u"}
 	for _, value := range []interface{}{
 		struct {
-			protocol.TurnModerationMetadataNotification
+			protocol.TurnModerationMetadataJSONNotification
 			Extra string `json:"extra"`
 		}{notification, "keep"},
 		struct {
-			Notification protocol.TurnModerationMetadataNotification `json:"notification"`
-			Extra        string                                      `json:"extra"`
+			Notification protocol.TurnModerationMetadataJSONNotification `json:"notification"`
+			Extra        string                                          `json:"extra"`
 		}{notification, "keep"},
 	} {
 		encoded, err := json.Marshal(value)
@@ -142,8 +203,8 @@ func TestModerationMetadataEnvelopeMarshalling(t *testing.T) {
 		}
 	}
 	var envelope struct {
-		Notification protocol.TurnModerationMetadataNotification `json:"notification"`
-		Extra        string                                      `json:"extra"`
+		Notification protocol.TurnModerationMetadataJSONNotification `json:"notification"`
+		Extra        string                                          `json:"extra"`
 	}
 	if err := json.Unmarshal([]byte(`{"notification":{"threadId":"t","turnId":"u","metadata":1e400},"extra":"keep"}`), &envelope); err != nil {
 		t.Fatal(err)
@@ -155,7 +216,7 @@ func TestModerationMetadataEnvelopeMarshalling(t *testing.T) {
 
 func TestModerationMetadataConstructionAndReplacement(t *testing.T) {
 	for _, metadata := range []json.RawMessage{nil, json.RawMessage(`null`), json.RawMessage(`{}`), json.RawMessage(`[]`), json.RawMessage(`9007199254740993`)} {
-		notification := protocol.TurnModerationMetadataNotification{Metadata: metadata, ThreadID: "t", TurnID: "u"}
+		notification := protocol.TurnModerationMetadataJSONNotification{Metadata: metadata, ThreadID: "t", TurnID: "u"}
 		encoded, err := json.Marshal(notification)
 		if err != nil {
 			t.Fatal(err)
@@ -173,12 +234,12 @@ func TestModerationMetadataConstructionAndReplacement(t *testing.T) {
 		}
 	}
 	for _, invalid := range []json.RawMessage{{}, json.RawMessage(`{`), json.RawMessage(`NaN`), json.RawMessage(`{} {}`)} {
-		if _, err := json.Marshal(protocol.TurnModerationMetadataNotification{Metadata: invalid}); err == nil {
+		if _, err := json.Marshal(protocol.TurnModerationMetadataJSONNotification{Metadata: invalid}); err == nil {
 			t.Fatal("malformed constructed JSON accepted")
 		}
 	}
 	old := json.RawMessage(`{"old":"value"}`)
-	notification := protocol.TurnModerationMetadataNotification{Metadata: old}
+	notification := protocol.TurnModerationMetadataJSONNotification{Metadata: old}
 	if err := json.Unmarshal([]byte(`{"threadId":"t","turnId":"u","metadata":[]}`), &notification); err != nil {
 		t.Fatal(err)
 	}
@@ -199,8 +260,8 @@ func TestModerationMetadataTypedDeliveryAndRecovery(t *testing.T) {
 	}))
 	defer client.Close()
 	var replacement, appended []string
-	record := func(destination *[]string) func(protocol.TurnModerationMetadataNotification) {
-		return func(notification protocol.TurnModerationMetadataNotification) {
+	record := func(destination *[]string) func(protocol.TurnModerationMetadataJSONNotification) {
+		return func(notification protocol.TurnModerationMetadataJSONNotification) {
 			encoded, err := json.Marshal(notification)
 			if err != nil {
 				t.Fatal(err)
@@ -212,8 +273,8 @@ func TestModerationMetadataTypedDeliveryAndRecovery(t *testing.T) {
 			*destination = append(*destination, string(members["metadata"]))
 		}
 	}
-	client.OnTurnModerationMetadata(record(&replacement))
-	remove := client.AddTurnModerationMetadataListener(record(&appended))
+	client.OnTurnModerationMetadataJSON(record(&replacement))
+	remove := client.AddTurnModerationMetadataJSONListener(record(&appended))
 	defer remove()
 	values := []string{`{}`, `null`, `[]`, `true`, `1`, `"text"`, `1e400`}
 	for _, metadata := range values {
@@ -230,8 +291,8 @@ func TestModerationMetadataTypedDeliveryAndRecovery(t *testing.T) {
 	}
 	remove()
 	remove()
-	client.OnTurnModerationMetadata(nil)
-	client.OnTurnModerationMetadata(record(&replacement))
+	client.OnTurnModerationMetadataJSON(nil)
+	client.OnTurnModerationMetadataJSON(record(&replacement))
 	mock.InjectServerNotification(context.Background(), protocol.Notification{Method: "turn/moderationMetadata", Params: json.RawMessage(`{"threadId":"t","turnId":"u","metadata":["recovered"]}`)})
 	if len(appended) != len(values) || len(replacement) != len(values)+1 || replacement[len(values)] != `["recovered"]` {
 		t.Fatal("recovery or unsubscribe failed")
@@ -250,7 +311,7 @@ func TestModerationMetadataDuplicateAndReceiverContract(t *testing.T) {
 		{`"metadata":{"a":1},"metadata":{"a":9007199254740993}`, `{"a":9007199254740993}`},
 	} {
 		t.Run(tc.fields, func(t *testing.T) {
-			notification := protocol.TurnModerationMetadataNotification{
+			notification := protocol.TurnModerationMetadataJSONNotification{
 				Metadata: json.RawMessage(`{"old":"value"}`), ThreadID: "old", TurnID: "old",
 			}
 			input := []byte(`{"threadId":"t","turnId":"u",` + tc.fields + `}`)
@@ -281,7 +342,7 @@ func TestModerationMetadataDuplicateAndReceiverContract(t *testing.T) {
 		`{"threadId":"t","turnId":"u","metadata":{`,
 	} {
 		t.Run(input, func(t *testing.T) {
-			original := protocol.TurnModerationMetadataNotification{Metadata: json.RawMessage(`{"keep":"value"}`), ThreadID: "old", TurnID: "old"}
+			original := protocol.TurnModerationMetadataJSONNotification{Metadata: json.RawMessage(`{"keep":"value"}`), ThreadID: "old", TurnID: "old"}
 			notification := original
 			if err := json.Unmarshal([]byte(input), &notification); err == nil {
 				t.Fatal("invalid notification accepted")

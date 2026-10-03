@@ -97,20 +97,38 @@ func (n *StrictReviewRequiredNotification) UnmarshalJSON(data []byte) error {
 
 func (n *TurnModerationMetadataNotification) UnmarshalJSON(data []byte) error {
 	type wire TurnModerationMetadataNotification
+	var decoded wire
+	if err := unmarshalInboundObject(data, &decoded, []string{"metadata", "threadId", "turnId"}, []string{"threadId", "turnId"}); err != nil {
+		return err
+	}
+	*n = TurnModerationMetadataNotification(decoded)
+	return nil
+}
+
+func decodeModerationMetadataJSON(data []byte) (TurnModerationMetadataJSONNotification, error) {
+	type wire TurnModerationMetadataJSONNotification
 	var decoded struct {
 		wire
 		Metadata moderationMetadataValue `json:"metadata"`
 	}
 	// metadata is open JSON and may be null; only its presence is required.
 	if err := unmarshalInboundObject(data, &decoded, []string{"metadata", "threadId", "turnId"}, []string{"threadId", "turnId"}); err != nil {
-		return err
+		return TurnModerationMetadataJSONNotification{}, err
 	}
 	metadata, err := decoded.Metadata.value()
 	if err != nil {
-		return err
+		return TurnModerationMetadataJSONNotification{}, err
 	}
 	decoded.wire.Metadata = metadata
-	*n = TurnModerationMetadataNotification(decoded.wire)
+	return TurnModerationMetadataJSONNotification(decoded.wire), nil
+}
+
+func (n *TurnModerationMetadataJSONNotification) UnmarshalJSON(data []byte) error {
+	decoded, err := decodeModerationMetadataJSON(data)
+	if err != nil {
+		return err
+	}
+	*n = decoded
 	return nil
 }
 

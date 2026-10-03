@@ -21,13 +21,6 @@ Do:
 
 Run `go test ./appserver/protocol -run TestSpecCoverage` to verify all specs have corresponding Go types.
 
-The migration of `TurnModerationMetadataNotification.Metadata` from
-`map[string]interface{}` to `json.RawMessage` is an explicitly approved breaking
-Go API correction for the schema's arbitrary JSON value. Preserve that raw
-representation and the migration guidance in `docs/protocol.md`; do not restore
-an object-only restriction. This exception applies only to this field and does
-not authorize other public API changes.
-
 For schema field changes, inventory properties, requiredness, nullability and
 union branches, including nested definitions. Check custom wire structs and
 assignment lists through public calls; type-name coverage cannot detect field

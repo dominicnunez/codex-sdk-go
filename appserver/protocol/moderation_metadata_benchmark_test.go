@@ -67,8 +67,8 @@ func BenchmarkModerationMetadataDelivery(b *testing.B) {
 			client := protocol.NewClient(mock)
 			defer client.Close()
 			calls := 0
-			client.OnTurnModerationMetadata(func(protocol.TurnModerationMetadataNotification) { calls++ })
-			remove := client.AddTurnModerationMetadataListener(func(protocol.TurnModerationMetadataNotification) { calls++ })
+			client.OnTurnModerationMetadataJSON(func(protocol.TurnModerationMetadataJSONNotification) { calls++ })
+			remove := client.AddTurnModerationMetadataJSONListener(func(protocol.TurnModerationMetadataJSONNotification) { calls++ })
 			defer remove()
 			notification := protocol.Notification{Method: "turn/moderationMetadata", Params: json.RawMessage(fields.String())}
 			mock.InjectServerNotification(context.Background(), notification)

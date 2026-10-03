@@ -27,7 +27,8 @@ func TestTypedNotificationListenersDispatchSpecMethods(t *testing.T) {
 		handlerType := method.Type.In(1)
 		notificationType := handlerType.In(0)
 		notificationTypeName := notificationType.Name()
-		notificationMethods, ok := methodByType[notificationTypeName]
+		schemaTypeName := serverNotificationSchemaType(notificationType)
+		notificationMethods, ok := methodByType[schemaTypeName]
 		if !ok {
 			t.Fatalf("%s handler type %s has no server notification spec method", method.Name, notificationTypeName)
 		}
@@ -39,7 +40,7 @@ func TestTypedNotificationListenersDispatchSpecMethods(t *testing.T) {
 		})
 		method.Func.Call([]reflect.Value{reflect.ValueOf(client), handler})
 
-		params := sampleServerNotificationParams(t, notificationTypeName)
+		params := sampleServerNotificationParams(t, schemaTypeName)
 		handlerErrors = nil
 		for _, notificationMethod := range notificationMethods {
 			client.handleNotification(context.Background(), Notification{Method: notificationMethod, Params: params})
@@ -72,7 +73,8 @@ func TestTypedNotificationAddListenersDispatchSpecMethods(t *testing.T) {
 		handlerType := method.Type.In(1)
 		notificationType := handlerType.In(0)
 		notificationTypeName := notificationType.Name()
-		notificationMethods, ok := methodByType[notificationTypeName]
+		schemaTypeName := serverNotificationSchemaType(notificationType)
+		notificationMethods, ok := methodByType[schemaTypeName]
 		if !ok {
 			t.Fatalf("%s handler type %s has no server notification spec method", method.Name, notificationTypeName)
 		}
@@ -84,7 +86,7 @@ func TestTypedNotificationAddListenersDispatchSpecMethods(t *testing.T) {
 		})
 		unsub := method.Func.Call([]reflect.Value{reflect.ValueOf(client), handler})[0]
 
-		params := sampleServerNotificationParams(t, notificationTypeName)
+		params := sampleServerNotificationParams(t, schemaTypeName)
 		handlerErrors = nil
 		for _, notificationMethod := range notificationMethods {
 			client.handleNotification(context.Background(), Notification{Method: notificationMethod, Params: params})
@@ -99,6 +101,15 @@ func TestTypedNotificationAddListenersDispatchSpecMethods(t *testing.T) {
 
 		unsub.Call(nil)
 	}
+}
+
+// Alternate Go representations share one wire schema. Both are still exercised
+// against the schema's method and fixture; no handler is skipped from coverage.
+func serverNotificationSchemaType(notificationType reflect.Type) string {
+	if notificationType == reflect.TypeFor[TurnModerationMetadataJSONNotification]() {
+		return "TurnModerationMetadataNotification"
+	}
+	return notificationType.Name()
 }
 
 func TestTypedNotificationAddListenersCoverTypedOnMethods(t *testing.T) {

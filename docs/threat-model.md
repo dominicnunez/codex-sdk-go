@@ -81,7 +81,12 @@ Typed decoders validate required fields, selected non-null fields, enums, unions
 [Moderation metadata admission](../appserver/protocol/notification_owner.go)
 requires the schema's metadata member but accepts every present JSON value,
 including null and numeric tokens outside float64 precision or range. The
-exported field owns raw JSON rather than an object-only map. Consecutive duplicate
+new `TurnModerationMetadataJSONNotification` field owns raw JSON. The original
+notification retains its object-map API and float64 conversion behavior; its
+legacy handlers can reject nonobject metadata or large numbers. Applications
+requiring the complete schema use the JSON replacement/append methods, which
+share the same wire method and isolate their decoding from legacy listeners.
+Consecutive duplicate
 objects merge their top-level members, while another value kind resets that
 accumulation. The decoder accumulates duplicate objects before one final
 serialization; it does not repeatedly serialize the growing object. Each typed

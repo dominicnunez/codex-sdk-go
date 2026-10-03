@@ -52,7 +52,7 @@ defer unsubscribe()
 
 The typed surface also covers thread reverts and queue changes, project updates, strict-review requirements, external-agent import progress, moderation metadata, and model safety-buffering changes. Use raw notification handlers only when intentionally handling a future method that the SDK does not yet type.
 
-`TurnModerationMetadataNotification.Metadata` is an owned `json.RawMessage`,
+`TurnModerationMetadataJSONNotification.Metadata` is an owned `json.RawMessage`,
 matching the schema's arbitrary JSON value. It preserves objects, arrays,
 scalars, explicit null and numeric tokens without converting them to float64.
 Metadata must be present when decoding. Consecutive duplicate metadata objects
@@ -60,9 +60,20 @@ merge their top-level members; null or another JSON kind resets the accumulated
 object. Successful decoding replaces a reused receiver, and failed admission
 leaves it unchanged. Each typed recipient receives its own metadata bytes.
 
-This changes the Go field from `map[string]interface{}` to `json.RawMessage`.
-To construct object metadata, marshal a map into the field. To inspect it,
-decode the field into the application type appropriate to that value. Use
+Use `OnTurnModerationMetadataJSON` or `AddTurnModerationMetadataJSONListener`
+for this complete JSON representation. The original
+`TurnModerationMetadataNotification.Metadata` remains a `map[string]interface{}`
+with its existing object/null decoding and float64 number behavior. Existing
+constructors, map indexing and registration methods remain unchanged. Those
+legacy methods can report errors for valid nonobject metadata or numbers outside
+float64 range; applications needing the full schema should use the JSON methods.
+Both replacement methods set the same handler for `turn/moderationMetadata`, so
+the last registration replaces the previous one and passing nil clears it.
+Appended listeners from either API coexist; a legacy decoding failure does not
+prevent JSON listeners from receiving the notification.
+
+To construct object metadata in the JSON type, marshal a map into its field.
+To inspect it, decode the field into the application type appropriate to that value. Use
 `json.Decoder.UseNumber` when decoding into an interface if numeric precision
 must be retained. For example:
 
@@ -74,10 +85,10 @@ if err := json.Unmarshal(n.Metadata, &object); err != nil {
 }
 ```
 
-The notification retains plain struct marshalling, so anonymous application
-wrappers keep their additional fields. Its existing `UnmarshalJSON` method still
-follows Go method promotion; use a named notification field when decoding an
-outer application envelope. Constructed metadata must contain valid JSON;
+Both notification types retain plain struct marshalling, so anonymous application
+wrappers keep their additional fields. Their `UnmarshalJSON` methods
+follow Go method promotion; use a named notification field when decoding an
+outer application envelope. Constructed JSON metadata must contain valid JSON;
 nil encodes as null, while a nonnil empty or malformed raw value fails encoding.
 
 `AddThreadStateListener` receives independent cached snapshots and thread closure
