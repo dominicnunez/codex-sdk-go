@@ -97,6 +97,35 @@ and admission flags before reuse; it does not bound the number of valid records
 in an admitted payload. Generic raw notification handlers remain responsible
 for their own decoding and validation.
 
+[Optional array admission](../appserver/protocol/optional_array_validation.go)
+rejects forbidden null arrays and null string elements in plugin, app, model,
+thread lifecycle, reasoning, text-input and workspace-sandbox carriers. Guards
+cover the folded and escaped names accepted by their existing wire decoders;
+invalid earlier occurrences remain failures after valid duplicates. Nullable
+arrays retain their separate schema contracts, and opaque strings do not gain
+path restrictions. Marketplace error records require their canonical schema
+members, reject nulls through recognized aliases, and validate the same final
+absolute path that the wire decoder publishes. Validation uses existing response,
+Config and union owners after their established decoding and semantic checks.
+The formerly plain concrete representations retain ordinary Go JSON decoding,
+receiver merging, error context and named or anonymous envelope traversal;
+decoding those representations directly does not perform SDK carrier admission.
+Fresh response owners retain replacement semantics. Config retains its existing
+merge and partial-update behavior; callers must not consume a failed decode.
+New admission errors propagate through existing custom decoders and can stop
+outer traversal or precede later service validation. This does not establish
+error parity for payloads that newly fail the array contract.
+These admission checks neither authorize the reported data nor bound the number
+of valid elements or callback-owned copies.
+
+Absolute-path validation errors quote at most 256 source bytes and report the
+omitted byte count for larger paths. The bound applies before escaping and
+wrapping, across shared inbound and outbound path validators, so rejected paths
+cannot amplify retained diagnostics in proportion to their full size. Short
+diagnostics, field context and error classification remain intact. Validation
+and decoding may still allocate for the complete path; this is not a total
+response-size or heap budget, and valid long paths are not truncated.
+
 Terminal transport cleanup clears requests awaiting handler registration and
 drains abandoned inbound requests and outbound envelopes. Queue admission is
 coordinated with cleanup, including blocked producers and registration replay,

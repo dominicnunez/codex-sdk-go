@@ -73,6 +73,9 @@ for every known schema method, and verify that callback finalization survives
 failures in error-reporting hooks as well as in the primary handler.
 For peer-controlled buffers, bound retained data as well as event counts across
 queued, in-flight, fallback and replay ownership.
+For rejected peer values, bound diagnostic previews before quoting and wrapping;
+trace the complete error chain and escaped-value growth. A frame limit does not
+bound allocation amplification or error retention inside the decoder.
 For callback fanout, isolate each recipient at the owning boundary, including
 initial replay and direct service/cache calls. Verify committed state reaches
 later SDK consumers after a callback or error reporter panics, and that replay
@@ -96,6 +99,10 @@ including decoding into receivers that already contain map entries.
 Compare receiver updates and retained references on type errors as well as on
 success. Include envelopes and user-defined wrappers: a custom decoder error
 can stop outer traversal and change error precedence, field context and offsets.
+Do not add JSON methods to formerly plain public representations merely to
+validate SDK carriers: method promotion can silently consume anonymous
+application envelopes. Use existing admission owners, run established checks
+before new restrictions, and compare mixed failures against the prior revision.
 
 ### Approval Flow
 Server→client requests for user approval (command exec, file write, etc.) flow through `Transport.OnRequest`. Each approval type has `*Params` and `*Response` types matching specs.

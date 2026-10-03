@@ -139,6 +139,9 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	decoded.AdditionalSpeedTiers = []string(lists.AdditionalSpeedTiers)
+	if err := validateOptionalArrays(data, nil, "inputModalities", "additionalSpeedTiers", "serviceTiers"); err != nil {
+		return err
+	}
 	*m = Model(decoded)
 	return nil
 }

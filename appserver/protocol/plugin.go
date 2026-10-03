@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
 // PluginAuthPolicy controls when plugin auth is requested.
@@ -355,7 +357,7 @@ func (p *PluginSummary) UnmarshalJSON(data []byte) error {
 	case wire.Source == nil:
 		return errors.New("missing plugin.summary.source")
 	}
-
+	previous := *p
 	p.AuthPolicy = *wire.AuthPolicy
 	p.DisabledReason = wire.DisabledReason
 	p.EligiblePlanTypes = wire.EligiblePlanTypes
@@ -382,6 +384,12 @@ func (p *PluginSummary) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	if err := validateOptionalPluginAvailabilityField("plugin.summary.availability", p.Availability); err != nil {
+		return err
+	}
+	if err := validateOptionalStringArrays(data, "keywords"); err != nil {
+		// Established semantic errors retain their original partial updates;
+		// only this new admission failure restores the previous receiver.
+		*p = previous
 		return err
 	}
 	return nil
@@ -446,6 +454,65 @@ type MarketplaceLoadErrorInfo struct {
 	Message         string `json:"message"`
 }
 
+// Validate records at their existing response owners without adding JSON
+// methods to the public representation. Ordinary wire decoding runs first so
+// its saved type errors retain their original context and precedence.
+func validateMarketplaceLoadErrors(data []byte) error {
+	return validateOptionalArrays(data, func(raw []byte) error {
+		return validateArrayElements(raw, func(i int, record []byte) error {
+			if err := validateMarketplaceLoadError(record); err != nil {
+				return fmt.Errorf("record %d: %w", i, err)
+			}
+			return nil
+		})
+	}, "marketplaceLoadErrors")
+}
+
+// The response wire has already checked JSON syntax and ordinary field types.
+// Keep canonical schema requiredness, but inspect nulls and select the final
+// path using the same folded names as that wire. Borrow spans instead of
+// allocating another record graph merely to validate its path.
+func validateMarketplaceLoadError(record []byte) error {
+	validation := inboundObjectValidationErrors()
+	if len(record) == 0 || record[0] != '{' {
+		return validation.notObject(fmt.Errorf("expected JSON object"))
+	}
+	var pathPresent, messagePresent bool
+	var pathRaw []byte
+	var err error
+	jsonobject.WalkFields(record, true, func(key, raw []byte) {
+		if err != nil {
+			return
+		}
+		pathPresent = pathPresent || jsonobject.FieldMatches(key, "marketplacePath")
+		messagePresent = messagePresent || jsonobject.FieldMatches(key, "message")
+		if jsonobject.FieldMatchesFolded(key, "marketplacepath") {
+			if isNullJSONValue(raw) {
+				err = validation.null("marketplacePath")
+				return
+			}
+			pathRaw = raw
+		} else if jsonobject.FieldMatchesFolded(key, "message") && isNullJSONValue(raw) {
+			err = validation.null("message")
+		}
+	})
+	if err != nil {
+		return err
+	}
+	if !pathPresent {
+		return validation.missing("marketplacePath")
+	}
+	if !messagePresent {
+		return validation.missing("message")
+	}
+	var path string
+	if err := json.Unmarshal(pathRaw, &path); err != nil {
+		return err
+	}
+	_, err = validateInboundAbsolutePathField("marketplacePath", path)
+	return err
+}
+
 func (r *PluginListResponse) UnmarshalJSON(data []byte) error {
 	if err := validateRequiredObjectFields(data, "marketplaces"); err != nil {
 		return err
@@ -453,6 +520,12 @@ func (r *PluginListResponse) UnmarshalJSON(data []byte) error {
 	type wire PluginListResponse
 	var decoded wire
 	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	if err := validateOptionalStringArrays(data, "featuredPluginIds"); err != nil {
+		return err
+	}
+	if err := validateMarketplaceLoadErrors(data); err != nil {
 		return err
 	}
 	*r = PluginListResponse(decoded)
@@ -466,6 +539,9 @@ func (r *PluginInstalledResponse) UnmarshalJSON(data []byte) error {
 	type wire PluginInstalledResponse
 	var decoded wire
 	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	if err := validateMarketplaceLoadErrors(data); err != nil {
 		return err
 	}
 	*r = PluginInstalledResponse(decoded)

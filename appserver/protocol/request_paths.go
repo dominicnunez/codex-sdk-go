@@ -6,6 +6,7 @@ import (
 	"fmt"
 	pathpkg "path"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/deepcopy"
@@ -141,7 +142,7 @@ func validateInboundAbsolutePathField(field, value string) (string, error) {
 		return "", fmt.Errorf("%s: %w", field, err)
 	}
 	if normalized != value {
-		return "", fmt.Errorf("%s: must be normalized, got %q", field, value)
+		return "", fmt.Errorf("%s: must be normalized, got %s", field, quotedPathDiagnostic(value))
 	}
 	return normalized, nil
 }
@@ -190,6 +191,16 @@ func normalizeGrantedPermissionProfileField(value GrantedPermissionProfile) Gran
 	return value
 }
 
+// Bound the source bytes before quoting: escaping and error wrapping must not
+// turn a large invalid path into multiple retained copies of that path.
+func quotedPathDiagnostic(value string) string {
+	const previewBytes = 256
+	if len(value) <= previewBytes {
+		return strconv.Quote(value)
+	}
+	return fmt.Sprintf("%s... (%d bytes omitted)", strconv.Quote(value[:previewBytes]), len(value)-previewBytes)
+}
+
 func normalizeAbsolutePath(value string) (string, error) {
 	switch {
 	case value == "":
@@ -205,7 +216,7 @@ func normalizeAbsolutePath(value string) (string, error) {
 	case strings.HasPrefix(value, "/"):
 		return pathpkg.Clean(value), nil
 	default:
-		return "", fmt.Errorf("must be an absolute path: %q", value)
+		return "", fmt.Errorf("must be an absolute path: %s", quotedPathDiagnostic(value))
 	}
 }
 
@@ -255,7 +266,7 @@ func normalizeWindowsDriveAbsolutePath(value string) (string, error) {
 func normalizeWindowsUNCPath(value string) (string, error) {
 	prefix, rest, ok := splitWindowsUNCPath(value)
 	if !ok {
-		return "", fmt.Errorf("must be an absolute path: %q", value)
+		return "", fmt.Errorf("must be an absolute path: %s", quotedPathDiagnostic(value))
 	}
 	return normalizeWindowsPath(prefix, rest, false), nil
 }
@@ -263,7 +274,7 @@ func normalizeWindowsUNCPath(value string) (string, error) {
 func normalizeWindowsExtendedAbsolutePath(value string) (string, error) {
 	prefix, rest, ok := splitWindowsExtendedAbsolutePath(value[4:])
 	if !ok {
-		return "", fmt.Errorf("must be an absolute path: %q", value)
+		return "", fmt.Errorf("must be an absolute path: %s", quotedPathDiagnostic(value))
 	}
 	return normalizeWindowsPath(`\\?\`+prefix, rest, true), nil
 }
@@ -271,7 +282,7 @@ func normalizeWindowsExtendedAbsolutePath(value string) (string, error) {
 func normalizeWindowsExtendedUNCPath(value string) (string, error) {
 	prefix, rest, ok := splitWindowsUNCPath(`\\` + value[8:])
 	if !ok {
-		return "", fmt.Errorf("must be an absolute path: %q", value)
+		return "", fmt.Errorf("must be an absolute path: %s", quotedPathDiagnostic(value))
 	}
 	return normalizeWindowsPath(`\\?\UNC`+prefix[1:], rest, false), nil
 }

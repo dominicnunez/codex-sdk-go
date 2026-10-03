@@ -457,6 +457,9 @@ func UnmarshalUserInput(data []byte) (UserInput, error) {
 		if err := json.Unmarshal(data, &input); err != nil {
 			return nil, err
 		}
+		if err := validateOptionalArrays(data, nil, "text_elements"); err != nil {
+			return nil, err
+		}
 		return &input, nil
 	case "image":
 		var input ImageUserInput

@@ -65,6 +65,9 @@ func (a *AppInfo) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	appInfo := AppInfo(decoded.wire)
+	if err := validateOptionalStringArrays(data, "pluginDisplayNames"); err != nil {
+		return err
+	}
 	if decoded.IsEnabled == nil {
 		appInfo.IsEnabled = true
 	} else {

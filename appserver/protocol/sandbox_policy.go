@@ -222,10 +222,16 @@ func (s *SandboxPolicyWrapper) UnmarshalJSON(data []byte) error {
 		if err := json.Unmarshal(data, &policy); err != nil {
 			return err
 		}
-		s.Value, err = validateInboundSandboxPolicyField("sandboxPolicy", policy)
+		var validated SandboxPolicy
+		validated, err = validateInboundSandboxPolicyField("sandboxPolicy", policy)
 		if err != nil {
+			s.Value = validated
 			return err
 		}
+		if err := validateOptionalStringArrays(data, "writableRoots"); err != nil {
+			return err
+		}
+		s.Value = validated
 	default:
 		s.Value = UnknownSandboxPolicy{Type: typeField, Raw: append(json.RawMessage(nil), data...)}
 	}
