@@ -69,3 +69,25 @@ func TestStandardCompositeNumericDecode(t *testing.T) {
 		t.Fatal("cyclic standard destination changed partial updates or failed to bound its diagnostic")
 	}
 }
+
+func TestStringTagNativeOwnedError(t *testing.T) {
+	var dest struct {
+		N int64 `json:"n,string"`
+	}
+	quoted, err := json.Marshal(strings.Repeat("x", 1<<20))
+	if err != nil {
+		t.Fatal(err)
+	}
+	original := json.Unmarshal([]byte(`{"n":`+string(quoted)+`}`), &dest)
+	if original == nil {
+		t.Fatal("native rejection missing")
+	}
+	before := original.Error()
+	bounded := NativeError(original)
+	if bounded == original || len(bounded.Error()) > 4096 || original.Error() != before || !strings.Contains(bounded.Error(), "bytes omitted") {
+		t.Fatal("owned formatter normalization changed original or retained full diagnostic")
+	}
+	if NativeError(bounded) != bounded || errors.Unwrap(bounded) != nil {
+		t.Fatal("formatter normalization is not idempotent or retains original cause")
+	}
+}

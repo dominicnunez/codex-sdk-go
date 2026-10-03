@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/diagnostic"
@@ -32,6 +33,17 @@ func NativeError(err error) error {
 		if len(message) > 2048 && strings.HasPrefix(message, prefix) && strings.HasSuffix(message, suffix) {
 			literal := message[len(prefix) : len(message)-len(suffix)]
 			return errors.New(prefix + diagnostic.Display(literal) + suffix)
+		}
+		const stringTagPrefix = "json: invalid use of ,string struct tag, trying to unmarshal "
+		if len(message) > 2048 && strings.HasPrefix(message, stringTagPrefix) {
+			// Parse the formatter's quoted literal without unquoting or copying
+			// it. Content and application-defined target types can both contain
+			// the delimiter, so text splitting cannot preserve the target suffix.
+			literal, parseErr := strconv.QuotedPrefix(message[len(stringTagPrefix):])
+			end := len(stringTagPrefix) + len(literal)
+			if parseErr == nil && strings.HasPrefix(message[end:], " into ") {
+				return errors.New(stringTagPrefix + diagnostic.Display(literal) + message[end:])
+			}
 		}
 	}
 	// The bounded 256-byte quoted preview is always below this retained-value
@@ -88,7 +100,9 @@ func standardType(t reflect.Type, seen map[reflect.Type]bool) bool {
 	case reflect.Struct:
 		for i := 0; i < t.NumField(); i++ {
 			field := t.Field(i)
-			if (field.PkgPath != "" && !field.Anonymous) || strings.Split(field.Tag.Get("json"), ",")[0] == "-" {
+			// Only the exact dash tag is ignored by encoding/json. With tag
+			// options, "-" names an active field that can delegate to a codec.
+			if (field.PkgPath != "" && !field.Anonymous) || field.Tag.Get("json") == "-" {
 				continue
 			}
 			if !standardType(field.Type, seen) {
