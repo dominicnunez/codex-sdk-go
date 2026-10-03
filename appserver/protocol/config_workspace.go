@@ -53,7 +53,11 @@ func (c Config) MarshalJSON() ([]byte, error) {
 	}
 	var workspace any
 	if c.ForcedChatgptWorkspaceIDs != nil {
-		workspace = c.ForcedChatgptWorkspaceIDs
+		list := *c.ForcedChatgptWorkspaceIDs
+		if list == nil {
+			list = []string{}
+		}
+		workspace = list
 	} else if c.ForcedChatgptWorkspaceID != nil {
 		workspace = c.ForcedChatgptWorkspaceID
 	}

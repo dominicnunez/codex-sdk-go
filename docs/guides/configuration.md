@@ -9,6 +9,8 @@ The SDK retains the selected branch:
 - `Config.ForcedChatgptWorkspaceIDs` is a `*[]string` for the array branch. A
   nonnil pointer to an empty slice retains an explicit `[]`. One-element arrays
   remain arrays; the SDK does not select their first ID as a single restriction.
+  A nonnil pointer to a nil slice also selects the array branch and marshals as
+  `[]`, without changing the caller's slice.
 - Null and absence produce nil pointers on a fresh Config and are omitted when
   marshaled. Decoding an omitted field into a reused Config retains its previous
   value; explicit null clears both branches.

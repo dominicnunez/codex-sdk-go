@@ -164,6 +164,45 @@ func TestConfigWorkspaceMalformedAdmission(t *testing.T) {
 	}
 }
 
+func TestConfigWorkspaceConstructedBranches(t *testing.T) {
+	emptyString := ""
+	single := "a"
+	var nilList []string
+	emptyList := []string{}
+	one := []string{"a"}
+	many := []string{"a", "b"}
+	for _, test := range []struct {
+		config codex.Config
+		wire   string
+	}{
+		{codex.Config{}, ""},
+		{codex.Config{ForcedChatgptWorkspaceID: &emptyString}, `""`},
+		{codex.Config{ForcedChatgptWorkspaceID: &single}, `"a"`},
+		{codex.Config{ForcedChatgptWorkspaceIDs: &nilList}, `[]`},
+		{codex.Config{ForcedChatgptWorkspaceIDs: &emptyList}, `[]`},
+		{codex.Config{ForcedChatgptWorkspaceIDs: &one}, `["a"]`},
+		{codex.Config{ForcedChatgptWorkspaceIDs: &many}, `["a","b"]`},
+	} {
+		requireJSONMember(t, test.config, "forced_chatgpt_workspace_id", test.wire != "", test.wire)
+		requireJSONMember(t, &test.config, "forced_chatgpt_workspace_id", test.wire != "", test.wire)
+		data, err := json.Marshal(test.config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var roundTrip codex.Config
+		if err := json.Unmarshal(data, &roundTrip); err != nil {
+			t.Fatal(err)
+		}
+		if (test.config.ForcedChatgptWorkspaceIDs != nil) != (roundTrip.ForcedChatgptWorkspaceIDs != nil) ||
+			(test.config.ForcedChatgptWorkspaceID != nil) != (roundTrip.ForcedChatgptWorkspaceID != nil) {
+			t.Fatal("constructed branch lost during round trip")
+		}
+	}
+	if nilList != nil {
+		t.Fatal("marshaling mutated caller nil slice")
+	}
+}
+
 func FuzzConfigWorkspaceRestrictionRoundTrip(f *testing.F) {
 	f.Add("workspace-a", "workspace-b", true)
 	f.Add("", "", false)

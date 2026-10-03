@@ -26,4 +26,14 @@ func TestConfigWorkspaceOwnedValues(t *testing.T) {
 	if (*config.ForcedChatgptWorkspaceIDs)[1] != "b" {
 		t.Fatal("source restriction aliases copy")
 	}
+	var nilList []string
+	source := Config{ForcedChatgptWorkspaceIDs: &nilList}
+	snapshot = cloneArbitraryValue(source)
+	if snapshot.ForcedChatgptWorkspaceIDs == nil || *snapshot.ForcedChatgptWorkspaceIDs != nil {
+		t.Fatal("copy changed constructed array presence or nil storage")
+	}
+	*snapshot.ForcedChatgptWorkspaceIDs = append(*snapshot.ForcedChatgptWorkspaceIDs, "snapshot")
+	if nilList != nil {
+		t.Fatal("copy shares constructed slice pointer")
+	}
 }

@@ -71,7 +71,8 @@ type Config struct {
 	SandboxWorkspaceWrite           *SandboxWorkspaceWrite                       `json:"sandbox_workspace_write,omitempty"`
 	Tools                           *ToolsV2                                     `json:"tools,omitempty"`
 	WebSearch                       *WebSearchMode                               `json:"web_search,omitempty"`
-	// ForcedChatgptWorkspaceIDs retains the array branch, including an empty list.
+	// ForcedChatgptWorkspaceIDs retains the array branch; a nonnil pointer to a
+	// nil or empty slice marshals as an empty list without mutating the slice.
 	// Set either this field or ForcedChatgptWorkspaceID; setting both is invalid.
 	ForcedChatgptWorkspaceIDs *[]string `json:"-"`
 }
