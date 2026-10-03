@@ -10,6 +10,7 @@ import (
 	"reflect"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 )
 
 // GetAccountParams are parameters for the account/read method.
@@ -233,7 +234,7 @@ func (a *AccountWrapper) MarshalJSON() ([]byte, error) {
 	if a == nil || a.Value == nil {
 		return []byte("null"), nil
 	}
-	return json.Marshal(a.Value)
+	return jsonencode.Marshal(a.Value)
 }
 
 // GetAccountRateLimitsParams declares the requesting client's usage-read capabilities.

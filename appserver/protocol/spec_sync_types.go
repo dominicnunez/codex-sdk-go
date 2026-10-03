@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 )
 
 type CommandExecutionApprovalKind string
@@ -413,7 +414,7 @@ func (w FunctionCallOutputContentItemWrapper) MarshalJSON() ([]byte, error) {
 	if isNilInterfaceValue(w.Value) {
 		return nil, fmt.Errorf("missing FunctionCallOutputContentItem")
 	}
-	return json.Marshal(w.Value)
+	return jsonencode.Marshal(w.Value)
 }
 
 type ThreadRealtimeItem interface{ isThreadRealtimeItem() }
@@ -581,7 +582,7 @@ func (w ThreadRealtimeBemItemPresentationWrapper) MarshalJSON() ([]byte, error) 
 	if isNilInterfaceValue(w.Value) {
 		return nil, fmt.Errorf("missing ThreadRealtimeBemItemPresentation")
 	}
-	return json.Marshal(w.Value)
+	return jsonencode.Marshal(w.Value)
 }
 
 // BemItemPromotedThreadRealtimeItem follows the upstream BemItemPromotedThreadRealtimeItem schema.
@@ -697,7 +698,7 @@ func (w ThreadRealtimeItemWrapper) MarshalJSON() ([]byte, error) {
 	if isNilInterfaceValue(w.Value) {
 		return nil, fmt.Errorf("missing ThreadRealtimeItem")
 	}
-	return json.Marshal(w.Value)
+	return jsonencode.Marshal(w.Value)
 }
 
 // AuthRecoveryNotification follows the upstream AuthRecoveryNotification schema.

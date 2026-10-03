@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 )
 
 // DynamicToolCallParams represents parameters for a dynamic tool call.
@@ -212,7 +213,7 @@ func (w *DynamicToolCallOutputContentItemWrapper) UnmarshalJSON(data []byte) err
 
 // MarshalJSON implements custom marshaling for DynamicToolCallOutputContentItemWrapper.
 func (w DynamicToolCallOutputContentItemWrapper) MarshalJSON() ([]byte, error) {
-	return json.Marshal(w.Value)
+	return jsonencode.Marshal(w.Value)
 }
 
 func (w DynamicToolCallOutputContentItemWrapper) validateForResponse() error {

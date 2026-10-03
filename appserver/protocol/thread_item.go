@@ -25,7 +25,7 @@ func (UserMessageThreadItem) threadItem() {}
 func (u *UserMessageThreadItem) MarshalJSON() ([]byte, error) {
 	items := make([]json.RawMessage, len(u.Content))
 	for i, input := range u.Content {
-		b, err := json.Marshal(input)
+		b, err := jsonencode.Marshal(input)
 		if err != nil {
 			return nil, err
 		}
@@ -616,7 +616,7 @@ func (w *ThreadItemWrapper) UnmarshalJSON(data []byte) error {
 }
 
 func (w ThreadItemWrapper) MarshalJSON() ([]byte, error) {
-	return json.Marshal(w.Value)
+	return jsonencode.Marshal(w.Value)
 }
 
 // IsCollabToolCall returns true if the item is a CollabAgentToolCallThreadItem.

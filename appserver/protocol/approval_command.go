@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
@@ -202,7 +203,7 @@ func (w *CommandActionWrapper) UnmarshalJSON(data []byte) error {
 
 // MarshalJSON implements custom marshaling for CommandActionWrapper.
 func (w CommandActionWrapper) MarshalJSON() ([]byte, error) {
-	return json.Marshal(w.Value)
+	return jsonencode.Marshal(w.Value)
 }
 
 // NetworkApprovalContext provides context for network-related approval requests.
@@ -588,7 +589,7 @@ func (w *ParsedCommandWrapper) UnmarshalJSON(data []byte) error {
 
 // MarshalJSON implements custom marshaling for ParsedCommandWrapper.
 func (w ParsedCommandWrapper) MarshalJSON() ([]byte, error) {
-	return json.Marshal(w.Value)
+	return jsonencode.Marshal(w.Value)
 }
 
 // ExecCommandApprovalResponse represents the response to an exec command approval request (legacy).

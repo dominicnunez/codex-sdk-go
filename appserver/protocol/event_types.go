@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
@@ -377,7 +378,7 @@ func (w *PatchChangeKindWrapper) UnmarshalJSON(data []byte) error {
 }
 
 func (w PatchChangeKindWrapper) MarshalJSON() ([]byte, error) {
-	return json.Marshal(w.Value)
+	return jsonencode.Marshal(w.Value)
 }
 
 // McpToolCallResult represents the result of an MCP tool call.
@@ -537,7 +538,7 @@ func (w *WebSearchActionWrapper) UnmarshalJSON(data []byte) error {
 }
 
 func (w WebSearchActionWrapper) MarshalJSON() ([]byte, error) {
-	return json.Marshal(w.Value)
+	return jsonencode.Marshal(w.Value)
 }
 
 func unmarshalRequiredEventObject(data []byte, dest interface{}, requiredFields ...string) error {

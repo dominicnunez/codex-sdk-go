@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
@@ -170,7 +171,7 @@ func (w *FileChangeWrapper) UnmarshalJSON(data []byte) error {
 
 // MarshalJSON implements custom marshaling for FileChangeWrapper.
 func (w FileChangeWrapper) MarshalJSON() ([]byte, error) {
-	return json.Marshal(w.Value)
+	return jsonencode.Marshal(w.Value)
 }
 
 // ApplyPatchApprovalResponse represents the response to an applyPatchApproval request.

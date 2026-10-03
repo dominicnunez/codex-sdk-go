@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
@@ -445,7 +446,7 @@ func (w ConfigLayerSourceWrapper) MarshalJSON() ([]byte, error) {
 	if w.Value == nil {
 		return []byte("null"), nil
 	}
-	return json.Marshal(w.Value)
+	return jsonencode.Marshal(w.Value)
 }
 
 // ConfigRequirementsReadResponse represents response from configRequirements/read request.

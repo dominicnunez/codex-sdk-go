@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
@@ -166,7 +167,7 @@ type ReviewTargetWrapper struct {
 }
 
 func (w ReviewTargetWrapper) MarshalJSON() ([]byte, error) {
-	return json.Marshal(w.Value)
+	return jsonencode.Marshal(w.Value)
 }
 
 func (w *ReviewTargetWrapper) UnmarshalJSON(data []byte) error {

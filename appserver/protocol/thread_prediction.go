@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 )
 
 type ThreadPredictionResult interface{ isThreadPredictionResult() }
@@ -54,7 +55,7 @@ func (w ThreadPredictionResultWrapper) MarshalJSON() ([]byte, error) {
 	if isNilInterfaceValue(w.Value) {
 		return nil, fmt.Errorf("missing ThreadPredictionResult")
 	}
-	return json.Marshal(w.Value)
+	return jsonencode.Marshal(w.Value)
 }
 
 type ThreadPredictionUpdatedNotification struct {
