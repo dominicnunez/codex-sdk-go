@@ -145,12 +145,18 @@ func validatePromptContext(ctx context.Context, prompt string) error {
 func buildRunResult(thread Thread, turn Turn, items []ThreadItemWrapper) *RunResult {
 	resultThread := cloneThreadState(thread)
 	resultTurn := turnWithItems(turn, items)
-	resultItems := cloneThreadItems(items)
 	resultThread.Turns = append(resultThread.Turns, cloneTurn(resultTurn))
+	return runResultWithThread(resultThread, resultTurn, items)
+}
+
+// thread and turn are already independently owned by the result builder or
+// atomic cache completion; append must occur only at those owning boundaries.
+func runResultWithThread(thread Thread, turn Turn, items []ThreadItemWrapper) *RunResult {
+	resultItems := cloneThreadItems(items)
 
 	result := &RunResult{
-		Thread: resultThread,
-		Turn:   resultTurn,
+		Thread: thread,
+		Turn:   turn,
 		Items:  resultItems,
 	}
 	// Extract response text from the last agentMessage item.

@@ -156,12 +156,27 @@ type threadStateListener struct {
 	id       uint64
 	onUpdate func(Thread)
 	onClose  func()
+	delivery *threadStateDelivery
+}
+
+// All delivery fields are owned by threadStateMu. Each registered recipient has
+// at most one drainer, one pending closure and one pending latest snapshot.
+type threadStateDelivery struct {
+	active       bool
+	update       *threadStateUpdate
+	closeContext string
+}
+
+type threadStateUpdate struct {
+	method string
+	thread Thread
 }
 
 type threadStateEntry struct {
 	thread      Thread
 	hasSnapshot bool
 	closed      bool
+	generation  uint64
 }
 
 // Client is the main entry point for interacting with the Codex JSON-RPC server.
@@ -200,6 +215,7 @@ type Client struct {
 	threadStateOrder       []string
 	threadStateListeners   map[string][]threadStateListener
 	threadStateListenerSeq uint64
+	threadStateGeneration  uint64
 	threadStateMu          sync.RWMutex
 
 	// Approval handlers for server→client requests

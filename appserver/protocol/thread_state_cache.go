@@ -24,6 +24,11 @@ func (c *Client) cacheThreadStateForMethod(method string, thread Thread) {
 	snapshot := cloneThreadState(thread)
 	c.threadStateMu.Lock()
 	c.ensureThreadStateCacheMapsLocked()
+	entry := c.threadStates[thread.ID]
+	if !entry.hasSnapshot || entry.closed {
+		c.threadStateGeneration++
+		entry.generation = c.threadStateGeneration
+	}
 	if snapshot.DisabledPluginIDs == nil {
 		// Thread-only reads and notifications do not carry lifecycle settings.
 		// Preserve the last settings without sharing ownership with the old entry.
@@ -32,13 +37,14 @@ func (c *Client) cacheThreadStateForMethod(method string, thread Thread) {
 	c.threadStates[thread.ID] = threadStateEntry{
 		thread:      snapshot,
 		hasSnapshot: true,
+		generation:  entry.generation,
 	}
 	c.touchThreadStateLocked(thread.ID)
 	c.evictThreadStatesLocked()
-	listeners := c.threadStateListenersLocked(thread.ID)
+	listeners := c.queueThreadUpdateLocked(thread.ID, method, snapshot)
 	c.threadStateMu.Unlock()
 
-	c.notifyThreadStateListeners(method, snapshot, listeners)
+	c.drainThreadStateListeners(listeners)
 }
 
 // CacheThreadState stores a best-effort latest snapshot for a thread.
@@ -62,6 +68,49 @@ func (c *Client) ThreadStateSnapshot(threadID string) (Thread, bool) {
 	return c.threadStateSnapshot(threadID)
 }
 
+// ThreadStateGeneration returns the current open cache incarnation, or zero if
+// absent or closed. It is local to this Client, remains stable across updates,
+// and changes after eviction or closure/reopening. It is not a remote revision,
+// durable identity, or authorization token.
+func (c *Client) ThreadStateGeneration(threadID string) uint64 {
+	c.threadStateMu.RLock()
+	defer c.threadStateMu.RUnlock()
+	entry := c.threadStates[threadID]
+	if !entry.hasSnapshot || entry.closed {
+		return 0
+	}
+	return entry.generation
+}
+
+// CompleteThreadTurn appends an owned turn to the latest open snapshot only if
+// its cache incarnation still matches generation. It atomically preserves
+// intervening metadata updates and admits listener delivery. Absence, eviction,
+// closure or an incarnation mismatch returns false without publishing state.
+// The returned snapshot describes this commit, even if reentrant listeners
+// subsequently publish newer state. Each call appends once; callers must not
+// retry the same completion expecting deduplication by turn ID.
+func (c *Client) CompleteThreadTurn(threadID string, generation uint64, turn Turn) (Thread, bool) {
+	if generation == 0 {
+		return Thread{}, false
+	}
+	c.threadStateMu.Lock()
+	entry, ok := c.threadStates[threadID]
+	if !ok || !entry.hasSnapshot || entry.closed || entry.generation != generation {
+		c.threadStateMu.Unlock()
+		return Thread{}, false
+	}
+	snapshot := cloneThreadState(entry.thread)
+	snapshot.Turns = append(snapshot.Turns, cloneArbitraryValue(turn))
+	entry.thread = snapshot
+	c.threadStates[threadID] = entry
+	c.touchThreadStateLocked(threadID)
+	c.evictThreadStatesLocked()
+	listeners := c.queueThreadUpdateLocked(threadID, threadStateUpdateContext, snapshot)
+	c.threadStateMu.Unlock()
+	c.drainThreadStateListeners(listeners)
+	return cloneThreadState(snapshot), true
+}
+
 func (c *Client) mutateThreadState(threadID string, mutate func(*Thread)) {
 	c.mutateThreadStateForMethod(threadStateUpdateContext, threadID, mutate)
 }
@@ -81,19 +130,21 @@ func (c *Client) mutateThreadStateForMethod(method string, threadID string, muta
 	c.ensureThreadStateCacheMapsLocked()
 	entry, ok := c.threadStates[threadID]
 	if ok && entry.hasSnapshot && !entry.closed {
+		// Pending deliveries may still refer to the previous immutable snapshot.
+		entry.thread = cloneThreadState(entry.thread)
 		mutate(&entry.thread)
-		snapshot = cloneThreadState(entry.thread)
+		snapshot = entry.thread
 		entry.thread = snapshot
 		c.threadStates[threadID] = entry
 		c.touchThreadStateLocked(threadID)
 		c.evictThreadStatesLocked()
-		listeners = c.threadStateListenersLocked(threadID)
+		listeners = c.queueThreadUpdateLocked(threadID, method, snapshot)
 		updated = true
 	}
 	c.threadStateMu.Unlock()
 
 	if updated {
-		c.notifyThreadStateListeners(method, snapshot, listeners)
+		c.drainThreadStateListeners(listeners)
 	}
 }
 
@@ -117,51 +168,54 @@ func (c *Client) closeThreadState(threadID string) {
 	c.threadStates[threadID] = entry
 	c.touchThreadStateLocked(threadID)
 	c.evictThreadStatesLocked()
-	listeners = c.threadStateListenersLocked(threadID)
+	listeners = c.queueThreadCloseLocked(threadID, notifyThreadClosed)
 	c.threadStateMu.Unlock()
 
-	c.notifyThreadClosedListeners(listeners)
+	c.drainThreadStateListeners(listeners)
 }
 
 func (c *Client) addThreadStateListener(threadID string, onUpdate func(Thread), onClose func()) func() {
-	if threadID == "" || (onUpdate == nil && onClose == nil) {
-		return func() {}
-	}
+	_, remove := c.addThreadStateListenerWithGeneration(threadID, onUpdate, onClose)
+	return remove
+}
 
-	var (
-		snapshot *Thread
-		closed   bool
-	)
+func (c *Client) addThreadStateListenerWithGeneration(threadID string, onUpdate func(Thread), onClose func()) (uint64, func()) {
+	if threadID == "" || (onUpdate == nil && onClose == nil) {
+		return 0, func() {}
+	}
 
 	c.threadStateMu.Lock()
 	c.ensureThreadStateCacheMapsLocked()
 	c.threadStateListenerSeq++
 	id := c.threadStateListenerSeq
-	c.threadStateListeners[threadID] = append(c.threadStateListeners[threadID], threadStateListener{
+	listener := threadStateListener{
 		id:       id,
 		onUpdate: onUpdate,
 		onClose:  onClose,
-	})
+		delivery: &threadStateDelivery{},
+	}
+	c.threadStateListeners[threadID] = append(c.threadStateListeners[threadID], listener)
+	var generation uint64
 	if entry, ok := c.threadStates[threadID]; ok {
+		if entry.hasSnapshot && !entry.closed {
+			generation = entry.generation
+		}
 		switch {
-		case entry.closed:
-			closed = true
-		case entry.hasSnapshot:
-			cp := cloneThreadState(entry.thread)
-			snapshot = &cp
+		case entry.closed && onClose != nil:
+			listener.delivery.closeContext = threadStateListenerContext
+		case entry.hasSnapshot && onUpdate != nil:
+			listener.delivery.update = &threadStateUpdate{method: threadStateListenerContext, thread: entry.thread}
 		}
 	}
+	active := c.claimThreadDeliveryLocked(listener)
 	c.evictThreadStatesLocked()
 	c.threadStateMu.Unlock()
 
-	switch {
-	case snapshot != nil && onUpdate != nil:
-		c.safeCallNotificationHandler(threadStateListenerContext, func() { onUpdate(*snapshot) })
-	case closed && onClose != nil:
-		c.safeCallNotificationHandler(threadStateListenerContext, onClose)
+	if active {
+		c.drainThreadStateListener(listener)
 	}
 
-	return func() {
+	return generation, func() {
 		c.threadStateMu.Lock()
 		defer c.threadStateMu.Unlock()
 		listeners := c.threadStateListeners[threadID]
@@ -182,10 +236,26 @@ func (c *Client) addThreadStateListener(threadID string, onUpdate func(Thread), 
 }
 
 // AddThreadStateListener subscribes to cached thread-state updates for threadID.
+// Each listener runs serially outside the cache lock. Reentrant or concurrent
+// writes can return before a busy listener receives them; pending updates are
+// coalesced to the latest snapshot. Closure supersedes earlier pending updates
+// and is delivered before a subsequent reopened snapshot. Repeated close/reopen
+// transitions while busy may coalesce to one closure and the latest update.
+// Unsubscribe prevents new admission; already admitted callbacks may finish.
 // Listener panics are reported through WithHandlerErrorCallback without stopping
 // other listeners. Initial delivery uses "AddThreadStateListener" as its context.
 func (c *Client) AddThreadStateListener(threadID string, onUpdate func(Thread), onClose func()) func() {
 	return c.addThreadStateListener(threadID, onUpdate, onClose)
+}
+
+// AddThreadStateListenerWithGeneration has the delivery contract of
+// AddThreadStateListener and also returns the open cache incarnation selected
+// atomically with registration/replay admission. Later closure or reopening
+// does not change the returned generation. Zero means no open cached snapshot
+// existed at registration, or registration was a no-op because threadID was
+// empty or both callbacks were nil; see ThreadStateGeneration for its local scope.
+func (c *Client) AddThreadStateListenerWithGeneration(threadID string, onUpdate func(Thread), onClose func()) (uint64, func()) {
+	return c.addThreadStateListenerWithGeneration(threadID, onUpdate, onClose)
 }
 
 func (c *Client) touchThreadStateLocked(threadID string) {
@@ -238,28 +308,71 @@ func (c *Client) ensureThreadStateCacheMapsLocked() {
 	}
 }
 
-func (c *Client) threadStateListenersLocked(threadID string) []threadStateListener {
-	src := c.threadStateListeners[threadID]
-	if len(src) == 0 {
-		return nil
-	}
-	listeners := make([]threadStateListener, len(src))
-	copy(listeners, src)
-	return listeners
-}
-
-func (c *Client) notifyThreadStateListeners(method string, thread Thread, listeners []threadStateListener) {
-	for _, listener := range listeners {
+func (c *Client) queueThreadUpdateLocked(threadID, method string, thread Thread) []threadStateListener {
+	var drainers []threadStateListener
+	for _, listener := range c.threadStateListeners[threadID] {
 		if listener.onUpdate != nil {
-			c.safeCallNotificationHandler(method, func() { listener.onUpdate(cloneThreadState(thread)) })
+			listener.delivery.update = &threadStateUpdate{method: method, thread: thread}
+		}
+		if c.claimThreadDeliveryLocked(listener) {
+			drainers = append(drainers, listener)
 		}
 	}
+	return drainers
 }
 
-func (c *Client) notifyThreadClosedListeners(listeners []threadStateListener) {
-	for _, listener := range listeners {
+func (c *Client) queueThreadCloseLocked(threadID, method string) []threadStateListener {
+	var drainers []threadStateListener
+	for _, listener := range c.threadStateListeners[threadID] {
+		listener.delivery.update = nil
 		if listener.onClose != nil {
-			c.safeCallNotificationHandler(notifyThreadClosed, listener.onClose)
+			listener.delivery.closeContext = method
+		}
+		if c.claimThreadDeliveryLocked(listener) {
+			drainers = append(drainers, listener)
+		}
+	}
+	return drainers
+}
+
+func (c *Client) claimThreadDeliveryLocked(listener threadStateListener) bool {
+	delivery := listener.delivery
+	if delivery.active || (delivery.update == nil && delivery.closeContext == "") {
+		return false
+	}
+	delivery.active = true
+	return true
+}
+
+func (c *Client) drainThreadStateListeners(listeners []threadStateListener) {
+	for _, listener := range listeners {
+		c.drainThreadStateListener(listener)
+	}
+}
+
+func (c *Client) drainThreadStateListener(listener threadStateListener) {
+	for {
+		c.threadStateMu.Lock()
+		delivery := listener.delivery
+		method := delivery.closeContext
+		var update *threadStateUpdate
+		if method != "" {
+			delivery.closeContext = ""
+		} else {
+			update = delivery.update
+			delivery.update = nil
+		}
+		if method == "" && update == nil {
+			delivery.active = false
+			c.threadStateMu.Unlock()
+			return
+		}
+		c.threadStateMu.Unlock()
+
+		if method != "" {
+			c.safeCallNotificationHandler(method, listener.onClose)
+		} else {
+			c.safeCallNotificationHandler(update.method, func() { listener.onUpdate(cloneThreadState(update.thread)) })
 		}
 	}
 }

@@ -60,7 +60,22 @@ originating RPC or notification method, or `CacheThreadState` for a direct cache
 update and `AddThreadStateListener` for initial replay. A panic during replay
 still returns the unsubscribe function. Callbacks run outside the cache lock;
 unsubscribing affects future deliveries, while an already selected callback may
-still run. Callbacks must return promptly because delivery is synchronous.
+still run. Each recipient runs serially in cache commit order. Idle delivery runs
+on the publishing call; concurrent or reentrant writes to a busy recipient can
+return before delivery. Pending updates coalesce to the latest snapshot. Closure
+supersedes older pending updates and precedes a later reopened snapshot; repeated
+close/reopen transitions while busy may coalesce to one closure and the latest
+update. Callbacks must return promptly, since an earlier blocked callback can
+delay later recipients selected by the same publication.
+
+`AddThreadStateListenerWithGeneration` also returns the client-cache incarnation
+selected atomically with registration. `ThreadStateGeneration` checks the current
+open incarnation, returning zero when absent or closed. `CompleteThreadTurn`
+atomically appends to that incarnation's latest metadata, returning an independent
+historical snapshot; closure, eviction or recreation causes publication to be
+skipped. Each successful call appends once, without turn-ID deduplication. These
+helpers support runtime snapshot ownership; generations are local best-effort
+cache state, not remote revisions, durable identity or authorization.
 
 ## Login variants
 

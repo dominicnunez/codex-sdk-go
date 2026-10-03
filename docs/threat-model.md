@@ -202,9 +202,30 @@ and closure continue to later listeners, so an earlier application callback
 cannot suppress a Conversation's closure update. Error reporting preserves the
 originating method or direct operation context and suppresses reporter panics.
 Initial replay still returns registration cleanup after recovery. Callbacks run
-outside the cache lock with independent snapshots; they remain synchronous and
-must return promptly. Panic recovery does not stop a callback that blocks or
-undo its external effects.
+outside the cache lock with independent snapshots. Each recipient runs serially
+in cache commit order. Idle delivery runs on the publishing call; concurrent or
+reentrant writes to a busy recipient commit and return with delivery deferred.
+Pending updates coalesce to the latest snapshot. A pending close supersedes
+older updates and survives reopening, preceding the latest reopened update;
+repeated close/reopen transitions while busy may coalesce to one closure and the
+latest update. Already admitted delivery may finish after unsubscribe. Each
+recipient retains at most one executing snapshot, one pending latest snapshot
+and one pending closure; complete semantic Thread graphs are not byte bounded.
+Callbacks must return promptly: panic recovery does not stop blocked callbacks
+or undo their external effects, and an earlier blocked recipient can delay
+drainers already selected for later recipients.
+
+Conversation registration captures its client-cache incarnation together with
+replay admission. New turns check that incarnation against committed cache
+state, including closure before the selected Conversation callback executes.
+An already admitted turn may finish after closure or local Close and return its
+owned historical result. Completion atomically appends to the latest metadata
+only within the captured open incarnation; it cannot reopen a closed entry or
+publish into an entry recreated after eviction or reopening. Ordered listeners
+own the Conversation's current snapshot, which freezes on local or delivered
+closure. Cache generations are local best-effort state, not remote revisions,
+durable identities or authorization. Transport EOF does not synthesize a thread
+closure, and historical results may differ from subsequently published state.
 
 ## Prompt injection, approvals, and tool results
 

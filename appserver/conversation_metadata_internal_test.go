@@ -42,15 +42,12 @@ func TestConversationMetadataSnapshotIsolation(t *testing.T) {
 		(*questions)[0].Title = "changed"
 		(*(*questions)[0].Options)[0] = "changed"
 	}
-	for _, storage := range []string{"initial", "store", "completed"} {
+	for _, storage := range []string{"initial", "store"} {
 		t.Run(storage, func(t *testing.T) {
 			input := makeThread()
 			state := newConversationState(input)
 			if storage == "store" {
 				state.storeSnapshot(input)
-			}
-			if storage == "completed" {
-				state.applyCompletedThread(input)
 			}
 			mutate(input)
 			conv := &Conversation{state: state}
