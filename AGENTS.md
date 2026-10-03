@@ -113,6 +113,9 @@ When adding reference-valued protocol fields, trace ownership through cache,
 conversation, collector, emitted events and final result views. Use the existing
 complete copy boundary rather than a partial field list; verify mutation in both
 directions, nil/empty values and representative snapshot cost.
+For bounded histories, verify backing storage as well as visible lengths: own
+trimmed substrings and clear evicted slice slots. Trace every retention writer,
+completion aggregation and snapshots; distinguish bounded text from full items.
 For initialization extensions, own serialized JSON before waiting or child
 launch. A snapshot error must fail admission; do not retain a mutable Go value
 as fallback. Recheck process cancellation after parameter preparation.
