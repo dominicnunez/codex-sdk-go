@@ -2,6 +2,7 @@ package appserver
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -16,6 +17,8 @@ import (
 
 	"github.com/dominicnunez/codex-sdk-go/appserver/protocol"
 	codextransport "github.com/dominicnunez/codex-sdk-go/appserver/transport"
+	"github.com/dominicnunez/codex-sdk-go/internal/deepcopy"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonvalue"
 	processctl "github.com/dominicnunez/codex-sdk-go/internal/process"
 )
 
@@ -160,6 +163,13 @@ func StartProcess(ctx context.Context, opts *ProcessOptions) (*Process, error) {
 	if err != nil {
 		return nil, err
 	}
+	initializeParams, err := resolveProcessInitializeParams(opts)
+	if err != nil {
+		return nil, fmt.Errorf("initialize params: %w", err)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 
 	cmd := exec.CommandContext(context.WithoutCancel(ctx), binary, args...)
 	processctl.ConfigureCommand(cmd)
@@ -207,7 +217,7 @@ func StartProcess(ctx context.Context, opts *ProcessOptions) (*Process, error) {
 		cmd:              cmd,
 		transport:        transport,
 		stdin:            stdin,
-		initializeParams: resolveProcessInitializeParams(opts),
+		initializeParams: initializeParams,
 		processTree:      processTree,
 		waitDone:         make(chan struct{}),
 		shutdownMode:     defaultProcessShutdownMode(),
@@ -224,23 +234,31 @@ func defaultInitializeParams() InitializeParams {
 	}
 }
 
-func resolveProcessInitializeParams(opts *ProcessOptions) InitializeParams {
+func resolveProcessInitializeParams(opts *ProcessOptions) (InitializeParams, error) {
 	if opts == nil || opts.InitializeParams == nil {
-		return defaultInitializeParams()
+		return defaultInitializeParams(), nil
 	}
 	return cloneInitializeParams(*opts.InitializeParams)
 }
 
-func cloneInitializeParams(params InitializeParams) InitializeParams {
+func cloneInitializeParams(params InitializeParams) (InitializeParams, error) {
 	cp := params
-	cp.ClientInfo = params.ClientInfo
-	cp.ClientInfo.Title = cloneStringPtr(params.ClientInfo.Title)
+	var extensions map[string]json.RawMessage
 	if params.Capabilities != nil {
+		var err error
+		extensions, err = jsonvalue.CloneObject(params.Capabilities.Extensions)
+		if err != nil {
+			return InitializeParams{}, fmt.Errorf("snapshot initialize extensions: %w", err)
+		}
 		capabilities := *params.Capabilities
-		capabilities.OptOutNotificationMethods = append([]string(nil), params.Capabilities.OptOutNotificationMethods...)
+		capabilities.Extensions = nil
 		cp.Capabilities = &capabilities
 	}
-	return cp
+	cp = deepcopy.Value(cp)
+	if cp.Capabilities != nil {
+		cp.Capabilities.Extensions = extensions
+	}
+	return cp, nil
 }
 
 func resolveBinaryPath(binaryPath string) (string, error) {
