@@ -90,6 +90,16 @@ have no correlated inbound outcome and continue to wait for actual write
 completion. An arbitrary caller-provided writer may block inside Write; the SDK
 bounds caller waiting and queued work but cannot forcibly stop that writer.
 
+Thread-state cache fanout also recovers each listener panic independently,
+including initial replay and direct service or cache updates. Committed state
+and closure continue to later listeners, so an earlier application callback
+cannot suppress a Conversation's closure update. Error reporting preserves the
+originating method or direct operation context and suppresses reporter panics.
+Initial replay still returns registration cleanup after recovery. Callbacks run
+outside the cache lock with independent snapshots; they remain synchronous and
+must return promptly. Panic recovery does not stop a callback that blocks or
+undo its external effects.
+
 ## Prompt injection, approvals, and tool results
 
 A repository file, retrieved resource, MCP tool response, attachment, or model message may try to persuade an application to authorize commands, disclose secrets, or render executable content. The SDK exposes these values and protocol operations; it does not classify their trustworthiness or implement prompt-injection prevention. Treat text and structured metadata as data, including image identifiers, MCP UI resource URIs, prediction text, and plugin metadata.
