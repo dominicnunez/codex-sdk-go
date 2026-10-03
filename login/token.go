@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"strings"
@@ -16,6 +17,7 @@ import (
 
 const maxTokenResponseBytes int64 = 1 << 20
 const maxErrorBodyBytes int64 = 4096
+const maxTokenLifetimeSeconds = math.MaxInt64 / int64(time.Second)
 
 const (
 	grantTypeAuthorizationCode = "authorization_code"
@@ -94,6 +96,9 @@ func doTokenRequest(cfg Config, req *http.Request, operation string) (auth.Crede
 	}
 	if strings.TrimSpace(decoded.AccessToken) == "" || strings.TrimSpace(decoded.RefreshToken) == "" || decoded.ExpiresIn <= 0 {
 		return auth.Credentials{}, fmt.Errorf("OpenAI Codex token %s response: %w", operation, auth.ErrMissingTokenFields)
+	}
+	if decoded.ExpiresIn > maxTokenLifetimeSeconds {
+		return auth.Credentials{}, fmt.Errorf("OpenAI Codex token %s response: expires_in exceeds supported duration", operation)
 	}
 
 	claims, err := auth.ExtractTokenClaims(decoded.AccessToken)
