@@ -245,7 +245,8 @@ func (s SystemConfigLayerSource) MarshalJSON() ([]byte, error) {
 
 // UserConfigLayerSource represents user config from $CODEX_HOME/config.toml
 type UserConfigLayerSource struct {
-	File string `json:"file"`
+	File    string  `json:"file"`
+	Profile *string `json:"profile,omitempty"`
 }
 
 func (UserConfigLayerSource) isConfigLayerSource() {}
@@ -270,9 +271,10 @@ func (s *UserConfigLayerSource) UnmarshalJSON(data []byte) error {
 
 func (s UserConfigLayerSource) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		Type string `json:"type"`
-		File string `json:"file"`
-	}{Type: "user", File: s.File})
+		Type    string  `json:"type"`
+		File    string  `json:"file"`
+		Profile *string `json:"profile,omitempty"`
+	}{Type: "user", File: s.File, Profile: s.Profile})
 }
 
 // ProjectConfigLayerSource represents project .codex/ folder
