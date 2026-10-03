@@ -31,11 +31,11 @@ func (u *UserMessageThreadItem) MarshalJSON() ([]byte, error) {
 		}
 		items[i] = b
 	}
-	contentBytes, err := json.Marshal(items)
+	contentBytes, err := jsonencode.Marshal(items)
 	if err != nil {
 		return nil, err
 	}
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type     string          `json:"type"`
 		ID       string          `json:"id"`
 		Content  json.RawMessage `json:"content"`
@@ -62,7 +62,7 @@ func (AgentMessageThreadItem) threadItem() {}
 
 func (a *AgentMessageThreadItem) MarshalJSON() ([]byte, error) {
 	type Alias AgentMessageThreadItem
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{
@@ -81,7 +81,7 @@ func (PlanThreadItem) threadItem() {}
 
 func (p *PlanThreadItem) MarshalJSON() ([]byte, error) {
 	type Alias PlanThreadItem
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{
@@ -101,7 +101,7 @@ func (ReasoningThreadItem) threadItem() {}
 
 func (r *ReasoningThreadItem) MarshalJSON() ([]byte, error) {
 	type Alias ReasoningThreadItem
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{
@@ -130,7 +130,7 @@ func (CommandExecutionThreadItem) threadItem() {}
 
 func (c *CommandExecutionThreadItem) MarshalJSON() ([]byte, error) {
 	type Alias CommandExecutionThreadItem
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{
@@ -150,7 +150,7 @@ func (FileChangeThreadItem) threadItem() {}
 
 func (f *FileChangeThreadItem) MarshalJSON() ([]byte, error) {
 	type Alias FileChangeThreadItem
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{
@@ -268,7 +268,7 @@ func (CollabAgentToolCallThreadItem) threadItem() {}
 
 func (c *CollabAgentToolCallThreadItem) MarshalJSON() ([]byte, error) {
 	type Alias CollabAgentToolCallThreadItem
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{
@@ -302,7 +302,7 @@ func (SubAgentActivityThreadItem) threadItem() {}
 
 func (s *SubAgentActivityThreadItem) MarshalJSON() ([]byte, error) {
 	type Alias SubAgentActivityThreadItem
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{Type: "subAgentActivity", Alias: (*Alias)(s)})
@@ -318,7 +318,7 @@ func (SleepThreadItem) threadItem() {}
 
 func (s *SleepThreadItem) MarshalJSON() ([]byte, error) {
 	type Alias SleepThreadItem
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{Type: "sleep", Alias: (*Alias)(s)})
@@ -336,7 +336,7 @@ func (WebSearchThreadItem) threadItem() {}
 
 func (w *WebSearchThreadItem) MarshalJSON() ([]byte, error) {
 	type Alias WebSearchThreadItem
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{
@@ -355,7 +355,7 @@ func (ImageViewThreadItem) threadItem() {}
 
 func (i *ImageViewThreadItem) MarshalJSON() ([]byte, error) {
 	type Alias ImageViewThreadItem
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{
@@ -374,7 +374,7 @@ func (EnteredReviewModeThreadItem) threadItem() {}
 
 func (e *EnteredReviewModeThreadItem) MarshalJSON() ([]byte, error) {
 	type Alias EnteredReviewModeThreadItem
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{
@@ -393,7 +393,7 @@ func (ExitedReviewModeThreadItem) threadItem() {}
 
 func (e *ExitedReviewModeThreadItem) MarshalJSON() ([]byte, error) {
 	type Alias ExitedReviewModeThreadItem
-	return json.Marshal(&struct {
+	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{
@@ -410,7 +410,7 @@ type ContextCompactionThreadItem struct {
 func (ContextCompactionThreadItem) threadItem() {}
 
 func (c *ContextCompactionThreadItem) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 		ID   string `json:"id"`
 	}{
@@ -447,7 +447,7 @@ func (u *UnknownThreadItem) MarshalJSON() ([]byte, error) {
 		Raw  json.RawMessage `json:"raw"`
 	}
 
-	return json.Marshal(fallbackThreadItem{
+	return jsonencode.Marshal(fallbackThreadItem{
 		Type: u.Type,
 		Raw:  u.Raw,
 	})

@@ -50,7 +50,7 @@ type UncommittedChangesReviewTarget struct{}
 func (*UncommittedChangesReviewTarget) reviewTarget() {}
 
 func (u *UncommittedChangesReviewTarget) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 	}{Type: reviewTargetTypeUncommittedChanges})
 }
@@ -71,7 +71,7 @@ type BaseBranchReviewTarget struct {
 func (*BaseBranchReviewTarget) reviewTarget() {}
 
 func (b *BaseBranchReviewTarget) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type   string `json:"type"`
 		Branch string `json:"branch"`
 	}{Type: reviewTargetTypeBaseBranch, Branch: b.Branch})
@@ -99,7 +99,7 @@ type CommitReviewTarget struct {
 func (*CommitReviewTarget) reviewTarget() {}
 
 func (c *CommitReviewTarget) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type  string  `json:"type"`
 		SHA   string  `json:"sha"`
 		Title *string `json:"title,omitempty"`
@@ -127,7 +127,7 @@ type CustomReviewTarget struct {
 func (*CustomReviewTarget) reviewTarget() {}
 
 func (c *CustomReviewTarget) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type         string `json:"type"`
 		Instructions string `json:"instructions"`
 	}{Type: reviewTargetTypeCustom, Instructions: c.Instructions})

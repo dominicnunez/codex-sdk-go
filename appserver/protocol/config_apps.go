@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 )
 
 // AppsConfig holds global defaults and settings keyed by connector ID.
@@ -51,7 +52,7 @@ func (c AppsConfig) MarshalJSON() ([]byte, error) {
 	if c.Default != nil {
 		fields["_default"] = c.Default
 	}
-	return json.Marshal(fields)
+	return jsonencode.Marshal(fields)
 }
 
 // AppsDefaultConfig contains default connector permissions returned by config/read.

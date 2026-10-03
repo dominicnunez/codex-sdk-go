@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 )
 
 // SandboxPolicy represents sandbox access policy
@@ -133,12 +134,12 @@ func (w ReadOnlyAccessWrapper) MarshalJSON() ([]byte, error) {
 	}
 	switch v := value.(type) {
 	case ReadOnlyAccessRestricted:
-		return json.Marshal(struct {
+		return jsonencode.Marshal(struct {
 			Type string `json:"type"`
 			ReadOnlyAccessRestricted
 		}{Type: "restricted", ReadOnlyAccessRestricted: v})
 	case ReadOnlyAccessFullAccess:
-		return json.Marshal(struct {
+		return jsonencode.Marshal(struct {
 			Type string `json:"type"`
 		}{Type: "fullAccess"})
 	case UnknownReadOnlyAccess:
@@ -251,21 +252,21 @@ func (s SandboxPolicyWrapper) MarshalJSON() ([]byte, error) {
 	}
 	switch v := value.(type) {
 	case SandboxPolicyDangerFullAccess:
-		return json.Marshal(struct {
+		return jsonencode.Marshal(struct {
 			Type string `json:"type"`
 		}{Type: "dangerFullAccess"})
 	case SandboxPolicyReadOnly:
-		return json.Marshal(struct {
+		return jsonencode.Marshal(struct {
 			Type string `json:"type"`
 			SandboxPolicyReadOnly
 		}{Type: "readOnly", SandboxPolicyReadOnly: v})
 	case SandboxPolicyExternalSandbox:
-		return json.Marshal(struct {
+		return jsonencode.Marshal(struct {
 			Type string `json:"type"`
 			SandboxPolicyExternalSandbox
 		}{Type: "externalSandbox", SandboxPolicyExternalSandbox: v})
 	case SandboxPolicyWorkspaceWrite:
-		return json.Marshal(struct {
+		return jsonencode.Marshal(struct {
 			Type string `json:"type"`
 			SandboxPolicyWorkspaceWrite
 		}{Type: "workspaceWrite", SandboxPolicyWorkspaceWrite: v})

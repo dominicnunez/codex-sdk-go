@@ -108,7 +108,7 @@ func (w ReasoningSummaryWrapper) MarshalJSON() ([]byte, error) {
 		return []byte("null"), nil
 	}
 	if mode, ok := w.Value.(ReasoningSummaryMode); ok {
-		return json.Marshal(mode)
+		return jsonencode.Marshal(mode)
 	}
 	return nil, fmt.Errorf("unknown ReasoningSummary type: %T", w.Value)
 }
@@ -206,7 +206,7 @@ func (s *MdmConfigLayerSource) UnmarshalJSON(data []byte) error {
 }
 
 func (s MdmConfigLayerSource) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type   string `json:"type"`
 		Domain string `json:"domain"`
 		Key    string `json:"key"`
@@ -239,7 +239,7 @@ func (s *SystemConfigLayerSource) UnmarshalJSON(data []byte) error {
 }
 
 func (s SystemConfigLayerSource) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 		File string `json:"file"`
 	}{Type: "system", File: s.File})
@@ -272,7 +272,7 @@ func (s *UserConfigLayerSource) UnmarshalJSON(data []byte) error {
 }
 
 func (s UserConfigLayerSource) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type    string  `json:"type"`
 		File    string  `json:"file"`
 		Profile *string `json:"profile,omitempty"`
@@ -305,7 +305,7 @@ func (s *ProjectConfigLayerSource) UnmarshalJSON(data []byte) error {
 }
 
 func (s ProjectConfigLayerSource) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type           string `json:"type"`
 		DotCodexFolder string `json:"dotCodexFolder"`
 	}{Type: "project", DotCodexFolder: s.DotCodexFolder})
@@ -317,7 +317,7 @@ type SessionFlagsConfigLayerSource struct{}
 func (SessionFlagsConfigLayerSource) isConfigLayerSource() {}
 
 func (SessionFlagsConfigLayerSource) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 	}{Type: "sessionFlags"})
 }
@@ -348,7 +348,7 @@ func (s *LegacyManagedConfigTomlFromFileConfigLayerSource) UnmarshalJSON(data []
 }
 
 func (s LegacyManagedConfigTomlFromFileConfigLayerSource) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 		File string `json:"file"`
 	}{Type: "legacyManagedConfigTomlFromFile", File: s.File})
@@ -360,7 +360,7 @@ type LegacyManagedConfigTomlFromMdmConfigLayerSource struct{}
 func (LegacyManagedConfigTomlFromMdmConfigLayerSource) isConfigLayerSource() {}
 
 func (LegacyManagedConfigTomlFromMdmConfigLayerSource) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 	}{Type: "legacyManagedConfigTomlFromMdm"})
 }

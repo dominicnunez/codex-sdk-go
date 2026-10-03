@@ -1,8 +1,9 @@
 package protocol
 
 import (
-	"encoding/json"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 )
 
 // AmazonBedrockAccessKeysLoginAccountParams authenticates with AWS access keys.
@@ -29,7 +30,7 @@ func (p *AmazonBedrockAccessKeysLoginAccountParams) marshalWire() ([]byte, error
 	type wire AmazonBedrockAccessKeysLoginAccountParams
 	v := wire(*p)
 	v.Type = "amazonBedrockAccessKeys"
-	return json.Marshal(v)
+	return jsonencode.Marshal(v)
 }
 
 func (p AmazonBedrockAccessKeysLoginAccountParams) MarshalJSON() ([]byte, error) {
@@ -41,7 +42,7 @@ func (p AmazonBedrockAccessKeysLoginAccountParams) MarshalJSON() ([]byte, error)
 	if p.SessionToken != nil {
 		v.SessionToken = Ptr("[REDACTED]")
 	}
-	return json.Marshal(v)
+	return jsonencode.Marshal(v)
 }
 
 func (p AmazonBedrockAccessKeysLoginAccountParams) String() string {

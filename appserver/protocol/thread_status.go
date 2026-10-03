@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 )
 
 // ThreadStatus represents the current status of a thread
@@ -103,19 +104,19 @@ func (t ThreadStatusWrapper) MarshalJSON() ([]byte, error) {
 	}
 	switch v := t.Value.(type) {
 	case ThreadStatusNotLoaded:
-		return json.Marshal(struct {
+		return jsonencode.Marshal(struct {
 			Type string `json:"type"`
 		}{Type: "notLoaded"})
 	case ThreadStatusIdle:
-		return json.Marshal(struct {
+		return jsonencode.Marshal(struct {
 			Type string `json:"type"`
 		}{Type: "idle"})
 	case ThreadStatusSystemError:
-		return json.Marshal(struct {
+		return jsonencode.Marshal(struct {
 			Type string `json:"type"`
 		}{Type: "systemError"})
 	case ThreadStatusActive:
-		return json.Marshal(struct {
+		return jsonencode.Marshal(struct {
 			Type string `json:"type"`
 			ThreadStatusActive
 		}{Type: "active", ThreadStatusActive: v})

@@ -297,7 +297,7 @@ type AddPatchChangeKind struct{}
 func (AddPatchChangeKind) patchChangeKind() {}
 
 func (a *AddPatchChangeKind) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 	}{Type: "add"})
 }
@@ -308,7 +308,7 @@ type DeletePatchChangeKind struct{}
 func (DeletePatchChangeKind) patchChangeKind() {}
 
 func (d *DeletePatchChangeKind) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 	}{Type: "delete"})
 }
@@ -321,7 +321,7 @@ type UpdatePatchChangeKind struct {
 func (UpdatePatchChangeKind) patchChangeKind() {}
 
 func (u *UpdatePatchChangeKind) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type     string  `json:"type"`
 		MovePath *string `json:"move_path,omitempty"`
 	}{Type: "update", MovePath: u.MovePath})
@@ -428,7 +428,7 @@ type SearchWebSearchAction struct {
 func (SearchWebSearchAction) webSearchAction() {}
 
 func (s *SearchWebSearchAction) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type    string    `json:"type"`
 		Query   *string   `json:"query,omitempty"`
 		Queries *[]string `json:"queries,omitempty"`
@@ -443,7 +443,7 @@ type OpenPageWebSearchAction struct {
 func (OpenPageWebSearchAction) webSearchAction() {}
 
 func (o *OpenPageWebSearchAction) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string  `json:"type"`
 		URL  *string `json:"url,omitempty"`
 	}{Type: "openPage", URL: o.URL})
@@ -458,7 +458,7 @@ type FindInPageWebSearchAction struct {
 func (FindInPageWebSearchAction) webSearchAction() {}
 
 func (f *FindInPageWebSearchAction) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type    string  `json:"type"`
 		URL     *string `json:"url,omitempty"`
 		Pattern *string `json:"pattern,omitempty"`
@@ -471,7 +471,7 @@ type OtherWebSearchAction struct{}
 func (OtherWebSearchAction) webSearchAction() {}
 
 func (o *OtherWebSearchAction) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 	}{Type: "other"})
 }

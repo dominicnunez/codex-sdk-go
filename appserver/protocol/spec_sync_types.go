@@ -265,7 +265,7 @@ func (v *InputTextFunctionCallOutputContentItem) UnmarshalJSON(data []byte) erro
 func (*InputTextFunctionCallOutputContentItem) isFunctionCallOutputContentItem() {}
 func (v *InputTextFunctionCallOutputContentItem) MarshalJSON() ([]byte, error) {
 	type wire InputTextFunctionCallOutputContentItem
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 		*wire
 	}{"input_text", (*wire)(v)})
@@ -315,7 +315,7 @@ func (v *InputImageFunctionCallOutputContentItem) MarshalJSON() ([]byte, error) 
 		return nil, fmt.Errorf("input image requires image_url or file_id")
 	}
 	type wire InputImageFunctionCallOutputContentItem
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 		*wire
 	}{"input_image", (*wire)(v)})
@@ -339,7 +339,7 @@ func (v *InputAudioFunctionCallOutputContentItem) UnmarshalJSON(data []byte) err
 func (*InputAudioFunctionCallOutputContentItem) isFunctionCallOutputContentItem() {}
 func (v *InputAudioFunctionCallOutputContentItem) MarshalJSON() ([]byte, error) {
 	type wire InputAudioFunctionCallOutputContentItem
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 		*wire
 	}{"input_audio", (*wire)(v)})
@@ -363,7 +363,7 @@ func (v *EncryptedContentFunctionCallOutputContentItem) UnmarshalJSON(data []byt
 func (*EncryptedContentFunctionCallOutputContentItem) isFunctionCallOutputContentItem() {}
 func (v *EncryptedContentFunctionCallOutputContentItem) MarshalJSON() ([]byte, error) {
 	type wire EncryptedContentFunctionCallOutputContentItem
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 		*wire
 	}{"encrypted_content", (*wire)(v)})
@@ -373,7 +373,7 @@ type UnknownFunctionCallOutputContentItem struct{ Raw json.RawMessage }
 
 func (*UnknownFunctionCallOutputContentItem) isFunctionCallOutputContentItem() {}
 func (v *UnknownFunctionCallOutputContentItem) MarshalJSON() ([]byte, error) {
-	return json.Marshal(v.Raw)
+	return jsonencode.Marshal(v.Raw)
 }
 func (w *FunctionCallOutputContentItemWrapper) UnmarshalJSON(data []byte) error {
 	tag, err := decodeRequiredObjectTypeField(data, "FunctionCallOutputContentItem")
@@ -439,7 +439,7 @@ func (v *RealtimeSessionStartedThreadRealtimeItem) UnmarshalJSON(data []byte) er
 func (*RealtimeSessionStartedThreadRealtimeItem) isThreadRealtimeItem() {}
 func (v *RealtimeSessionStartedThreadRealtimeItem) MarshalJSON() ([]byte, error) {
 	type wire RealtimeSessionStartedThreadRealtimeItem
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 		*wire
 	}{"realtimeSessionStarted", (*wire)(v)})
@@ -482,7 +482,7 @@ func (v *TranscriptSegmentThreadRealtimeItem) UnmarshalJSON(data []byte) error {
 func (*TranscriptSegmentThreadRealtimeItem) isThreadRealtimeItem() {}
 func (v *TranscriptSegmentThreadRealtimeItem) MarshalJSON() ([]byte, error) {
 	type wire TranscriptSegmentThreadRealtimeItem
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 		*wire
 	}{"transcriptSegment", (*wire)(v)})
@@ -500,7 +500,7 @@ type WholeItemThreadRealtimeBemItemPresentation struct {
 func (*WholeItemThreadRealtimeBemItemPresentation) isThreadRealtimeBemItemPresentation() {}
 func (v *WholeItemThreadRealtimeBemItemPresentation) MarshalJSON() ([]byte, error) {
 	type wire WholeItemThreadRealtimeBemItemPresentation
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 		*wire
 	}{"wholeItem", (*wire)(v)})
@@ -513,7 +513,7 @@ type InlineMarkdownThreadRealtimeBemItemPresentation struct {
 func (*InlineMarkdownThreadRealtimeBemItemPresentation) isThreadRealtimeBemItemPresentation() {}
 func (v *InlineMarkdownThreadRealtimeBemItemPresentation) MarshalJSON() ([]byte, error) {
 	type wire InlineMarkdownThreadRealtimeBemItemPresentation
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 		*wire
 	}{"inlineMarkdown", (*wire)(v)})
@@ -537,7 +537,7 @@ func (v *InlineVisualizationThreadRealtimeBemItemPresentation) UnmarshalJSON(dat
 func (*InlineVisualizationThreadRealtimeBemItemPresentation) isThreadRealtimeBemItemPresentation() {}
 func (v *InlineVisualizationThreadRealtimeBemItemPresentation) MarshalJSON() ([]byte, error) {
 	type wire InlineVisualizationThreadRealtimeBemItemPresentation
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 		*wire
 	}{"inlineVisualization", (*wire)(v)})
@@ -547,7 +547,7 @@ type UnknownThreadRealtimeBemItemPresentation struct{ Raw json.RawMessage }
 
 func (*UnknownThreadRealtimeBemItemPresentation) isThreadRealtimeBemItemPresentation() {}
 func (v *UnknownThreadRealtimeBemItemPresentation) MarshalJSON() ([]byte, error) {
-	return json.Marshal(v.Raw)
+	return jsonencode.Marshal(v.Raw)
 }
 func (w *ThreadRealtimeBemItemPresentationWrapper) UnmarshalJSON(data []byte) error {
 	tag, err := decodeRequiredObjectTypeField(data, "ThreadRealtimeBemItemPresentation")
@@ -607,7 +607,7 @@ func (v *BemItemPromotedThreadRealtimeItem) UnmarshalJSON(data []byte) error {
 func (*BemItemPromotedThreadRealtimeItem) isThreadRealtimeItem() {}
 func (v *BemItemPromotedThreadRealtimeItem) MarshalJSON() ([]byte, error) {
 	type wire BemItemPromotedThreadRealtimeItem
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 		*wire
 	}{"bemItemPromoted", (*wire)(v)})
@@ -649,7 +649,7 @@ func (v *RealtimeSessionClosedThreadRealtimeItem) UnmarshalJSON(data []byte) err
 func (*RealtimeSessionClosedThreadRealtimeItem) isThreadRealtimeItem() {}
 func (v *RealtimeSessionClosedThreadRealtimeItem) MarshalJSON() ([]byte, error) {
 	type wire RealtimeSessionClosedThreadRealtimeItem
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 		*wire
 	}{"realtimeSessionClosed", (*wire)(v)})
@@ -658,7 +658,7 @@ func (v *RealtimeSessionClosedThreadRealtimeItem) MarshalJSON() ([]byte, error) 
 type UnknownThreadRealtimeItem struct{ Raw json.RawMessage }
 
 func (*UnknownThreadRealtimeItem) isThreadRealtimeItem()          {}
-func (v *UnknownThreadRealtimeItem) MarshalJSON() ([]byte, error) { return json.Marshal(v.Raw) }
+func (v *UnknownThreadRealtimeItem) MarshalJSON() ([]byte, error) { return jsonencode.Marshal(v.Raw) }
 func (w *ThreadRealtimeItemWrapper) UnmarshalJSON(data []byte) error {
 	tag, err := decodeRequiredObjectTypeField(data, "ThreadRealtimeItem")
 	if err != nil {

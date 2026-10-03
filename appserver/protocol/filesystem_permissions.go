@@ -1,11 +1,11 @@
 package protocol
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 )
 
 // FileSystemAccessMode controls access to a filesystem entry.
@@ -113,17 +113,17 @@ func (w *FileSystemPathWrapper) UnmarshalJSON(data []byte) error {
 func (w FileSystemPathWrapper) MarshalJSON() ([]byte, error) {
 	switch v := permissionUnionValue(w.Value).(type) {
 	case PathFileSystemPath:
-		return json.Marshal(struct {
+		return jsonencode.Marshal(struct {
 			Type string `json:"type"`
 			PathFileSystemPath
 		}{"path", v})
 	case GlobPatternFileSystemPath:
-		return json.Marshal(struct {
+		return jsonencode.Marshal(struct {
 			Type string `json:"type"`
 			GlobPatternFileSystemPath
 		}{"glob_pattern", v})
 	case SpecialFileSystemPath:
-		return json.Marshal(struct {
+		return jsonencode.Marshal(struct {
 			Type string `json:"type"`
 			SpecialFileSystemPath
 		}{"special", v})
@@ -216,28 +216,28 @@ func (w *FileSystemSpecialPathWrapper) UnmarshalJSON(data []byte) error {
 func (w FileSystemSpecialPathWrapper) MarshalJSON() ([]byte, error) {
 	switch v := permissionUnionValue(w.Value).(type) {
 	case RootFileSystemSpecialPath:
-		return json.Marshal(struct {
+		return jsonencode.Marshal(struct {
 			Kind string `json:"kind"`
 		}{"root"})
 	case MinimalFileSystemSpecialPath:
-		return json.Marshal(struct {
+		return jsonencode.Marshal(struct {
 			Kind string `json:"kind"`
 		}{"minimal"})
 	case ProjectRootsFileSystemSpecialPath:
-		return json.Marshal(struct {
+		return jsonencode.Marshal(struct {
 			Kind string `json:"kind"`
 			ProjectRootsFileSystemSpecialPath
 		}{"project_roots", v})
 	case TmpdirFileSystemSpecialPath:
-		return json.Marshal(struct {
+		return jsonencode.Marshal(struct {
 			Kind string `json:"kind"`
 		}{"tmpdir"})
 	case SlashTmpFileSystemSpecialPath:
-		return json.Marshal(struct {
+		return jsonencode.Marshal(struct {
 			Kind string `json:"kind"`
 		}{"slash_tmp"})
 	case UnknownFileSystemSpecialPath:
-		return json.Marshal(struct {
+		return jsonencode.Marshal(struct {
 			Kind string `json:"kind"`
 			UnknownFileSystemSpecialPath
 		}{"unknown", v})
@@ -326,5 +326,5 @@ func (p AdditionalFileSystemPermissions) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	type wire AdditionalFileSystemPermissions
-	return json.Marshal(wire(p))
+	return jsonencode.Marshal(wire(p))
 }

@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
@@ -20,7 +19,7 @@ func (*CompletedThreadPredictionResult) isThreadPredictionResult() {}
 func (*FailedThreadPredictionResult) isThreadPredictionResult()    {}
 func (v CompletedThreadPredictionResult) MarshalJSON() ([]byte, error) {
 	type wire CompletedThreadPredictionResult
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 		wire
 	}{"completed", wire(v)})

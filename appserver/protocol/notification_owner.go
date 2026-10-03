@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 )
 
 // These synced notifications use exact schema properties, matching transport
@@ -160,7 +161,7 @@ func (m *moderationMetadataValue) UnmarshalJSON(data []byte) error {
 
 func (m *moderationMetadataValue) value() (json.RawMessage, error) {
 	if m.object != nil {
-		return json.Marshal(m.object)
+		return jsonencode.Marshal(m.object)
 	}
 	return m.raw, nil
 }

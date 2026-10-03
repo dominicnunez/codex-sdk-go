@@ -2,10 +2,10 @@ package protocol
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 )
 
 // HookTrustStatus is the trust state of a configured hook.
@@ -115,7 +115,7 @@ func (m HookMetadata) MarshalJSON() ([]byte, error) {
 		}
 	}
 	type wire HookMetadata
-	return json.Marshal(wire(m))
+	return jsonencode.Marshal(wire(m))
 }
 
 // HooksListEntry groups hooks, warnings, and errors for a cwd.

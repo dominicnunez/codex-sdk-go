@@ -84,7 +84,7 @@ func (a *ApiKeyAccount) UnmarshalJSON(data []byte) error {
 // MarshalJSON injects the type discriminator, matching the pattern used by all
 // other discriminated union variants in the codebase.
 func (a *ApiKeyAccount) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 	}{Type: "apiKey"})
 }
@@ -117,7 +117,7 @@ func (c *ChatgptAccount) UnmarshalJSON(data []byte) error {
 // MarshalJSON injects the type discriminator, matching the pattern used by all
 // other discriminated union variants in the codebase.
 func (c *ChatgptAccount) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type     string   `json:"type"`
 		Email    string   `json:"email"`
 		PlanType PlanType `json:"planType"`
@@ -488,7 +488,7 @@ func (p ApiKeyLoginAccountParams) MarshalJSON() ([]byte, error) {
 		Type   string `json:"type"`
 		ApiKey string `json:"apiKey"`
 	}
-	return json.Marshal(redacted{
+	return jsonencode.Marshal(redacted{
 		Type:   loginTypeApiKey,
 		ApiKey: "[REDACTED]",
 	})
@@ -506,7 +506,7 @@ func (p *ApiKeyLoginAccountParams) marshalWire() ([]byte, error) {
 		Type:   loginTypeApiKey,
 		ApiKey: p.ApiKey,
 	}
-	return json.Marshal(w)
+	return jsonencode.Marshal(w)
 }
 
 // String redacts the API key to prevent accidental credential leaks in logs.
@@ -557,7 +557,7 @@ func (p *ChatgptLoginAccountParams) marshalWire() ([]byte, error) {
 		CodexStreamlinedLogin:     p.CodexStreamlinedLogin,
 		UseHostedLoginSuccessPage: p.UseHostedLoginSuccessPage,
 	}
-	return json.Marshal(w)
+	return jsonencode.Marshal(w)
 }
 
 // ChatgptDeviceCodeLoginAccountParams requests device-code authentication.
@@ -571,7 +571,7 @@ func (p *ChatgptDeviceCodeLoginAccountParams) marshalWire() ([]byte, error) {
 	if p == nil {
 		return nil, errNilLoginAccountParams
 	}
-	return json.Marshal(ChatgptDeviceCodeLoginAccountParams{Type: loginTypeChatgptDeviceCode})
+	return jsonencode.Marshal(ChatgptDeviceCodeLoginAccountParams{Type: loginTypeChatgptDeviceCode})
 }
 
 // ChatgptAuthTokensLoginAccountParams represents external auth token login parameters
@@ -593,7 +593,7 @@ func (p ChatgptAuthTokensLoginAccountParams) MarshalJSON() ([]byte, error) {
 		ChatgptAccountId string  `json:"chatgptAccountId"`
 		ChatgptPlanType  *string `json:"chatgptPlanType,omitempty"`
 	}
-	return json.Marshal(redacted{
+	return jsonencode.Marshal(redacted{
 		Type:             loginTypeChatgptAuthTokens,
 		AccessToken:      "[REDACTED]",
 		ChatgptAccountId: p.ChatgptAccountId,
@@ -618,7 +618,7 @@ func (p *ChatgptAuthTokensLoginAccountParams) marshalWire() ([]byte, error) {
 		ChatgptAccountId: p.ChatgptAccountId,
 		ChatgptPlanType:  p.ChatgptPlanType,
 	}
-	return json.Marshal(w)
+	return jsonencode.Marshal(w)
 }
 
 // String redacts the access token to prevent accidental credential leaks in logs.
@@ -645,7 +645,7 @@ func (*AmazonBedrockLoginAccountParams) isLoginAccountParams() {}
 
 // MarshalJSON redacts the API key from logs and debug serializers.
 func (p AmazonBedrockLoginAccountParams) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type   string `json:"type"`
 		ApiKey string `json:"apiKey"`
 		Region string `json:"region"`
@@ -663,7 +663,7 @@ func (p *AmazonBedrockLoginAccountParams) marshalWire() ([]byte, error) {
 		return nil, err
 	}
 	type wire AmazonBedrockLoginAccountParams
-	return json.Marshal(wire{Type: loginTypeAmazonBedrock, ApiKey: p.ApiKey, Region: p.Region})
+	return jsonencode.Marshal(wire{Type: loginTypeAmazonBedrock, ApiKey: p.ApiKey, Region: p.Region})
 }
 
 func (p AmazonBedrockLoginAccountParams) String() string {

@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 )
 
 const (
@@ -84,7 +85,7 @@ func (p ThreadItemsListParams) MarshalJSON() ([]byte, error) {
 	if p.CursorAnchor != nil {
 		cursor = p.CursorAnchor
 	}
-	return json.Marshal(wire{p.ThreadID, p.TurnID, cursor, p.Limit, p.SortDirection})
+	return jsonencode.Marshal(wire{p.ThreadID, p.TurnID, cursor, p.Limit, p.SortDirection})
 }
 
 // UnmarshalJSON distinguishes the schema's string and item-anchor cursor variants.
@@ -124,7 +125,7 @@ func (a ThreadItemsListAnchor) MarshalJSON() ([]byte, error) {
 	if a.ItemID == "" {
 		return nil, errors.New("thread items anchor requires itemId")
 	}
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type   string `json:"type"`
 		ItemID string `json:"itemId"`
 	}{Type: "item", ItemID: a.ItemID})

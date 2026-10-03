@@ -90,7 +90,7 @@ type InputTextDynamicToolCallOutputContentItem struct {
 func (i *InputTextDynamicToolCallOutputContentItem) dynamicToolCallOutputContentItem() {}
 
 func (i *InputTextDynamicToolCallOutputContentItem) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 		Text string `json:"text"`
 	}{
@@ -123,7 +123,7 @@ type InputImageDynamicToolCallOutputContentItem struct {
 func (i *InputImageDynamicToolCallOutputContentItem) dynamicToolCallOutputContentItem() {}
 
 func (i *InputImageDynamicToolCallOutputContentItem) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type     string `json:"type"`
 		ImageURL string `json:"imageUrl"`
 	}{
@@ -156,7 +156,7 @@ type InputAudioDynamicToolCallOutputContentItem struct {
 func (i *InputAudioDynamicToolCallOutputContentItem) dynamicToolCallOutputContentItem() {}
 
 func (i *InputAudioDynamicToolCallOutputContentItem) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type     string `json:"type"`
 		AudioURL string `json:"audioUrl"`
 	}{Type: "inputAudio", AudioURL: i.AudioURL})

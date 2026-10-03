@@ -78,9 +78,23 @@ type numberLiteralUserInput struct {
 	protocol.UserInput `json:"-"`
 	numberLiteralUnionData
 }
+type numberLiteralSchedule struct {
+	protocol.ScheduledTaskSchedule `json:"-"`
+	numberLiteralUnionData
+}
+type numberLiteralSubAgent struct {
+	protocol.SubAgentSource `json:"-"`
+	numberLiteralUnionData
+}
 
 func TestMalformedNumberEmbeddedUnionOwners(t *testing.T) {
 	factories := map[string]func(numberLiteralUnionData) any{
+		"nested schedule": func(p numberLiteralUnionData) any {
+			return protocol.ScheduledTaskSummary{Schedule: numberLiteralSchedule{nil, p}}
+		},
+		"nested subagent": func(p numberLiteralUnionData) any {
+			return protocol.SessionSourceWrapper{Value: protocol.SessionSourceSubAgent{SubAgent: numberLiteralSubAgent{nil, p}}}
+		},
 		"account": func(p numberLiteralUnionData) any {
 			return &protocol.AccountWrapper{Value: numberLiteralAccount{nil, p}}
 		},

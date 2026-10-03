@@ -1,9 +1,10 @@
 package protocol
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 )
 
 // ChatgptAuthTokensRefreshParams represents parameters for ChatGPT auth token refresh.
@@ -53,7 +54,7 @@ func (r ChatgptAuthTokensRefreshResponse) MarshalJSON() ([]byte, error) {
 		ChatgptAccountID string  `json:"chatgptAccountId"`
 		ChatgptPlanType  *string `json:"chatgptPlanType,omitempty"`
 	}
-	return json.Marshal(redacted{
+	return jsonencode.Marshal(redacted{
 		AccessToken:      "[REDACTED]",
 		ChatgptAccountID: r.ChatgptAccountID,
 		ChatgptPlanType:  r.ChatgptPlanType,
@@ -63,7 +64,7 @@ func (r ChatgptAuthTokensRefreshResponse) MarshalJSON() ([]byte, error) {
 func (r ChatgptAuthTokensRefreshResponse) marshalWire() ([]byte, error) {
 	type wire ChatgptAuthTokensRefreshResponse
 	w := wire(r)
-	return json.Marshal(w)
+	return jsonencode.Marshal(w)
 }
 
 // String redacts the access token to prevent accidental credential leaks in logs.

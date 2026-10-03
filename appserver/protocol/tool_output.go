@@ -2,10 +2,10 @@ package protocol
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 )
 
 // FunctionCallOutputBody is either plain text or an array of output content items.
@@ -20,9 +20,9 @@ func (b FunctionCallOutputBody) MarshalJSON() ([]byte, error) {
 		return nil, fmt.Errorf("tool output requires exactly one of Text or Content")
 	}
 	if b.Text != nil {
-		return json.Marshal(*b.Text)
+		return jsonencode.Marshal(*b.Text)
 	}
-	return json.Marshal(b.Content)
+	return jsonencode.Marshal(b.Content)
 }
 
 func (b *FunctionCallOutputBody) UnmarshalJSON(data []byte) error {
@@ -61,7 +61,7 @@ func (FunctionCallOutputThreadItem) threadItem() {}
 
 func (v *FunctionCallOutputThreadItem) MarshalJSON() ([]byte, error) {
 	type wire FunctionCallOutputThreadItem
-	return json.Marshal(struct {
+	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
 		*wire
 	}{"functionCallOutput", (*wire)(v)})
