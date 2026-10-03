@@ -263,10 +263,14 @@ func (t *StdioTransport) Send(ctx context.Context, req Request) (Response, error
 }
 
 func duplicateRequestIDError(id RequestID) error {
-	if value, ok := id.Value.(string); ok {
+	switch value := id.Value.(type) {
+	case string:
 		return NewTransportError("send failed", fmt.Errorf("duplicate request ID: %s", diagnostic.Display(value)))
+	case json.Number:
+		return NewTransportError("send failed", fmt.Errorf("duplicate request ID: %s", diagnostic.Display(value.String())))
 	}
-	// The admission owner already normalized non-string IDs to int64.
+	// Other accepted numeric primitives have bounded displays. Normalization
+	// computes the pending key; it does not replace the original RequestID.Value.
 	return NewTransportError("send failed", fmt.Errorf("duplicate request ID: %v", id.Value))
 }
 

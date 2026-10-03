@@ -76,6 +76,9 @@ queued, in-flight, fallback and replay ownership.
 For rejected peer values, bound diagnostic previews before quoting and wrapping;
 trace the complete error chain and escaped-value growth. A frame limit does not
 bound allocation amplification or error retention inside the decoder.
+For identifier errors, trace the original display value separately from the
+canonical matching key: accepted alternate spellings can remain large after
+successful normalization.
 For callback fanout, isolate each recipient at the owning boundary, including
 initial replay and direct service/cache calls. Verify committed state reaches
 later SDK consumers after a callback or error reporter panics, and that replay
