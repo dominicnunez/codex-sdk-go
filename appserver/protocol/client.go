@@ -247,9 +247,11 @@ func WithRequestTimeout(timeout time.Duration) ClientOption {
 }
 
 // WithHandlerErrorCallback sets a callback that is invoked when a notification
-// handler or approval handler panics or returns an error. The callback receives
-// the JSON-RPC method name and the error. If the callback itself panics, the
-// panic is silently recovered.
+// handler or approval handler panics or returns an error, or a thread-state
+// listener panics. The callback receives the JSON-RPC method name and the error.
+// Direct cache updates and initial listener delivery use "CacheThreadState" and
+// "AddThreadStateListener" respectively. If the callback itself panics, the panic
+// is silently recovered.
 func WithHandlerErrorCallback(cb func(method string, err error)) ClientOption {
 	return func(c *Client) {
 		c.handlerErrorCallback = cb

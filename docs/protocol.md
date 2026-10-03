@@ -52,6 +52,16 @@ defer unsubscribe()
 
 The typed surface also covers thread reverts and queue changes, project updates, strict-review requirements, external-agent import progress, moderation metadata, and model safety-buffering changes. Use raw notification handlers only when intentionally handling a future method that the SDK does not yet type.
 
+`AddThreadStateListener` receives independent cached snapshots and thread closure
+updates, including an immediate replay when state is already cached. Each listener
+panic is recovered separately and reported through `WithHandlerErrorCallback`;
+later listeners still receive the committed update. The error context is the
+originating RPC or notification method, or `CacheThreadState` for a direct cache
+update and `AddThreadStateListener` for initial replay. A panic during replay
+still returns the unsubscribe function. Callbacks run outside the cache lock;
+unsubscribing affects future deliveries, while an already selected callback may
+still run. Callbacks must return promptly because delivery is synchronous.
+
 ## Login variants
 
 `Account.Login` accepts these typed parameter variants:

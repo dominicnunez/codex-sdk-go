@@ -160,7 +160,7 @@ func (s *ThreadService) Start(ctx context.Context, params ThreadStartParams) (Th
 		return ThreadStartResponse{}, err
 	}
 	response.Thread = threadWithDisabledPlugins(response.Thread, response.DisabledPluginIDs)
-	s.client.cacheThreadState(response.Thread)
+	s.client.cacheThreadStateForMethod(methodThreadStart, response.Thread)
 	return response, nil
 }
 
@@ -195,7 +195,7 @@ func (s *ThreadService) Read(ctx context.Context, params ThreadReadParams) (Thre
 	if err := s.client.sendRequest(ctx, methodThreadRead, params, &response); err != nil {
 		return ThreadReadResponse{}, err
 	}
-	s.client.cacheThreadState(response.Thread)
+	s.client.cacheThreadStateForMethod(methodThreadRead, response.Thread)
 	return response, nil
 }
 
@@ -244,7 +244,7 @@ func (s *ThreadService) List(ctx context.Context, params ThreadListParams) (Thre
 		return ThreadListResponse{}, err
 	}
 	for _, thread := range response.Data {
-		s.client.cacheThreadState(thread)
+		s.client.cacheThreadStateForMethod(methodThreadList, thread)
 	}
 	return response, nil
 }
@@ -429,7 +429,7 @@ func (s *ThreadService) Resume(ctx context.Context, params ThreadResumeParams) (
 		return ThreadResumeResponse{}, err
 	}
 	response.Thread = threadWithDisabledPlugins(response.Thread, response.DisabledPluginIDs)
-	s.client.cacheThreadState(response.Thread)
+	s.client.cacheThreadStateForMethod(methodThreadResume, response.Thread)
 	return response, nil
 }
 
@@ -505,7 +505,7 @@ func (s *ThreadService) Fork(ctx context.Context, params ThreadForkParams) (Thre
 		return ThreadForkResponse{}, err
 	}
 	response.Thread = threadWithDisabledPlugins(response.Thread, response.DisabledPluginIDs)
-	s.client.cacheThreadState(response.Thread)
+	s.client.cacheThreadStateForMethod(methodThreadFork, response.Thread)
 	return response, nil
 }
 
@@ -533,7 +533,7 @@ func (s *ThreadService) Rollback(ctx context.Context, params ThreadRollbackParam
 	if err := s.client.sendRequest(ctx, methodThreadRollback, params, &response); err != nil {
 		return ThreadRollbackResponse{}, err
 	}
-	s.client.cacheThreadState(response.Thread)
+	s.client.cacheThreadStateForMethod(methodThreadRollback, response.Thread)
 	return response, nil
 }
 
@@ -587,7 +587,7 @@ func (s *ThreadService) MetadataUpdate(ctx context.Context, params ThreadMetadat
 	if err := s.client.sendRequest(ctx, methodThreadMetadataUpdate, params, &response); err != nil {
 		return ThreadMetadataUpdateResponse{}, err
 	}
-	s.client.cacheThreadState(response.Thread)
+	s.client.cacheThreadStateForMethod(methodThreadMetadataUpdate, response.Thread)
 	return response, nil
 }
 
@@ -632,7 +632,7 @@ func (s *ThreadService) Unarchive(ctx context.Context, params ThreadUnarchivePar
 	if err := s.client.sendRequest(ctx, methodThreadUnarchive, params, &response); err != nil {
 		return ThreadUnarchiveResponse{}, err
 	}
-	s.client.cacheThreadState(response.Thread)
+	s.client.cacheThreadStateForMethod(methodThreadUnarchive, response.Thread)
 	return response, nil
 }
 

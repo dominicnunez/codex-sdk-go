@@ -309,6 +309,6 @@ func (s *ThreadService) Revert(ctx context.Context, params ThreadRevertParams) (
 	if err := s.client.sendRequest(ctx, methodThreadRevert, params, &response); err != nil {
 		return ThreadRevertResponse{}, err
 	}
-	s.client.cacheThreadState(response.Thread)
+	s.client.cacheThreadStateForMethod(methodThreadRevert, response.Thread)
 	return response, nil
 }

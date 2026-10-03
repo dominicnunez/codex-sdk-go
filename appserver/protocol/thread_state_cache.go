@@ -8,7 +8,14 @@ import (
 
 const maxCachedThreadStates = 64
 
+const threadStateUpdateContext = "CacheThreadState"
+const threadStateListenerContext = "AddThreadStateListener"
+
 func (c *Client) cacheThreadState(thread Thread) {
+	c.cacheThreadStateForMethod(threadStateUpdateContext, thread)
+}
+
+func (c *Client) cacheThreadStateForMethod(method string, thread Thread) {
 	if thread.ID == "" {
 		return
 	}
@@ -30,10 +37,11 @@ func (c *Client) cacheThreadState(thread Thread) {
 	listeners := c.threadStateListenersLocked(thread.ID)
 	c.threadStateMu.Unlock()
 
-	c.notifyThreadStateListeners(snapshot, listeners)
+	c.notifyThreadStateListeners(method, snapshot, listeners)
 }
 
 // CacheThreadState stores a best-effort latest snapshot for a thread.
+// Listener panics are reported with "CacheThreadState" as the error context.
 func (c *Client) CacheThreadState(thread Thread) {
 	c.cacheThreadState(thread)
 }
@@ -54,6 +62,10 @@ func (c *Client) ThreadStateSnapshot(threadID string) (Thread, bool) {
 }
 
 func (c *Client) mutateThreadState(threadID string, mutate func(*Thread)) {
+	c.mutateThreadStateForMethod(threadStateUpdateContext, threadID, mutate)
+}
+
+func (c *Client) mutateThreadStateForMethod(method string, threadID string, mutate func(*Thread)) {
 	if threadID == "" {
 		return
 	}
@@ -80,7 +92,7 @@ func (c *Client) mutateThreadState(threadID string, mutate func(*Thread)) {
 	c.threadStateMu.Unlock()
 
 	if updated {
-		c.notifyThreadStateListeners(snapshot, listeners)
+		c.notifyThreadStateListeners(method, snapshot, listeners)
 	}
 }
 
@@ -143,9 +155,9 @@ func (c *Client) addThreadStateListener(threadID string, onUpdate func(Thread), 
 
 	switch {
 	case snapshot != nil && onUpdate != nil:
-		onUpdate(*snapshot)
+		c.safeCallNotificationHandler(threadStateListenerContext, func() { onUpdate(*snapshot) })
 	case closed && onClose != nil:
-		onClose()
+		c.safeCallNotificationHandler(threadStateListenerContext, onClose)
 	}
 
 	return func() {
@@ -167,6 +179,8 @@ func (c *Client) addThreadStateListener(threadID string, onUpdate func(Thread), 
 }
 
 // AddThreadStateListener subscribes to cached thread-state updates for threadID.
+// Listener panics are reported through WithHandlerErrorCallback without stopping
+// other listeners. Initial delivery uses "AddThreadStateListener" as its context.
 func (c *Client) AddThreadStateListener(threadID string, onUpdate func(Thread), onClose func()) func() {
 	return c.addThreadStateListener(threadID, onUpdate, onClose)
 }
@@ -231,10 +245,10 @@ func (c *Client) threadStateListenersLocked(threadID string) []threadStateListen
 	return listeners
 }
 
-func (c *Client) notifyThreadStateListeners(thread Thread, listeners []threadStateListener) {
+func (c *Client) notifyThreadStateListeners(method string, thread Thread, listeners []threadStateListener) {
 	for _, listener := range listeners {
 		if listener.onUpdate != nil {
-			listener.onUpdate(cloneThreadState(thread))
+			c.safeCallNotificationHandler(method, func() { listener.onUpdate(cloneThreadState(thread)) })
 		}
 	}
 }
@@ -242,7 +256,7 @@ func (c *Client) notifyThreadStateListeners(thread Thread, listeners []threadSta
 func (c *Client) notifyThreadClosedListeners(listeners []threadStateListener) {
 	for _, listener := range listeners {
 		if listener.onClose != nil {
-			listener.onClose()
+			c.safeCallNotificationHandler(notifyThreadClosed, listener.onClose)
 		}
 	}
 }
@@ -254,7 +268,7 @@ func (c *Client) installThreadStateCache() {
 			c.reportHandlerError(notifyThreadSettingsUpdated, fmt.Errorf("unmarshal %s: %w", notifyThreadSettingsUpdated, err))
 			return
 		}
-		c.mutateThreadState(n.ThreadID, func(thread *Thread) {
+		c.mutateThreadStateForMethod(notif.Method, n.ThreadID, func(thread *Thread) {
 			*thread = threadWithDisabledPlugins(*thread, n.ThreadSettings.DisabledPluginIDs)
 		})
 	})
@@ -265,7 +279,7 @@ func (c *Client) installThreadStateCache() {
 			c.reportHandlerError(notifyThreadProjectUpdated, fmt.Errorf("unmarshal %s: %w", notifyThreadProjectUpdated, err))
 			return
 		}
-		c.mutateThreadState(n.ThreadID, func(thread *Thread) { thread.ProjectID = cloneStringPtr(n.ProjectID) })
+		c.mutateThreadStateForMethod(notif.Method, n.ThreadID, func(thread *Thread) { thread.ProjectID = cloneStringPtr(n.ProjectID) })
 	})
 
 	c.addNotificationListener(notifyThreadStarted, func(_ context.Context, notif Notification) {
@@ -274,7 +288,7 @@ func (c *Client) installThreadStateCache() {
 			c.reportHandlerError(notifyThreadStarted, fmt.Errorf("unmarshal %s: %w", notifyThreadStarted, err))
 			return
 		}
-		c.cacheThreadState(n.Thread)
+		c.cacheThreadStateForMethod(notif.Method, n.Thread)
 	})
 
 	c.addNotificationListener(notifyThreadNameUpdated, func(_ context.Context, notif Notification) {
@@ -283,7 +297,7 @@ func (c *Client) installThreadStateCache() {
 			c.reportHandlerError(notifyThreadNameUpdated, fmt.Errorf("unmarshal %s: %w", notifyThreadNameUpdated, err))
 			return
 		}
-		c.mutateThreadState(n.ThreadID, func(thread *Thread) {
+		c.mutateThreadStateForMethod(notif.Method, n.ThreadID, func(thread *Thread) {
 			thread.Name = cloneStringPtr(n.ThreadName)
 		})
 	})
@@ -294,7 +308,7 @@ func (c *Client) installThreadStateCache() {
 			c.reportHandlerError(notifyThreadStatusChanged, fmt.Errorf("unmarshal %s: %w", notifyThreadStatusChanged, err))
 			return
 		}
-		c.mutateThreadState(n.ThreadID, func(thread *Thread) {
+		c.mutateThreadStateForMethod(notif.Method, n.ThreadID, func(thread *Thread) {
 			thread.Status = cloneThreadStatusWrapper(n.Status)
 		})
 	})
