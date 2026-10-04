@@ -10,7 +10,7 @@ import (
 
 // OptionalNullable distinguishes an absent field from explicit null and a value.
 // Present=false omits an object member with omitzero. Present=true and Value=nil
-// emits null. A nonnil Value holds the supplied collection, including empty values.
+// emits null. A nonnil Value holds the supplied value, including empty values.
 // All state is exported so normal SDK deep copies retain independent values.
 type OptionalNullable[T any] struct {
 	Present bool
