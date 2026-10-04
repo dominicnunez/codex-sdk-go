@@ -242,6 +242,14 @@ func (s *HookRunSummary) UnmarshalJSON(data []byte) error {
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
+	validatedSourcePath, err := validateInboundAbsolutePathField("hook.sourcePath", decoded.SourcePath)
+	if err != nil {
+		return err
+	}
+	decoded.SourcePath = validatedSourcePath
+	if err := validateHookSourceOccurrences(data, "source"); err != nil {
+		return err
+	}
 	*s = HookRunSummary(decoded)
 	return nil
 }
