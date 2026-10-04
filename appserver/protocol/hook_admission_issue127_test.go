@@ -379,8 +379,8 @@ func TestHookRunSummaryAcceptsSourcesAndNormalizedAbsolutePaths(t *testing.T) {
 						if gotPath != path {
 							t.Fatalf("sourcePath = %q; want %q", gotPath, path)
 						}
-						if source == "" && gotSource != nil {
-							t.Fatalf("omitted source = %v; want nil to preserve omission", *gotSource)
+						if source == "" && (gotSource == nil || *gotSource != codex.HookSourceUnknown) {
+							t.Fatalf("omitted source = %v; want %q", gotSource, codex.HookSourceUnknown)
 						}
 						if source != "" && (gotSource == nil || string(*gotSource) != source) {
 							t.Fatalf("source = %v; want %q", gotSource, source)
@@ -400,7 +400,7 @@ func TestHookRunSummarySourceOccurrencesUseExactJSONFieldSemantics(t *testing.T)
 		{"escaped key unknown value", `"\u0073ource":"bogus"`, "/tmp/hook", "", "invalid hook.source"},
 		{"invalid duplicate before valid", `"source":"bogus","source":"user"`, "/tmp/hook", "", "invalid hook.source"},
 		{"explicit null remains invalid before valid duplicate", `"source":null,"source":"user"`, "/tmp/hook", "", "hook.source"},
-		{"folded alias ignored", `"SOURCE":"bogus"`, "/tmp/hook", "", ""},
+		{"folded alias ignored and omitted source defaults", `"SOURCE":"bogus"`, "/tmp/hook", "unknown", ""},
 		{"path error precedes enum restriction", `"source":"bogus"`, "relative/hook", "", "must be an absolute path"},
 		{"native type error precedes new restrictions", `"source":7`, "relative/hook", "", "cannot unmarshal number"},
 	}
@@ -473,3 +473,203 @@ func TestHookRunSummaryInvalidAdmissionPreservesReceiverAndAllowsRecovery(t *tes
 		t.Fatalf("recovered value = %+v", run)
 	}
 }
+
+func TestHookMetadataCommandAsyncOmittedDefaultsFalseThroughHooksList(t *testing.T) {
+	response, err := issue74ReadHooks(issue74HookPayload(`,"handlerType":"command","command":"echo ready"`))
+	if err != nil {
+		t.Fatalf("Hooks.List error = %v", err)
+	}
+	async := response.Data[0].Hooks[0].Async
+	if async == nil || *async {
+		t.Fatalf("omitted command async = %v; want non-nil false default", async)
+	}
+	if response.Data[0].Hooks[0].AdditionalContextLimit != nil {
+		t.Fatalf("omitted additionalContextLimit = %v; want nil", *response.Data[0].Hooks[0].AdditionalContextLimit)
+	}
+	encoded, err := json.Marshal(response.Data[0].Hooks[0])
+	if err != nil {
+		t.Fatalf("marshal defaulted command hook: %v", err)
+	}
+	var members map[string]json.RawMessage
+	if err := json.Unmarshal(encoded, &members); err != nil {
+		t.Fatal(err)
+	}
+	if string(members["async"]) != "false" {
+		t.Fatalf("serialized default async = %s; want false", members["async"])
+	}
+}
+
+func TestHookMetadataAsyncDefaultFollowsFinalHandlerBranch(t *testing.T) {
+	tests := []struct {
+		name       string
+		properties string
+		wantAsync  *bool
+	}{
+		{"command omitted", `,"handlerType":"command","command":"echo ready"`, issue127Bool(false)},
+		{"command explicit true", `,"handlerType":"command","command":"echo ready","async":true`, issue127Bool(true)},
+		{"command explicit false", `,"handlerType":"command","command":"echo ready","async":false`, issue127Bool(false)},
+		{"final command duplicate handler type", `,"handlerType":"mcpTool","server":"docs","tool":"search","handlerType":"command","command":"echo ready"`, issue127Bool(false)},
+		{"final mcpTool duplicate handler type", `,"handlerType":"command","command":"echo ready","handlerType":"mcpTool","server":"docs","tool":"search"`, nil},
+		{"final mcpTool preserves legacy async", `,"handlerType":"command","command":"echo ready","async":true,"handlerType":"mcpTool","server":"docs","tool":"search"`, issue127Bool(true)},
+		{"prompt branch", `,"handlerType":"prompt"`, nil},
+		{"agent branch", `,"handlerType":"agent"`, nil},
+		{"mcpTool branch", `,"handlerType":"mcpTool","server":"docs","tool":"search"`, nil},
+		{"prompt legacy extra async true", `,"handlerType":"prompt","async":true`, issue127Bool(true)},
+		{"mcpTool legacy extra async null", `,"handlerType":"mcpTool","server":"docs","tool":"search","async":null`, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			response, err := issue74ReadHooks(issue74HookPayload(tt.properties))
+			if err != nil {
+				t.Fatalf("Hooks.List error = %v", err)
+			}
+			got := response.Data[0].Hooks[0].Async
+			if tt.wantAsync == nil {
+				if got != nil {
+					t.Fatalf("async = %v; want nil for non-command branch", *got)
+				}
+				return
+			}
+			if got == nil || *got != *tt.wantAsync {
+				t.Fatalf("async = %v; want %v", got, *tt.wantAsync)
+			}
+		})
+	}
+}
+
+func TestHookMetadataAsyncExactAndEscapedFieldSemantics(t *testing.T) {
+	tests := []struct {
+		name       string
+		properties string
+		want       bool
+	}{
+		{"exact explicit true", `,"handlerType":"command","command":"echo ready","async":true`, true},
+		{"escaped exact key", `,"handlerType":"command","command":"echo ready","\u0061sync":true`, true},
+		{"folded alias ignored then defaulted", `,"handlerType":"command","command":"echo ready","ASYNC":true`, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			response, err := issue74ReadHooks(issue74HookPayload(tt.properties))
+			if err != nil {
+				t.Fatalf("Hooks.List error = %v", err)
+			}
+			async := response.Data[0].Hooks[0].Async
+			if async == nil || *async != tt.want {
+				t.Fatalf("async = %v; want non-nil %v", async, tt.want)
+			}
+		})
+	}
+}
+
+func TestHookRunSummaryDuplicateRunUsesFreshSourceDefault(t *testing.T) {
+	transport := NewMockTransport()
+	var got codex.HookSource
+	var gotRunID string
+	var called bool
+	client := codex.NewClient(transport)
+	t.Cleanup(func() { _ = client.Close() })
+	client.OnHookStarted(func(notification codex.HookStartedNotification) {
+		called = true
+		gotRunID = notification.Run.ID
+		if notification.Run.Source != nil {
+			got = *notification.Run.Source
+		}
+	})
+	previous := `{"displayOrder":1,"entries":[],"eventName":"sessionStart","executionMode":"sync","handlerType":"command","id":"previous","scope":"thread","source":"user","sourcePath":"/tmp/hook","startedAt":123,"status":"running"}`
+	final := `{"displayOrder":2,"entries":[],"eventName":"sessionStart","executionMode":"sync","handlerType":"command","id":"final","scope":"thread","sourcePath":"/tmp/hook","startedAt":124,"status":"running"}`
+	params := `{"run":` + previous + `,"run":` + final + `,"threadId":"thread-1"}`
+	transport.InjectServerNotification(context.Background(), codex.Notification{Method: "hook/started", Params: json.RawMessage(params)})
+	if !called || gotRunID != "final" || got != codex.HookSourceUnknown {
+		t.Fatalf("duplicate run result: called=%v id=%q source=%q", called, gotRunID, got)
+	}
+}
+
+func TestHookMetadataAsyncDefaultDirectDecodeOwnershipAndRecovery(t *testing.T) {
+	explicitTrue := true
+	metadata := codex.HookMetadata{Async: &explicitTrue, Key: "old", SourcePath: "/tmp/old"}
+	previousAsync := metadata.Async
+	invalid := issue74HookPayload(`,"handlerType":"command","command":"echo ready","async":null`)
+	if err := json.Unmarshal([]byte(invalid), &metadata); err == nil {
+		t.Fatal("command async null unexpectedly decoded")
+	}
+	if metadata.Async != previousAsync || metadata.Async == nil || !*metadata.Async || metadata.Key != "old" || metadata.SourcePath != "/tmp/old" {
+		t.Fatalf("receiver changed after rejected decode: %+v", metadata)
+	}
+
+	command := issue74HookPayload(`,"handlerType":"command","command":"echo ready"`)
+	if err := json.Unmarshal([]byte(command), &metadata); err != nil {
+		t.Fatalf("command recovery decode failed: %v", err)
+	}
+	if metadata.Async == nil || *metadata.Async {
+		t.Fatalf("command default async = %v; want fresh non-nil false", metadata.Async)
+	}
+	commandAsync := metadata.Async
+	var anotherCommand codex.HookMetadata
+	if err := json.Unmarshal([]byte(command), &anotherCommand); err != nil {
+		t.Fatalf("second command decode failed: %v", err)
+	}
+	if anotherCommand.Async == nil || anotherCommand.Async == commandAsync {
+		t.Fatal("separate decodes reused the default false pointer")
+	}
+	*metadata.Async = true
+	if *anotherCommand.Async {
+		t.Fatal("mutating one default async pointer changed another decode")
+	}
+	*metadata.Async = false
+
+	prompt := issue74HookPayload(`,"handlerType":"prompt"`)
+	if err := json.Unmarshal([]byte(prompt), &metadata); err != nil {
+		t.Fatalf("prompt recovery decode failed: %v", err)
+	}
+	if metadata.Async != nil {
+		t.Fatalf("prompt async = %v; want nil", *metadata.Async)
+	}
+	if *commandAsync {
+		t.Fatal("later decode changed previously returned default pointer")
+	}
+
+	commandText := "echo ready"
+	constructed := codex.HookMetadata{
+		CurrentHash: "hash",
+		EventName:   codex.HookEventNameSessionStart,
+		HandlerType: codex.HookHandlerTypeCommand,
+		Command:     &commandText,
+		Source:      codex.HookSourceUser,
+		TrustStatus: codex.HookTrustStatusTrusted,
+	}
+	encoded, err := json.Marshal(constructed)
+	if err != nil {
+		t.Fatalf("marshal constructed command hook: %v", err)
+	}
+	var members map[string]json.RawMessage
+	if err := json.Unmarshal(encoded, &members); err != nil {
+		t.Fatal(err)
+	}
+	if _, present := members["async"]; present {
+		t.Fatalf("constructed nil async was materialized during serialization: %s", encoded)
+	}
+}
+
+func TestHookMetadataAsyncDefaultOnDuplicateArrayReuse(t *testing.T) {
+	first := issue74HookPayload(`,"handlerType":"command","command":"echo first","async":true`)
+	second := issue74HookPayload(`,"handlerType":"command","command":"echo second"`)
+	first = strings.TrimSuffix(strings.TrimPrefix(first, "{"), "}")
+	second = strings.TrimSuffix(strings.TrimPrefix(second, "{"), "}")
+	payload := `{"data":[{"cwd":"/tmp","errors":[],"hooks":[{` + first + `}],"hooks":[{` + second + `}],"warnings":[]}]}`
+	transport := NewMockTransport()
+	if err := transport.SetResponseData("hooks/list", json.RawMessage(payload)); err != nil {
+		t.Fatal(err)
+	}
+	client := codex.NewClient(transport)
+	t.Cleanup(func() { _ = client.Close() })
+	response, err := client.Hooks.List(context.Background(), codex.HooksListParams{})
+	if err != nil {
+		t.Fatalf("Hooks.List duplicate arrays failed: %v", err)
+	}
+	hooks := response.Data[0].Hooks
+	if len(hooks) != 1 || hooks[0].Command == nil || *hooks[0].Command != "echo second" || hooks[0].Async == nil || *hooks[0].Async {
+		t.Fatalf("final duplicate-array hook = %+v; want second command and fresh false async default", hooks)
+	}
+}
+
+func issue127Bool(value bool) *bool { return &value }

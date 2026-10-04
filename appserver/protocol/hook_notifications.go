@@ -250,6 +250,12 @@ func (s *HookRunSummary) UnmarshalJSON(data []byte) error {
 	if err := validateHookSourceOccurrences(data, "source"); err != nil {
 		return err
 	}
+	if decoded.Source == nil {
+		// HookRunSummary's reference decoder defaults an omitted source to unknown.
+		// Constructed nil values still remain omitted by the JSON encoder.
+		unknown := HookSourceUnknown
+		decoded.Source = &unknown
+	}
 	*s = HookRunSummary(decoded)
 	return nil
 }

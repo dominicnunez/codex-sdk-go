@@ -168,10 +168,13 @@ reuse across duplicate arrays, preserve hidden slots across shrink and reextend,
 reset when an empty array replaces the slice, and check required fields only on
 the final visible records. Recognized null items or scalar occurrences remain
 invalid after later repair or reset; existing root, native type and warning
-errors keep their precedence. Hook metadata requires a non-null `source`, and
-run summaries accept an omitted optional source without materializing its
-schema default; both carriers reject null or unknown source values and validate
-the 11 schema enum values. Their `sourcePath` fields must be normalized absolute
+errors keep their precedence. Hook metadata requires a non-null valid `source`;
+an omitted command-handler `async` decodes to an owned `false`, while other
+handler variants leave it unset. Explicit command booleans survive decoding.
+Run summaries materialize omitted optional `source` as an owned `unknown`, and
+both carriers reject explicit null or unrecognized source values while validating
+the 11 schema enum values. Constructed nil `source` and `async` pointers remain
+omitted by encoding. Their `sourcePath` fields must be normalized absolute
 paths, while `HookErrorInfo.path` remains an opaque string. `HookSource` and
 `HookErrorInfo` stay plain Go representations, so direct decoding and anonymous
 envelopes retain standard JSON behavior. These checks admit record shape; they

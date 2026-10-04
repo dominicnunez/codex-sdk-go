@@ -103,6 +103,11 @@ func (m *HookMetadata) UnmarshalJSON(data []byte) error {
 	if err := validateHookSourceOccurrences(data, "source"); err != nil {
 		return err
 	}
+	if decoded.HandlerType == HookHandlerTypeCommand && decoded.Async == nil {
+		// The command variant's reference decoder defaults async to false.
+		async := false
+		decoded.Async = &async
+	}
 	*m = HookMetadata(decoded)
 	return nil
 }

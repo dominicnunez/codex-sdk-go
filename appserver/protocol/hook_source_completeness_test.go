@@ -116,8 +116,32 @@ func TestHookRunSummarySourceRoundTripsAllKnownValuesAndOmission(t *testing.T) {
 	if err := json.Unmarshal(encoded, &got); err != nil {
 		t.Fatalf("omitted source roundtrip failed: %v", err)
 	}
-	if !reflect.DeepEqual(got, want) || got.Source != nil || got.SourcePath != want.SourcePath {
+	unknown := codex.HookSourceUnknown
+	want.Source = &unknown
+	if !reflect.DeepEqual(got, want) || got.Source == nil || *got.Source != codex.HookSourceUnknown || got.SourcePath != want.SourcePath {
 		t.Fatalf("omitted source roundtrip = %+v; want %+v", got, want)
+	}
+	defaultedJSON, err := json.Marshal(got)
+	if err != nil {
+		t.Fatalf("marshal defaulted source: %v", err)
+	}
+	var defaultedMembers map[string]json.RawMessage
+	if err := json.Unmarshal(defaultedJSON, &defaultedMembers); err != nil {
+		t.Fatal(err)
+	}
+	if string(defaultedMembers["source"]) != `"unknown"` {
+		t.Fatalf("defaulted source serialized as %s; want \"unknown\"", defaultedMembers["source"])
+	}
+	var another codex.HookRunSummary
+	if err := json.Unmarshal(encoded, &another); err != nil {
+		t.Fatalf("second omitted-source decode failed: %v", err)
+	}
+	if another.Source == nil || another.Source == got.Source {
+		t.Fatal("separate summary decodes reused the default source pointer")
+	}
+	*got.Source = codex.HookSourceSystem
+	if *another.Source != codex.HookSourceUnknown {
+		t.Fatal("mutating one default source pointer changed another decode")
 	}
 }
 
