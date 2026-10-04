@@ -21,6 +21,14 @@ type AuthPrompt struct {
 }
 
 func Login(ctx context.Context, opts LoginOptions) (auth.Credentials, error) {
+	return loginWithCallbackServer(ctx, opts, StartCallbackServer)
+}
+
+func loginWithCallbackServer(
+	ctx context.Context,
+	opts LoginOptions,
+	startCallbackServer func(context.Context, Config, string) (*CallbackServer, error),
+) (auth.Credentials, error) {
 	pkce, err := GeneratePKCE()
 	if err != nil {
 		return auth.Credentials{}, fmt.Errorf("generate PKCE: %w", err)
@@ -34,7 +42,7 @@ func Login(ctx context.Context, opts LoginOptions) (auth.Credentials, error) {
 		return auth.Credentials{}, err
 	}
 
-	callbackServer, callbackErr := StartCallbackServer(ctx, opts.Config, state)
+	callbackServer, callbackErr := startCallbackServer(ctx, opts.Config, state)
 	if callbackErr == nil {
 		defer callbackServer.Close()
 	}

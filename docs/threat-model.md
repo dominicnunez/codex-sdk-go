@@ -450,6 +450,14 @@ Context cancellation and RPC timeouts stop local waiting or request cooperative 
 
 The [normal login flow](../login/login.go) generates a random state and an S256 PKCE challenge using [crypto/rand](../login/pkce.go). The [callback server](../login/callback.go) defaults to IPv4 loopback, accepts only the callback route, checks the expected state when supplied, and has a header-read timeout. Wrong-state requests do not complete the normal flow. A caller invoking the lower-level callback API with an empty expected state opts out of that comparison.
 
+`CallbackServer.Close` attempts graceful HTTP shutdown with its fixed deadline,
+then force-closes the owned server if graceful shutdown fails. This releases
+active callback TCP connections after a timeout while preserving the shutdown
+error; if forced close also errors, both errors are retained. `Close` does not
+cancel `Wait` or promise to join arbitrary HTTP handler goroutines. Login still
+uses the same callback response, authorization-code and token-exchange behavior;
+the cleanup change affects only callback server lifetime.
+
 Callback host, authorization/token endpoints, redirect URI, and HTTP client are [configurable](../login/config.go), including a callback-host environment override. Non-loopback binding and nonstandard endpoints are caller-controlled exposure decisions. The SDK does not require every configured endpoint to use HTTPS, pin endpoint identity, enforce exact browser Origin/Host, or limit callback connections per user. It must not be exposed as a general authenticated HTTP API. The [manual-input parser](../login/parse.go) supports a bare code without state; supplying a manual code relies on the application's trusted user interaction and the flow's PKCE verifier. A provided mismatched state is rejected.
 
 [Token requests](../login/token.go) use the caller's context, bound token-response reads to 1 MiB, and omit non-success response bodies from errors because they may echo credentials. The configured HTTP client's TLS, redirect, and timeout behavior still matters. A malicious configured endpoint, permissive custom HTTP transport, or unsafe URL logger can disclose codes, verifiers, or refresh tokens.
