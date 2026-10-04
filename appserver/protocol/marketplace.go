@@ -98,6 +98,9 @@ func (r *MarketplaceUpgradeResponse) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
+	if err := validateOptionalStringArrays(data, "selectedMarketplaces", "upgradedRoots"); err != nil {
+		return err
+	}
 	decoded.UpgradedRoots = validatedUpgradedRoots
 	*r = MarketplaceUpgradeResponse(decoded)
 	return nil

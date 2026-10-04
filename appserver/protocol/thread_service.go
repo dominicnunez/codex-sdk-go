@@ -290,6 +290,9 @@ func (r *ThreadLoadedListResponse) UnmarshalJSON(data []byte) error {
 	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	if err := validateOptionalStringArrays(data, "data"); err != nil {
+		return err
+	}
 	*r = ThreadLoadedListResponse(decoded)
 	return nil
 }

@@ -69,6 +69,14 @@ func (a *AppInfo) UnmarshalJSON(data []byte) error {
 	if err := validateOptionalStringArrays(data, "pluginDisplayNames"); err != nil {
 		return err
 	}
+	if err := validateOptionalFields(data, func(_ string, raw []byte) error {
+		if isNullJSONValue(raw) {
+			return nil
+		}
+		return validateNullableStringArrays(raw, true, "categories", "subCategories")
+	}, "appMetadata"); err != nil {
+		return err
+	}
 	if decoded.IsEnabled == nil {
 		appInfo.IsEnabled = true
 	} else {

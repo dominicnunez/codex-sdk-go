@@ -133,6 +133,9 @@ func (e *HooksListEntry) UnmarshalJSON(data []byte) error {
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
+	if err := validateStringArrays(data, false, "warnings"); err != nil {
+		return err
+	}
 	*e = HooksListEntry(decoded)
 	return nil
 }

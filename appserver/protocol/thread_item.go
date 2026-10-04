@@ -514,7 +514,22 @@ func decodeUserMessageThreadItem(data []byte) (ThreadItem, error) {
 }
 
 func decodeAgentMessageThreadItem(data []byte) (ThreadItem, error) {
-	return decodeThreadItemInto(data, &AgentMessageThreadItem{}, "id", "text")
+	item, err := decodeThreadItemInto(data, &AgentMessageThreadItem{}, "id", "text")
+	if err != nil {
+		return nil, err
+	}
+	// Keep the public citation representation method-free. Validate each
+	// recognized occurrence at the owning union, preserving standard decoding
+	// and merges while rejecting null array members before publishing the item.
+	if err := validateOptionalFields(data, func(_ string, raw []byte) error {
+		if isNullJSONValue(raw) {
+			return nil
+		}
+		return validateOptionalStringArrays(raw, "threadIds")
+	}, "memoryCitation"); err != nil {
+		return nil, err
+	}
+	return item, nil
 }
 
 func decodePlanThreadItem(data []byte) (ThreadItem, error) {
@@ -559,7 +574,14 @@ func decodeDynamicToolCallThreadItem(data []byte) (ThreadItem, error) {
 }
 
 func decodeCollabAgentToolCallThreadItem(data []byte) (ThreadItem, error) {
-	return decodeThreadItemInto(data, &CollabAgentToolCallThreadItem{}, "agentsStates", "id", "receiverThreadIds", "senderThreadId", "status", "tool")
+	item, err := decodeThreadItemInto(data, &CollabAgentToolCallThreadItem{}, "agentsStates", "id", "receiverThreadIds", "senderThreadId", "status", "tool")
+	if err != nil {
+		return nil, err
+	}
+	if err := validateOptionalStringArrays(data, "receiverThreadIds"); err != nil {
+		return nil, err
+	}
+	return item, nil
 }
 
 func decodeSubAgentActivityThreadItem(data []byte) (ThreadItem, error) {
