@@ -399,6 +399,7 @@ func TestHookRunSummarySourceOccurrencesUseExactJSONFieldSemantics(t *testing.T)
 		{"escaped key and value", `"\u0073ource":"syst\u0065m"`, "/tmp/hook", "system", ""},
 		{"escaped key unknown value", `"\u0073ource":"bogus"`, "/tmp/hook", "", "invalid hook.source"},
 		{"invalid duplicate before valid", `"source":"bogus","source":"user"`, "/tmp/hook", "", "invalid hook.source"},
+		{"explicit null remains invalid before valid duplicate", `"source":null,"source":"user"`, "/tmp/hook", "", "hook.source"},
 		{"folded alias ignored", `"SOURCE":"bogus"`, "/tmp/hook", "", ""},
 		{"path error precedes enum restriction", `"source":"bogus"`, "relative/hook", "", "must be an absolute path"},
 		{"native type error precedes new restrictions", `"source":7`, "relative/hook", "", "cannot unmarshal number"},
@@ -448,13 +449,21 @@ func TestHookRunSummaryInvalidAdmissionPreservesReceiverAndAllowsRecovery(t *tes
 		SourcePath: "/tmp/previous",
 		Entries:    []codex.HookOutputEntry{{Kind: codex.HookOutputEntryKindWarning, Text: "previous"}},
 	}
-	before := run
+	previousSourceExpected := codex.HookSource("user")
+	wantBefore := codex.HookRunSummary{
+		ID:         "previous",
+		Source:     &previousSourceExpected,
+		SourcePath: "/tmp/previous",
+		Entries:    []codex.HookOutputEntry{{Kind: codex.HookOutputEntryKindWarning, Text: "previous"}},
+	}
+	entriesSlot := &run.Entries[0]
+	sourceSlot := run.Source
 	invalid := `{"displayOrder":1,"entries":[],"eventName":"sessionStart","executionMode":"sync","handlerType":"command","id":"invalid","scope":"thread","source":"bogus","sourcePath":"/tmp/hook","startedAt":123,"status":"completed"}`
 	if err := json.Unmarshal([]byte(invalid), &run); err == nil {
 		t.Fatal("invalid HookRunSummary source unexpectedly decoded")
 	}
-	if !reflect.DeepEqual(run, before) {
-		t.Fatalf("receiver changed after rejected decode: got %+v, want %+v", run, before)
+	if !reflect.DeepEqual(run, wantBefore) || run.Source != sourceSlot || &run.Entries[0] != entriesSlot {
+		t.Fatalf("receiver or prior reference changed after rejected decode: got %+v, want %+v", run, wantBefore)
 	}
 	valid := `{"displayOrder":2,"entries":[],"eventName":"sessionStart","executionMode":"sync","handlerType":"command","id":"recovered","scope":"thread","source":"system","sourcePath":"/tmp/hook","startedAt":123,"status":"completed"}`
 	if err := json.Unmarshal([]byte(valid), &run); err != nil {
