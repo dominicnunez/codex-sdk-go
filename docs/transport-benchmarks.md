@@ -11,15 +11,13 @@ go test ./appserver/transport -run '^$' -bench 'BenchmarkInbound(Large|Pipeline|
 
 The Transport benchmarks workflow collects this baseline on Linux and Windows,
 records the commit and environment, and uploads raw results, CPU/allocation
-profiles, and profile summaries. It runs on relevant pull requests and can be
-dispatched manually. Results are observations, not timing gates: hosted runners
-vary, so compare repeated runs on equivalent environments rather than comparing
-absolute Linux and Windows timings as an OS performance ranking.
-
-Pull requests also measure the base commit's real pipeline on the same runner.
-The base checkout SHA and results are saved beside the candidate results. This
-controls hardware differences, although load and measurement order can still
-affect timing. Compare medians and sample ranges, not a single iteration.
+profiles, and profile summaries. It runs only when dispatched manually from the
+Actions tab, or with `gh workflow run transport-benchmarks.yml --ref <branch-or-tag>`.
+Results are observations, not timing gates: hosted runners vary, so compare
+repeated runs on equivalent environments rather than comparing absolute Linux
+and Windows timings as an OS performance ranking. For controlled comparisons,
+dispatch runs for the baseline and candidate revisions and compare their results
+from equivalent runners; load and measurement order can still affect timing.
 
 ## Parse microbenchmarks
 
