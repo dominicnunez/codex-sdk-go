@@ -86,6 +86,217 @@ func TestHooksListRejectsInvalidMetadataSource(t *testing.T) {
 	}
 }
 
+func TestHooksListRejectsErrorRecordMissingRequiredFields(t *testing.T) {
+	transport := NewMockTransport()
+	client := codex.NewClient(transport)
+	t.Cleanup(func() { _ = client.Close() })
+	payload := `{"data":[{"cwd":"/tmp","errors":[{}],"hooks":[],"warnings":[]}]}`
+	if err := transport.SetResponseData("hooks/list", json.RawMessage(payload)); err != nil {
+		t.Fatal(err)
+	}
+	_, err := client.Hooks.List(context.Background(), codex.HooksListParams{})
+	if err == nil || !strings.Contains(err.Error(), "message") {
+		t.Fatalf("Hooks.List error = %v; want missing HookErrorInfo.message rejection", err)
+	}
+}
+
+func TestHooksListHookErrorInfoAdmission(t *testing.T) {
+	tests := []struct {
+		name, fields, wantError string
+		want                    []codex.HookErrorInfo
+		wantNonNilEmpty         bool
+	}{
+		{
+			name:   "empty values and opaque relative path are valid",
+			fields: `"errors":[{"message":"","path":"relative/path"}]`,
+			want:   []codex.HookErrorInfo{{Message: "", Path: "relative/path"}},
+		},
+		{
+			name:   "both empty required strings are present",
+			fields: `"errors":[{"message":"","path":""}]`,
+			want:   []codex.HookErrorInfo{{Message: "", Path: ""}},
+		},
+		{
+			name:      "missing message",
+			fields:    `"errors":[{"path":"relative"}]`,
+			wantError: "hook.errors[0].message is required",
+		},
+		{
+			name:      "missing path",
+			fields:    `"errors":[{"message":"present"}]`,
+			wantError: "hook.errors[0].path is required",
+		},
+		{
+			name:      "null item",
+			fields:    `"errors":[null]`,
+			wantError: "hook.errors[0] must not be null",
+		},
+		{
+			name:      "null message",
+			fields:    `"errors":[{"message":null,"path":"opaque"}]`,
+			wantError: "hook.errors[0].message must not be null",
+		},
+		{
+			name:      "escaped field null remains forbidden",
+			fields:    `"errors":[{"me\u0073sage":null,"path":"opaque"}]`,
+			wantError: "hook.errors[0].message must not be null",
+		},
+		{
+			name:      "null path",
+			fields:    `"errors":[{"message":"present","path":null}]`,
+			wantError: "hook.errors[0].path must not be null",
+		},
+		{
+			name:   "duplicate arrays complete the same item",
+			fields: `"errors":[{"message":"merged"}],"errors":[{"path":"relative"}]`,
+			want:   []codex.HookErrorInfo{{Message: "merged", Path: "relative"}},
+		},
+		{
+			name:      "array item null remains invalid after repair",
+			fields:    `"errors":[null],"errors":[{"message":"repaired","path":"opaque"}]`,
+			wantError: "hook.errors[0] must not be null",
+		},
+		{
+			name:      "scalar null remains invalid after repair",
+			fields:    `"errors":[{"message":null,"path":"opaque"}],"errors":[{"message":"repaired","path":"opaque"}]`,
+			wantError: "hook.errors[0].message must not be null",
+		},
+		{
+			name:      "empty array resets old presence masks",
+			fields:    `"errors":[{"message":"old","path":"old"}],"errors":[],"errors":[{"message":"new"}]`,
+			wantError: "hook.errors[0].path is required",
+		},
+		{
+			name:   "shrink and reextend reuse hidden slot fields",
+			fields: `"errors":[{"message":"first","path":"first"},{"message":"old","path":"retained"}],"errors":[{"message":"middle","path":"middle"}],"errors":[{"message":"final","path":"final"},{"message":"reused"}]`,
+			want:   []codex.HookErrorInfo{{Message: "final", Path: "final"}, {Message: "reused", Path: "retained"}},
+		},
+		{
+			name:   "truncated partial item is no longer visible",
+			fields: `"errors":[{"message":"first","path":"first"},{"message":"hidden"}],"errors":[{"message":"visible","path":"visible"}]`,
+			want:   []codex.HookErrorInfo{{Message: "visible", Path: "visible"}},
+		},
+		{
+			name:            "final empty array remains empty",
+			fields:          `"errors":[{"message":"old","path":"old"}],"errors":[]`,
+			want:            []codex.HookErrorInfo{},
+			wantNonNilEmpty: true,
+		},
+		{
+			name:   "folded escaped and Unicode field names match stdlib",
+			fields: `"errors":[{"me\u017Fsage":"unicode","pa\u0074h":"opaque"}]`,
+			want:   []codex.HookErrorInfo{{Message: "unicode", Path: "opaque"}},
+		},
+		{
+			name:   "folded root alias remains unknown",
+			fields: `"ERRORS":[{}],"errors":[{"message":"exact","path":"opaque"}]`,
+			want:   []codex.HookErrorInfo{{Message: "exact", Path: "opaque"}},
+		},
+		{
+			name:   "escaped root field matches exactly",
+			fields: `"err\u006frs":[{"message":"escaped","path":"opaque"}]`,
+			want:   []codex.HookErrorInfo{{Message: "escaped", Path: "opaque"}},
+		},
+		{
+			name:      "root null array remains invalid after repair",
+			fields:    `"errors":null,"errors":[{"message":"repaired","path":"opaque"}]`,
+			wantError: `required field "errors" must not be null`,
+		},
+		{
+			name:      "wrong-kind root array keeps native type error",
+			fields:    `"errors":{},"errors":[{"message":"repaired","path":"opaque"}]`,
+			wantError: "cannot unmarshal object",
+		},
+		{
+			name:      "native type error precedes null admission",
+			fields:    `"errors":[{"message":null,"path":3}]`,
+			wantError: "cannot unmarshal number",
+		},
+		{
+			name:      "existing warnings failure precedes missing error fields",
+			fields:    `"errors":[{}],"warnings":[null]`,
+			wantError: "warnings",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := NewMockTransport()
+			client := codex.NewClient(transport)
+			t.Cleanup(func() { _ = client.Close() })
+			payload := `{"data":[{"cwd":"/tmp",` + tt.fields + `,"hooks":[],"warnings":[]}]}`
+			if err := transport.SetResponseData("hooks/list", json.RawMessage(payload)); err != nil {
+				t.Fatal(err)
+			}
+			resp, err := client.Hooks.List(context.Background(), codex.HooksListParams{})
+			if tt.wantError != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantError) {
+					t.Fatalf("Hooks.List error = %v; want substring %q", err, tt.wantError)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Hooks.List error = %v", err)
+			}
+			if len(resp.Data) != 1 || !reflect.DeepEqual(resp.Data[0].Errors, tt.want) {
+				t.Fatalf("HookErrorInfo values = %#v; want %#v", resp.Data, tt.want)
+			}
+			if tt.wantNonNilEmpty && resp.Data[0].Errors == nil {
+				t.Fatal("empty errors array became nil")
+			}
+		})
+	}
+}
+
+type anonymousHookErrorEnvelope struct {
+	Before string `json:"before"`
+	codex.HookErrorInfo
+	After string `json:"after"`
+}
+
+func TestHookErrorInfoRemainsPlainAndEntryFailureDoesNotMutateReceiver(t *testing.T) {
+	if reflect.TypeOf(codex.HookErrorInfo{}).NumMethod() != 0 || reflect.TypeOf((*codex.HookErrorInfo)(nil)).NumMethod() != 0 {
+		t.Fatal("HookErrorInfo acquired public methods")
+	}
+	var plain codex.HookErrorInfo
+	if err := json.Unmarshal([]byte(`{}`), &plain); err != nil || plain != (codex.HookErrorInfo{}) {
+		t.Fatalf("plain HookErrorInfo behavior changed: value=%+v err=%v", plain, err)
+	}
+	var envelope anonymousHookErrorEnvelope
+	if err := json.Unmarshal([]byte(`{"before":"left","message":"m","path":"p","after":"right"}`), &envelope); err != nil {
+		t.Fatalf("anonymous HookErrorInfo envelope decode failed: %v", err)
+	}
+	if envelope.Before != "left" || envelope.Message != "m" || envelope.Path != "p" || envelope.After != "right" {
+		t.Fatalf("anonymous HookErrorInfo envelope = %+v", envelope)
+	}
+
+	entry := codex.HooksListEntry{
+		Cwd:      "/before",
+		Errors:   []codex.HookErrorInfo{{Message: "before", Path: "opaque"}},
+		Hooks:    []codex.HookMetadata{},
+		Warnings: []string{"before"},
+	}
+	wantBefore := codex.HooksListEntry{
+		Cwd:      "/before",
+		Errors:   []codex.HookErrorInfo{{Message: "before", Path: "opaque"}},
+		Hooks:    []codex.HookMetadata{},
+		Warnings: []string{"before"},
+	}
+	errorsSlot := &entry.Errors[0]
+	if err := json.Unmarshal([]byte(`{"cwd":"/after","errors":[{}],"hooks":[],"warnings":[]}`), &entry); err == nil {
+		t.Fatal("HooksListEntry accepted incomplete HookErrorInfo")
+	}
+	if !reflect.DeepEqual(entry, wantBefore) || &entry.Errors[0] != errorsSlot {
+		t.Fatalf("receiver or prior slice storage changed after failure: got %+v want %+v", entry, wantBefore)
+	}
+	if err := json.Unmarshal([]byte(`{"cwd":"/recovered","errors":[{"message":"ok","path":"relative"}],"hooks":[],"warnings":[]}`), &entry); err != nil {
+		t.Fatalf("valid receiver recovery failed: %v", err)
+	}
+	if entry.Cwd != "/recovered" || !reflect.DeepEqual(entry.Errors, []codex.HookErrorInfo{{Message: "ok", Path: "relative"}}) {
+		t.Fatalf("recovered HooksListEntry = %+v", entry)
+	}
+}
+
 func TestHooksListAcceptsEveryKnownMetadataSource(t *testing.T) {
 	sources := []string{
 		"system", "user", "project", "mdm", "sessionFlags", "plugin",
