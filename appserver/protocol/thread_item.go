@@ -514,7 +514,8 @@ func decodeUserMessageThreadItem(data []byte) (ThreadItem, error) {
 }
 
 func decodeAgentMessageThreadItem(data []byte) (ThreadItem, error) {
-	item, err := decodeThreadItemInto(data, &AgentMessageThreadItem{}, "id", "text")
+	agentMessage := &AgentMessageThreadItem{}
+	item, err := decodeThreadItemInto(data, agentMessage, "id", "text")
 	if err != nil {
 		return nil, err
 	}
@@ -527,6 +528,9 @@ func decodeAgentMessageThreadItem(data []byte) (ThreadItem, error) {
 		}
 		return validateOptionalStringArrays(raw, "threadIds")
 	}, "memoryCitation"); err != nil {
+		return nil, err
+	}
+	if err := validateMemoryCitationAdmission(data, agentMessage); err != nil {
 		return nil, err
 	}
 	return item, nil
