@@ -270,6 +270,26 @@ func (n *ModelVerificationNotification) UnmarshalJSON(data []byte) error {
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
+	if err := validateArrays(data, func(raw []byte) error {
+		return validateArrayElements(raw, func(index int, element []byte) error {
+			// The containing decoder already checked JSON syntax and string
+			// types. Avoid decoding the usual token a second time; escaped
+			// spellings still use the standard string decoder below.
+			if string(element) == `"trustedAccessForCyber"` {
+				return nil
+			}
+			var value ModelVerification
+			if err := jsondecode.Unmarshal(element, &value); err != nil {
+				return err
+			}
+			if value != ModelVerificationTrustedAccessForCyber {
+				return fmt.Errorf("invalid verification at index %d: %s", index, quotedValueDiagnostic(string(value)))
+			}
+			return nil
+		})
+	}, false, "verifications"); err != nil {
+		return err
+	}
 	*n = ModelVerificationNotification(decoded)
 	return nil
 }

@@ -57,6 +57,9 @@ func (v *AsyncUserInputQuestion) UnmarshalJSON(data []byte) error {
 	if err := unmarshalInboundObject(data, &decoded, []string{"title"}, []string{"title"}); err != nil {
 		return err
 	}
+	if err := validateNullableStringArrays(data, false, "options"); err != nil {
+		return err
+	}
 	*v = AsyncUserInputQuestion(decoded)
 	return nil
 }

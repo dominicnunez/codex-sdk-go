@@ -195,6 +195,9 @@ func (n *FsChangedNotification) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
+	if err := validateStringArrays(data, false, "changedPaths"); err != nil {
+		return err
+	}
 	decoded.ChangedPaths = validatedPaths
 	*n = FsChangedNotification(decoded)
 	return nil

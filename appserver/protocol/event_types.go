@@ -512,6 +512,9 @@ func (w *WebSearchActionWrapper) UnmarshalJSON(data []byte) error {
 		if err := jsondecode.Unmarshal(data, &s); err != nil {
 			return err
 		}
+		if err := validateNullableStringArrays(data, true, "queries"); err != nil {
+			return err
+		}
 		w.Value = &s
 		return nil
 	case "openPage":

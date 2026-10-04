@@ -116,13 +116,19 @@ and admission flags before reuse; it does not bound the number of valid records
 in an admitted payload. Generic raw notification handlers remain responsible
 for their own decoding and validation.
 
-[Optional array admission](../appserver/protocol/optional_array_validation.go)
+[String and optional array admission](../appserver/protocol/optional_array_validation.go)
 rejects forbidden null arrays and null string elements in plugin, app, model,
-thread lifecycle, reasoning, text-input and workspace-sandbox carriers. Guards
-cover the folded and escaped names accepted by their existing wire decoders;
-invalid earlier occurrences remain failures after valid duplicates. Nullable
-arrays retain their separate schema contracts, and opaque strings do not gain
-path restrictions. Marketplace error records require their canonical schema
+thread lifecycle, reasoning, text-input and workspace-sandbox carriers, as well
+as loaded thread IDs, hook warnings, plugin reconciliation IDs, citation thread
+IDs, collaboration receiver IDs, Windows warning paths and filesystem changes.
+Nullable plugin default prompts, app categories, question options and web-search
+queries accept whole-array null but reject null string elements. Model
+verification arrays admit only their schema enum values. Guards follow each
+existing owner's exact or folded property matching, including escaped names;
+invalid earlier occurrences remain failures after valid duplicates or resets.
+Absolute path arrays retain their final-value path validation and also reject
+overwritten null elements; opaque strings do not gain path restrictions.
+Marketplace error records require their canonical schema
 members, reject nulls through recognized aliases, and validate the same final
 absolute path that the wire decoder publishes. Validation uses existing response,
 Config and union owners after their established decoding and semantic checks.
@@ -131,6 +137,8 @@ receiver merging, error context and named or anonymous envelope traversal;
 decoding those representations directly does not perform SDK carrier admission.
 Fresh response owners retain replacement semantics. Config retains its existing
 merge and partial-update behavior; callers must not consume a failed decode.
+Plugin interface and detail path failures retain their existing partial receiver updates;
+new string-array admission failures preserve the prior receiver.
 New admission errors propagate through existing custom decoders and can stop
 outer traversal or precede later service validation. This does not establish
 error parity for payloads that newly fail the array contract.

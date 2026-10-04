@@ -204,9 +204,11 @@ func (p *PluginInterface) UnmarshalJSON(data []byte) error {
 	if wire.Screenshots == nil {
 		return errors.New("missing plugin.interface.screenshots")
 	}
-	if err := validateOptionalStringArrays(data, "capabilities", "screenshotUrls"); err != nil {
-		return err
-	}
+	// Stage updates so new array admission failures retain the prior receiver.
+	// Established path failures keep their original partial-update behavior.
+	receiver := p
+	staged := *p
+	p = &staged
 
 	p.BrandColor = wire.BrandColor
 	p.Capabilities = *wire.Capabilities
@@ -214,6 +216,7 @@ func (p *PluginInterface) UnmarshalJSON(data []byte) error {
 	p.ComposerIconURL = wire.ComposerIconURL
 	validatedComposerIcon, err := validateInboundAbsolutePathPointerField("plugin.interface.composerIcon", wire.ComposerIcon)
 	if err != nil {
+		*receiver = staged
 		return err
 	}
 	p.ComposerIcon = validatedComposerIcon
@@ -223,11 +226,13 @@ func (p *PluginInterface) UnmarshalJSON(data []byte) error {
 	p.LogoURL = wire.LogoURL
 	validatedLogo, err := validateInboundAbsolutePathPointerField("plugin.interface.logo", wire.Logo)
 	if err != nil {
+		*receiver = staged
 		return err
 	}
 	p.Logo = validatedLogo
 	validatedLogoDark, err := validateInboundAbsolutePathPointerField("plugin.interface.logoDark", wire.LogoDark)
 	if err != nil {
+		*receiver = staged
 		return err
 	}
 	p.LogoDark = validatedLogoDark
@@ -237,12 +242,20 @@ func (p *PluginInterface) UnmarshalJSON(data []byte) error {
 	p.ScreenshotURLs = *wire.ScreenshotURLs
 	validatedScreenshots, err := validateInboundAbsolutePathSliceField("plugin.interface.screenshots", *wire.Screenshots)
 	if err != nil {
+		*receiver = staged
 		return err
 	}
 	p.Screenshots = validatedScreenshots
 	p.ShortDescription = wire.ShortDescription
 	p.TermsOfServiceURL = wire.TermsOfServiceURL
 	p.WebsiteURL = wire.WebsiteURL
+	if err := validateOptionalStringArrays(data, "capabilities", "screenshotUrls", "screenshots"); err != nil {
+		return err
+	}
+	if err := validateNullableStringArrays(data, true, "defaultPrompt"); err != nil {
+		return err
+	}
+	*receiver = staged
 	return nil
 }
 
@@ -983,9 +996,9 @@ func (p *PluginDetail) UnmarshalJSON(data []byte) error {
 	case wire.AppTemplates == nil:
 		return errors.New("missing plugin.appTemplates")
 	}
-	if err := validateOptionalStringArrays(data, "mcpServers"); err != nil {
-		return err
-	}
+	receiver := p
+	staged := *p
+	p = &staged
 
 	p.Apps = *wire.Apps
 	p.AppTemplates = *wire.AppTemplates
@@ -996,6 +1009,7 @@ func (p *PluginDetail) UnmarshalJSON(data []byte) error {
 	p.MarketplaceName = *wire.MarketplaceName
 	validatedMarketplacePath, err := validateInboundAbsolutePathPointerField("plugin.marketplacePath", wire.MarketplacePath)
 	if err != nil {
+		*receiver = staged
 		return err
 	}
 	p.MarketplacePath = validatedMarketplacePath
@@ -1003,6 +1017,10 @@ func (p *PluginDetail) UnmarshalJSON(data []byte) error {
 	p.Skills = *wire.Skills
 	p.Summary = *wire.Summary
 	p.OnboardingSkill = wire.OnboardingSkill
+	if err := validateOptionalStringArrays(data, "mcpServers"); err != nil {
+		return err
+	}
+	*receiver = staged
 	return nil
 }
 

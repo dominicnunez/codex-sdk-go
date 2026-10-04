@@ -18,17 +18,28 @@ func validateOptionalStringArrays(data []byte, names ...string) error {
 // Requiredness belongs to the containing owner. Match its actual field rules:
 // standard struct decoding accepts folded aliases; exact schema decoders do not.
 func validateStringArrays(data []byte, acceptAliases bool, names ...string) error {
-	return validateArrays(data, func(raw []byte) error {
-		// Whole-input validation already established these value boundaries.
-		// Inspect only top-level elements; the wire decoder owns string types,
-		// unquoting and established type-error context.
-		return validateArrayElements(raw, func(index int, element []byte) error {
-			if isNullJSONValue(element) {
-				return fmt.Errorf("string at index %d must not be null", index)
-			}
+	return validateArrays(data, validateStringArrayItems, acceptAliases, names...)
+}
+
+func validateNullableStringArrays(data []byte, acceptAliases bool, names ...string) error {
+	return validateFields(data, func(_ string, raw []byte) error {
+		if isNullJSONValue(raw) {
 			return nil
-		})
+		}
+		return validateStringArrayItems(raw)
 	}, acceptAliases, names...)
+}
+
+func validateStringArrayItems(raw []byte) error {
+	// Whole-input validation already established these value boundaries.
+	// Inspect only top-level elements; the wire decoder owns string types,
+	// unquoting and established type-error context.
+	return validateArrayElements(raw, func(index int, element []byte) error {
+		if isNullJSONValue(element) {
+			return fmt.Errorf("string at index %d must not be null", index)
+		}
+		return nil
+	})
 }
 
 // The caller has validated the whole JSON input and owns array type decoding.
