@@ -145,6 +145,22 @@ error parity for payloads that newly fail the array contract.
 These admission checks neither authorize the reported data nor bound the number
 of valid elements or callback-owned copies.
 
+[Memory-citation admission](../appserver/protocol/memory_citation_admission.go)
+requires the citation's thread IDs and entries, plus every visible entry's
+schema-required fields, before a typed agent message is published. The optional
+whole citation may be omitted or reset with null. Null entries arrays, entry
+elements and required scalar occurrences remain invalid even when a later
+duplicate would otherwise reset or repair the native Go value. Ordinary object
+merges, folded and escaped field aliases, and same-index array-entry reuse
+retain the wire decoder's semantics; private per-call presence masks track
+those merges in proportion to historical entry indices and validate required
+fields in the final visible record after split-field duplicates. Errors identify
+fixed field names and numeric indices without quoting peer values. The exported
+citation records remain plain Go representations: direct caller
+decoding, caller-owned raw handlers, and outbound construction do not acquire
+this carrier admission rule. This validates record shape, not citation truth or
+a total payload/heap budget.
+
 SDK-generated previews of rejected paths, string enums, discriminators, app and
 answer-map keys, and request identifiers quote at most 256 source bytes and
 report the omitted byte count. The bound applies before escaping and wrapping,
