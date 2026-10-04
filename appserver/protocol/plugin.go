@@ -1020,6 +1020,9 @@ func (p *PluginDetail) UnmarshalJSON(data []byte) error {
 	if err := validateOptionalStringArrays(data, "mcpServers"); err != nil {
 		return err
 	}
+	if err := validatePluginHookSummaryRecords(data); err != nil {
+		return err
+	}
 	*receiver = staged
 	return nil
 }
