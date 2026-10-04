@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
 // McpAuthStatus represents the authentication status of an MCP server.
@@ -70,6 +71,9 @@ func (r *Resource) UnmarshalJSON(data []byte) error {
 	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	if err := validateOptionalFields(data, validateMcpCatalogIconArray, "icons"); err != nil {
+		return err
+	}
 	*r = Resource(decoded)
 	return nil
 }
@@ -118,8 +122,22 @@ func (t *Tool) UnmarshalJSON(data []byte) error {
 	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	if err := validateOptionalFields(data, validateMcpCatalogIconArray, "icons"); err != nil {
+		return err
+	}
 	*t = Tool(decoded)
 	return nil
+}
+
+func validateMcpCatalogIconArray(_ string, raw []byte) error {
+	if isNullJSONValue(raw) {
+		return nil
+	}
+	start := jsonobject.SkipWhitespace(raw, 0)
+	if start < len(raw) && raw[start] == '[' {
+		return nil
+	}
+	return fmt.Errorf("must be an array or null")
 }
 
 // McpServerStatus represents the status of a single MCP server.

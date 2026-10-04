@@ -409,6 +409,15 @@ or billing evidence. Plugin schedules are decoded as data; the SDK does not run
 their prompts. External config imports return the required import ID so callers
 can correlate progress and completion; that ID does not authenticate the peer or
 prove that an import completed.
+
+`Resource.icons` and `Tool.icons` catalog values are admitted only when absent,
+null, or arrays; the schema leaves array elements unrestricted. The check runs
+after each owner's existing required-field and native type decoding, before a
+successful value is assigned to its receiver. A rejected icon root returns from
+the custom item decoder, so it can replace an earlier outer sibling error or
+prevent a later sibling from being decoded. This is limited to catalog response
+shape; it does not validate icon contents or establish that a peer is trusted.
+
 New nullable collection fields retain absence, explicit null and present empty
 values separately. Their exported presence and value state can be copied without
 sharing collection storage. Nullable scalar and struct-pointer fields retain the
