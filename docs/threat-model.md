@@ -161,6 +161,23 @@ decoding, caller-owned raw handlers, and outbound construction do not acquire
 this carrier admission rule. This validates record shape, not citation truth or
 a total payload/heap budget.
 
+[Hook list and run admission](../appserver/protocol/hook_error_admission.go)
+requires each visible `hooks/list` error record to contain non-null `message`
+and `path` strings. Private presence masks follow ordinary same-index struct
+reuse across duplicate arrays, preserve hidden slots across shrink and reextend,
+reset when an empty array replaces the slice, and check required fields only on
+the final visible records. Recognized null items or scalar occurrences remain
+invalid after later repair or reset; existing root, native type and warning
+errors keep their precedence. Hook metadata requires a non-null `source`, and
+run summaries accept an omitted optional source without materializing its
+schema default; both carriers reject null or unknown source values and validate
+the 11 schema enum values. Their `sourcePath` fields must be normalized absolute
+paths, while `HookErrorInfo.path` remains an opaque string. `HookSource` and
+`HookErrorInfo` stay plain Go representations, so direct decoding and anonymous
+envelopes retain standard JSON behavior. These checks admit record shape; they
+do not authenticate hook provenance, authorize or execute hooks, or set a total
+payload or heap limit.
+
 SDK-generated previews of rejected paths, string enums, discriminators, app and
 answer-map keys, and request identifiers quote at most 256 source bytes and
 report the omitted byte count. The bound applies before escaping and wrapping,
