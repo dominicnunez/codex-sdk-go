@@ -181,6 +181,25 @@ envelopes retain standard JSON behavior. These checks admit record shape; they
 do not authenticate hook provenance, authorize or execute hooks, or set a total
 payload or heap limit.
 
+[MCP resource-read admission](../appserver/protocol/mcp_resource_read_admission.go)
+requires every visible resource item to have a non-null string URI and at least
+one string `text` or `blob` branch. A pass over borrowed JSON spans uses small
+presence masks to follow native duplicate-array reuse, shrink/reextend and
+empty-array reset behavior. Nullable branch members clear their state, while
+recognized null contents, null items and null URIs remain invalid after later
+duplicates. The normal wire decode keeps ownership of common field types and
+native errors. On a failed decode, a cold recovery accepts only schema-permitted
+incompatible opposite-branch extras when the counterpart is usable by the end
+of the same source object; it projects those values to null in a temporary copy
+at their original member positions and retries the plain wire decode. If the
+recovery proof fails, the original native error, including its type and field
+context, is returned. `_meta` remains opaque raw JSON with its original numeric
+precision. `ResourceContent` stays a plain Go representation, so direct
+decoding, serialization and caller envelopes keep ordinary `encoding/json`
+behavior. This validates the typed response carrier only; it does not impose
+URI, MIME, base64 or metadata policy, or bound valid response size and
+application-owned copies.
+
 SDK-generated previews of rejected paths, string enums, discriminators, app and
 answer-map keys, and request identifiers quote at most 256 source bytes and
 report the omitted byte count. The bound applies before escaping and wrapping,
