@@ -261,14 +261,55 @@ func (p *PluginInterface) UnmarshalJSON(data []byte) error {
 
 // PluginSource identifies where a plugin came from.
 type PluginSource struct {
+	// Package is required for npm sources; a pointer preserves a valid empty package name.
+	Package *string `json:"package,omitempty"`
 	Path    *string `json:"path,omitempty"`
 	RefName *string `json:"refName,omitempty"`
-	SHA     *string `json:"sha,omitempty"`
-	Type    string  `json:"type"`
-	URL     *string `json:"url,omitempty"`
+	// Registry preserves absent, explicit null, and string values for npm sources.
+	Registry OptionalNullable[string] `json:"registry,omitzero"`
+	SHA      *string                  `json:"sha,omitempty"`
+	Type     string                   `json:"type"`
+	URL      *string                  `json:"url,omitempty"`
+	// Version preserves absent, explicit null, and string values for npm sources.
+	Version OptionalNullable[string] `json:"version,omitzero"`
 }
 
 func (p *PluginSource) UnmarshalJSON(data []byte) error {
+	// Select the branch using the native decoder's case folding, duplicate-key,
+	// and null semantics. Selector errors are intentionally discarded: the
+	// selected wire below owns the original error and ordering for each branch.
+	var selector struct {
+		Type *string `json:"type"`
+	}
+	_ = jsondecode.Unmarshal(data, &selector)
+	if selector.Type != nil && *selector.Type == "npm" {
+		var npmWire struct {
+			Package  *string                  `json:"package"`
+			Registry OptionalNullable[string] `json:"registry"`
+			Type     *string                  `json:"type"`
+			Version  OptionalNullable[string] `json:"version"`
+		}
+		if err := jsondecode.Unmarshal(data, &npmWire); err != nil {
+			return err
+		}
+		if npmWire.Type == nil {
+			return errors.New("missing plugin.source.type")
+		}
+		if *npmWire.Type != "npm" {
+			return validatePluginSourceTypeField("plugin.source.type", *npmWire.Type)
+		}
+		if npmWire.Package == nil {
+			return errors.New("missing plugin.source.package")
+		}
+		*p = PluginSource{
+			Package:  npmWire.Package,
+			Registry: npmWire.Registry,
+			Type:     *npmWire.Type,
+			Version:  npmWire.Version,
+		}
+		return nil
+	}
+
 	type pluginSourceWire struct {
 		Path    *string `json:"path"`
 		RefName *string `json:"refName"`
@@ -302,10 +343,13 @@ func (p *PluginSource) UnmarshalJSON(data []byte) error {
 		return errors.New("missing plugin.source.url")
 	}
 	p.Path = wire.Path
+	p.Package = nil
 	p.RefName = wire.RefName
+	p.Registry = OptionalNullable[string]{}
 	p.SHA = wire.SHA
 	p.Type = *wire.Type
 	p.URL = wire.URL
+	p.Version = OptionalNullable[string]{}
 	return nil
 }
 

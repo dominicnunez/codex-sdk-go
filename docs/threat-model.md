@@ -193,6 +193,15 @@ the native decoder. `PluginHookSummary` remains plain and embeddable, and this
 carrier check does not authenticate hook provenance or execute hooks; existing
 path failures retain their established partial receiver update behavior.
 
+[Plugin source decoding](../appserver/protocol/plugin.go) admits the checked-in
+`npm` source branch and retains its required package string plus optional
+registry and version states (absent, null or string). Branch-specific native
+decoding for npm ignores legacy fields that its schema leaves unrestricted,
+while legacy branches retain their existing decoding and validation path. The
+public source representation uses ordinary JSON encoding and adds no outbound
+validation. This validates response shape only; it does not verify packages,
+authenticate a registry, install or execute code, or authorize a plugin.
+
 [MCP resource-read admission](../appserver/protocol/mcp_resource_read_admission.go)
 requires every visible resource item to have a non-null string URI and at least
 one string `text` or `blob` branch. A pass over borrowed JSON spans uses small
