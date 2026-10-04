@@ -35,8 +35,9 @@ Test constructed union branches separately from decoded values, including
 pointers to nil slices. Nullability must not erase an explicitly selected branch.
 For record admission, trace reused public types into each carrier's actual
 schema: legacy shared fields may have different enums in different contexts.
-Materialize behavioral defaults and verify explicit values survive serialization;
-a decoder default and an omitting encoder can silently change a round trip.
+Trace omitted-field defaults to the owning reference codec and materialize its
+behavioral defaults. Verify both defaults and explicit values survive
+serialization; an omitting encoder can silently change a round trip.
 
 ## Architecture
 

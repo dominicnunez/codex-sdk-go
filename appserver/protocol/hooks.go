@@ -6,6 +6,7 @@ import (
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
 // HookTrustStatus is the trust state of a configured hook.
@@ -99,8 +100,56 @@ func (m *HookMetadata) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	decoded.SourcePath = validatedSourcePath
+	if err := validateHookSourceOccurrences(data, "source"); err != nil {
+		return err
+	}
+	if decoded.HandlerType == HookHandlerTypeCommand && decoded.Async == nil {
+		// The command variant's reference decoder defaults async to false.
+		async := false
+		decoded.Async = &async
+	}
 	*m = HookMetadata(decoded)
 	return nil
+}
+
+var validHookSources = map[HookSource]struct{}{
+	HookSourceSystem:                  {},
+	HookSourceUser:                    {},
+	HookSourceProject:                 {},
+	HookSourceMDM:                     {},
+	HookSourceSessionFlags:            {},
+	HookSourcePlugin:                  {},
+	HookSourceCloudRequirements:       {},
+	HookSourceCloudManagedConfig:      {},
+	HookSourceLegacyManagedConfigFile: {},
+	HookSourceLegacyManagedConfigMDM:  {},
+	HookSourceUnknown:                 {},
+}
+
+// validateHookSourceOccurrences enforces the schema enum at each typed carrier
+// that admits HookSource. Match the same exact decoded field names as
+// unmarshalInboundObject, including escaped JSON spellings. Ordinary decoding
+// runs first so native type and syntax errors keep their existing ownership.
+func validateHookSourceOccurrences(data []byte, field string) error {
+	var validationErr error
+	jsonobject.WalkFields(data, true, func(key, raw []byte) {
+		if validationErr != nil || !jsonobject.FieldMatches(key, field) {
+			return
+		}
+		if isNullJSONValue(raw) {
+			validationErr = fmt.Errorf("hook.%s: must not be null", field)
+			return
+		}
+		for value := range validHookSources {
+			if jsonobject.FieldMatches(raw, string(value)) {
+				return
+			}
+		}
+		// Keep this diagnostic independent of the peer string's size. The
+		// ordinary decoder already owns string type errors and field decoding.
+		validationErr = fmt.Errorf("invalid hook.%s", field)
+	})
+	return validationErr
 }
 
 func (m HookMetadata) MarshalJSON() ([]byte, error) {
@@ -134,6 +183,9 @@ func (e *HooksListEntry) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	if err := validateStringArrays(data, false, "warnings"); err != nil {
+		return err
+	}
+	if err := validateHookErrorInfoAdmission(data); err != nil {
 		return err
 	}
 	*e = HooksListEntry(decoded)
