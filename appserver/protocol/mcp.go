@@ -274,7 +274,15 @@ func (r *McpResourceReadResponse) UnmarshalJSON(data []byte) error {
 	}
 	type wire McpResourceReadResponse
 	var decoded wire
-	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
+	decodeErr := jsondecode.Unmarshal(data, &decoded)
+	if decodeErr != nil {
+		if recovered, ok := recoverMcpResourceReadExtras(data); ok {
+			*r = recovered
+			return nil
+		}
+		return decodeErr
+	}
+	if err := validateMcpResourceReadContents(data); err != nil {
 		return err
 	}
 	*r = McpResourceReadResponse(decoded)
