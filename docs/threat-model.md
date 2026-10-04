@@ -197,10 +197,18 @@ path failures retain their established partial receiver update behavior.
 `npm` source branch and retains its required package string plus optional
 registry and version states (absent, null or string). Branch-specific native
 decoding for npm ignores legacy fields that its schema leaves unrestricted,
-while legacy branches retain their existing decoding and validation path. The
-public source representation uses ordinary JSON encoding and adds no outbound
-validation. This validates response shape only; it does not verify packages,
-authenticate a registry, install or execute code, or authorize a plugin.
+while the git branch and invalid-selector fallback retain their existing
+decoding and validation path. The local and remote source branches also leave
+their legacy extra string fields unrestricted. For those selected branches, a
+pass through a private native string decoder skips only direct wrong-type
+errors for these extras, keeps the last successfully decoded string, and lets
+null clear it. Required local path, the selected type, and all git-declared
+fields retain their native validation; the git branch keeps its established
+wire path. Successful decoding replaces the whole source, while failures
+preserve a seeded receiver and its references. The public source representation
+uses ordinary JSON encoding and adds no outbound validation. This validates
+response shape only; it does not verify packages, authenticate a registry,
+install or execute code, or authorize a plugin.
 
 [MCP resource-read admission](../appserver/protocol/mcp_resource_read_admission.go)
 requires every visible resource item to have a non-null string URI and at least
