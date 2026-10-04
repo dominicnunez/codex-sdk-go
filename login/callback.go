@@ -76,7 +76,13 @@ func (s *CallbackServer) Close() error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), callbackShutdownTimeout)
 	defer cancel()
-	return s.server.Shutdown(ctx)
+	if err := s.server.Shutdown(ctx); err != nil {
+		if closeErr := s.server.Close(); closeErr != nil {
+			return errors.Join(err, closeErr)
+		}
+		return err
+	}
+	return nil
 }
 
 func (s *CallbackServer) send(result callbackResult) {
