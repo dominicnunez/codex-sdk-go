@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strconv"
+	"strings"
 	"testing"
 
 	protocol "github.com/dominicnunez/codex-sdk-go/appserver/protocol"
@@ -68,7 +70,7 @@ func assertMemoryCitationEqual(t *testing.T, got, want *protocol.MemoryCitation)
 func TestMemoryCitationRecordAdmission(t *testing.T) {
 	for name, raw := range invalidMemoryCitationItems() {
 		t.Run(name, func(t *testing.T) {
-			seed := `{"type":"agentMessage","id":"prior","text":"prior","memoryCitation":{"entries":[],"threadIds":["prior"]}}`
+			seed := `{"type":"agentMessage","id":"prior","text":"prior","memoryCitation":{"entries":[{"lineEnd":8,"lineStart":3,"note":"prior-note","path":"prior-path"}],"threadIds":["prior-id"]}}`
 			var item protocol.ThreadItemWrapper
 			if err := json.Unmarshal([]byte(seed), &item); err != nil {
 				t.Fatal(err)
@@ -77,12 +79,19 @@ func TestMemoryCitationRecordAdmission(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			priorAgent := item.Value.(*protocol.AgentMessageThreadItem)
+			priorCitation := priorAgent.MemoryCitation
+			priorEntry := &priorCitation.Entries[0]
+			priorThreadID := &priorCitation.ThreadIDs[0]
 			if err := json.Unmarshal([]byte(raw), &item); err == nil {
 				t.Fatal("invalid memory citation admitted")
 			}
 			after, err := json.Marshal(item)
 			if err != nil || string(before) != string(after) {
 				t.Fatalf("rejection changed prior wrapper value: err=%v before=%s after=%s", err, before, after)
+			}
+			if item.Value != priorAgent || priorAgent.MemoryCitation != priorCitation || &priorCitation.Entries[0] != priorEntry || &priorCitation.ThreadIDs[0] != priorThreadID {
+				t.Fatal("rejection changed a retained wrapper/citation/slice reference")
 			}
 			if err := json.Unmarshal([]byte(validMemoryCitationItems()[0]), &item); err != nil {
 				t.Fatalf("valid recovery: %v", err)
@@ -244,6 +253,487 @@ func TestMemoryCitationFinalResetsValidateVisibleGraph(t *testing.T) {
 	if finalNull.Value.(*protocol.AgentMessageThreadItem).MemoryCitation != nil {
 		t.Fatal("final null citation did not reset public value")
 	}
+	for name, body := range map[string]string{
+		"entries empty then complete": memoryCitationItem(`,"memoryCitation":{"entries":[{"lineEnd":9,"lineStart":4,"note":"old","path":"old"}],"threadIds":["old"]},"memoryCitation":{"entries":[]},"memoryCitation":{"entries":[{"lineEnd":0,"lineStart":0,"note":"","path":""}],"threadIds":[]}`),
+		"citation null then complete": memoryCitationItem(`,"memoryCitation":{"entries":[{"lineEnd":9,"lineStart":4,"note":"old","path":"old"}],"threadIds":["old"]},"memoryCitation":null,"memoryCitation":{"entries":[{"lineEnd":0,"lineStart":0,"note":"","path":""}],"threadIds":[]}`),
+	} {
+		t.Run(name, func(t *testing.T) {
+			var wrapper protocol.ThreadItemWrapper
+			if err := json.Unmarshal([]byte(body), &wrapper); err != nil {
+				t.Fatalf("complete record after reset rejected: %v", err)
+			}
+			assertMemoryCitationEqual(t, wrapper.Value.(*protocol.AgentMessageThreadItem).MemoryCitation, &protocol.MemoryCitation{
+				Entries: []protocol.MemoryCitationEntry{{LineEnd: 0, LineStart: 0, Note: "", Path: ""}}, ThreadIDs: []string{},
+			})
+		})
+	}
+}
+
+func TestMemoryCitationSplitEntryFieldsAndVisibility(t *testing.T) {
+	const first = `{"lineEnd":7,"lineStart":2}`
+	const second = `{"note":"note","path":"opaque/../path"}`
+	for _, tc := range []struct {
+		name          string
+		first, second string
+	}{
+		{"line fields then text fields", first, second},
+		{"text fields then line fields", second, first},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body := memoryCitationItem(`,"memoryCitation":{"entries":[` + tc.first + `]},"memoryCitation":{"entries":[` + tc.second + `],"threadIds":[""]}`)
+			var wrapper protocol.ThreadItemWrapper
+			if err := json.Unmarshal([]byte(body), &wrapper); err != nil {
+				t.Fatalf("split fields rejected: %v", err)
+			}
+			assertMemoryCitationEqual(t, wrapper.Value.(*protocol.AgentMessageThreadItem).MemoryCitation, &protocol.MemoryCitation{
+				Entries:   []protocol.MemoryCitationEntry{{LineEnd: 7, LineStart: 2, Note: "note", Path: "opaque/../path"}},
+				ThreadIDs: []string{""},
+			})
+		})
+	}
+
+	t.Run("newly visible incomplete index rejects", func(t *testing.T) {
+		body := memoryCitationItem(`,"memoryCitation":{"entries":[{"lineEnd":1,"lineStart":0,"note":"n","path":"p"}],"threadIds":[]},"memoryCitation":{"entries":[{"note":"replacement"},{"note":"incomplete"}]}`)
+		var wrapper protocol.ThreadItemWrapper
+		if err := json.Unmarshal([]byte(body), &wrapper); err == nil {
+			t.Fatal("newly visible incomplete index admitted")
+		}
+	})
+	t.Run("truncation hides incomplete index", func(t *testing.T) {
+		body := memoryCitationItem(`,"memoryCitation":{"entries":[{"lineEnd":1,"lineStart":0,"note":"n","path":"p"},{"note":"hidden"}],"threadIds":[]},"memoryCitation":{"entries":[{"note":"visible"}]}`)
+		var wrapper protocol.ThreadItemWrapper
+		if err := json.Unmarshal([]byte(body), &wrapper); err != nil {
+			t.Fatalf("hidden incomplete index affected final visible graph: %v", err)
+		}
+		assertMemoryCitationEqual(t, wrapper.Value.(*protocol.AgentMessageThreadItem).MemoryCitation, &protocol.MemoryCitation{
+			Entries: []protocol.MemoryCitationEntry{{LineEnd: 1, LineStart: 0, Note: "visible", Path: "p"}}, ThreadIDs: []string{},
+		})
+	})
+}
+
+func TestMemoryCitationNullRepairIsStickyForEveryEntryField(t *testing.T) {
+	fields := []struct {
+		name          string
+		nullFragment  string
+		validFragment string
+	}{
+		{"lineEnd", `"lineEnd":null`, `"lineEnd":1`},
+		{"lineStart", `"lineStart":null`, `"lineStart":2`},
+		{"note", `"note":null`, `"note":"n"`},
+		{"path", `"path":null`, `"path":"p"`},
+	}
+	for _, field := range fields {
+		for _, invalidFirst := range []bool{true, false} {
+			order := "null then value"
+			if !invalidFirst {
+				order = "value then null"
+			}
+			t.Run(field.name+"/"+order, func(t *testing.T) {
+				first, second := field.nullFragment, field.validFragment
+				if !invalidFirst {
+					first, second = second, first
+				}
+				body := memoryCitationItem(`,"memoryCitation":{"entries":[{"lineEnd":0,"lineStart":0,"note":"","path":"",` + first + `}],"threadIds":[]},"memoryCitation":{"entries":[{` + second + `}]}`)
+				var wrapper protocol.ThreadItemWrapper
+				if err := json.Unmarshal([]byte(body), &wrapper); err == nil {
+					t.Fatalf("null %s repaired by later value", field.name)
+				}
+			})
+		}
+	}
+	for _, alias := range []struct{ name, field, key, repair string }{
+		{"folded", "path", "PATH", `"path":"p"`},
+		{"escaped", "path", `\u0070ath`, `"path":"p"`},
+		{"long s", "lineStart", "lineſtart", `"lineStart":1`},
+	} {
+		t.Run(alias.name, func(t *testing.T) {
+			body := memoryCitationItem(`,"memoryCitation":{"entries":[{"lineEnd":0,"` + alias.key + `":null,"note":"n","path":"p"}],"threadIds":[]},"memoryCitation":{"entries":[{` + alias.repair + `}]}`)
+			var wrapper protocol.ThreadItemWrapper
+			if err := json.Unmarshal([]byte(body), &wrapper); err == nil {
+				t.Fatalf("%s null %s occurrence admitted", alias.name, alias.field)
+			}
+		})
+	}
+	var reset protocol.ThreadItemWrapper
+	if err := json.Unmarshal([]byte(memoryCitationItem(`,"memoryCitation":{"entries":[{"lineEnd":null,"lineStart":0,"note":"n","path":"p"}],"threadIds":[]},"memoryCitation":null`)), &reset); err == nil {
+		t.Fatal("citation null reset repaired earlier null scalar")
+	}
+}
+
+func TestMemoryCitationUnicodeFoldAndBoundsControls(t *testing.T) {
+	// encoding/json applies Unicode simple folding to struct field names. The
+	// long-s aliases below are recognized by the standard library and matcher.
+	for _, tc := range []struct {
+		name string
+		body string
+		want *protocol.MemoryCitation
+	}{
+		{
+			name: "long-s entries and thread IDs",
+			body: `{"type":"agentMessage","id":"m","text":"t","memoryCitation":{"entrieſ":[{"lineEnd":1,"lineStart":2,"note":"n","path":"p"}],"threadIdſ":["s"]}}`,
+			want: &protocol.MemoryCitation{Entries: []protocol.MemoryCitationEntry{{LineEnd: 1, LineStart: 2, Note: "n", Path: "p"}}, ThreadIDs: []string{"s"}},
+		},
+		{
+			name: "long-s lineStart",
+			body: `{"type":"agentMessage","id":"m","text":"t","memoryCitation":{"entries":[{"lineEnd":1,"lineſtart":2,"note":"n","path":"p"}],"threadIds":[]}}`,
+			want: &protocol.MemoryCitation{Entries: []protocol.MemoryCitationEntry{{LineEnd: 1, LineStart: 2, Note: "n", Path: "p"}}, ThreadIDs: []string{}},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var wrapper protocol.ThreadItemWrapper
+			var reference struct {
+				Type           string `json:"type"`
+				ID             string `json:"id"`
+				Text           string `json:"text"`
+				MemoryCitation *struct {
+					Entries []struct {
+						LineEnd   uint32 `json:"lineEnd"`
+						LineStart uint32 `json:"lineStart"`
+						Note      string `json:"note"`
+						Path      string `json:"path"`
+					} `json:"entries"`
+					ThreadIDs []string `json:"threadIds"`
+				} `json:"memoryCitation"`
+			}
+			if err := json.Unmarshal([]byte(tc.body), &reference); err != nil {
+				t.Fatalf("native reference rejected unicode fold: %v", err)
+			}
+			if err := json.Unmarshal([]byte(tc.body), &wrapper); err != nil {
+				t.Fatalf("admission rejected unicode fold accepted by native reference: %v", err)
+			}
+			assertMemoryCitationEqual(t, wrapper.Value.(*protocol.AgentMessageThreadItem).MemoryCitation, tc.want)
+		})
+	}
+
+	var omitted protocol.ThreadItemWrapper
+	if err := json.Unmarshal([]byte(memoryCitationItem("")), &omitted); err != nil {
+		t.Fatalf("omitted optional citation rejected: %v", err)
+	}
+	if omitted.Value.(*protocol.AgentMessageThreadItem).MemoryCitation != nil {
+		t.Fatal("omitted optional citation produced a value")
+	}
+	maxU32 := ^uint32(0)
+	maxUint32 := strconv.FormatUint(uint64(maxU32), 10)
+	maxBody := memoryCitationItem(`,"memoryCitation":{"entries":[{"lineEnd":` + maxUint32 + `,"lineStart":0,"note":"","path":""}],"threadIds":[""]}`)
+	var maxValue protocol.ThreadItemWrapper
+	if err := json.Unmarshal([]byte(maxBody), &maxValue); err != nil {
+		t.Fatalf("max uint32/empty opaque fields rejected: %v", err)
+	}
+	got := maxValue.Value.(*protocol.AgentMessageThreadItem).MemoryCitation
+	assertMemoryCitationEqual(t, got, &protocol.MemoryCitation{Entries: []protocol.MemoryCitationEntry{{LineEnd: maxU32, Note: "", Path: ""}}, ThreadIDs: []string{""}})
+	lessBody := memoryCitationItem(`,"memoryCitation":{"entries":[{"lineEnd":0,"lineStart":1,"note":"","path":""}],"threadIds":[]}`)
+	var less protocol.ThreadItemWrapper
+	if err := json.Unmarshal([]byte(lessBody), &less); err != nil {
+		t.Fatalf("schema-valid lineEnd < lineStart rejected: %v", err)
+	}
+}
+
+type nativeCitationReference struct {
+	Entries   []nativeCitationEntry `json:"entries"`
+	ThreadIDs []string              `json:"threadIds"`
+}
+
+type nativeCitationEntry struct {
+	LineEnd   uint32 `json:"lineEnd"`
+	LineStart uint32 `json:"lineStart"`
+	Note      string `json:"note"`
+	Path      string `json:"path"`
+}
+
+type nativeAgentMessageReference struct {
+	Type           string                   `json:"type"`
+	ID             string                   `json:"id"`
+	Text           string                   `json:"text"`
+	MemoryCitation *nativeCitationReference `json:"memoryCitation"`
+}
+
+func marshalCitationFixture(t *testing.T, value any) string {
+	t.Helper()
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(encoded)
+}
+
+func TestMemoryCitationGeneratedNativeReference(t *testing.T) {
+	fieldNames := []string{"lineEnd", "lineStart", "note", "path"}
+	for seed := 0; seed < 32; seed++ {
+		t.Run(fmt.Sprintf("seed-%02d", seed), func(t *testing.T) {
+			count := 2 + (seed*7+1)%4
+			complete := make([]nativeCitationEntry, count)
+			for i := range complete {
+				complete[i] = nativeCitationEntry{
+					LineEnd: uint32(seed + i + 1), LineStart: uint32(seed + i + 2),
+					Note: fmt.Sprintf("note-%d-%d", seed, i), Path: fmt.Sprintf("opaque/%d/%d", seed, i),
+				}
+			}
+			ids := []string{fmt.Sprintf("id-%d", seed), ""}
+			occurrences := make([]string, 0, 12)
+			appendEntries := func(entries []map[string]any) {
+				occurrences = append(occurrences, `"memoryCitation":{"entries":`+marshalCitationFixture(t, entries)+`}`)
+			}
+			for _, name := range fieldNames {
+				entries := make([]map[string]any, count)
+				for i, entry := range complete {
+					var value any
+					switch name {
+					case "lineEnd":
+						value = entry.LineEnd
+					case "lineStart":
+						value = entry.LineStart
+					case "note":
+						value = entry.Note
+					case "path":
+						value = entry.Path
+					}
+					entries[i] = map[string]any{name: value}
+				}
+				appendEntries(entries)
+			}
+			occurrences = append(occurrences, `"memoryCitation":{"threadIds":`+marshalCitationFixture(t, ids)+`}`)
+
+			switch seed % 4 {
+			case 0:
+				// A partial object merges over all populated indices.
+				entries := make([]map[string]any, count)
+				for i := range entries {
+					entries[i] = map[string]any{"note": fmt.Sprintf("later-%d-%d", seed, i)}
+				}
+				appendEntries(entries)
+			case 1:
+				// Truncation and reextension reuse the hidden same-index values.
+				short := make([]map[string]any, count-1)
+				for i := range short {
+					short[i] = map[string]any{"note": fmt.Sprintf("short-%d-%d", seed, i)}
+				}
+				appendEntries(short)
+				reextended := make([]map[string]any, count)
+				for i := range reextended {
+					reextended[i] = map[string]any{"path": fmt.Sprintf("reextended/%d/%d", seed, i)}
+				}
+				appendEntries(reextended)
+			case 2:
+				occurrences = append(occurrences, `"memoryCitation":{"entries":[]}`)
+				appendCompleteOccurrences := func() {
+					for _, name := range fieldNames {
+						entries := make([]map[string]any, count)
+						for i, entry := range complete {
+							var value any
+							switch name {
+							case "lineEnd":
+								value = entry.LineEnd
+							case "lineStart":
+								value = entry.LineStart
+							case "note":
+								value = entry.Note
+							case "path":
+								value = entry.Path
+							}
+							entries[i] = map[string]any{name: value}
+						}
+						appendEntries(entries)
+					}
+				}
+				appendCompleteOccurrences()
+			case 3:
+				occurrences = append(occurrences, `"memoryCitation":null`)
+				for _, name := range fieldNames {
+					entries := make([]map[string]any, count)
+					for i, entry := range complete {
+						var value any
+						switch name {
+						case "lineEnd":
+							value = entry.LineEnd
+						case "lineStart":
+							value = entry.LineStart
+						case "note":
+							value = entry.Note
+						case "path":
+							value = entry.Path
+						}
+						entries[i] = map[string]any{name: value}
+					}
+					appendEntries(entries)
+				}
+				occurrences = append(occurrences, `"memoryCitation":{"threadIds":`+marshalCitationFixture(t, ids)+`}`)
+			}
+			raw := `{"type":"agentMessage","id":"generated","text":"reference"}`
+			raw = strings.TrimSuffix(raw, `}`) + `,` + strings.Join(occurrences, ",") + `}`
+			var reference nativeAgentMessageReference
+			if err := json.Unmarshal([]byte(raw), &reference); err != nil {
+				t.Fatalf("method-free native reference rejected generated valid sequence: %v\n%s", err, raw)
+			}
+			if reference.MemoryCitation == nil || len(reference.MemoryCitation.Entries) != count || len(reference.MemoryCitation.ThreadIDs) != len(ids) {
+				t.Fatalf("generated native reference was vacuous: %#v", reference.MemoryCitation)
+			}
+			var actual protocol.ThreadItemWrapper
+			if err := json.Unmarshal([]byte(raw), &actual); err != nil {
+				t.Fatalf("SDK rejected native-valid generated sequence: %v\n%s", err, raw)
+			}
+			got := actual.Value.(*protocol.AgentMessageThreadItem).MemoryCitation
+			want := &protocol.MemoryCitation{Entries: make([]protocol.MemoryCitationEntry, len(reference.MemoryCitation.Entries)), ThreadIDs: append([]string(nil), reference.MemoryCitation.ThreadIDs...)}
+			for i, entry := range reference.MemoryCitation.Entries {
+				want.Entries[i] = protocol.MemoryCitationEntry{LineEnd: entry.LineEnd, LineStart: entry.LineStart, Note: entry.Note, Path: entry.Path}
+			}
+			assertMemoryCitationEqual(t, got, want)
+		})
+	}
+}
+
+func generatedCitationSequence(input []byte) string {
+	byteAt := func(index int) byte {
+		if len(input) == 0 {
+			return 0
+		}
+		return input[index%len(input)]
+	}
+	count := 1 + int(byteAt(0)%4)
+	full := make([]map[string]any, count)
+	for i := range full {
+		full[i] = map[string]any{
+			"lineEnd":   uint32(byteAt(i+1)) + uint32(i),
+			"lineStart": uint32(byteAt(i+5)) + uint32(i),
+			"note":      fmt.Sprintf("n-%d-%d", byteAt(i+9), i),
+			"path":      fmt.Sprintf("opaque/%d/%d", byteAt(i+13), i),
+		}
+	}
+	var occurrences []string
+	appendObject := func(value any, citationKey string) {
+		entries, _ := json.Marshal(value)
+		occurrences = append(occurrences, `"memoryCitation":{"`+citationKey+`":`+string(entries)+`}`)
+	}
+	fieldNames := []string{"lineEnd", "lineStart", "note", "path"}
+	start := int(byteAt(18) % 4)
+	for offset := 0; offset < 4; offset++ {
+		field := fieldNames[(start+offset)%4]
+		key := field
+		if byteAt(offset+19)%2 == 1 {
+			key = strings.ToUpper(field)
+		}
+		partial := make([]map[string]any, count)
+		for i := range full {
+			partial[i] = map[string]any{key: full[i][field]}
+		}
+		appendObject(partial, "entries")
+	}
+	ids := []string{fmt.Sprintf("id-%d", byteAt(23)), ""}
+	appendObject(ids, "threadIds")
+	operationCount := 1 + int(byteAt(24)%5)
+	for operation := 0; operation < operationCount; operation++ {
+		choice := byteAt(25+operation) % 4
+		switch choice {
+		case 0:
+			visible := 1 + int(byteAt(30+operation)%byte(count))
+			partial := make([]map[string]any, visible)
+			for i := range partial {
+				partial[i] = map[string]any{"note": fmt.Sprintf("update-%d-%d", operation, i)}
+			}
+			appendObject(partial, "ENTRIES")
+		case 1:
+			occurrences = append(occurrences, `"memoryCitation":{"entries":[]}`)
+			appendObject(full, "entries")
+		case 2:
+			occurrences = append(occurrences, `"memoryCitation":null`)
+			appendObject(full, "entries")
+			appendObject(ids, "THREADIDS")
+		case 3:
+			visible := 1 + int(byteAt(35+operation)%byte(count))
+			partial := make([]map[string]any, visible)
+			for i := range partial {
+				partial[i] = map[string]any{"path": fmt.Sprintf("alias/%d/%d", operation, i)}
+			}
+			appendObject(partial, "entries")
+		}
+	}
+	return `{"type":"agentMessage","id":"generated","text":"reference",` + strings.Join(occurrences, ",") + `}`
+}
+
+func FuzzMemoryCitationGeneratedNativeReference(f *testing.F) {
+	for _, seed := range [][]byte{
+		{}, {0}, {1, 2, 3, 4, 5, 6}, {255, 254, 253, 252, 251},
+		{4, 0, 3, 8, 1, 7, 2, 6, 9, 5}, {3, 9, 1, 8, 2, 7, 4, 6},
+		{2, 12, 29, 44, 51, 73, 98, 121}, {7, 0, 0, 1, 1, 2, 3, 5, 8, 13},
+	} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, rawSeed []byte) {
+		if len(rawSeed) > 128 {
+			rawSeed = rawSeed[:128]
+		}
+		valid := generatedCitationSequence(rawSeed)
+		var reference nativeAgentMessageReference
+		if err := json.Unmarshal([]byte(valid), &reference); err != nil {
+			t.Fatalf("method-free native reference rejected generated sequence: %v\n%s", err, valid)
+		}
+		if reference.MemoryCitation == nil || len(reference.MemoryCitation.Entries) == 0 {
+			t.Fatalf("generator produced vacuous valid reference: %#v", reference.MemoryCitation)
+		}
+		var actual protocol.ThreadItemWrapper
+		if err := json.Unmarshal([]byte(valid), &actual); err != nil {
+			t.Fatalf("SDK rejected native-valid generated sequence: %v\n%s", err, valid)
+		}
+		got := actual.Value.(*protocol.AgentMessageThreadItem).MemoryCitation
+		want := &protocol.MemoryCitation{Entries: make([]protocol.MemoryCitationEntry, len(reference.MemoryCitation.Entries)), ThreadIDs: append([]string(nil), reference.MemoryCitation.ThreadIDs...)}
+		for i, entry := range reference.MemoryCitation.Entries {
+			want.Entries[i] = protocol.MemoryCitationEntry{LineEnd: entry.LineEnd, LineStart: entry.LineStart, Note: entry.Note, Path: entry.Path}
+		}
+		assertMemoryCitationEqual(t, got, want)
+
+		// Each generated valid record gets a separate guaranteed forbidden null
+		// occurrence, and rejection must preserve an existing public wrapper.
+		mutation := int(rawSeedByte(rawSeed, 0) % 4)
+		badEntryFields := []string{"lineEnd", "lineStart", "note", "path"}
+		var badEntry string
+		if rawSeedByte(rawSeed, 1)%2 == 0 {
+			badEntry = strings.TrimSuffix(valid, "}") + `,"memoryCitation":{"entries":[{"` + badEntryFields[mutation] + `":null}]}}`
+		} else {
+			missing := badEntryFields[mutation]
+			members := make([]string, 0, len(badEntryFields)-1)
+			for _, field := range badEntryFields {
+				switch field {
+				case missing:
+					continue
+				}
+				value := `"n"`
+				switch field {
+				case "lineEnd":
+					value = `1`
+				case "lineStart":
+					value = `0`
+				}
+				members = append(members, `"`+field+`":`+value)
+			}
+			badEntry = strings.TrimSuffix(valid, "}") + `,"memoryCitation":null,"memoryCitation":{"entries":[{` + strings.Join(members, ",") + `}],"threadIds":[]}}`
+		}
+		var nativeBad nativeAgentMessageReference
+		if err := json.Unmarshal([]byte(badEntry), &nativeBad); err != nil {
+			t.Fatalf("native method-free reference rejected null scalar mutation: %v", err)
+		}
+		priorRaw := memoryCitationItem(`,"memoryCitation":{"entries":[],"threadIds":["prior"]}`)
+		var target protocol.ThreadItemWrapper
+		if err := json.Unmarshal([]byte(priorRaw), &target); err != nil {
+			t.Fatal(err)
+		}
+		before, err := json.Marshal(target)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := json.Unmarshal([]byte(badEntry), &target); err == nil {
+			t.Fatal("generated repaired null scalar admitted")
+		}
+		after, err := json.Marshal(target)
+		if err != nil || !reflect.DeepEqual(before, after) {
+			t.Fatalf("generated rejection changed prior wrapper: before=%s after=%s err=%v", before, after, err)
+		}
+	})
+}
+
+func rawSeedByte(seed []byte, index int) byte {
+	if len(seed) == 0 {
+		return 0
+	}
+	return seed[index%len(seed)]
 }
 
 func TestMemoryCitationPersistedThreadReadAdmission(t *testing.T) {
