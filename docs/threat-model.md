@@ -181,6 +181,18 @@ envelopes retain standard JSON behavior. These checks admit record shape; they
 do not authenticate hook provenance, authorize or execute hooks, or set a total
 payload or heap limit.
 
+[Plugin.Read hook-summary admission](../appserver/protocol/plugin_hook_admission.go)
+requires each visible plugin hook summary to include a valid `eventName` and a
+string `key`; empty keys and empty hook arrays remain valid. After existing
+native decode, required-field, marketplace-path and `mcpServers` checks, a pass
+over borrowed JSON spans tracks required-field presence across duplicate-array
+slot reuse, shrink/reextend and empty-array reset, and checks only the final
+visible records. Recognized null `hooks` arrays, items and keys remain invalid
+after later duplicates; event-name type, null and enum errors remain owned by
+the native decoder. `PluginHookSummary` remains plain and embeddable, and this
+carrier check does not authenticate hook provenance or execute hooks; existing
+path failures retain their established partial receiver update behavior.
+
 [MCP resource-read admission](../appserver/protocol/mcp_resource_read_admission.go)
 requires every visible resource item to have a non-null string URI and at least
 one string `text` or `blob` branch. A pass over borrowed JSON spans uses small
