@@ -103,11 +103,6 @@ func (m *SkillMetadata) UnmarshalJSON(data []byte) error {
 	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
-	validatedPath, err := validateInboundAbsolutePathField("skill.path", decoded.Path)
-	if err != nil {
-		return err
-	}
-	decoded.Path = validatedPath
 	*m = SkillMetadata(decoded)
 	return nil
 }

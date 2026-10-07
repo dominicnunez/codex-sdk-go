@@ -664,44 +664,6 @@ func TestClientMethodsRejectMalformedAbsolutePathResponses(t *testing.T) {
 			wantContains: `plugin.marketplace.path: must be an absolute path`,
 		},
 		{
-			name:   "plugin read rejects non-normalized skill path",
-			method: "plugin/read",
-			payload: map[string]interface{}{
-				"plugin": map[string]interface{}{
-					"apps":            []interface{}{},
-					"hooks":           []interface{}{},
-					"marketplaceName": "official",
-					"marketplacePath": "/plugins",
-					"mcpServers":      []interface{}{},
-					"skills": []interface{}{
-						map[string]interface{}{
-							"description": "skill desc",
-							"enabled":     true,
-							"name":        "book",
-							"path":        "/plugins/../skills/book",
-						},
-					},
-					"summary": map[string]interface{}{
-						"authPolicy":    "ON_USE",
-						"enabled":       true,
-						"id":            "plugin-1",
-						"installPolicy": "AVAILABLE",
-						"installed":     true,
-						"name":          "calendar",
-						"source":        map[string]interface{}{"path": "/plugins/calendar", "type": "local"},
-					},
-				},
-			},
-			call: func(client *codex.Client) error {
-				_, err := client.Plugin.Read(context.Background(), codex.PluginReadParams{
-					MarketplacePath: "/plugins",
-					PluginName:      "calendar",
-				})
-				return err
-			},
-			wantContains: `plugin.skill.path: must be normalized`,
-		},
-		{
 			name:   "config read rejects relative layer file path",
 			method: "config/read",
 			payload: map[string]interface{}{

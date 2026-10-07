@@ -410,6 +410,24 @@ their prompts. External config imports return the required import ID so callers
 can correlate progress and completion; that ID does not authenticate the peer or
 prove that an import completed.
 
+Skill catalog and bundled-plugin skill paths follow the schema's opaque legacy
+string contract. They may be relative or non-normalized and are preserved as
+returned; genuine `AbsolutePathBuf` fields retain their separate validation.
+A malicious peer could supply a path that looks safe in a catalog but resolves
+elsewhere in the consuming application. Applications must bind any filesystem
+access to their own trusted base and policy rather than treating a catalog path
+as an approved location.
+
+Browser extension request-header requirements, independent speed-mode support,
+turn lineage, sub-agent model metadata, attachment-owner lookup results, and
+misalignment review targets are also protocol data. The SDK does not apply these
+headers to browser requests, enforce the described browser policy, authenticate
+attachment ownership, or grant continuation authority from a review target.
+Consumers must
+avoid logging sensitive header values and must authorize any resulting action
+at their own boundary. A partial-answer phase is display metadata; turn
+completion remains a separate lifecycle event.
+
 `Resource.icons` and `Tool.icons` catalog values are admitted only when absent,
 null, or arrays; the schema leaves array elements unrestricted. The check runs
 after each owner's existing required-field and native type decoding, before a

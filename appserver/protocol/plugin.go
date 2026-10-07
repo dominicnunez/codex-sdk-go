@@ -1071,11 +1071,7 @@ func (s *SkillSummary) UnmarshalJSON(data []byte) error {
 	s.Enabled = *wire.Enabled
 	s.Interface = wire.Interface
 	s.Name = *wire.Name
-	validatedPath, err := validateInboundAbsolutePathPointerField("plugin.skill.path", wire.Path)
-	if err != nil {
-		return err
-	}
-	s.Path = validatedPath
+	s.Path = wire.Path
 	s.ShortDescription = wire.ShortDescription
 	return nil
 }

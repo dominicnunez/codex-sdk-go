@@ -292,10 +292,12 @@ const (
 
 // SubAgentActivityThreadItem represents activity from a sub-agent thread.
 type SubAgentActivityThreadItem struct {
-	AgentPath     string               `json:"agentPath"`
-	AgentThreadID string               `json:"agentThreadId"`
-	ID            string               `json:"id"`
-	Kind          SubAgentActivityKind `json:"kind"`
+	AgentPath       string               `json:"agentPath"`
+	AgentThreadID   string               `json:"agentThreadId"`
+	ID              string               `json:"id"`
+	Kind            SubAgentActivityKind `json:"kind"`
+	Model           *string              `json:"model,omitempty"`
+	ReasoningEffort *ReasoningEffort     `json:"reasoningEffort,omitempty"`
 }
 
 func (SubAgentActivityThreadItem) threadItem() {}

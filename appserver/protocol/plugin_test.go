@@ -123,7 +123,7 @@ func TestPluginRead(t *testing.T) {
 					"marketplaceName":"official",
 					"marketplacePath":"/plugins",
 					"mcpServers":["calendar"],
-					"skills":[{"description":"skill desc","enabled":true,"name":"book","path":"/plugins/book"}],
+					"skills":[{"description":"skill desc","enabled":true,"name":"book","path":"skills/book"}],
 					"summary":{
 						"authPolicy":"ON_USE",
 						"enabled":true,
@@ -146,6 +146,9 @@ func TestPluginRead(t *testing.T) {
 		}
 		if resp.Plugin.MarketplaceName != "official" {
 			t.Fatalf("marketplace name = %q; want official", resp.Plugin.MarketplaceName)
+		}
+		if len(resp.Plugin.Skills) != 1 || resp.Plugin.Skills[0].Path == nil || *resp.Plugin.Skills[0].Path != "skills/book" {
+			t.Fatalf("opaque plugin skill path = %+v", resp.Plugin.Skills)
 		}
 		if len(resp.Plugin.Apps) != 1 || resp.Plugin.Apps[0].ID != "app-1" {
 			t.Fatalf("apps = %+v; want decoded app list", resp.Plugin.Apps)
