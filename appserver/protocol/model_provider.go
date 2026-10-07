@@ -17,7 +17,7 @@ type ModelProviderCapabilitiesReadResponse struct {
 }
 
 func (r *ModelProviderCapabilitiesReadResponse) UnmarshalJSON(data []byte) error {
-	if err := validateRequiredObjectFields(data, "imageGeneration", "namespaceTools", "webSearch"); err != nil {
+	if err := validateRequiredObjectFields(data, "imageGeneration", "webSearch"); err != nil {
 		return err
 	}
 	type wire ModelProviderCapabilitiesReadResponse

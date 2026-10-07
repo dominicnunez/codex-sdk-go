@@ -30,7 +30,7 @@ func TestSkillsList(t *testing.T) {
 							map[string]interface{}{
 								"name":        "example-skill",
 								"description": "An example skill",
-								"path":        "/home/user/project/.claude/skills/example-skill",
+								"path":        "skills/example-skill",
 								"enabled":     true,
 								"scope":       "repo",
 							},
@@ -50,6 +50,9 @@ func TestSkillsList(t *testing.T) {
 					t.Errorf("expected 1 skill, got %d", len(entry.Skills))
 				}
 				skill := entry.Skills[0]
+				if skill.Path != "skills/example-skill" {
+					t.Errorf("expected opaque skill path to be preserved, got %q", skill.Path)
+				}
 				if skill.Name != "example-skill" {
 					t.Errorf("expected name = example-skill, got %s", skill.Name)
 				}
@@ -368,27 +371,6 @@ func TestSkillsListRejectsInvalidPaths(t *testing.T) {
 				},
 			},
 			wantContains: `skills.cwd: must be an absolute path`,
-		},
-		{
-			name: "non-normalized skill path",
-			response: map[string]interface{}{
-				"data": []interface{}{
-					map[string]interface{}{
-						"cwd":    "/home/user/project",
-						"errors": []interface{}{},
-						"skills": []interface{}{
-							map[string]interface{}{
-								"name":        "example-skill",
-								"description": "An example skill",
-								"path":        "/home/user/project/../project/.claude/skills/example-skill",
-								"enabled":     true,
-								"scope":       "repo",
-							},
-						},
-					},
-				},
-			},
-			wantContains: `skill.path: must be normalized`,
 		},
 		{
 			name: "relative error path",

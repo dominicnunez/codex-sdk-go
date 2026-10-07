@@ -22,6 +22,8 @@ func newTurnService(client *Client) *TurnService {
 
 // TurnStartParams are the parameters for turn/start.
 type TurnStartParams struct {
+	ParentTurnID        *string            `json:"parentTurnId,omitempty"`
+	RootTurnID          *string            `json:"rootTurnId,omitempty"`
 	ServiceTierForTurn  *string            `json:"serviceTierForTurn,omitempty"`
 	ToolOutput          *TurnToolOutput    `json:"toolOutput,omitempty"`
 	TurnTrigger         *string            `json:"turnTrigger,omitempty"`
@@ -65,6 +67,8 @@ func (p TurnStartParams) MarshalJSON() ([]byte, error) {
 		Summary             *ReasoningSummaryWrapper `json:"summary,omitempty"`
 		CollaborationMode   *CollaborationMode       `json:"collaborationMode,omitempty"`
 		DisabledPluginIDs   *[]string                `json:"disabledPluginIds,omitempty"`
+		ParentTurnID        *string                  `json:"parentTurnId,omitempty"`
+		RootTurnID          *string                  `json:"rootTurnId,omitempty"`
 	}
 
 	wire := wireTurnStartParams{
@@ -82,6 +86,8 @@ func (p TurnStartParams) MarshalJSON() ([]byte, error) {
 		Summary:             p.Summary,
 		CollaborationMode:   p.CollaborationMode,
 		DisabledPluginIDs:   p.DisabledPluginIDs,
+		ParentTurnID:        p.ParentTurnID,
+		RootTurnID:          p.RootTurnID,
 	}
 	if p.ApprovalPolicy != nil {
 		wire.ApprovalPolicy = &AskForApprovalWrapper{Value: *p.ApprovalPolicy}
@@ -126,6 +132,8 @@ func (p *TurnStartParams) UnmarshalJSON(data []byte) error {
 		Summary             *ReasoningSummaryWrapper `json:"summary,omitempty"`
 		CollaborationMode   *CollaborationMode       `json:"collaborationMode,omitempty"`
 		DisabledPluginIDs   *[]string                `json:"disabledPluginIds,omitempty"`
+		ParentTurnID        *string                  `json:"parentTurnId,omitempty"`
+		RootTurnID          *string                  `json:"rootTurnId,omitempty"`
 	}
 
 	wire := &wireTurnStartParams{}
@@ -168,6 +176,8 @@ func (p *TurnStartParams) UnmarshalJSON(data []byte) error {
 		Summary:             wire.Summary,
 		CollaborationMode:   wire.CollaborationMode,
 		DisabledPluginIDs:   wire.DisabledPluginIDs,
+		ParentTurnID:        wire.ParentTurnID,
+		RootTurnID:          wire.RootTurnID,
 	}
 	return nil
 }

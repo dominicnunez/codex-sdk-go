@@ -188,6 +188,59 @@ func (s *ThreadService) AttachmentRemove(ctx context.Context, params ThreadAttac
 	return ThreadAttachmentRemoveResponse{}, nil
 }
 
+// ThreadAttachmentOwnerListParams looks up threads that own an attachment identity.
+type ThreadAttachmentOwnerListParams struct {
+	AttachmentType string  `json:"attachmentType"`
+	IdentityKey    string  `json:"identityKey"`
+	Cursor         *string `json:"cursor,omitempty"`
+	Limit          *uint32 `json:"limit,omitempty"`
+	Archived       *bool   `json:"archived,omitempty"`
+}
+
+// ThreadAttachmentOwner describes a thread matching an attachment identity.
+type ThreadAttachmentOwner struct {
+	Archived bool   `json:"archived"`
+	ThreadID string `json:"threadId"`
+}
+
+func (o *ThreadAttachmentOwner) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "archived", "threadId"); err != nil {
+		return err
+	}
+	type wire ThreadAttachmentOwner
+	var decoded wire
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*o = ThreadAttachmentOwner(decoded)
+	return nil
+}
+
+// ThreadAttachmentOwnerListResponse is one page of matching attachment owners.
+type ThreadAttachmentOwnerListResponse struct {
+	Data       []ThreadAttachmentOwner `json:"data"`
+	NextCursor *string                 `json:"nextCursor,omitempty"`
+}
+
+func (r *ThreadAttachmentOwnerListResponse) UnmarshalJSON(data []byte) error {
+	type wire ThreadAttachmentOwnerListResponse
+	var decoded wire
+	if err := unmarshalResponseObject(data, &decoded, []string{"data"}, []string{"data"}); err != nil {
+		return err
+	}
+	*r = ThreadAttachmentOwnerListResponse(decoded)
+	return nil
+}
+
+// AttachmentOwnerList returns threads that own the requested attachment identity.
+func (s *ThreadService) AttachmentOwnerList(ctx context.Context, params ThreadAttachmentOwnerListParams) (ThreadAttachmentOwnerListResponse, error) {
+	var response ThreadAttachmentOwnerListResponse
+	if err := s.client.sendRequest(ctx, methodThreadAttachmentOwnerList, params, &response); err != nil {
+		return ThreadAttachmentOwnerListResponse{}, err
+	}
+	return response, nil
+}
+
 func (c *Client) OnThreadAttachmentUpdated(handler func(ThreadAttachmentUpdatedNotification)) {
 	if handler == nil {
 		c.OnNotification(notifyThreadAttachmentUpdated, nil)

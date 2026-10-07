@@ -223,18 +223,21 @@ func (s *ThreadService) Read(ctx context.Context, params ThreadReadParams) (Thre
 type ThreadListParams struct {
 	// Originators filters exact originator values on hosted backends. The local
 	// app-server rejects nonempty lists; omitted or empty lists are unrestricted.
-	Originators    []string           `json:"originators,omitempty"`
-	Archived       *bool              `json:"archived,omitempty"`
-	Cursor         *string            `json:"cursor,omitempty"`
-	Cwd            *string            `json:"cwd,omitempty"`
-	Limit          *uint32            `json:"limit,omitempty"`
-	ModelProviders []string           `json:"modelProviders,omitempty"`
-	SearchTerm     *string            `json:"searchTerm,omitempty"`
-	SectionID      *string            `json:"sectionId,omitempty"`
-	SortDirection  *SortDirection     `json:"sortDirection,omitempty"`
-	SortKey        *ThreadSortKey     `json:"sortKey,omitempty"`
-	SourceKinds    []ThreadSourceKind `json:"sourceKinds,omitempty"`
-	UseStateDbOnly *bool              `json:"useStateDbOnly,omitempty"`
+	Originators []string `json:"originators,omitempty"`
+	// ExcludedThreadIDs excludes matching IDs when non-empty. The server enforces
+	// its maximum of 100 entries; the SDK forwards the supplied list unchanged.
+	ExcludedThreadIDs OptionalNullable[[]string] `json:"excludedThreadIds,omitzero"`
+	Archived          *bool                      `json:"archived,omitempty"`
+	Cursor            *string                    `json:"cursor,omitempty"`
+	Cwd               *string                    `json:"cwd,omitempty"`
+	Limit             *uint32                    `json:"limit,omitempty"`
+	ModelProviders    []string                   `json:"modelProviders,omitempty"`
+	SearchTerm        *string                    `json:"searchTerm,omitempty"`
+	SectionID         *string                    `json:"sectionId,omitempty"`
+	SortDirection     *SortDirection             `json:"sortDirection,omitempty"`
+	SortKey           *ThreadSortKey             `json:"sortKey,omitempty"`
+	SourceKinds       []ThreadSourceKind         `json:"sourceKinds,omitempty"`
+	UseStateDbOnly    *bool                      `json:"useStateDbOnly,omitempty"`
 }
 
 // ThreadListResponse is the response from listing threads

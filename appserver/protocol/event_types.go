@@ -51,13 +51,15 @@ func (t *TextElement) UnmarshalJSON(data []byte) error {
 type MessagePhase string
 
 const (
-	MessagePhaseCommentary  MessagePhase = "commentary"   // Mid-turn assistant text (preamble/progress narration)
-	MessagePhaseFinalAnswer MessagePhase = "final_answer" // Terminal answer text for the current turn
+	MessagePhaseCommentary    MessagePhase = "commentary"   // Mid-turn assistant text (preamble/progress narration)
+	MessagePhaseFinalAnswer   MessagePhase = "final_answer" // Terminal answer text for the current turn
+	MessagePhasePartialAnswer MessagePhase = "partial_answer"
 )
 
 var validMessagePhases = map[MessagePhase]struct{}{
-	MessagePhaseCommentary:  {},
-	MessagePhaseFinalAnswer: {},
+	MessagePhaseCommentary:    {},
+	MessagePhaseFinalAnswer:   {},
+	MessagePhasePartialAnswer: {},
 }
 
 func (p *MessagePhase) UnmarshalJSON(data []byte) error {

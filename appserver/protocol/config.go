@@ -451,7 +451,8 @@ func (w ConfigLayerSourceWrapper) MarshalJSON() ([]byte, error) {
 
 // ConfigRequirementsReadResponse represents response from configRequirements/read request.
 type ConfigRequirementsReadResponse struct {
-	Requirements *ConfigRequirements `json:"requirements,omitempty"`
+	Requirements                  *ConfigRequirements `json:"requirements,omitempty"`
+	SupportsIndependentSpeedModes *bool               `json:"supportsIndependentSpeedModes,omitempty"`
 }
 
 // ConfigRequirements represents configuration requirements

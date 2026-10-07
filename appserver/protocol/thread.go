@@ -157,6 +157,7 @@ type GitInfo struct {
 
 // Turn represents a single turn in a conversation
 type Turn struct {
+	RootTurnID  *string             `json:"rootTurnId,omitempty"`
 	ItemsView   TurnItemsView       `json:"itemsView,omitempty"`
 	StartedAt   *int64              `json:"startedAt,omitempty"`
 	CompletedAt *int64              `json:"completedAt,omitempty"`

@@ -83,6 +83,7 @@ func (v *MisalignmentSteer) UnmarshalJSON(data []byte) error {
 type MisalignmentErrorDetails struct {
 	DetailedExplanation *string            `json:"detailedExplanation,omitempty"`
 	ErrorType           *string            `json:"errorType,omitempty"`
+	ReviewTarget        *string            `json:"reviewTarget,omitempty"`
 	Steer               *MisalignmentSteer `json:"steer,omitempty"`
 }
 
@@ -228,6 +229,31 @@ type BrowserUseRequirements struct {
 	DefaultOriginPolicy           *BrowserUseOriginPolicy            `json:"defaultOriginPolicy,omitempty"`
 	DisableAutoReview             *bool                              `json:"disableAutoReview,omitempty"`
 	Origins                       *map[string]BrowserUseOriginPolicy `json:"origins,omitempty"`
+	Extension                     *BrowserUseExtensionRequirements   `json:"extension,omitempty"`
+}
+
+// BrowserUseExtensionRequirements describes managed browser extension headers.
+type BrowserUseExtensionRequirements struct {
+	RequestHeaders OptionalNullable[[]RequestHeader] `json:"requestHeaders,omitzero"`
+}
+
+// RequestHeader is a required name/value pair used by a browser extension.
+type RequestHeader struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+func (h *RequestHeader) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "name", "value"); err != nil {
+		return err
+	}
+	type wire RequestHeader
+	var decoded wire
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*h = RequestHeader(decoded)
+	return nil
 }
 
 // TurnToolOutput follows the upstream TurnToolOutput schema.

@@ -3,6 +3,7 @@ package protocol_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"sort"
 	"strings"
@@ -276,6 +277,9 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 	verified["thread/list"] = verifyMethod(t, transport, "thread/list", func() {
 		_, _ = client.Thread.List(context.Background(), codex.ThreadListParams{})
 	})
+	verified["thread/attachmentOwner/list"] = verifyMethod(t, transport, "thread/attachmentOwner/list", func() {
+		_, _ = client.Thread.AttachmentOwnerList(context.Background(), codex.ThreadAttachmentOwnerListParams{})
+	})
 	verified["thread/loaded/list"] = verifyMethod(t, transport, "thread/loaded/list", func() {
 		_, _ = client.Thread.LoadedList(context.Background(), codex.ThreadLoadedListParams{})
 	})
@@ -539,6 +543,134 @@ func TestRepresentativeRequestMethodOutcomes(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "server returned non-object result") {
 		t.Fatalf("Account.Get() error = %q, want non-object result context", err)
+	}
+}
+
+func TestThreadAttachmentOwnerListRequestContract(t *testing.T) {
+	transport := NewMockTransport()
+	client := codex.NewClient(transport)
+	if err := transport.SetResponseData("thread/attachmentOwner/list", map[string]interface{}{
+		"data": []interface{}{map[string]interface{}{"threadId": "", "archived": false}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	archived := false
+	limit := uint32(0)
+	response, err := client.Thread.AttachmentOwnerList(context.Background(), codex.ThreadAttachmentOwnerListParams{
+		AttachmentType: "", IdentityKey: "", Archived: &archived, Limit: &limit,
+	})
+	if err != nil {
+		t.Fatalf("AttachmentOwnerList() error: %v", err)
+	}
+	if len(response.Data) != 1 || response.Data[0].ThreadID != "" || response.Data[0].Archived {
+		t.Fatalf("AttachmentOwnerList() response = %+v", response)
+	}
+	request := transport.GetSentRequest(transport.CallCount() - 1)
+	var params map[string]interface{}
+	if err := json.Unmarshal(request.Params, &params); err != nil {
+		t.Fatal(err)
+	}
+	if request.Method != "thread/attachmentOwner/list" || params["attachmentType"] != "" || params["identityKey"] != "" || params["archived"] != false || params["limit"] != float64(0) {
+		t.Fatalf("request = method %q params %s", request.Method, request.Params)
+	}
+}
+
+func TestThreadAttachmentOwnerListRejectsMalformedResponses(t *testing.T) {
+	for _, payload := range []map[string]interface{}{
+		{},
+		{"data": []interface{}{map[string]interface{}{"threadId": "thread-1"}}},
+		{"data": []interface{}{map[string]interface{}{"archived": false}}},
+	} {
+		transport := NewMockTransport()
+		if err := transport.SetResponseData("thread/attachmentOwner/list", payload); err != nil {
+			t.Fatal(err)
+		}
+		client := codex.NewClient(transport)
+		response, err := client.Thread.AttachmentOwnerList(context.Background(), codex.ThreadAttachmentOwnerListParams{})
+		if err == nil || len(response.Data) != 0 {
+			t.Errorf("malformed response %v returned %+v, %v; want decode error and zero response", payload, response, err)
+		}
+	}
+}
+
+func TestThreadListForwardsAllExcludedIDs(t *testing.T) {
+	transport := NewMockTransport()
+	client := codex.NewClient(transport)
+	if err := transport.SetResponseData("thread/list", map[string]interface{}{"data": []interface{}{}}); err != nil {
+		t.Fatal(err)
+	}
+	ids := make([]string, 101)
+	for i := range ids {
+		ids[i] = fmt.Sprintf("thread-%d", i)
+	}
+	_, err := client.Thread.List(context.Background(), codex.ThreadListParams{
+		ExcludedThreadIDs: codex.OptionalNullable[[]string]{Present: true, Value: &ids},
+	})
+	if err != nil {
+		t.Fatalf("Thread.List() error: %v", err)
+	}
+	request := transport.GetSentRequest(transport.CallCount() - 1)
+	var params struct {
+		Excluded []string `json:"excludedThreadIds"`
+	}
+	if err := json.Unmarshal(request.Params, &params); err != nil {
+		t.Fatal(err)
+	}
+	if len(params.Excluded) != len(ids) || params.Excluded[0] != ids[0] || params.Excluded[len(ids)-1] != ids[len(ids)-1] {
+		t.Fatalf("forwarded %d excluded IDs, want all %d", len(params.Excluded), len(ids))
+	}
+}
+
+func TestModelProviderCapabilitiesReadAcceptsCurrentAndLegacyResponses(t *testing.T) {
+	transport := NewMockTransport()
+	client := codex.NewClient(transport)
+	if err := transport.SetResponseData("modelProvider/capabilities/read", map[string]interface{}{
+		"imageGeneration": false,
+		"webSearch":       true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	current, err := client.ModelProvider.CapabilitiesRead(context.Background(), codex.ModelProviderCapabilitiesReadParams{})
+	if err != nil || current.ImageGeneration || !current.WebSearch || current.NamespaceTools {
+		t.Fatalf("current capabilities = %+v, %v", current, err)
+	}
+	if err := transport.SetResponseData("modelProvider/capabilities/read", map[string]interface{}{
+		"imageGeneration": true,
+		"namespaceTools":  true,
+		"webSearch":       false,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	legacy, err := client.ModelProvider.CapabilitiesRead(context.Background(), codex.ModelProviderCapabilitiesReadParams{})
+	if err != nil || !legacy.ImageGeneration || !legacy.NamespaceTools || legacy.WebSearch {
+		t.Fatalf("legacy capabilities = %+v, %v", legacy, err)
+	}
+	if err := transport.SetResponseData("modelProvider/capabilities/read", map[string]interface{}{"webSearch": true}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.ModelProvider.CapabilitiesRead(context.Background(), codex.ModelProviderCapabilitiesReadParams{}); err == nil {
+		t.Fatal("CapabilitiesRead accepted a response missing required imageGeneration")
+	}
+}
+
+func TestTurnStartSendsLineageFields(t *testing.T) {
+	transport := NewMockTransport()
+	client := codex.NewClient(transport)
+	transport.SetResponse("turn/start", codex.Response{JSONRPC: "2.0", Result: json.RawMessage(`{"turn":{"id":"turn-1","status":"inProgress","items":[]}}`)})
+	parent, root := "", "root-1"
+	_, err := client.Turn.Start(context.Background(), codex.TurnStartParams{
+		ThreadID: "thread-1", Input: []codex.UserInput{}, ParentTurnID: &parent, RootTurnID: &root,
+	})
+	if err != nil {
+		t.Fatalf("Turn.Start() error: %v", err)
+	}
+	request := transport.GetSentRequest(transport.CallCount() - 1)
+	var params map[string]interface{}
+	if err := json.Unmarshal(request.Params, &params); err != nil {
+		t.Fatal(err)
+	}
+	if request.Method != "turn/start" || params["parentTurnId"] != "" || params["rootTurnId"] != "root-1" {
+		t.Fatalf("turn/start request = method %q params %s", request.Method, request.Params)
 	}
 }
 

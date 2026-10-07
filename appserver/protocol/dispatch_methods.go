@@ -167,6 +167,7 @@ const (
 	methodThreadGoalSet                          = "thread/goal/set"
 	methodThreadGoalClear                        = "thread/goal/clear"
 	methodThreadAttachmentAdd                    = "thread/attachment/add"
+	methodThreadAttachmentOwnerList              = "thread/attachmentOwner/list"
 	methodThreadAttachmentList                   = "thread/attachment/list"
 	methodThreadAttachmentRemove                 = "thread/attachment/remove"
 	methodThreadSectionMove                      = "thread/section/move"
