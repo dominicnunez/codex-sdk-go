@@ -480,6 +480,14 @@ Callback host, authorization/token endpoints, redirect URI, and HTTP client are 
 
 [Token requests](../login/token.go) use the caller's context, bound token-response reads to 1 MiB, and omit non-success response bodies from errors because they may echo credentials. The configured HTTP client's TLS, redirect, and timeout behavior still matters. A malicious configured endpoint, permissive custom HTTP transport, or unsafe URL logger can disclose codes, verifiers, or refresh tokens.
 
+A successful refresh response may omit or null the replacement refresh token.
+The refresh flow retains the submitted token in that case, uses a nonblank new
+token when supplied, and rejects an explicitly blank replacement. Authorization-
+code exchange still requires an issued refresh token. The selected token is
+published only with the validated access token, account metadata and lifetime;
+failed validation returns no partial credentials. This preserves the endpoint's
+rotation contract, not proof that a retained token remains valid or unrevoked.
+
 Both authorization-code exchange and refresh reject nonpositive lifetimes and
 `expires_in` values above 9,223,372,036 seconds before multiplying into a signed
 nanosecond duration or publishing credentials. Accepted lifetimes preserve their

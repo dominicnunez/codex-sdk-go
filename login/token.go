@@ -26,9 +26,9 @@ const (
 )
 
 type tokenResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	ExpiresIn    int64  `json:"expires_in"`
+	AccessToken  string  `json:"access_token"`
+	RefreshToken *string `json:"refresh_token"`
+	ExpiresIn    int64   `json:"expires_in"`
 }
 
 type refreshRequest struct {
@@ -64,7 +64,7 @@ func Refresh(ctx context.Context, cfg Config, refreshToken string) (auth.Credent
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	return doTokenRequest(cfg, req, "refresh")
+	return doTokenRequest(cfg, req, "refresh", strings.TrimSpace(refreshToken))
 }
 
 func postTokenForm(ctx context.Context, cfg Config, form url.Values, operation string) (auth.Credentials, error) {
@@ -74,10 +74,10 @@ func postTokenForm(ctx context.Context, cfg Config, form url.Values, operation s
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
-	return doTokenRequest(cfg, req, operation)
+	return doTokenRequest(cfg, req, operation, "")
 }
 
-func doTokenRequest(cfg Config, req *http.Request, operation string) (auth.Credentials, error) {
+func doTokenRequest(cfg Config, req *http.Request, operation string, fallbackRefreshToken string) (auth.Credentials, error) {
 	resp, err := cfg.HTTPClient.Do(req)
 	if err != nil {
 		return auth.Credentials{}, fmt.Errorf("OpenAI Codex token %s error: %w", operation, err)
@@ -95,7 +95,11 @@ func doTokenRequest(cfg Config, req *http.Request, operation string) (auth.Crede
 	if err := jsondecode.NativeError(json.NewDecoder(io.LimitReader(resp.Body, maxTokenResponseBytes)).Decode(&decoded)); err != nil {
 		return auth.Credentials{}, fmt.Errorf("decode OpenAI Codex token %s response: %w", operation, err)
 	}
-	if strings.TrimSpace(decoded.AccessToken) == "" || strings.TrimSpace(decoded.RefreshToken) == "" || decoded.ExpiresIn <= 0 {
+	refreshToken := fallbackRefreshToken
+	if decoded.RefreshToken != nil {
+		refreshToken = *decoded.RefreshToken
+	}
+	if strings.TrimSpace(decoded.AccessToken) == "" || strings.TrimSpace(refreshToken) == "" || decoded.ExpiresIn <= 0 {
 		return auth.Credentials{}, fmt.Errorf("OpenAI Codex token %s response: %w", operation, auth.ErrMissingTokenFields)
 	}
 	if decoded.ExpiresIn > maxTokenLifetimeSeconds {
@@ -108,7 +112,7 @@ func doTokenRequest(cfg Config, req *http.Request, operation string) (auth.Crede
 	}
 	return auth.Credentials{
 		AccessToken:  decoded.AccessToken,
-		RefreshToken: decoded.RefreshToken,
+		RefreshToken: refreshToken,
 		ExpiresAt:    time.Now().UTC().Add(time.Duration(decoded.ExpiresIn) * time.Second),
 		AccountID:    claims.AccountID,
 		PlanType:     claims.PlanType,
