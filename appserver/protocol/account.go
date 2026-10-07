@@ -255,7 +255,7 @@ type GetAccountRateLimitsResponse struct {
 	AccountID             *string                       `json:"accountId,omitempty"`
 	RateLimitUpsell       json.RawMessage               `json:"rateLimitUpsell,omitempty"`
 	RateLimits            RateLimitSnapshot             `json:"rateLimits"`
-	RateLimitsByLimitId   map[string]*RateLimitSnapshot `json:"rateLimitsByLimitId,omitempty"`
+	RateLimitsByLimitId   map[string]*RateLimitSnapshot `json:"rateLimitsByLimitId,omitzero"`
 	RateLimitResetCredits json.RawMessage               `json:"rateLimitResetCredits,omitempty"`
 }
 
@@ -266,6 +266,9 @@ func (r *GetAccountRateLimitsResponse) UnmarshalJSON(data []byte) error {
 	type wire GetAccountRateLimitsResponse
 	var decoded wire
 	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	if err := validateRateLimitBuckets(data); err != nil {
 		return err
 	}
 	*r = GetAccountRateLimitsResponse(decoded)

@@ -97,6 +97,19 @@ authority. Payload copying and duplicate-object accumulation remain proportional
 to admitted semantic data, with no additional metadata byte quota. Application
 retention and any later decoding or numeric conversion are separate contracts.
 
+[Rate-limit response admission](../appserver/protocol/account.go) permits a null
+outer multi-bucket map but requires each supplied bucket to be an object. A
+malformed peer could otherwise expose a nil bucket to an application expecting
+a usable snapshot. The response owner rejects null bucket occurrences after its
+existing required-field, native type and enum checks, before publishing a
+successful value; later duplicates or map resets do not hide that failure.
+Empty object buckets remain valid, and a present empty map retains its object
+shape when encoded. The legacy public map represents both omitted and null
+roots as nil and omits them during encoding; this is not exact null/absence
+preservation. The guard does not authenticate the account, enforce usage policy,
+or validate every programmatically constructed response. Newly rejected values
+can change error precedence or stop later fields in an enclosing JSON wrapper.
+
 [Synced record admission](../appserver/protocol/synced_record_validation.go)
 validates app, workspace-message, token-usage, goal, section and import records
 at their shared decoding owners before typed service success or callback
