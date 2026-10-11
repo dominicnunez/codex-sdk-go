@@ -491,6 +491,13 @@ the cleanup change affects only callback server lifetime.
 
 Callback host, authorization/token endpoints, redirect URI, and HTTP client are [configurable](../login/config.go), including a callback-host environment override. Non-loopback binding and nonstandard endpoints are caller-controlled exposure decisions. The SDK does not require every configured endpoint to use HTTPS, pin endpoint identity, enforce exact browser Origin/Host, or limit callback connections per user. It must not be exposed as a general authenticated HTTP API. The [manual-input parser](../login/parse.go) supports a bare code without state; supplying a manual code relies on the application's trusted user interaction and the flow's PKCE verifier. A provided mismatched state is rejected.
 
+The manual-input state comparison uses the complete received value. A rejected
+state is displayed through a bounded diagnostic preview before error formatting,
+so an unusually large pasted value is not copied into the retained error in
+full. The same parser serves redirect URLs, query strings and code/state pairs;
+a mismatch does not publish credentials or initiate token exchange. This is an
+error-retention control, not a manual-input size limit or universal redaction.
+
 [Token requests](../login/token.go) use the caller's context, bound token-response reads to 1 MiB, and omit non-success response bodies from errors because they may echo credentials. The configured HTTP client's TLS, redirect, and timeout behavior still matters. A malicious configured endpoint, permissive custom HTTP transport, or unsafe URL logger can disclose codes, verifiers, or refresh tokens.
 
 A successful refresh response may omit or null the replacement refresh token.
