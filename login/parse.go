@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/diagnostic"
 )
 
 type AuthorizationCode struct {
@@ -27,7 +29,7 @@ func ParseAuthorizationInput(input string, expectedState string) (AuthorizationC
 		return AuthorizationCode{}, ErrMissingAuthorizationCode
 	}
 	if expectedState != "" && state != "" && state != expectedState {
-		return AuthorizationCode{}, fmt.Errorf("%w: got %s", ErrStateMismatch, state)
+		return AuthorizationCode{}, fmt.Errorf("%w: got %s", ErrStateMismatch, diagnostic.Display(state))
 	}
 	return AuthorizationCode{Code: code, State: state}, nil
 }
