@@ -36,7 +36,7 @@ func TestObservedThreadStartFailureDoesNotPin(t *testing.T) {
 					t.Fatal(err)
 				}
 			case "params":
-				params.Cwd = codex.Ptr("relative")
+				params.Config = json.RawMessage{}
 			case "canceled":
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithCancel(ctx)

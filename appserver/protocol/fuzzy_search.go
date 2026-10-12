@@ -19,11 +19,6 @@ func (p FuzzyFileSearchParams) prepareRequest() (interface{}, error) {
 		return nil, invalidParamsError("roots must not be null")
 	}
 
-	var err error
-	p.Roots, err = normalizeAbsolutePathSliceField("roots", p.Roots)
-	if err != nil {
-		return nil, err
-	}
 	return p, nil
 }
 

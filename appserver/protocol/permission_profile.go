@@ -53,11 +53,6 @@ func (r *PermissionProfileListResponse) UnmarshalJSON(data []byte) error {
 }
 
 func (p PermissionProfileListParams) prepareRequest() (interface{}, error) {
-	var err error
-	p.Cwd, err = normalizeOptionalAbsolutePathField("cwd", p.Cwd)
-	if err != nil {
-		return nil, err
-	}
 	return p, nil
 }
 

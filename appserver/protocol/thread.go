@@ -139,10 +139,7 @@ func (t *Thread) UnmarshalJSON(data []byte) error {
 	t.AgentRole = wire.AgentRole
 	t.GitInfo = wire.GitInfo
 	t.Name = wire.Name
-	t.Path, err = validateInboundAbsolutePathPointerField("thread.path", wire.Path)
-	if err != nil {
-		return err
-	}
+	t.Path = wire.Path
 	t.DisabledPluginIDs = nil
 
 	return nil

@@ -16,6 +16,88 @@ The main service fields on `Client` include `Thread`, `Turn`, `Account`, `Apps`,
 
 Parameters and responses are separate schema-shaped types. Optional fields use pointers when the wire protocol distinguishes omission from a zero value.
 
+## Server path resolution
+
+These schema-string path values pass unchanged to the server, which resolves
+them in its own execution or configuration context:
+
+| API | Path values |
+| --- | --- |
+| `Thread.Start`, `Thread.Resume`, `Thread.Fork`, `Thread.List`, `Turn.Start`, `Command.Exec` | `Cwd` |
+| `Config.Read`, `PermissionProfile.List` | `Cwd` |
+| `Config.Write`, `Config.BatchWrite` | `FilePath` |
+| `Skills.List`, `Hooks.List` | `Cwds` |
+| `FuzzyFileSearch.Search` | `Roots` |
+| `ExternalAgent.ConfigDetect`, `ExternalAgent.ConfigImport` | `Cwds`, migration-item `Cwd` |
+
+The SDK does not resolve these values using the application's working directory.
+Returned skill grouping and migration-item cwd strings, `SkillErrorInfo.Path`, and
+`Thread.Path` retain the peer's text, including relative values. Server permissions
+and operation-specific restrictions still determine acceptance: resuming a running
+thread can reject an override that
+conflicts with its active configuration, and config writes remain restricted to
+the server's user config file.
+
+Fields declared as `AbsolutePathBuf`, such as Windows sandbox setup's cwd,
+retain their existing SDK absolute-path checks. Legacy fields absent from the
+current schemas retain their existing public representations and validation.
+
+Service methods receive typed Go parameters. Plain parameter structs retain
+standard `encoding/json` decoding behavior: for example, decoding a null array
+element into a fresh `[]string` produces an empty string before the SDK receives it.
+The service cannot recover that distinction, and these path schemas permit empty
+strings. Applications accepting raw JSON must validate its shape before that
+conversion; typed request preparation is not a raw JSON schema validator.
+
+## Thread-list filters
+
+`Thread.List` preserves its existing parameter fields. A nil `ModelProviders`
+slice omits the provider filter; a nonnil empty slice sends `[]`, which asks for
+all providers. Its scalar `Cwd` is sent unchanged. The server resolves relative
+cwd filters using its own working directory, rather than the client's.
+
+Use `Thread.ListJSON` with `ThreadListParamsJSON` for the complete checked-in
+filter schema. It returns the same typed `ThreadListResponse` and uses the same
+response validation and thread-state cache as `List`. Its `Cwd` raw JSON can be
+absent, null, a string or an array of strings. The SDK checks that shape before
+sending and preserves the path strings for server resolution.
+
+Nullable fields use `OptionalNullable[T]`: `Present: false` omits a member;
+`Present: true` with a nil `Value` sends null; a nonnil `Value` sends that value,
+including empty arrays, empty strings, false and zero. In particular, omitted
+`SectionID` includes all sections, null selects unsectioned threads, and a string
+selects that section. Collection filters with a nonnil `Value` pointing to a nil
+slice select an empty array; request preparation preserves that branch without
+changing the caller's slice. `UseStateDbOnly` also uses `OptionalNullable[bool]`
+to retain decoded presence, but `ListJSON` rejects an explicit null because the
+schema permits only omission, false or true.
+
+`ThreadListParamsJSON` also retains standard struct decoding behavior. Decode
+each replacement request into a fresh zero-value DTO. Reusing a populated DTO
+merges newly supplied members; omitted members keep their previous values.
+For example, decoding `{}` into a populated DTO does not clear its filters.
+The DTO has no JSON methods of its own, so it can be embedded in application
+request envelopes without a promoted codec consuming sibling fields.
+
+For example, select unsectioned threads across all providers and two cwd filters:
+
+```go
+providers := []string{}
+page, err := client.Thread.ListJSON(ctx, protocol.ThreadListParamsJSON{
+    Cwd: json.RawMessage(`["repo-a","repo-b"]`),
+    ModelProviders: protocol.OptionalNullable[[]string]{
+        Present: true,
+        Value:   &providers,
+    },
+    SectionID: protocol.OptionalNullable[string]{Present: true},
+})
+```
+
+Import `encoding/json` and `appserver/protocol` for those parameter values.
+Keep the same filters when following `NextCursor` or `BackwardsCursor`.
+The original `ThreadListParams` field types and JSON method set remain unchanged;
+it cannot express cwd arrays or explicit null for `SectionID`.
+
 ## Inputs and thread items
 
 `UserInput` supports text, remote and local images, remote and local audio, skills, and mentions. For example:

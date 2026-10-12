@@ -469,10 +469,10 @@ func TestFuzzyFileSearchServicePreparesRequestParams(t *testing.T) {
 			}
 			roots, ok := got["roots"].([]interface{})
 			if !ok || len(roots) != 1 {
-				t.Fatalf("roots = %#v, want single normalized path", got["roots"])
+				t.Fatalf("roots = %#v, want single forwarded path", got["roots"])
 			}
-			if roots[0] != "/workspace/project" {
-				t.Fatalf("roots[0] = %#v, want %q", roots[0], "/workspace/project")
+			if roots[0] != "/workspace/./project/../project" {
+				t.Fatalf("roots[0] = %#v, want original spelling", roots[0])
 			}
 		})
 	}

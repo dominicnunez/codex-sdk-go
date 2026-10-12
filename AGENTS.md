@@ -39,6 +39,15 @@ Trace omitted-field defaults to the owning reference codec and materialize its
 behavioral defaults. Verify both defaults and explicit values survive
 serialization; an omitting encoder can silently change a round trip.
 
+For path-contract changes, inventory production `normalize*AbsolutePath*` callers
+across the protocol package and the affected response readers. Check schema
+references and pinned server resolution at every admission stage; a constructor
+that resolves a `PathBuf` is distinct from `AbsolutePathBuf` JSON deserialization.
+Preserve request selectors and returned grouping values together. Existing
+negative path fixtures do not establish which server inputs are supported.
+An absolute value produced by the pinned server does not narrow a plain-string
+response schema; validate the declared carrier contract as well as the producer.
+
 ## Architecture
 
 ### Zero Dependencies

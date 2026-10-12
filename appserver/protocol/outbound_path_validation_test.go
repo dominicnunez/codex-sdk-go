@@ -123,8 +123,8 @@ func TestOutboundAbsolutePathRequestsNormalizeBeforeSend(t *testing.T) {
 		if err := json.Unmarshal(transport.GetSentRequest(0).Params, &params); err != nil {
 			t.Fatalf("unmarshal params: %v", err)
 		}
-		if params.Cwd == nil || *params.Cwd != "/workspace/repo" {
-			t.Fatalf("Cwd = %v, want /workspace/repo", params.Cwd)
+		if params.Cwd == nil || *params.Cwd != "/tmp/../workspace//repo" {
+			t.Fatalf("Cwd = %v, want original spelling", params.Cwd)
 		}
 	})
 
@@ -175,24 +175,24 @@ func TestOutboundAbsolutePathRequestsNormalizeBeforeSend(t *testing.T) {
 		if err := json.Unmarshal(transport.GetSentRequest(0).Params, &readParams); err != nil {
 			t.Fatalf("unmarshal read params: %v", err)
 		}
-		if readParams.Cwd == nil || *readParams.Cwd != "/repo/project" {
-			t.Fatalf("Read Cwd = %v, want /repo/project", readParams.Cwd)
+		if readParams.Cwd == nil || *readParams.Cwd != "/tmp/../repo//project" {
+			t.Fatalf("Read Cwd = %v, want original spelling", readParams.Cwd)
 		}
 
 		var writeParams codex.ConfigValueWriteParams
 		if err := json.Unmarshal(transport.GetSentRequest(1).Params, &writeParams); err != nil {
 			t.Fatalf("unmarshal write params: %v", err)
 		}
-		if writeParams.FilePath == nil || *writeParams.FilePath != "/repo/config.toml" {
-			t.Fatalf("Write FilePath = %v, want /repo/config.toml", writeParams.FilePath)
+		if writeParams.FilePath == nil || *writeParams.FilePath != "/tmp/../repo/config.toml" {
+			t.Fatalf("Write FilePath = %v, want original spelling", writeParams.FilePath)
 		}
 
 		var batchParams codex.ConfigBatchWriteParams
 		if err := json.Unmarshal(transport.GetSentRequest(2).Params, &batchParams); err != nil {
 			t.Fatalf("unmarshal batch params: %v", err)
 		}
-		if batchParams.FilePath == nil || *batchParams.FilePath != "/repo/config.toml" {
-			t.Fatalf("Batch FilePath = %v, want /repo/config.toml", batchParams.FilePath)
+		if batchParams.FilePath == nil || *batchParams.FilePath != "/tmp/../repo/config.toml" {
+			t.Fatalf("Batch FilePath = %v, want original spelling", batchParams.FilePath)
 		}
 	})
 
@@ -230,8 +230,8 @@ func TestOutboundAbsolutePathRequestsNormalizeBeforeSend(t *testing.T) {
 		if err := json.Unmarshal(transport.GetSentRequest(0).Params, &listParams); err != nil {
 			t.Fatalf("unmarshal list params: %v", err)
 		}
-		if got := listParams.Cwds[0]; got != "/repo" {
-			t.Fatalf("Cwds[0] = %q, want /repo", got)
+		if got := listParams.Cwds[0]; got != "/tmp/../repo" {
+			t.Fatalf("Cwds[0] = %q, want original spelling", got)
 		}
 		if got := listParams.PerCwdExtraUserRoots[0].Cwd; got != "/project" {
 			t.Fatalf("PerCwdExtraUserRoots[0].Cwd = %q, want /project", got)
@@ -271,11 +271,11 @@ func TestOutboundAbsolutePathRequestsNormalizeBeforeSend(t *testing.T) {
 		if params.Cwds == nil {
 			t.Fatal("Cwds = nil, want normalized values")
 		}
-		if got := (*params.Cwds)[0]; got != "/repo" {
-			t.Fatalf("Cwds[0] = %q, want /repo", got)
+		if got := (*params.Cwds)[0]; got != "/tmp/../repo" {
+			t.Fatalf("Cwds[0] = %q, want original spelling", got)
 		}
-		if got := (*params.Cwds)[1]; got != `C:\project` {
-			t.Fatalf("Cwds[1] = %q, want %q", got, `C:\project`)
+		if got := (*params.Cwds)[1]; got != `C:\work\..\project` {
+			t.Fatalf("Cwds[1] = %q, want original spelling", got)
 		}
 	})
 
@@ -330,32 +330,32 @@ func TestOutboundAbsolutePathRequestsNormalizeBeforeSend(t *testing.T) {
 		if err := json.Unmarshal(transport.GetSentRequest(0).Params, &startParams); err != nil {
 			t.Fatalf("unmarshal start params: %v", err)
 		}
-		if startParams.Cwd == nil || *startParams.Cwd != "/repo" {
-			t.Fatalf("ThreadStart Cwd = %v, want /repo", startParams.Cwd)
+		if startParams.Cwd == nil || *startParams.Cwd != "/tmp/../repo" {
+			t.Fatalf("ThreadStart Cwd = %v, want original spelling", startParams.Cwd)
 		}
 
 		var listParams codex.ThreadListParams
 		if err := json.Unmarshal(transport.GetSentRequest(1).Params, &listParams); err != nil {
 			t.Fatalf("unmarshal list params: %v", err)
 		}
-		if listParams.Cwd == nil || *listParams.Cwd != "/project" {
-			t.Fatalf("ThreadList Cwd = %v, want /project", listParams.Cwd)
+		if listParams.Cwd == nil || *listParams.Cwd != "/workspace/../project" {
+			t.Fatalf("ThreadList Cwd = %v, want original spelling", listParams.Cwd)
 		}
 
 		var resumeParams codex.ThreadResumeParams
 		if err := json.Unmarshal(transport.GetSentRequest(2).Params, &resumeParams); err != nil {
 			t.Fatalf("unmarshal resume params: %v", err)
 		}
-		if resumeParams.Cwd == nil || *resumeParams.Cwd != "/repo" {
-			t.Fatalf("ThreadResume Cwd = %v, want /repo", resumeParams.Cwd)
+		if resumeParams.Cwd == nil || *resumeParams.Cwd != "/tmp/../repo" {
+			t.Fatalf("ThreadResume Cwd = %v, want original spelling", resumeParams.Cwd)
 		}
 
 		var forkParams codex.ThreadForkParams
 		if err := json.Unmarshal(transport.GetSentRequest(3).Params, &forkParams); err != nil {
 			t.Fatalf("unmarshal fork params: %v", err)
 		}
-		if forkParams.Cwd == nil || *forkParams.Cwd != `C:\fork` {
-			t.Fatalf("ThreadFork Cwd = %v, want %q", forkParams.Cwd, `C:\fork`)
+		if forkParams.Cwd == nil || *forkParams.Cwd != `C:\repo\..\fork` {
+			t.Fatalf("ThreadFork Cwd = %v, want original spelling", forkParams.Cwd)
 		}
 	})
 
@@ -427,8 +427,8 @@ func TestOutboundAbsolutePathRequestsNormalizeBeforeSend(t *testing.T) {
 		if err := json.Unmarshal(transport.GetSentRequest(0).Params, &params); err != nil {
 			t.Fatalf("unmarshal params: %v", err)
 		}
-		if params.Cwd == nil || *params.Cwd != "/workspace/repo" {
-			t.Fatalf("Cwd = %v, want /workspace/repo", params.Cwd)
+		if params.Cwd == nil || *params.Cwd != "/tmp/../workspace//repo" {
+			t.Fatalf("Cwd = %v, want original spelling", params.Cwd)
 		}
 		policy, ok := (*params.SandboxPolicy).(codex.SandboxPolicyReadOnly)
 		if !ok {
@@ -494,60 +494,6 @@ func TestOutboundAbsolutePathRequestsRejectRelativePaths(t *testing.T) {
 			},
 		},
 		{
-			name: "command cwd",
-			call: func(client *codex.Client) error {
-				_, err := client.Command.Exec(context.Background(), codex.CommandExecParams{
-					Command: []string{"pwd"},
-					Cwd:     ptr("repo"),
-				})
-				return err
-			},
-		},
-		{
-			name: "config read cwd",
-			call: func(client *codex.Client) error {
-				_, err := client.Config.Read(context.Background(), codex.ConfigReadParams{
-					Cwd: ptr("repo"),
-				})
-				return err
-			},
-		},
-		{
-			name: "config write file path",
-			call: func(client *codex.Client) error {
-				_, err := client.Config.Write(context.Background(), codex.ConfigValueWriteParams{
-					KeyPath:       "model",
-					MergeStrategy: codex.MergeStrategyReplace,
-					Value:         json.RawMessage(`"gpt-5"`),
-					FilePath:      ptr("config.toml"),
-				})
-				return err
-			},
-		},
-		{
-			name: "config batch write file path",
-			call: func(client *codex.Client) error {
-				_, err := client.Config.BatchWrite(context.Background(), codex.ConfigBatchWriteParams{
-					Edits: []codex.ConfigEdit{{
-						KeyPath:       "model",
-						MergeStrategy: codex.MergeStrategyReplace,
-						Value:         json.RawMessage(`"gpt-5"`),
-					}},
-					FilePath: ptr("config.toml"),
-				})
-				return err
-			},
-		},
-		{
-			name: "skills list cwd",
-			call: func(client *codex.Client) error {
-				_, err := client.Skills.List(context.Background(), codex.SkillsListParams{
-					Cwds: []string{"repo"},
-				})
-				return err
-			},
-		},
-		{
 			name: "skills list extra roots",
 			call: func(client *codex.Client) error {
 				_, err := client.Skills.List(context.Background(), codex.SkillsListParams{
@@ -570,26 +516,6 @@ func TestOutboundAbsolutePathRequestsRejectRelativePaths(t *testing.T) {
 			},
 		},
 		{
-			name: "external agent detect cwd",
-			call: func(client *codex.Client) error {
-				_, err := client.ExternalAgent.ConfigDetect(context.Background(), codex.ExternalAgentConfigDetectParams{
-					Cwds: ptr([]string{"repo"}),
-				})
-				return err
-			},
-		},
-		{
-			name: "turn start cwd",
-			call: func(client *codex.Client) error {
-				_, err := client.Turn.Start(context.Background(), codex.TurnStartParams{
-					ThreadID: "thread-1",
-					Input:    []codex.UserInput{&codex.TextUserInput{Text: "hi"}},
-					Cwd:      ptr("repo"),
-				})
-				return err
-			},
-		},
-		{
 			name: "command sandbox roots",
 			call: func(client *codex.Client) error {
 				_, err := client.Command.Exec(context.Background(), codex.CommandExecParams{
@@ -597,44 +523,6 @@ func TestOutboundAbsolutePathRequestsRejectRelativePaths(t *testing.T) {
 					SandboxPolicy: &codex.SandboxPolicyWrapper{Value: codex.SandboxPolicyWorkspaceWrite{
 						WritableRoots: []string{"repo"},
 					}},
-				})
-				return err
-			},
-		},
-		{
-			name: "thread start cwd",
-			call: func(client *codex.Client) error {
-				_, err := client.Thread.Start(context.Background(), codex.ThreadStartParams{
-					Cwd: ptr("repo"),
-				})
-				return err
-			},
-		},
-		{
-			name: "thread list cwd",
-			call: func(client *codex.Client) error {
-				_, err := client.Thread.List(context.Background(), codex.ThreadListParams{
-					Cwd: ptr("repo"),
-				})
-				return err
-			},
-		},
-		{
-			name: "thread resume cwd",
-			call: func(client *codex.Client) error {
-				_, err := client.Thread.Resume(context.Background(), codex.ThreadResumeParams{
-					ThreadID: "thread-1",
-					Cwd:      ptr("repo"),
-				})
-				return err
-			},
-		},
-		{
-			name: "thread fork cwd",
-			call: func(client *codex.Client) error {
-				_, err := client.Thread.Fork(context.Background(), codex.ThreadForkParams{
-					ThreadID: "thread-1",
-					Cwd:      ptr("repo"),
 				})
 				return err
 			},

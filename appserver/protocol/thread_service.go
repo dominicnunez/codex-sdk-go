@@ -231,13 +231,33 @@ type ThreadListParams struct {
 	Cursor            *string                    `json:"cursor,omitempty"`
 	Cwd               *string                    `json:"cwd,omitempty"`
 	Limit             *uint32                    `json:"limit,omitempty"`
-	ModelProviders    []string                   `json:"modelProviders,omitempty"`
+	ModelProviders    []string                   `json:"modelProviders,omitzero"`
 	SearchTerm        *string                    `json:"searchTerm,omitempty"`
 	SectionID         *string                    `json:"sectionId,omitempty"`
 	SortDirection     *SortDirection             `json:"sortDirection,omitempty"`
 	SortKey           *ThreadSortKey             `json:"sortKey,omitempty"`
 	SourceKinds       []ThreadSourceKind         `json:"sourceKinds,omitempty"`
 	UseStateDbOnly    *bool                      `json:"useStateDbOnly,omitempty"`
+}
+
+// ThreadListParamsJSON is a presence-aware representation of the complete
+// Thread.List JSON filter contract. Use Cwd with a JSON string, string array,
+// or null; nil omits the member. Nullable properties distinguish omission from
+// explicit null and empty values.
+type ThreadListParamsJSON struct {
+	Archived          OptionalNullable[bool]               `json:"archived,omitzero"`
+	Cursor            OptionalNullable[string]             `json:"cursor,omitzero"`
+	Cwd               json.RawMessage                      `json:"cwd,omitempty"`
+	ExcludedThreadIDs OptionalNullable[[]string]           `json:"excludedThreadIds,omitzero"`
+	Limit             OptionalNullable[uint32]             `json:"limit,omitzero"`
+	ModelProviders    OptionalNullable[[]string]           `json:"modelProviders,omitzero"`
+	Originators       OptionalNullable[[]string]           `json:"originators,omitzero"`
+	SearchTerm        OptionalNullable[string]             `json:"searchTerm,omitzero"`
+	SectionID         OptionalNullable[string]             `json:"sectionId,omitzero"`
+	SortDirection     OptionalNullable[SortDirection]      `json:"sortDirection,omitzero"`
+	SortKey           OptionalNullable[ThreadSortKey]      `json:"sortKey,omitzero"`
+	SourceKinds       OptionalNullable[[]ThreadSourceKind] `json:"sourceKinds,omitzero"`
+	UseStateDbOnly    OptionalNullable[bool]               `json:"useStateDbOnly,omitzero"`
 }
 
 // ThreadListResponse is the response from listing threads
@@ -262,6 +282,15 @@ func (r *ThreadListResponse) UnmarshalJSON(data []byte) error {
 
 // List retrieves a list of threads
 func (s *ThreadService) List(ctx context.Context, params ThreadListParams) (ThreadListResponse, error) {
+	return s.list(ctx, params)
+}
+
+// ListJSON retrieves threads with full JSON presence and union fidelity.
+func (s *ThreadService) ListJSON(ctx context.Context, params ThreadListParamsJSON) (ThreadListResponse, error) {
+	return s.list(ctx, params)
+}
+
+func (s *ThreadService) list(ctx context.Context, params interface{}) (ThreadListResponse, error) {
 	var response ThreadListResponse
 	if err := s.client.sendRequest(ctx, methodThreadList, params, &response); err != nil {
 		return ThreadListResponse{}, err

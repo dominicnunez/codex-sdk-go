@@ -16,11 +16,6 @@ type ConfigReadParams struct {
 }
 
 func (p ConfigReadParams) prepareRequest() (interface{}, error) {
-	var err error
-	p.Cwd, err = normalizeOptionalAbsolutePathField("cwd", p.Cwd)
-	if err != nil {
-		return nil, err
-	}
 	return p, nil
 }
 
@@ -511,11 +506,6 @@ func (p ConfigValueWriteParams) prepareRequest() (interface{}, error) {
 	if err := validateRequiredNonEmptyStringField("keyPath", p.KeyPath); err != nil {
 		return nil, err
 	}
-	var err error
-	p.FilePath, err = normalizeOptionalAbsolutePathField("filePath", p.FilePath)
-	if err != nil {
-		return nil, err
-	}
 	return p, nil
 }
 
@@ -542,11 +532,6 @@ func (p ConfigBatchWriteParams) prepareRequest() (interface{}, error) {
 		if err := validateRequiredNonEmptyStringField(fmt.Sprintf("edits[%d].keyPath", i), edit.KeyPath); err != nil {
 			return nil, err
 		}
-	}
-	var err error
-	p.FilePath, err = normalizeOptionalAbsolutePathField("filePath", p.FilePath)
-	if err != nil {
-		return nil, err
 	}
 	return p, nil
 }
