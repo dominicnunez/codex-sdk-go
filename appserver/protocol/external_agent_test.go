@@ -384,7 +384,7 @@ func TestExternalAgentConfigImportPreparesRequestParams(t *testing.T) {
 			wantErr: `invalid externalAgentConfig.itemType "PROMPTS"`,
 		},
 		{
-			name: "normalizes repo cwd",
+			name: "preserves repo cwd spelling",
 			params: codex.ExternalAgentConfigImportParams{
 				MigrationItems: []codex.ExternalAgentConfigMigrationItem{{
 					Cwd:         ptr("/repo/./subdir/.."),
@@ -392,7 +392,7 @@ func TestExternalAgentConfigImportPreparesRequestParams(t *testing.T) {
 					ItemType:    codex.MigrationItemTypeSkills,
 				}},
 			},
-			wantCwd: "/repo",
+			wantCwd: "/repo/./subdir/..",
 		},
 	}
 

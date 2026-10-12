@@ -691,10 +691,6 @@ func (p CommandExecParams) prepareRequest() (interface{}, error) {
 	}
 
 	var err error
-	p.Cwd, err = normalizeOptionalAbsolutePathField("cwd", p.Cwd)
-	if err != nil {
-		return nil, err
-	}
 	p.SandboxPolicy, err = normalizeSandboxPolicyWrapperField("sandboxPolicy", p.SandboxPolicy)
 	if err != nil {
 		return nil, err
@@ -745,10 +741,6 @@ func (p TurnStartParams) prepareRequest() (interface{}, error) {
 	}
 
 	var err error
-	p.Cwd, err = normalizeOptionalAbsolutePathField("cwd", p.Cwd)
-	if err != nil {
-		return nil, err
-	}
 	p.SandboxPolicy, err = normalizeSandboxPolicyPointerField("sandboxPolicy", p.SandboxPolicy)
 	if err != nil {
 		return nil, err
@@ -788,11 +780,6 @@ func (p ThreadStartParams) prepareRequest() (interface{}, error) {
 	if err := validateOptionalEnumValue("threadSource", p.ThreadSource, validThreadSources); err != nil {
 		return nil, err
 	}
-	var err error
-	p.Cwd, err = normalizeOptionalAbsolutePathField("cwd", p.Cwd)
-	if err != nil {
-		return nil, err
-	}
 	return p, nil
 }
 
@@ -800,12 +787,67 @@ func (p ThreadListParams) prepareRequest() (interface{}, error) {
 	if err := validateOptionalEnumValue("sortDirection", p.SortDirection, validSortDirections); err != nil {
 		return nil, err
 	}
-	var err error
-	p.Cwd, err = normalizeOptionalAbsolutePathField("cwd", p.Cwd)
-	if err != nil {
+	return p, nil
+}
+
+func (p ThreadListParamsJSON) prepareRequest() (interface{}, error) {
+	if err := validateThreadListCwdFilter(p.Cwd); err != nil {
+		return nil, err
+	}
+	if err := validateOptionalNullableEnum("sortDirection", p.SortDirection, validSortDirections); err != nil {
+		return nil, err
+	}
+	if err := validateOptionalNullableEnum("sortKey", p.SortKey, validThreadSortKeys); err != nil {
+		return nil, err
+	}
+	if err := validateOptionalNullableEnumSlice("sourceKinds", p.SourceKinds, validThreadSourceKinds); err != nil {
 		return nil, err
 	}
 	return p, nil
+}
+
+func validateThreadListCwdFilter(value json.RawMessage) error {
+	if value == nil {
+		return nil
+	}
+	trimmed := bytes.TrimSpace(value)
+	if len(trimmed) == 0 || !json.Valid(trimmed) {
+		return invalidParamsError("cwd must be a string, array of strings, or null")
+	}
+	if bytes.Equal(trimmed, []byte("null")) {
+		return nil
+	}
+	switch trimmed[0] {
+	case '"':
+		return nil
+	case '[':
+		var paths nonNullStringList
+		if err := json.Unmarshal(trimmed, &paths); err != nil {
+			return invalidParamsError("cwd must be a string, array of strings, or null")
+		}
+		return nil
+	default:
+		return invalidParamsError("cwd must be a string, array of strings, or null")
+	}
+}
+
+func validateOptionalNullableEnum[T ~string](field string, value OptionalNullable[T], allowed map[T]struct{}) error {
+	if !value.Present || value.Value == nil {
+		return nil
+	}
+	return validateEnumValue(field, *value.Value, allowed)
+}
+
+func validateOptionalNullableEnumSlice[T ~string](field string, value OptionalNullable[[]T], allowed map[T]struct{}) error {
+	if !value.Present || value.Value == nil {
+		return nil
+	}
+	for i, item := range *value.Value {
+		if err := validateEnumValue(fmt.Sprintf("%s[%d]", field, i), item, allowed); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (p ThreadReadParams) prepareRequest() (interface{}, error) {
@@ -849,11 +891,6 @@ func (p ThreadInjectItemsParams) prepareRequest() (interface{}, error) {
 }
 
 func (p HooksListParams) prepareRequest() (interface{}, error) {
-	var err error
-	p.Cwds, err = normalizeAbsolutePathSliceField("cwds", p.Cwds)
-	if err != nil {
-		return nil, err
-	}
 	return p, nil
 }
 
@@ -862,11 +899,6 @@ func (p ThreadResumeParams) prepareRequest() (interface{}, error) {
 		return nil, err
 	}
 	if err := validateOptionalRawJSONObjectField("config", p.Config); err != nil {
-		return nil, err
-	}
-	var err error
-	p.Cwd, err = normalizeOptionalAbsolutePathField("cwd", p.Cwd)
-	if err != nil {
 		return nil, err
 	}
 	return p, nil
@@ -880,11 +912,6 @@ func (p ThreadForkParams) prepareRequest() (interface{}, error) {
 		return nil, err
 	}
 	if err := validateOptionalEnumValue("threadSource", p.ThreadSource, validThreadSources); err != nil {
-		return nil, err
-	}
-	var err error
-	p.Cwd, err = normalizeOptionalAbsolutePathField("cwd", p.Cwd)
-	if err != nil {
 		return nil, err
 	}
 	return p, nil

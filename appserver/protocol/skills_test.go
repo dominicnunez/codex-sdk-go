@@ -360,19 +360,6 @@ func TestSkillsListRejectsInvalidPaths(t *testing.T) {
 		wantContains string
 	}{
 		{
-			name: "relative cwd",
-			response: map[string]interface{}{
-				"data": []interface{}{
-					map[string]interface{}{
-						"cwd":    "project",
-						"errors": []interface{}{},
-						"skills": []interface{}{},
-					},
-				},
-			},
-			wantContains: `skills.cwd: must be an absolute path`,
-		},
-		{
 			name: "relative error path",
 			response: map[string]interface{}{
 				"data": []interface{}{

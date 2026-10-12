@@ -16,6 +16,70 @@ The main service fields on `Client` include `Thread`, `Turn`, `Account`, `Apps`,
 
 Parameters and responses are separate schema-shaped types. Optional fields use pointers when the wire protocol distinguishes omission from a zero value.
 
+## Server path resolution
+
+These schema-string path values pass unchanged to the server, which resolves
+them in its own execution or configuration context:
+
+| API | Path values |
+| --- | --- |
+| `Thread.Start`, `Thread.Resume`, `Thread.Fork`, `Thread.List`, `Turn.Start`, `Command.Exec` | `Cwd` |
+| `Config.Read`, `PermissionProfile.List` | `Cwd` |
+| `Config.Write`, `Config.BatchWrite` | `FilePath` |
+| `Skills.List`, `Hooks.List` | `Cwds` |
+| `FuzzyFileSearch.Search` | `Roots` |
+| `ExternalAgent.ConfigDetect`, `ExternalAgent.ConfigImport` | `Cwds`, migration-item `Cwd` |
+
+The SDK does not resolve these values using the application's working directory.
+Returned skill grouping cwd strings also retain the peer's text, including
+relative values. Server permissions and operation-specific restrictions still
+determine acceptance: resuming a running thread can reject an override that
+conflicts with its active configuration, and config writes remain restricted to
+the server's user config file.
+
+Fields declared as `AbsolutePathBuf`, such as Windows sandbox setup's cwd,
+retain their existing SDK absolute-path checks. Legacy fields absent from the
+current schemas retain their existing public representations and validation.
+
+## Thread-list filters
+
+`Thread.List` preserves its existing parameter fields. A nil `ModelProviders`
+slice omits the provider filter; a nonnil empty slice sends `[]`, which asks for
+all providers. Its scalar `Cwd` is sent unchanged. The server resolves relative
+cwd filters using its own working directory, rather than the client's.
+
+Use `Thread.ListJSON` with `ThreadListParamsJSON` for the complete checked-in
+filter schema. It returns the same typed `ThreadListResponse` and uses the same
+response validation and thread-state cache as `List`. Its `Cwd` raw JSON can be
+absent, null, a string or an array of strings. The SDK checks that shape before
+sending and preserves the path strings for server resolution.
+
+Nullable fields use `OptionalNullable[T]`: `Present: false` omits a member;
+`Present: true` with a nil `Value` sends null; a nonnil `Value` sends that value,
+including empty arrays, empty strings, false and zero. In particular, omitted
+`SectionID` includes all sections, null selects unsectioned threads, and a string
+selects that section. `UseStateDbOnly` uses an optional boolean pointer because
+the schema permits omission, false or true, without a null value.
+
+For example, select unsectioned threads across all providers and two cwd filters:
+
+```go
+providers := []string{}
+page, err := client.Thread.ListJSON(ctx, protocol.ThreadListParamsJSON{
+    Cwd: json.RawMessage(`["repo-a","repo-b"]`),
+    ModelProviders: protocol.OptionalNullable[[]string]{
+        Present: true,
+        Value:   &providers,
+    },
+    SectionID: protocol.OptionalNullable[string]{Present: true},
+})
+```
+
+Import `encoding/json` and `appserver/protocol` for those parameter values.
+Keep the same filters when following `NextCursor` or `BackwardsCursor`.
+The original `ThreadListParams` field types and JSON method set remain unchanged;
+it cannot express cwd arrays or explicit null for `SectionID`.
+
 ## Inputs and thread items
 
 `UserInput` supports text, remote and local images, remote and local audio, skills, and mentions. For example:

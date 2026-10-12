@@ -78,6 +78,23 @@ These limits do not constitute a total transport or process heap budget. Frame p
 
 Typed decoders validate required fields, selected non-null fields, enums, unions, and request-specific constraints. [Object validation](../appserver/protocol/json_validation.go) and [schema coverage tests](../appserver/protocol/spec_coverage_test.go) help preserve the wire contract. Validation is not universal semantic authorization or a guarantee of canonical JSON: some semantic leaf types use ordinary `encoding/json`, which can allocate when unquoting escaped field names or decoding known duplicate values, and duplicate-member rejection is not a general SDK control. Selected fallback item/turn payloads, unknown variants, open JSON metadata, application configuration maps, and attachments intentionally retain their semantic data. Consumers must validate any additional security meaning before acting on it.
 
+[Thread-list filters](../appserver/protocol/thread_service.go) preserve an empty
+provider list as a request for all providers. The additive `ListJSON` parameters
+also preserve cwd string/array choices and explicit null selecting unsectioned
+threads. The shared request path validates raw cwd shapes before transport and
+uses the same response admission and cache publication as the legacy method.
+Plain string paths in thread, turn, command, config, permission-profile, skills,
+hooks, fuzzy-search and migration requests pass unchanged to the server, which
+owns relative-path resolution and operation-specific restrictions. Skill
+response grouping cwd strings retain the peer's value. A running resume keeps
+the server's active-configuration consistency check, and config writes still
+require the server's allowed user-config target. Genuine `AbsolutePathBuf`
+fields, including Windows sandbox setup's cwd, keep their SDK absolute-path
+validation. These controls prevent request representation loss; they do not
+make a listing filter an authorization boundary. An application that relies on
+section, provider or path filters to enforce user access still needs an
+independent authorization policy and a trusted peer.
+
 [Moderation metadata admission](../appserver/protocol/notification_owner.go)
 requires the schema's metadata member but accepts every present JSON value,
 including null and numeric tokens outside float64 precision or range. The

@@ -146,11 +146,6 @@ type SkillsListParams struct {
 
 func (p SkillsListParams) prepareRequest() (interface{}, error) {
 	var err error
-	p.Cwds, err = normalizeAbsolutePathSliceField("cwds", p.Cwds)
-	if err != nil {
-		return nil, err
-	}
-
 	for i := range p.PerCwdExtraUserRoots {
 		p.PerCwdExtraUserRoots[i].Cwd, err = normalizeAbsolutePathField(
 			fmt.Sprintf("perCwdExtraUserRoots[%d].cwd", i),
@@ -187,11 +182,6 @@ func (e *SkillsListEntry) UnmarshalJSON(data []byte) error {
 	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
-	validatedCwd, err := validateInboundAbsolutePathField("skills.cwd", decoded.Cwd)
-	if err != nil {
-		return err
-	}
-	decoded.Cwd = validatedCwd
 	*e = SkillsListEntry(decoded)
 	return nil
 }

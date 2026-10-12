@@ -79,19 +79,6 @@ type ExternalAgentConfigDetectParams struct {
 	Source            *string   `json:"source,omitempty"`
 }
 
-func (p ExternalAgentConfigDetectParams) prepareRequest() (interface{}, error) {
-	if p.Cwds == nil {
-		return p, nil
-	}
-
-	normalized, err := normalizeAbsolutePathSliceField("cwds", *p.Cwds)
-	if err != nil {
-		return nil, err
-	}
-	p.Cwds = &normalized
-	return p, nil
-}
-
 // ExternalAgentConfigDetectResponse contains the result of config detection.
 type ExternalAgentConfigDetectResponse struct {
 	Items []ExternalAgentConfigMigrationItem `json:"items"`
@@ -166,19 +153,6 @@ func (p ExternalAgentConfigImportParams) prepareRequest() (interface{}, error) {
 			return nil, invalidParamsError("migrationItems[%d].itemType: %v", i, err)
 		}
 
-		cwd := p.MigrationItems[i].Cwd
-		if cwd == nil || *cwd == "" {
-			continue
-		}
-
-		normalized, err := normalizeAbsolutePathField(
-			fmt.Sprintf("migrationItems[%d].cwd", i),
-			*cwd,
-		)
-		if err != nil {
-			return nil, err
-		}
-		p.MigrationItems[i].Cwd = &normalized
 	}
 
 	return p, nil
@@ -219,6 +193,11 @@ func newExternalAgentService(client *Client) *ExternalAgentService {
 
 // ConfigDetect detects external agent configurations in specified directories.
 func (s *ExternalAgentService) ConfigDetect(ctx context.Context, params ExternalAgentConfigDetectParams) (ExternalAgentConfigDetectResponse, error) {
+	if params.Cwds != nil && *params.Cwds == nil {
+		// Preserve the selected array branch without changing caller-owned data.
+		empty := []string{}
+		params.Cwds = &empty
+	}
 	var resp ExternalAgentConfigDetectResponse
 	if err := s.client.sendRequest(ctx, methodExternalAgentConfigDetect, params, &resp); err != nil {
 		return ExternalAgentConfigDetectResponse{}, err
