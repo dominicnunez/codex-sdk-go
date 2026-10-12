@@ -257,7 +257,7 @@ type ThreadListParamsJSON struct {
 	SortDirection     OptionalNullable[SortDirection]      `json:"sortDirection,omitzero"`
 	SortKey           OptionalNullable[ThreadSortKey]      `json:"sortKey,omitzero"`
 	SourceKinds       OptionalNullable[[]ThreadSourceKind] `json:"sourceKinds,omitzero"`
-	UseStateDbOnly    *bool                                `json:"useStateDbOnly,omitempty"`
+	UseStateDbOnly    OptionalNullable[bool]               `json:"useStateDbOnly,omitzero"`
 }
 
 // ThreadListResponse is the response from listing threads

@@ -45,6 +45,8 @@ references and pinned server resolution at every admission stage; a constructor
 that resolves a `PathBuf` is distinct from `AbsolutePathBuf` JSON deserialization.
 Preserve request selectors and returned grouping values together. Existing
 negative path fixtures do not establish which server inputs are supported.
+An absolute value produced by the pinned server does not narrow a plain-string
+response schema; validate the declared carrier contract as well as the producer.
 
 ## Architecture
 

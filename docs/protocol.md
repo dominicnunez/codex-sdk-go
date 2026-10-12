@@ -31,9 +31,10 @@ them in its own execution or configuration context:
 | `ExternalAgent.ConfigDetect`, `ExternalAgent.ConfigImport` | `Cwds`, migration-item `Cwd` |
 
 The SDK does not resolve these values using the application's working directory.
-Returned skill grouping cwd strings also retain the peer's text, including
-relative values. Server permissions and operation-specific restrictions still
-determine acceptance: resuming a running thread can reject an override that
+Returned skill grouping and migration-item cwd strings, `SkillErrorInfo.Path`, and
+`Thread.Path` retain the peer's text, including relative values. Server permissions
+and operation-specific restrictions still determine acceptance: resuming a running
+thread can reject an override that
 conflicts with its active configuration, and config writes remain restricted to
 the server's user config file.
 
@@ -58,8 +59,11 @@ Nullable fields use `OptionalNullable[T]`: `Present: false` omits a member;
 `Present: true` with a nil `Value` sends null; a nonnil `Value` sends that value,
 including empty arrays, empty strings, false and zero. In particular, omitted
 `SectionID` includes all sections, null selects unsectioned threads, and a string
-selects that section. `UseStateDbOnly` uses an optional boolean pointer because
-the schema permits omission, false or true, without a null value.
+selects that section. Collection filters with a nonnil `Value` pointing to a nil
+slice select an empty array; request preparation preserves that branch without
+changing the caller's slice. `UseStateDbOnly` also uses `OptionalNullable[bool]`
+to retain decoded presence, but `ListJSON` rejects an explicit null because the
+schema permits only omission, false or true.
 
 For example, select unsectioned threads across all providers and two cwd filters:
 

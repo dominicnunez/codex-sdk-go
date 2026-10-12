@@ -83,12 +83,16 @@ provider list as a request for all providers. The additive `ListJSON` parameters
 also preserve cwd string/array choices and explicit null selecting unsectioned
 threads. The shared request path validates raw cwd shapes before transport and
 uses the same response admission and cache publication as the legacy method.
+Selected collection values backed by nil slices remain empty arrays during
+request preparation. Explicit null for the nonnullable useStateDbOnly filter
+fails before transport rather than becoming omission.
 Plain string paths in thread, turn, command, config, permission-profile, skills,
 hooks, fuzzy-search and migration requests pass unchanged to the server, which
-owns relative-path resolution and operation-specific restrictions. Skill
-response grouping cwd strings retain the peer's value. A running resume keeps
-the server's active-configuration consistency check, and config writes still
-require the server's allowed user-config target. Genuine `AbsolutePathBuf`
+owns relative-path resolution and operation-specific restrictions. Skill grouping
+and migration-item response cwd strings, skill error paths and Thread.path retain
+the peer's value. A running resume keeps the server's active-configuration
+consistency check, and config writes still require the server's allowed user-config
+target. Genuine `AbsolutePathBuf`
 fields, including Windows sandbox setup's cwd, keep their SDK absolute-path
 validation. These controls prevent request representation loss; they do not
 make a listing filter an authorization boundary. An application that relies on

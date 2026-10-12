@@ -26,14 +26,17 @@ func TestThreadListJSONAllSchemaPropertiesReachTransport(t *testing.T) {
 		SortDirection:     codex.OptionalNullable[codex.SortDirection]{Present: true, Value: codex.Ptr(codex.SortDirectionAsc)},
 		SortKey:           codex.OptionalNullable[codex.ThreadSortKey]{Present: true, Value: codex.Ptr(codex.ThreadSortKeyUpdatedAt)},
 		SourceKinds:       codex.OptionalNullable[[]codex.ThreadSourceKind]{Present: true, Value: codex.Ptr([]codex.ThreadSourceKind{})},
-		UseStateDbOnly:    codex.Ptr(false),
+		UseStateDbOnly:    codex.OptionalNullable[bool]{Present: true, Value: codex.Ptr(false)},
 	}
 	assertListJSONParams(t, params, `{"archived":false,"cursor":"","cwd":["repo/../work",""],"excludedThreadIds":null,"limit":0,"modelProviders":[],"originators":["cli"],"searchTerm":null,"sectionId":null,"sortDirection":"asc","sortKey":"updated_at","sourceKinds":[],"useStateDbOnly":false}`)
 }
 
 func TestThreadListJSONPresenceStates(t *testing.T) {
 	str := func(value string) *string { return codex.Ptr(value) }
-	boolValue := func(value bool) *bool { return codex.Ptr(value) }
+	boolPtr := func(value bool) *bool { return codex.Ptr(value) }
+	boolValue := func(value bool) codex.OptionalNullable[bool] {
+		return codex.OptionalNullable[bool]{Present: true, Value: codex.Ptr(value)}
+	}
 	limit := func(value uint32) *uint32 { return codex.Ptr(value) }
 	stringsValue := func(values ...string) *[]string {
 		if values == nil {
@@ -48,7 +51,7 @@ func TestThreadListJSONPresenceStates(t *testing.T) {
 	}{
 		{"all omitted", codex.ThreadListParamsJSON{}, `{}`},
 		{"archived null", codex.ThreadListParamsJSON{Archived: codex.OptionalNullable[bool]{Present: true}}, `{"archived":null}`},
-		{"archived false", codex.ThreadListParamsJSON{Archived: codex.OptionalNullable[bool]{Present: true, Value: boolValue(false)}}, `{"archived":false}`},
+		{"archived false", codex.ThreadListParamsJSON{Archived: codex.OptionalNullable[bool]{Present: true, Value: boolPtr(false)}}, `{"archived":false}`},
 		{"cursor null", codex.ThreadListParamsJSON{Cursor: codex.OptionalNullable[string]{Present: true}}, `{"cursor":null}`},
 		{"cursor empty", codex.ThreadListParamsJSON{Cursor: codex.OptionalNullable[string]{Present: true, Value: str("")}}, `{"cursor":""}`},
 		{"cwd null", codex.ThreadListParamsJSON{Cwd: json.RawMessage(`null`)}, `{"cwd":null}`},
@@ -98,6 +101,7 @@ func TestThreadListJSONRejectsInvalidCwdAndEnumsBeforeTransport(t *testing.T) {
 		{"invalid sort direction", codex.ThreadListParamsJSON{SortDirection: codex.OptionalNullable[codex.SortDirection]{Present: true, Value: codex.Ptr(codex.SortDirection("sideways"))}}},
 		{"invalid sort key", codex.ThreadListParamsJSON{SortKey: codex.OptionalNullable[codex.ThreadSortKey]{Present: true, Value: codex.Ptr(codex.ThreadSortKey("name"))}}},
 		{"invalid source kind", codex.ThreadListParamsJSON{SourceKinds: codex.OptionalNullable[[]codex.ThreadSourceKind]{Present: true, Value: codex.Ptr([]codex.ThreadSourceKind{codex.ThreadSourceKind("unknown-value")})}}},
+		{"null state DB value", codex.ThreadListParamsJSON{UseStateDbOnly: codex.OptionalNullable[bool]{Present: true}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -260,6 +264,94 @@ func TestThreadListJSONSchemaPropertyInventory(t *testing.T) {
 		if _, ok := fields[name]; !ok {
 			t.Errorf("schema property %q missing from ThreadListParamsJSON", name)
 		}
+	}
+}
+
+func TestThreadListSelectedNilFilterSlicesEncodeEmptyArrays(t *testing.T) {
+	ids := []string(nil)
+	providers := []string(nil)
+	originators := []string(nil)
+	sources := []codex.ThreadSourceKind(nil)
+	params := codex.ThreadListParamsJSON{
+		ExcludedThreadIDs: codex.OptionalNullable[[]string]{Present: true, Value: &ids},
+		ModelProviders:    codex.OptionalNullable[[]string]{Present: true, Value: &providers},
+		Originators:       codex.OptionalNullable[[]string]{Present: true, Value: &originators},
+		SourceKinds:       codex.OptionalNullable[[]codex.ThreadSourceKind]{Present: true, Value: &sources},
+	}
+	assertListJSONParams(t, params, `{"excludedThreadIds":[],"modelProviders":[],"originators":[],"sourceKinds":[]}`)
+	if ids != nil || providers != nil || originators != nil || sources != nil {
+		t.Fatal("ListJSON() changed caller-owned nil slices")
+	}
+}
+
+func TestThreadListLegacyExcludedNilSliceEncodesEmptyArray(t *testing.T) {
+	ids := []string(nil)
+	transport := NewMockTransport()
+	defer transport.Close()
+	if err := transport.SetResponseData("thread/list", map[string]interface{}{"data": []interface{}{}}); err != nil {
+		t.Fatal(err)
+	}
+	client := codex.NewClient(transport)
+	defer client.Close()
+	params := codex.ThreadListParams{ExcludedThreadIDs: codex.OptionalNullable[[]string]{Present: true, Value: &ids}}
+	if _, err := client.Thread.List(context.Background(), params); err != nil {
+		t.Fatalf("Thread.List() error = %v", err)
+	}
+	var got map[string]json.RawMessage
+	if err := json.Unmarshal(transport.GetSentRequest(0).Params, &got); err != nil {
+		t.Fatalf("decode params: %v", err)
+	}
+	if string(got["excludedThreadIds"]) != `[]` {
+		t.Fatalf("excludedThreadIds = %s, want []", got["excludedThreadIds"])
+	}
+	if ids != nil {
+		t.Fatal("Thread.List() changed caller-owned nil slice")
+	}
+}
+
+func TestThreadListJSONRejectsDecodedNullUseStateDbOnly(t *testing.T) {
+	var params codex.ThreadListParamsJSON
+	if err := json.Unmarshal([]byte(`{"useStateDbOnly":null}`), &params); err != nil {
+		t.Fatalf("decode params: %v", err)
+	}
+	transport := NewMockTransport()
+	defer transport.Close()
+	if err := transport.SetResponseData("thread/list", map[string]interface{}{"data": []interface{}{}}); err != nil {
+		t.Fatal(err)
+	}
+	client := codex.NewClient(transport)
+	defer client.Close()
+	_, err := client.Thread.ListJSON(context.Background(), params)
+	if err == nil || !strings.Contains(err.Error(), "invalid params") {
+		t.Fatalf("ListJSON() error = %v, want local non-null validation", err)
+	}
+	if transport.CallCount() != 0 {
+		t.Fatalf("transport calls = %d, want 0", transport.CallCount())
+	}
+}
+
+func TestThreadListJSONRejectsInvalidDecodedCollectionElements(t *testing.T) {
+	tests := []struct {
+		name string
+		json string
+	}{
+		{"excluded null", `{"excludedThreadIds":[null]}`},
+		{"excluded number", `{"excludedThreadIds":[1]}`},
+		{"providers null", `{"modelProviders":[null]}`},
+		{"providers number", `{"modelProviders":[1]}`},
+		{"originators null", `{"originators":[null]}`},
+		{"originators number", `{"originators":[1]}`},
+		{"source kinds null", `{"sourceKinds":[null]}`},
+		{"source kinds number", `{"sourceKinds":[1]}`},
+		{"source kinds invalid value", `{"sourceKinds":["unknown-value"]}`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var params codex.ThreadListParamsJSON
+			if err := json.Unmarshal([]byte(tt.json), &params); err == nil {
+				t.Fatalf("decode %s succeeded, want invalid collection element error", tt.json)
+			}
+		})
 	}
 }
 

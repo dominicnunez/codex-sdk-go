@@ -563,16 +563,16 @@ func TestClientMethodsRejectMalformedAbsolutePathResponses(t *testing.T) {
 			wantContains: `thread.cwd: must be an absolute path`,
 		},
 		{
-			name:   "thread read rejects non-normalized thread path",
+			name:   "thread read rejects non-normalized cwd",
 			method: "thread/read",
 			payload: map[string]interface{}{
 				"thread": map[string]interface{}{
 					"id":        "thread-1",
 					"projectId": nil, "sessionId": "session-1", "cliVersion": "1.0.0",
 					"createdAt":     int64(1700000000),
-					"cwd":           "/tmp",
+					"cwd":           "/tmp/../workspace",
 					"modelProvider": "openai",
-					"path":          "/tmp/../workspace",
+					"path":          "relative/thread.json",
 					"preview":       "",
 					"source":        "exec",
 					"status":        map[string]interface{}{"type": "idle"},
@@ -585,7 +585,7 @@ func TestClientMethodsRejectMalformedAbsolutePathResponses(t *testing.T) {
 				_, err := client.Thread.Read(context.Background(), codex.ThreadReadParams{ThreadID: "thread-1"})
 				return err
 			},
-			wantContains: `thread.path: must be normalized`,
+			wantContains: `thread.cwd: must be normalized`,
 		},
 		{
 			name:   "thread start rejects relative readable roots",

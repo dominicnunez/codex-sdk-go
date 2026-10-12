@@ -787,6 +787,7 @@ func (p ThreadListParams) prepareRequest() (interface{}, error) {
 	if err := validateOptionalEnumValue("sortDirection", p.SortDirection, validSortDirections); err != nil {
 		return nil, err
 	}
+	p.ExcludedThreadIDs = preserveFilterArray(p.ExcludedThreadIDs)
 	return p, nil
 }
 
@@ -803,7 +804,22 @@ func (p ThreadListParamsJSON) prepareRequest() (interface{}, error) {
 	if err := validateOptionalNullableEnumSlice("sourceKinds", p.SourceKinds, validThreadSourceKinds); err != nil {
 		return nil, err
 	}
+	if p.UseStateDbOnly.Present && p.UseStateDbOnly.Value == nil {
+		return nil, invalidParamsError("useStateDbOnly must not be null")
+	}
+	p.ExcludedThreadIDs = preserveFilterArray(p.ExcludedThreadIDs)
+	p.ModelProviders = preserveFilterArray(p.ModelProviders)
+	p.Originators = preserveFilterArray(p.Originators)
+	p.SourceKinds = preserveFilterArray(p.SourceKinds)
 	return p, nil
+}
+
+func preserveFilterArray[T any](value OptionalNullable[[]T]) OptionalNullable[[]T] {
+	if value.Present && value.Value != nil && *value.Value == nil {
+		empty := []T{}
+		value.Value = &empty
+	}
+	return value
 }
 
 func validateThreadListCwdFilter(value json.RawMessage) error {
