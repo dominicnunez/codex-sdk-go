@@ -240,6 +240,57 @@ func TestThreadListJSONDecodesThenSendsAllPresenceStates(t *testing.T) {
 	assertListJSONParams(t, params, input)
 }
 
+func TestThreadListJSONDecodingRequiresFreshReceiverForReplacement(t *testing.T) {
+	const populated = `{"archived":false,"cursor":null,"cwd":["repo","/workspace"],"excludedThreadIds":[],"limit":0,"modelProviders":[],"originators":["cli"],"searchTerm":"term","sectionId":"section","sortDirection":"desc","sortKey":"created_at","sourceKinds":["cli"],"useStateDbOnly":false}`
+	var reused codex.ThreadListParamsJSON
+	if err := json.Unmarshal([]byte(populated), &reused); err != nil {
+		t.Fatalf("decode populated filters: %v", err)
+	}
+	if err := json.Unmarshal([]byte(`{}`), &reused); err != nil {
+		t.Fatalf("decode empty object into reused filters: %v", err)
+	}
+	assertListJSONParams(t, reused, populated)
+
+	var fresh codex.ThreadListParamsJSON
+	if err := json.Unmarshal([]byte(`{}`), &fresh); err != nil {
+		t.Fatalf("decode empty object into fresh filters: %v", err)
+	}
+	assertListJSONParams(t, fresh, `{}`)
+}
+
+func TestThreadListJSONEnvelopeKeepsSiblingFields(t *testing.T) {
+	type envelope struct {
+		codex.ThreadListParamsJSON
+		Marker string `json:"marker"`
+	}
+	var decoded envelope
+	if err := json.Unmarshal([]byte(`{"cursor":"next","modelProviders":["openai"],"marker":"outer"}`), &decoded); err != nil {
+		t.Fatalf("decode embedded envelope: %v", err)
+	}
+	if decoded.Cursor.Value == nil || *decoded.Cursor.Value != "next" || !decoded.Cursor.Present {
+		t.Fatalf("embedded cursor = %+v, want present next cursor", decoded.Cursor)
+	}
+	if !decoded.ModelProviders.Present || decoded.ModelProviders.Value == nil || !reflect.DeepEqual(*decoded.ModelProviders.Value, []string{"openai"}) {
+		t.Fatalf("embedded model providers = %+v, want [openai]", decoded.ModelProviders)
+	}
+	if decoded.Marker != "outer" {
+		t.Fatalf("embedded marker = %q, want outer", decoded.Marker)
+	}
+	type jsonUnmarshaler interface{ UnmarshalJSON([]byte) error }
+	type jsonMarshaler interface{ MarshalJSON() ([]byte, error) }
+	for label, value := range map[string]interface{}{
+		"value":   decoded.ThreadListParamsJSON,
+		"pointer": &decoded.ThreadListParamsJSON,
+	} {
+		if _, ok := value.(jsonUnmarshaler); ok {
+			t.Errorf("ThreadListParamsJSON %s gained UnmarshalJSON", label)
+		}
+		if _, ok := value.(jsonMarshaler); ok {
+			t.Errorf("ThreadListParamsJSON %s gained MarshalJSON", label)
+		}
+	}
+}
+
 func TestThreadListJSONSchemaPropertyInventory(t *testing.T) {
 	schema, err := os.ReadFile("schema/json/v2/ThreadListParams.json")
 	if err != nil {

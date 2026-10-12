@@ -99,6 +99,12 @@ make a listing filter an authorization boundary. An application that relies on
 section, provider or path filters to enforce user access still needs an
 independent authorization policy and a trusted peer.
 
+Typed service parameters retain
+ordinary Go JSON decoding semantics when an application decodes into them. The
+SDK cannot recover a null array element after that decoder converts it to an
+empty string. Validating externally supplied raw request JSON belongs at the
+application's decoder boundary; typed preparation does not supply that control.
+
 [Moderation metadata admission](../appserver/protocol/notification_owner.go)
 requires the schema's metadata member but accepts every present JSON value,
 including null and numeric tokens outside float64 precision or range. The

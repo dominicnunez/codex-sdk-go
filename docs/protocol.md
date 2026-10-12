@@ -42,6 +42,13 @@ Fields declared as `AbsolutePathBuf`, such as Windows sandbox setup's cwd,
 retain their existing SDK absolute-path checks. Legacy fields absent from the
 current schemas retain their existing public representations and validation.
 
+Service methods receive typed Go parameters. Plain parameter structs retain
+standard `encoding/json` decoding behavior: for example, decoding a null array
+element into a fresh `[]string` produces an empty string before the SDK receives it.
+The service cannot recover that distinction, and these path schemas permit empty
+strings. Applications accepting raw JSON must validate its shape before that
+conversion; typed request preparation is not a raw JSON schema validator.
+
 ## Thread-list filters
 
 `Thread.List` preserves its existing parameter fields. A nil `ModelProviders`
@@ -64,6 +71,13 @@ slice select an empty array; request preparation preserves that branch without
 changing the caller's slice. `UseStateDbOnly` also uses `OptionalNullable[bool]`
 to retain decoded presence, but `ListJSON` rejects an explicit null because the
 schema permits only omission, false or true.
+
+`ThreadListParamsJSON` also retains standard struct decoding behavior. Decode
+each replacement request into a fresh zero-value DTO. Reusing a populated DTO
+merges newly supplied members; omitted members keep their previous values.
+For example, decoding `{}` into a populated DTO does not clear its filters.
+The DTO has no JSON methods of its own, so it can be embedded in application
+request envelopes without a promoted codec consuming sibling fields.
 
 For example, select unsectioned threads across all providers and two cwd filters:
 

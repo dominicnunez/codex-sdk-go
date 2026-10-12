@@ -82,7 +82,12 @@ func TestPlainPathRequestsForwardServerOwnedPaths(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		for _, tc := range []struct{ name, value string }{{"relative", relative}, {"absolute spelling", "/tmp/../workspace"}} {
+		values := []struct{ name, value string }{{"relative", relative}, {"absolute spelling", "/tmp/../workspace"}}
+		switch tt.name {
+		case "skills list cwds", "hooks list cwds", "fuzzy search roots", "external detect cwds":
+			values = append(values, struct{ name, value string }{"empty string", ""})
+		}
+		for _, tc := range values {
 			t.Run(tt.name+"/"+tc.name, func(t *testing.T) {
 				transport := NewMockTransport()
 				defer transport.Close()
