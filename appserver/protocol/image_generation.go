@@ -115,9 +115,31 @@ func decodeImageGenerationThreadItem(data []byte) (ThreadItem, error) {
 	if err := validateRequiredTaggedObjectFields(data, "id", "status"); err != nil {
 		return nil, err
 	}
-	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
+	// Decode common fields independently: each anyOf branch constrains only
+	// its own alternative, so the other property may have any JSON shape.
+	type wire ImageGenerationThreadItem
+	common := struct {
+		*wire
+		FileID discardedImageAlternative `json:"fileId"`
+		Result discardedImageAlternative `json:"result"`
+	}{wire: (*wire)(&decoded)}
+	if err := jsondecode.Unmarshal(data, &common); err != nil {
 		return nil, err
 	}
+	var file struct {
+		FileID *string `json:"fileId"`
+	}
+	if err := jsondecode.Unmarshal(data, &file); err == nil {
+		decoded.FileID = file.FileID
+	}
+	var inline struct {
+		Result *string `json:"result"`
+	}
+	if err := jsondecode.Unmarshal(data, &inline); err == nil {
+		decoded.Result = inline.Result
+	}
+	// Prefer FileID when both alternatives succeed. Preserve a valid legacy
+	// Result alongside it, but an invalid extra must never reject the item.
 	if decoded.FileID == nil && decoded.Result == nil {
 		return nil, errors.New("imageGeneration requires fileId or result")
 	}
@@ -140,3 +162,7 @@ func decodeImageGenerationThreadItem(data []byte) (ThreadItem, error) {
 	}
 	return &decoded, nil
 }
+
+type discardedImageAlternative struct{}
+
+func (*discardedImageAlternative) UnmarshalJSON([]byte) error { return nil }
