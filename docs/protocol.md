@@ -118,6 +118,11 @@ including its discriminator, validation, and unknown-variant raw payload.
 Use the wrapper when serializing a value variant; its concrete type may expose
 `MarshalJSON` only through a pointer receiver.
 
+`ThreadStatusWrapper`, `SessionSourceWrapper`, and `ReasoningSummaryWrapper` also
+accept built-in values or pointers, including a pointer to a literal enum value.
+Known nil pointers encode as null, matching a missing wrapper value. Unsupported
+application-defined variants remain errors in these closed wire unions.
+
 `UserInput` supports text, remote and local images, remote and local audio, skills, and mentions. For example:
 
 ```go

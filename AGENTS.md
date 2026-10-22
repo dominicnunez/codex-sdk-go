@@ -30,6 +30,10 @@ For untagged `anyOf` object unions, validate alternatives independently and reta
 their schema order. A property constrained in one alternative can be an
 unconstrained extra in another; test valid alternatives with malformed inactive
 properties as well as malformed shared properties.
+For interface unions, compare marker and JSON method sets: value markers admit
+both values and pointers, while forwarding encoders and type switches may handle
+only one. Exercise both forms, typed nils, unknown raw payloads and nested carriers
+at the owning wrapper without changing application extension behavior.
 For nullable collections, distinguish absent, null, empty and populated values
 with JSON member checks. Trace aliases, duplicate/reset and reused receiver
 behavior; presence state must preserve the shared deep-copy contract.

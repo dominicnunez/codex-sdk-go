@@ -99,10 +99,11 @@ func (t *ThreadStatusWrapper) UnmarshalJSON(data []byte) error {
 // so that client-constructed values marshal correctly without requiring callers
 // to manually set the Type field.
 func (t ThreadStatusWrapper) MarshalJSON() ([]byte, error) {
-	if t.Value == nil {
+	value := normalizeThreadStatus(t.Value)
+	if value == nil {
 		return []byte("null"), nil
 	}
-	switch v := t.Value.(type) {
+	switch v := value.(type) {
 	case ThreadStatusNotLoaded:
 		return jsonencode.Marshal(struct {
 			Type string `json:"type"`
@@ -125,4 +126,32 @@ func (t ThreadStatusWrapper) MarshalJSON() ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("unknown ThreadStatus type: %T", v)
 	}
+}
+
+func normalizeThreadStatus(value ThreadStatus) ThreadStatus {
+	switch v := value.(type) {
+	case *ThreadStatusNotLoaded:
+		if v != nil {
+			return *v
+		}
+	case *ThreadStatusIdle:
+		if v != nil {
+			return *v
+		}
+	case *ThreadStatusSystemError:
+		if v != nil {
+			return *v
+		}
+	case *ThreadStatusActive:
+		if v != nil {
+			return *v
+		}
+	case *UnknownThreadStatus:
+		if v != nil {
+			return *v
+		}
+	default:
+		return value
+	}
+	return nil
 }
