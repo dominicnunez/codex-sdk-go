@@ -162,6 +162,8 @@ func (s *McpServerInfo) UnmarshalJSON(data []byte) error {
 }
 
 type McpServerStatus struct {
+	// ToolListMeta is opaque metadata from the first page of the tool catalog.
+	ToolListMeta json.RawMessage `json:"toolListMeta,omitempty"`
 	// ToolsError reports discovery failure when no catalog was returned.
 	ToolsError         *string                    `json:"toolsError,omitempty"`
 	PluginID           *string                    `json:"pluginId,omitempty"`

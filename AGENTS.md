@@ -26,6 +26,10 @@ union branches, including nested definitions. Check custom wire structs and
 assignment lists through public calls; type-name coverage cannot detect field
 loss. Preserve present empty values and legacy public fields without requiring
 fields absent from the current schema.
+For untagged `anyOf` object unions, validate alternatives independently and retain
+their schema order. A property constrained in one alternative can be an
+unconstrained extra in another; test valid alternatives with malformed inactive
+properties as well as malformed shared properties.
 For nullable collections, distinguish absent, null, empty and populated values
 with JSON member checks. Trace aliases, duplicate/reset and reused receiver
 behavior; presence state must preserve the shared deep-copy contract.

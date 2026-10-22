@@ -20,3 +20,27 @@ Do not compare `gh pr list --json author` against the REST login: that GraphQL
 command returns `app/github-actions` for the same bot. This mismatch previously
 caused every bot PR to be skipped while the workflow still reported success.
 Branch deletion runs as part of closing each superseded PR.
+
+## Schema snapshot fea1d7f7d163
+
+The reachable additions are read-state notifications and unread positions,
+generated-image attachment references and local-input provenance, tool-output
+retention, opaque MCP tool-list metadata, `sci` plan tiers and model-request
+hook events. The nested `ThreadReadState` definitions in thread responses do not
+add a read-state property to `Thread`; notifications expose that state separately.
+
+| Contract | Owner and callers | Evidence | Decision |
+| --- | --- | --- | --- |
+| Read-state required fields, position branches and null/absent distinction | Typed notification decoder and both listener APIs | `TestSyncFea1ReadState`, `TestSyncFea1ConstructedUnions`, `TestReadStateNotificationLifecycle` | Validate before callbacks; preserve empty identifiers and revisions |
+| Read-state delivery under pressure and per-thread ownership | Stdio protected notification queue | `TestStdioAllKnownNotificationsSurviveBestEffortPressure`, `TestStdioOrdersAllSchemaNotifications` | Protected delivery uses the exact `threadId` owner |
+| Image reference/inline alternatives, input provenance and typed failure | `ThreadItemWrapper` in history and item notifications | `TestSyncFea1ImageGeneration`, `TestSyncFea1ConstructedUnions`, `TestGeneratedImageFailureAdmission`, `TestImageGenerationAlternatives`, `TestImageGenerationAlternativesThroughCarriers`, `TestImageGenerationAlternativeHistory` | Preserve file references even when legacy inline data is also present; accept either valid alternative regardless of the other property’s shape; reject missing alternatives and malformed shared input or failure records |
+| New references remain isolated in runtime views | Shared deep-copy boundary in cache, conversation, events and results | `TestEveryItemSnapshotOwnsReferences`, `TestRunResultOwnsAllItemAndTurnReferences`, `TestConversationCacheAndSnapshotItemOwnership`, `TestStreamEventsCollectorAndResultOwnership` | Exercise populated, empty and nil references and mutations in both directions |
+| Retention, catalog metadata and new enums survive typed codecs | Turn start, MCP status, account and hook carriers | `TestSyncFea1Fields`, `TestSyncedFieldsThroughServices`, schema field and enum coverage | Preserve false/zero/empty/null metadata and numeric tokens |
+| Local lint uses the same pinned version as CI | Hook resolver, PATH, GOBIN, first GOPATH entry and optional Nix delegation | `TestHookRunnerRequiresPinnedVersion` | Reject wrong versions before execution, verify installations, and retain the host-environment fallback without Nix |
+
+The Responses API additions remain inside the existing raw `Thread.InjectItems`
+carrier. `RawResponseItemCompletedNotification` is absent from the server-method
+union and remains excluded as documented in `TestSpecCoverage`. The changed
+`ManagedHooksRequirements` and realtime-voice definitions, and the new
+`ThreadReadStateOperation` definition, have no referencing wire entry points in
+this snapshot; they do not establish new SDK service methods.

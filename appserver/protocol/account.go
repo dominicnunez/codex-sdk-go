@@ -161,6 +161,8 @@ const (
 	PlanTypeEnterpriseCBPAutomation     PlanType = "enterprise_cbp_automation"
 	PlanTypeEduPlus                     PlanType = "edu_plus"
 	PlanTypeEduPro                      PlanType = "edu_pro"
+	PlanTypeSci                         PlanType = "sci"
+	PlanTypeSciPlus                     PlanType = "sci_plus"
 	PlanTypeUnknown                     PlanType = "unknown"
 )
 
@@ -182,6 +184,8 @@ var validPlanTypes = map[PlanType]struct{}{
 	PlanTypeEnterpriseCBPAutomation:     {},
 	PlanTypeEduPlus:                     {},
 	PlanTypeEduPro:                      {},
+	PlanTypeSci:                         {},
+	PlanTypeSciPlus:                     {},
 	PlanTypeUnknown:                     {},
 }
 

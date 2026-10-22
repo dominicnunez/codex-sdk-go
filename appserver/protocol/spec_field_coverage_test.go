@@ -675,6 +675,7 @@ func testStructFields(t *testing.T) {
 		{specFile, "ThreadItem", "SubAgentActivityThreadItem", reflect.TypeOf(SubAgentActivityThreadItem{})},
 		{specFile, "ThreadItem", "WebSearchThreadItem", reflect.TypeOf(WebSearchThreadItem{})},
 		{specFile, "ThreadItem", "ImageViewThreadItem", reflect.TypeOf(ImageViewThreadItem{})},
+		{specFile, "ThreadItem", "ImageGenerationThreadItem", reflect.TypeOf(ImageGenerationThreadItem{})},
 		{specFile, "ThreadItem", "EnteredReviewModeThreadItem", reflect.TypeOf(EnteredReviewModeThreadItem{})},
 		{specFile, "ThreadItem", "ExitedReviewModeThreadItem", reflect.TypeOf(ExitedReviewModeThreadItem{})},
 		{specFile, "ThreadItem", "ContextCompactionThreadItem", reflect.TypeOf(ContextCompactionThreadItem{})},
@@ -875,7 +876,7 @@ func testEnumValues(t *testing.T) {
 				PlanTypeEdu, PlanTypeSelfServeBusinessUsageBased,
 				PlanTypeEnterpriseCBPUsageBased, PlanTypeSelfServeBusinessProLite,
 				PlanTypeEnt26, PlanTypeEnterpriseCBPAutomation, PlanTypeEduPlus,
-				PlanTypeEduPro, PlanTypeUnknown,
+				PlanTypeEduPro, PlanTypeSci, PlanTypeSciPlus, PlanTypeUnknown,
 			),
 		},
 		{
@@ -887,7 +888,7 @@ func testEnumValues(t *testing.T) {
 				PlanTypeEdu, PlanTypeSelfServeBusinessUsageBased,
 				PlanTypeEnterpriseCBPUsageBased, PlanTypeSelfServeBusinessProLite,
 				PlanTypeEnt26, PlanTypeEnterpriseCBPAutomation, PlanTypeEduPlus,
-				PlanTypeEduPro, PlanTypeUnknown,
+				PlanTypeEduPro, PlanTypeSci, PlanTypeSciPlus, PlanTypeUnknown,
 			),
 		},
 		{
@@ -912,6 +913,7 @@ func testEnumValues(t *testing.T) {
 			goValues: enumStrings(
 				HookEventNameSessionStart, HookEventNameUserPromptSubmit,
 				HookEventNameSubagentStart,
+				HookEventNamePreModelRequest, HookEventNamePostModelRequest,
 				HookEventNamePreToolUse, HookEventNamePermissionRequest,
 				HookEventNamePostToolUse, HookEventNamePreCompact,
 				HookEventNamePostCompact, HookEventNameStop, HookEventNameSessionEnd,
