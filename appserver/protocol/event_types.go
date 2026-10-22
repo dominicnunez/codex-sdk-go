@@ -380,6 +380,16 @@ func (w *PatchChangeKindWrapper) UnmarshalJSON(data []byte) error {
 }
 
 func (w PatchChangeKindWrapper) MarshalJSON() ([]byte, error) {
+	switch v := w.Value.(type) {
+	case AddPatchChangeKind:
+		return jsonencode.Marshal(&v)
+	case DeletePatchChangeKind:
+		return jsonencode.Marshal(&v)
+	case UpdatePatchChangeKind:
+		return jsonencode.Marshal(&v)
+	case UnknownPatchChangeKind:
+		return jsonencode.Marshal(&v)
+	}
 	return jsonencode.Marshal(w.Value)
 }
 
@@ -543,6 +553,18 @@ func (w *WebSearchActionWrapper) UnmarshalJSON(data []byte) error {
 }
 
 func (w WebSearchActionWrapper) MarshalJSON() ([]byte, error) {
+	switch v := w.Value.(type) {
+	case SearchWebSearchAction:
+		return jsonencode.Marshal(&v)
+	case OpenPageWebSearchAction:
+		return jsonencode.Marshal(&v)
+	case FindInPageWebSearchAction:
+		return jsonencode.Marshal(&v)
+	case OtherWebSearchAction:
+		return jsonencode.Marshal(&v)
+	case UnknownWebSearchAction:
+		return jsonencode.Marshal(&v)
+	}
 	return jsonencode.Marshal(w.Value)
 }
 

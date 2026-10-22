@@ -112,6 +112,12 @@ it cannot express cwd arrays or explicit null for `SectionID`.
 
 ## Inputs and thread items
 
+`ThreadItemWrapper`, `PatchChangeKindWrapper`, and `WebSearchActionWrapper` accept
+SDK variants as values or pointers. Both forms use the variant's wire codec,
+including its discriminator, validation, and unknown-variant raw payload.
+Use the wrapper when serializing a value variant; its concrete type may expose
+`MarshalJSON` only through a pointer receiver.
+
 `UserInput` supports text, remote and local images, remote and local audio, skills, and mentions. For example:
 
 ```go
