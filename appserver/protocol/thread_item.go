@@ -645,6 +645,48 @@ func (w *ThreadItemWrapper) UnmarshalJSON(data []byte) error {
 }
 
 func (w ThreadItemWrapper) MarshalJSON() ([]byte, error) {
+	// Values satisfy ThreadItem too, but their wire codecs have pointer
+	// receivers. Use those codecs without changing application-defined values.
+	switch v := w.Value.(type) {
+	case UserMessageThreadItem:
+		return jsonencode.Marshal(&v)
+	case AgentMessageThreadItem:
+		return jsonencode.Marshal(&v)
+	case PlanThreadItem:
+		return jsonencode.Marshal(&v)
+	case ReasoningThreadItem:
+		return jsonencode.Marshal(&v)
+	case CommandExecutionThreadItem:
+		return jsonencode.Marshal(&v)
+	case FileChangeThreadItem:
+		return jsonencode.Marshal(&v)
+	case McpToolCallThreadItem:
+		return jsonencode.Marshal(&v)
+	case DynamicToolCallThreadItem:
+		return jsonencode.Marshal(&v)
+	case CollabAgentToolCallThreadItem:
+		return jsonencode.Marshal(&v)
+	case SubAgentActivityThreadItem:
+		return jsonencode.Marshal(&v)
+	case SleepThreadItem:
+		return jsonencode.Marshal(&v)
+	case WebSearchThreadItem:
+		return jsonencode.Marshal(&v)
+	case ImageViewThreadItem:
+		return jsonencode.Marshal(&v)
+	case EnteredReviewModeThreadItem:
+		return jsonencode.Marshal(&v)
+	case ExitedReviewModeThreadItem:
+		return jsonencode.Marshal(&v)
+	case ContextCompactionThreadItem:
+		return jsonencode.Marshal(&v)
+	case FunctionCallOutputThreadItem:
+		return jsonencode.Marshal(&v)
+	case ImageGenerationThreadItem:
+		return jsonencode.Marshal(&v)
+	case UnknownThreadItem:
+		return jsonencode.Marshal(&v)
+	}
 	return jsonencode.Marshal(w.Value)
 }
 
