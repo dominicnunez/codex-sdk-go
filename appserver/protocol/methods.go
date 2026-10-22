@@ -24,6 +24,7 @@ const (
 	NotifyThreadNameUpdated       = "thread/name/updated"
 	NotifyThreadSettingsUpdated   = "thread/settings/updated"
 	NotifyThreadStatusChanged     = "thread/status/changed"
+	NotifyThreadReadStateChanged  = "thread/readState/changed"
 	NotifyThreadTokenUsageUpdated = "thread/tokenUsage/updated"
 	NotifyThreadCompacted         = "thread/compacted"
 

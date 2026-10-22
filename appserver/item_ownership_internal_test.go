@@ -28,6 +28,7 @@ func ownershipItems(mode int) []ThreadItemWrapper {
 		&protocol.FunctionCallOutputThreadItem{Output: protocol.FunctionCallOutputBody{Content: []protocol.FunctionCallOutputContentItemWrapper{{Value: &protocol.InputTextFunctionCallOutputContentItem{}}, {Value: &protocol.InputImageFunctionCallOutputContentItem{}}, {Value: &protocol.InputAudioFunctionCallOutputContentItem{}}, {Value: &protocol.EncryptedContentFunctionCallOutputContentItem{}}, {Value: &protocol.UnknownFunctionCallOutputContentItem{}}}}},
 		&ImageViewThreadItem{}, &EnteredReviewModeThreadItem{}, &ExitedReviewModeThreadItem{}, &ContextCompactionThreadItem{},
 		&protocol.SubAgentActivityThreadItem{}, &protocol.SleepThreadItem{}, &UnknownThreadItem{},
+		&protocol.ImageGenerationThreadItem{Failure: &protocol.ImageGenerationFailureWrapper{Value: &protocol.UsageLimitExceededImageGenerationFailure{}}},
 	}
 	wrappers := make([]ThreadItemWrapper, len(items))
 	for i, item := range items {

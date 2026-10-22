@@ -61,7 +61,7 @@ func TestHookRunnerPinsGolangciLintV2(t *testing.T) {
 
 	script := string(data)
 	requiredSnippets := []string{
-		`required_golangci_lint_version="v2.11.3"`,
+		`required_golangci_lint_version="v2.14.0"`,
 		`github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${required_golangci_lint_version}`,
 		`if [[ "${1:-}" == "golangci-lint" ]]; then`,
 	}

@@ -258,6 +258,7 @@ func (h *RequestHeader) UnmarshalJSON(data []byte) error {
 
 // TurnToolOutput follows the upstream TurnToolOutput schema.
 type TurnToolOutput struct {
+	Retain    *bool                  `json:"retain,omitempty"`
 	Name      string                 `json:"name"`
 	Namespace *string                `json:"namespace,omitempty"`
 	Output    FunctionCallOutputBody `json:"output"`

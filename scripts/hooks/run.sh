@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root=$(git rev-parse --show-toplevel)
-required_golangci_lint_version="v2.11.3"
+required_golangci_lint_version="v2.14.0"
 
 is_golangci_lint_v2() {
   local binary="$1"

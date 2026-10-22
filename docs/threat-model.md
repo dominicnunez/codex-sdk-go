@@ -31,7 +31,7 @@ This document describes the codebase at the revision containing it. Implemented 
 
 4. **Server request to application authority:** Command, file-change, permission, dynamic-tool, elicitation, attestation, and token-refresh requests invoke application callbacks. Schema-valid requests are not automatically authorized. The application must decide which user, workspace, account, command, or resource is permitted, and Codex must enforce its execution and sandbox configuration.
 
-5. **Conversation state to application consumers:** Responses and notifications update cached state. Snapshots and listeners cross an ownership boundary where the recipient may mutate returned values. Clone helpers isolate supported protocol values, including disabled plugin IDs, image file IDs and detail preferences, and MCP app UI metadata. This protects state ownership, not the truthfulness of peer-provided content.
+5. **Conversation state to application consumers:** Responses and notifications update cached state. Snapshots and listeners cross an ownership boundary where the recipient may mutate returned values. Clone helpers isolate supported protocol values, including disabled plugin IDs, generated-image file references and input provenance, image detail preferences, and MCP app UI metadata. Generated-image paths and hashes are peer assertions; decoding does not read or verify local image files. Read-state notifications validate their required revision and unread-position branch before typed callbacks and use protected per-thread transport delivery. Opaque MCP tool-list metadata remains untrusted raw JSON. This protects state ownership, not the truthfulness of peer-provided content.
 
 6. **Browser and network to OAuth login:** The normal login flow generates PKCE and state, publishes an authorization URL through a caller callback, receives a local or manual authorization code, and exchanges it at a configured token endpoint. The browser, local requests, pasted input, endpoint configuration, and HTTP client behavior are separate trust concerns.
 
@@ -48,6 +48,14 @@ Untrusted prompts, peers, and lower-privileged processes are not excluded merely
 The SDK is not a hosted multi-tenant service, browser dashboard, durable audit ledger, encrypted credential vault, JWT verifier, or hostile-code containment mechanism. It does not provide quotas for total turn output, provider spend, workspace storage, or arbitrary application callbacks. External provider behavior and Codex's actual sandbox implementation require their own security assessment.
 
 # 3. Attack surface, mitigations and attacker stories
+
+The JSON admission and bounded-diagnostic controls below describe the legacy
+`encoding/json` backend. Go 1.27 builds require `GOEXPERIMENT=nojsonv2`, as CI
+configures. Its new default backend changes error metadata, traversal after
+custom decoder failures and native formatter messages; current diagnostic bounds
+do not cover all of those messages. That backend remains unsupported pending a
+separate migration and verification of these controls. The compatibility opt-out
+is temporary, so a future toolchain upgrade must revisit this prerequisite.
 
 ## Process startup and local execution
 

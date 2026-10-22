@@ -17,6 +17,7 @@ func TestSyncNestedFieldCoverage(t *testing.T) {
 		{"schema/json/v2/ConfigReadResponse.json", []interface{}{AppsConfig{}, AppsDefaultConfig{}, AppConfig{}, AppToolConfig{}, AppLinkConfig{}}},
 		{"schema/json/v2/ConfigRequirementsReadResponse.json", []interface{}{BrowserUseRequirements{}, BrowserUseOriginPolicy{}, ComputerUseRequirements{}, ComputerUseMacosRequirements{}, ComputerUseWindowsRequirements{}, ComputerUseWindowsExeRequirement{}, InAppBrowserRequirements{}}},
 		{"schema/json/v2/ThreadReadResponse.json", []interface{}{Thread{}, Turn{}, TurnError{}, MisalignmentErrorDetails{}, MisalignmentSteer{}, AsyncUserInputQuestion{}}},
+		{"schema/json/v2/ThreadReadResponse.json", []interface{}{ImageGenerationInputImage{}, ThreadReadState{}}},
 		{"schema/json/v2/ThreadItemsListResponse.json", []interface{}{ThreadItemEntry{}}},
 		{"schema/json/v2/PluginReconcileResponse.json", []interface{}{PluginReconcileChangedPlugin{}}},
 		{"schema/json/v2/McpServerEventStreamNotification.json", []interface{}{McpServerEventNotification{}}},

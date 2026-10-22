@@ -458,6 +458,7 @@ func (u *UnknownThreadItem) MarshalJSON() ([]byte, error) {
 type threadItemDecoder func([]byte) (ThreadItem, error)
 
 var threadItemDecoders = map[string]threadItemDecoder{
+	"imageGeneration":     decodeImageGenerationThreadItem,
 	"functionCallOutput":  decodeFunctionCallOutputThreadItem,
 	"userMessage":         decodeUserMessageThreadItem,
 	"agentMessage":        decodeAgentMessageThreadItem,

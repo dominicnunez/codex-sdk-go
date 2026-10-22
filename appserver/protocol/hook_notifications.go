@@ -19,6 +19,8 @@ const (
 	HookEventNameUserPromptSubmit  HookEventName = "userPromptSubmit"
 	HookEventNameSubagentStart     HookEventName = "subagentStart"
 	HookEventNamePreToolUse        HookEventName = "preToolUse"
+	HookEventNamePreModelRequest   HookEventName = "preModelRequest"
+	HookEventNamePostModelRequest  HookEventName = "postModelRequest"
 	HookEventNamePermissionRequest HookEventName = "permissionRequest"
 	HookEventNamePostToolUse       HookEventName = "postToolUse"
 	HookEventNamePreCompact        HookEventName = "preCompact"
@@ -34,6 +36,8 @@ var validHookEventNames = map[HookEventName]struct{}{
 	HookEventNameUserPromptSubmit:  {},
 	HookEventNameSubagentStart:     {},
 	HookEventNamePreToolUse:        {},
+	HookEventNamePreModelRequest:   {},
+	HookEventNamePostModelRequest:  {},
 	HookEventNamePermissionRequest: {},
 	HookEventNamePostToolUse:       {},
 	HookEventNamePreCompact:        {},

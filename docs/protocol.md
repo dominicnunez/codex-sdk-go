@@ -16,6 +16,18 @@ The main service fields on `Client` include `Thread`, `Turn`, `Account`, `Apps`,
 
 Parameters and responses are separate schema-shaped types. Optional fields use pointers when the wire protocol distinguishes omission from a zero value.
 
+`OnThreadReadStateChanged` and `AddThreadReadStateChangedListener` receive durable
+local read-state changes. `ThreadReadState.Revision` is opaque; `FirstUnread`
+distinguishes omission, explicit null (read), thread start and a completed turn.
+There is no read-state editing request in the current wire-method inventory.
+
+Generated images use `ImageGenerationThreadItem`: `FileID` identifies a durable
+attachment, while `Result` carries legacy inline data. Prefer `FileID` when both
+are present. `InputImages` preserves absent versus present empty provenance lists;
+paths and SHA-256 strings describe the peer's reported inputs and are not local
+file verification. `TurnToolOutput.Retain` preserves an explicit false value.
+MCP catalog `ToolListMeta` retains arbitrary JSON, including null and numeric tokens.
+
 ## Server path resolution
 
 These schema-string path values pass unchanged to the server, which resolves

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	codex "github.com/dominicnunez/codex-sdk-go/appserver"
+	"github.com/dominicnunez/codex-sdk-go/appserver/protocol"
 )
 
 func TestCollectorItemMetadataOwnership(t *testing.T) {
@@ -42,13 +43,15 @@ func TestCollectorItemMetadataOwnership(t *testing.T) {
 
 const ownershipCommandJSON = `{"type":"commandExecution","id":"command","command":"pwd","commandActions":[],"cwd":"/workspace","source":"agent","status":"completed","pluginId":"original","scriptPath":"/workspace/script"}`
 const ownershipMCPJSON = `{"type":"mcpToolCall","id":"mcp","server":"server","tool":"tool","status":"completed","arguments":{"nested":["original"]},"pluginId":"original","readOnlyHint":true,"mcpAppResourceUri":"ui://original","appContext":{"connectorId":"original","actionName":"original","appName":"original","linkId":"original","resourceUri":"ui://original"},"mcpAppUi":{"preferredModelDisplayMode":"inline","resourceUri":"ui://original"},"result":{"content":[],"structuredContent":{"nested":["original"]},"_meta":{"ui":{"resourceUri":"ui://original"}}}}`
+const ownershipImageJSON = `{"type":"imageGeneration","id":"image","status":"completed","fileId":"original","inputImages":[{"path":"/tmp/input.png","sha256":"original"}]}`
+
 const ownershipDynamicJSON = `{"type":"dynamicToolCall","id":"dynamic","tool":"tool","namespace":"original","status":"completed","arguments":{},"contentItems":[],"success":true}`
 const ownershipCollabJSON = `{"type":"collabAgentToolCall","id":"collab","tool":"spawnAgent","status":"completed","agentsStates":{"agent":{"status":"completed","message":"original"}},"receiverThreadIds":["agent"],"senderThreadId":"thread-1"}`
 
 func ownershipWireItems(t *testing.T) []codex.ThreadItemWrapper {
 	t.Helper()
 	var items []codex.ThreadItemWrapper
-	if err := json.Unmarshal([]byte(`[`+ownershipCommandJSON+`,`+ownershipMCPJSON+`,`+ownershipDynamicJSON+`,`+ownershipCollabJSON+`]`), &items); err != nil {
+	if err := json.Unmarshal([]byte(`[`+ownershipCommandJSON+`,`+ownershipMCPJSON+`,`+ownershipDynamicJSON+`,`+ownershipCollabJSON+`,`+ownershipImageJSON+`]`), &items); err != nil {
 		t.Fatal(err)
 	}
 	if string(items[1].Value.(*codex.McpToolCallThreadItem).Result.Meta) != `{"ui":{"resourceUri":"ui://original"}}` {
@@ -70,6 +73,9 @@ func mutateWireItemMetadata(items []codex.ThreadItemWrapper) {
 	mcp.Result.Meta[0] = '!'
 	*items[2].Value.(*codex.DynamicToolCallThreadItem).Namespace = "mutated"
 	*items[3].Value.(*codex.CollabAgentToolCallThreadItem).AgentsStates["agent"].Message = "mutated"
+	image := items[4].Value.(*protocol.ImageGenerationThreadItem)
+	*image.FileID = "mutated"
+	(*image.InputImages)[0].SHA256 = "mutated"
 }
 
 func TestConversationCacheAndSnapshotItemOwnership(t *testing.T) {
@@ -145,6 +151,9 @@ func TestStreamEventsCollectorAndResultOwnership(t *testing.T) {
 					case *codex.McpToolCallThreadItem:
 						item.AppContext.ConnectorID = "event mutation"
 						item.Result.Meta[0] = '!'
+					case *protocol.ImageGenerationThreadItem:
+						*item.FileID = "event mutation"
+						(*item.InputImages)[0].SHA256 = "event mutation"
 					case *codex.DynamicToolCallThreadItem:
 						*item.Namespace = "event mutation"
 					case *codex.CollabAgentToolCallThreadItem:
@@ -155,7 +164,7 @@ func TestStreamEventsCollectorAndResultOwnership(t *testing.T) {
 						*item.AgentsStates["agent"].Message = "generic event mutation"
 					}
 					count++
-					if count == 4 {
+					if count == 5 {
 						close(itemsSeen)
 					}
 				case *codex.TurnCompleted:
@@ -166,7 +175,7 @@ func TestStreamEventsCollectorAndResultOwnership(t *testing.T) {
 			}
 			consumerDone <- nil
 		}()
-		for _, item := range []string{ownershipCommandJSON, ownershipMCPJSON, ownershipDynamicJSON, ownershipCollabJSON} {
+		for _, item := range []string{ownershipCommandJSON, ownershipMCPJSON, ownershipDynamicJSON, ownershipCollabJSON, ownershipImageJSON} {
 			mock.InjectServerNotification(ctx, codex.Notification{Method: "item/completed", Params: json.RawMessage(`{"completedAtMs":1,"threadId":"thread-1","turnId":"turn-1","item":` + item + `}`)})
 		}
 		select {

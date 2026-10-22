@@ -9,6 +9,11 @@ on:
 permissions:
   contents: read
 
+# Preserve the SDK's established encoding/json contract while the Go 1.27
+# default backend migration is handled separately.
+env:
+  GOEXPERIMENT: nojsonv2
+
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -21,7 +26,7 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version: '1.25.x'
+          go-version: '1.27.x'
           cache: false
 
       - name: Show Go version
@@ -59,7 +64,7 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version: '1.25.x'
+          go-version: '1.27.x'
           cache: false
 
       - name: Show Go version
@@ -81,7 +86,7 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version: '1.25.x'
+          go-version: '1.27.x'
           cache: false
 
       - name: Show Go version
@@ -100,11 +105,11 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version: '1.25.x'
+          go-version: '1.27.x'
           cache: false
 
       - name: Lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.11.3
+          version: v2.14.0
           args: --config=.golangci.yml ./...
