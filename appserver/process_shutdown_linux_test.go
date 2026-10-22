@@ -6,7 +6,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -24,6 +26,78 @@ func shutdownCPUTime(t *testing.T) time.Duration {
 		t.Fatal(err)
 	}
 	return time.Duration(usage.Utime.Sec+usage.Stime.Sec)*time.Second + time.Duration(usage.Utime.Usec+usage.Stime.Usec)*time.Microsecond
+}
+
+func shutdownProcessStopped(data []byte, err error) (bool, error) {
+	if errors.Is(err, os.ErrNotExist) || errors.Is(err, syscall.ESRCH) {
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	_, tail, ok := strings.Cut(string(data), ") ")
+	return ok && strings.HasPrefix(tail, "Z "), nil
+}
+
+func TestShutdownProcessStoppedObservations(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		data    string
+		err     error
+		stopped bool
+	}{
+		{name: "missing", err: &os.PathError{Op: "open", Path: "/proc/123/stat", Err: syscall.ENOENT}, stopped: true},
+		{name: "disappeared", err: &os.PathError{Op: "read", Path: "/proc/123/stat", Err: syscall.ESRCH}, stopped: true},
+		{name: "permission denied", err: &os.PathError{Op: "open", Path: "/proc/123/stat", Err: syscall.EACCES}},
+		{name: "read failure", data: "123 (sleep) Z ", err: &os.PathError{Op: "read", Path: "/proc/123/stat", Err: syscall.EIO}},
+		{name: "running", data: "123 (sleep) R 1 2"},
+		{name: "sleeping", data: "123 (sleep) S 1 2"},
+		{name: "zombie", data: "123 (sleep) Z 1 2", stopped: true},
+		{name: "malformed", data: "unrecognized stat"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			stopped, err := shutdownProcessStopped([]byte(tc.data), tc.err)
+			if stopped != tc.stopped {
+				t.Errorf("stopped = %v, want %v", stopped, tc.stopped)
+			}
+			if tc.err != nil && !tc.stopped {
+				if !errors.Is(err, tc.err) {
+					t.Errorf("error = %v, want original error %v", err, tc.err)
+				}
+			} else if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestShutdownProcessStoppedAfterProcfsDisappears(t *testing.T) {
+	child := exec.Command("sleep", "60")
+	if err := child.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = child.Process.Kill()
+		_ = child.Wait()
+	})
+	stat, err := os.Open(fmt.Sprintf("/proc/%d/stat", child.Process.Pid))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stat.Close()
+	if err := child.Process.Kill(); err != nil {
+		t.Fatal(err)
+	}
+	_ = child.Wait()
+	// A held procfs descriptor outlives its task, reproducing disappearance
+	// between the open and read inside os.ReadFile without a timing race.
+	data, readErr := io.ReadAll(stat)
+	if !errors.Is(readErr, syscall.ESRCH) {
+		t.Fatalf("read after reap = %v, want ESRCH", readErr)
+	}
+	if stopped, err := shutdownProcessStopped(data, readErr); err != nil || !stopped {
+		t.Fatalf("reaped process observation = (%v, %v), want (true, nil)", stopped, err)
+	}
 }
 
 func TestProcessCloseWaitsWithoutSpinningForOwnedDescendant(t *testing.T) {
@@ -90,14 +164,11 @@ func TestProcessCloseWaitsWithoutSpinningForOwnedDescendant(t *testing.T) {
 			deadline := time.Now().Add(time.Second)
 			for {
 				data, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
-				if errors.Is(err, os.ErrNotExist) {
-					break
-				}
+				stopped, err := shutdownProcessStopped(data, err)
 				if err != nil {
 					t.Fatal(err)
 				}
-				_, tail, ok := strings.Cut(string(data), ") ")
-				if ok && strings.HasPrefix(tail, "Z ") {
+				if stopped {
 					break
 				}
 				if time.Now().After(deadline) {
