@@ -198,10 +198,11 @@ func unmarshalSubAgentSource(data json.RawMessage) (SubAgentSource, error) {
 
 // MarshalJSON for SessionSourceWrapper
 func (s SessionSourceWrapper) MarshalJSON() ([]byte, error) {
-	if s.Value == nil {
+	value := normalizeSessionSource(s.Value)
+	if value == nil {
 		return []byte("null"), nil
 	}
-	switch v := s.Value.(type) {
+	switch v := value.(type) {
 	case sessionSourceLiteral:
 		return jsonencode.Marshal(string(v))
 	case SessionSourceSubAgent:
@@ -211,4 +212,24 @@ func (s SessionSourceWrapper) MarshalJSON() ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("unknown SessionSource type: %T", v)
 	}
+}
+
+func normalizeSessionSource(value SessionSource) SessionSource {
+	switch v := value.(type) {
+	case *sessionSourceLiteral:
+		if v != nil {
+			return *v
+		}
+	case *SessionSourceSubAgent:
+		if v != nil {
+			return *v
+		}
+	case *UnknownSessionSource:
+		if v != nil {
+			return *v
+		}
+	default:
+		return value
+	}
+	return nil
 }

@@ -102,7 +102,10 @@ func (w ReasoningSummaryWrapper) MarshalJSON() ([]byte, error) {
 	if w.Value == nil {
 		return []byte("null"), nil
 	}
-	if mode, ok := w.Value.(ReasoningSummaryMode); ok {
+	switch mode := w.Value.(type) {
+	case ReasoningSummaryMode:
+		return jsonencode.Marshal(mode)
+	case *ReasoningSummaryMode:
 		return jsonencode.Marshal(mode)
 	}
 	return nil, fmt.Errorf("unknown ReasoningSummary type: %T", w.Value)
