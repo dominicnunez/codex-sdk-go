@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
@@ -140,6 +141,9 @@ type SkillsListParams struct {
 }
 
 func (p SkillsListParams) prepareRequest() (interface{}, error) {
+	// Normalization replaces record fields; own their backing array before any
+	// writes, including writes made before a later validation failure.
+	p.PerCwdExtraUserRoots = slices.Clone(p.PerCwdExtraUserRoots)
 	var err error
 	for i := range p.PerCwdExtraUserRoots {
 		p.PerCwdExtraUserRoots[i].Cwd, err = normalizeAbsolutePathField(
