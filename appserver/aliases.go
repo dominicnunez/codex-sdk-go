@@ -120,6 +120,7 @@ type (
 	SearchWebSearchAction                      = protocol.SearchWebSearchAction
 	SkillUserInput                             = protocol.SkillUserInput
 	SessionSource                              = protocol.SessionSource
+	SessionSourceCustom                        = protocol.SessionSourceCustom
 	SessionSourceSubAgent                      = protocol.SessionSourceSubAgent
 	SessionSourceWrapper                       = protocol.SessionSourceWrapper
 	SubAgentSource                             = protocol.SubAgentSource

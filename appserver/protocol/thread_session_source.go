@@ -27,6 +27,26 @@ const (
 	SessionSourceUnknown   sessionSourceLiteral = "unknown"
 )
 
+// SessionSourceCustom represents a custom session source name.
+type SessionSourceCustom struct {
+	Custom string `json:"custom"`
+}
+
+func (SessionSourceCustom) isSessionSource() {}
+
+func (s *SessionSourceCustom) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "custom"); err != nil {
+		return err
+	}
+	type wire SessionSourceCustom
+	var decoded wire
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*s = SessionSourceCustom(decoded)
+	return nil
+}
+
 // SessionSourceSubAgent represents a sub-agent session source
 type SessionSourceSubAgent struct {
 	SubAgent SubAgentSource `json:"subAgent"`
@@ -150,12 +170,20 @@ func (s *SessionSourceWrapper) UnmarshalJSON(data []byte) error {
 	}
 
 	// Try object
-	raw, err := jsonobject.SelectFields(data, "subAgent")
+	raw, err := jsonobject.SelectFields(data, "subAgent", "custom")
 	if err != nil {
 		return fmt.Errorf("unable to unmarshal SessionSource from: %.200s", data)
 	}
 	subAgentRaw, hasKey := raw["subAgent"]
 	if !hasKey {
+		if _, hasCustom := raw["custom"]; hasCustom {
+			var custom SessionSourceCustom
+			if err := jsondecode.Unmarshal(data, &custom); err != nil {
+				return fmt.Errorf("unmarshal session source custom: %w", err)
+			}
+			s.Value = custom
+			return nil
+		}
 		// Unknown object variant — preserve for forward compatibility
 		s.Value = UnknownSessionSource{Raw: append(json.RawMessage(nil), data...)}
 		return nil
@@ -216,6 +244,8 @@ func (s SessionSourceWrapper) MarshalJSON() ([]byte, error) {
 	switch v := value.(type) {
 	case sessionSourceLiteral:
 		return jsonencode.Marshal(string(v))
+	case SessionSourceCustom:
+		return jsonencode.Marshal(v)
 	case SessionSourceSubAgent:
 		return jsonencode.Marshal(v)
 	case UnknownSessionSource:
@@ -232,6 +262,10 @@ func normalizeSessionSource(value SessionSource) SessionSource {
 			return *v
 		}
 	case *SessionSourceSubAgent:
+		if v != nil {
+			return *v
+		}
+	case *SessionSourceCustom:
 		if v != nil {
 			return *v
 		}
