@@ -377,6 +377,12 @@ func (r *GuardianApprovalReview) UnmarshalJSON(data []byte) error {
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
+	var enums struct {
+		UserAuthorization *guardianUserAuthValue `json:"userAuthorization"`
+	}
+	if err := unmarshalInboundObject(data, &enums, nil, nil); err != nil {
+		return err
+	}
 	*r = GuardianApprovalReview(decoded)
 	return nil
 }
@@ -433,6 +439,12 @@ func (n *ItemGuardianApprovalReviewCompletedNotification) UnmarshalJSON(data []b
 	}{wire: &decoded}
 	required := []string{"action", "completedAtMs", "decisionSource", "review", "reviewId", "startedAtMs", "threadId", "turnId"}
 	if err := unmarshalInboundObject(data, &payload, required, required); err != nil {
+		return err
+	}
+	var enums struct {
+		DecisionSource autoReviewSourceValue `json:"decisionSource"`
+	}
+	if err := unmarshalInboundObject(data, &enums, nil, nil); err != nil {
 		return err
 	}
 	decoded.Action = payload.Action.Value
