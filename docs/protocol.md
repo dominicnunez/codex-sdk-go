@@ -270,6 +270,15 @@ not an approval or proof that the server resolves a path in a particular way.
 
 ## Compatibility
 
+Custom session sources decode as `SessionSourceCustom{Custom: name}` rather than
+`UnknownSessionSource`. The `custom` member must be a non-null string; an empty
+string is valid. Construct the value directly or place it (by value or pointer)
+in `SessionSourceWrapper.Value`. Code that inspected custom source names through
+`UnknownSessionSource.Raw` should switch to the typed branch. Genuinely unknown
+source objects continue to use `UnknownSessionSource`. The wrapper owns this
+validation; `SessionSourceCustom` remains a plain struct so applications can
+embed it in their own JSON envelopes.
+
 ### Thread-spawn source metadata migration
 
 `SubAgentSourceThreadSpawn.ThreadSpawn` now matches the checked-in `SubAgentSource`

@@ -134,9 +134,9 @@ including decoding into receivers that already contain map entries.
 Compare receiver updates and retained references on type errors as well as on
 success. Include envelopes and user-defined wrappers: a custom decoder error
 can stop outer traversal and change error precedence, field context and offsets.
-Do not add JSON methods to formerly plain public representations merely to
-validate SDK carriers: method promotion can silently consume anonymous
-application envelopes. Use existing admission owners, run established checks
+Keep public record representations plain when validation belongs to SDK
+carriers, including newly introduced types: JSON method promotion can consume
+anonymous application envelopes. Use existing admission owners, run established checks
 before new restrictions, and compare mixed failures against the prior revision.
 
 ### Approval Flow
