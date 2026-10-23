@@ -270,4 +270,40 @@ not an approval or proof that the server resolves a path in a particular way.
 
 ## Compatibility
 
+### Thread-spawn source metadata migration
+
+`SubAgentSourceThreadSpawn.ThreadSpawn` now matches the checked-in `SubAgentSource`
+schema. `AgentPath` is available as `*string`; `AgentNickname` and `AgentRole`
+change from `string` to `*string`, and `Depth` changes from `uint32` to `int32`.
+These are breaking Go API corrections; the server's JSON shape is unchanged.
+Missing or null metadata decodes to nil and encodes as null, matching the pinned
+server's defaults. A pointer to an empty string retains an explicit empty value.
+Agent paths are opaque protocol strings, not local filesystem paths.
+
+Before:
+
+```go
+source.ThreadSpawn.AgentNickname = "worker"
+source.ThreadSpawn.AgentRole = "researcher"
+```
+
+After:
+
+```go
+var source protocol.SubAgentSourceThreadSpawn
+source.ThreadSpawn.AgentNickname = protocol.Ptr("worker")
+source.ThreadSpawn.AgentRole = protocol.Ptr("researcher")
+source.ThreadSpawn.AgentPath = protocol.Ptr("worker/alpha")
+source.ThreadSpawn.Depth = 1
+source.ThreadSpawn.ParentThreadID = "parent"
+```
+
+Check pointers before reading optional metadata; nil and `protocol.Ptr("")` have
+different meanings. Existing code assigning an entire anonymous `ThreadSpawn`
+record must include the new field and updated types, or switch to field-by-field
+assignment as above. If converting a `uint32` depth variable, check that it is at
+most `math.MaxInt32` before converting to `int32`. The schema's signed range also
+permits negative values. These field changes apply through the public `appserver`
+type alias too.
+
 Unknown discriminated-union variants are preserved where the public type exposes an `Unknown...` form. Outbound responses are validated more strictly because the SDK must not send a shape rejected by the current server schema.
