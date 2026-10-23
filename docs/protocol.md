@@ -270,6 +270,12 @@ not an approval or proof that the server resolves a path in a particular way.
 
 ## Compatibility
 
+Guardian review records validate `userAuthorization` as `unknown`, `low`,
+`medium`, or `high`; it may also be absent or null. Completed review records
+require `decisionSource` to be `agent`. These checks run at the notification
+and review record decoders before typed callback delivery. The public scalar
+types retain ordinary string decoding when used outside those records.
+
 `ItemGuardianApprovalReviewStartedNotification.TargetItemID` and
 `ItemGuardianApprovalReviewCompletedNotification.TargetItemID` now use `*string`
 to match the optional nullable schema field. Check for nil before reading an
