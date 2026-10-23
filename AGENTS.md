@@ -14,7 +14,7 @@ Do NOT:
 Do:
 - Fix internal implementation (error handling, transport, retries, etc.)
 - Add unexported helpers, improve test coverage
-- Tighten types (e.g. `interface{}` → concrete type) as long as the public API stays compatible
+- Align Go field types with the checked-in schemas; document migrations for source-incompatible corrections
 - Fix bugs in request construction, response parsing, or notification dispatch
 
 **When in doubt:** check the type against the corresponding `appserver/protocol/schema/json/*.json` schema before changing it.

@@ -53,10 +53,11 @@ const (
 // SubAgentSourceThreadSpawn represents a thread spawn sub-agent
 type SubAgentSourceThreadSpawn struct {
 	ThreadSpawn struct {
-		AgentNickname  string `json:"agent_nickname"`
-		AgentRole      string `json:"agent_role"`
-		Depth          uint32 `json:"depth"`
-		ParentThreadID string `json:"parent_thread_id"`
+		AgentNickname  *string `json:"agent_nickname"`
+		AgentPath      *string `json:"agent_path"`
+		AgentRole      *string `json:"agent_role"`
+		Depth          int32   `json:"depth"`
+		ParentThreadID string  `json:"parent_thread_id"`
 	} `json:"thread_spawn"`
 }
 
