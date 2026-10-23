@@ -46,19 +46,19 @@ func TestSessionSourceCustomRoundTrip(t *testing.T) {
 	assertUnionJSON(t, p.SessionSourceWrapper{Value: (*p.SessionSourceCustom)(nil)}, `null`)
 }
 
-func TestSessionSourceCustomDirectValidation(t *testing.T) {
+func TestSessionSourceCustomOwnerValidation(t *testing.T) {
 	for _, wire := range []string{
-		`{}`, `null`, `{"custom":null}`, `{"custom":17}`,
+		`null`, `{"custom":null}`, `{"custom":17}`,
 		`{"custom":null,"custom":"later"}`, `{"custom":"prior","custom":null}`,
 		`{"custom":false,"custom":"later"}`, `{"custom":null,"cu\u0073tom":"later"}`,
 	} {
 		t.Run(wire, func(t *testing.T) {
-			value := p.SessionSourceCustom{Custom: "old"}
+			value := p.SessionSourceWrapper{Value: p.SessionSourceCustom{Custom: "old"}}
 			if err := json.Unmarshal([]byte(wire), &value); err == nil {
-				t.Fatal("invalid direct custom source admitted")
+				t.Fatal("invalid custom source admitted at union owner")
 			}
-			if value.Custom != "old" {
-				t.Fatal("failed direct decode changed receiver")
+			if value.Value != (p.SessionSourceCustom{Custom: "old"}) {
+				t.Fatal("failed union decode changed receiver")
 			}
 		})
 	}
@@ -74,6 +74,32 @@ func TestSessionSourceCustomDirectValidation(t *testing.T) {
 		t.Fatalf("future object = %T", source.Value)
 	}
 	assertUnionJSON(t, source, `{"future":{"payload":42}}`)
+}
+
+func TestSessionSourceCustomEmbeddedEnvelope(t *testing.T) {
+	for _, tc := range []struct {
+		wire  string
+		name  string
+		valid bool
+	}{
+		{`{"custom":"atlas","note":"kept"}`, "atlas", true},
+		{`{"custom":null,"note":"kept"}`, "", true},
+		{`{"custom":17,"note":"kept"}`, "", false},
+	} {
+		t.Run(tc.wire, func(t *testing.T) {
+			var envelope struct {
+				p.SessionSourceCustom
+				Note string `json:"note"`
+			}
+			err := json.Unmarshal([]byte(tc.wire), &envelope)
+			if (err == nil) != tc.valid {
+				t.Fatalf("envelope decode = %v, valid=%v", err, tc.valid)
+			}
+			if envelope.Custom != tc.name || envelope.Note != "kept" {
+				t.Fatalf("embedded envelope lost fields: %#v", envelope)
+			}
+		})
+	}
 }
 
 func TestSessionSourceCustomPublicAdmission(t *testing.T) {

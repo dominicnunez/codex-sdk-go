@@ -275,7 +275,9 @@ Custom session sources decode as `SessionSourceCustom{Custom: name}` rather than
 string is valid. Construct the value directly or place it (by value or pointer)
 in `SessionSourceWrapper.Value`. Code that inspected custom source names through
 `UnknownSessionSource.Raw` should switch to the typed branch. Genuinely unknown
-source objects continue to use `UnknownSessionSource`.
+source objects continue to use `UnknownSessionSource`. The wrapper owns this
+validation; `SessionSourceCustom` remains a plain struct so applications can
+embed it in their own JSON envelopes.
 
 ### Thread-spawn source metadata migration
 

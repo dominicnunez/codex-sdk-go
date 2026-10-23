@@ -34,19 +34,6 @@ type SessionSourceCustom struct {
 
 func (SessionSourceCustom) isSessionSource() {}
 
-func (s *SessionSourceCustom) UnmarshalJSON(data []byte) error {
-	if err := validateRequiredObjectFields(data, "custom"); err != nil {
-		return err
-	}
-	type wire SessionSourceCustom
-	var decoded wire
-	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
-		return err
-	}
-	*s = SessionSourceCustom(decoded)
-	return nil
-}
-
 // SessionSourceSubAgent represents a sub-agent session source
 type SessionSourceSubAgent struct {
 	SubAgent SubAgentSource `json:"subAgent"`
@@ -178,7 +165,7 @@ func (s *SessionSourceWrapper) UnmarshalJSON(data []byte) error {
 	if !hasKey {
 		if _, hasCustom := raw["custom"]; hasCustom {
 			var custom SessionSourceCustom
-			if err := jsondecode.Unmarshal(data, &custom); err != nil {
+			if err := unmarshalInboundObject(data, &custom, []string{"custom"}, []string{"custom"}); err != nil {
 				return fmt.Errorf("unmarshal session source custom: %w", err)
 			}
 			s.Value = custom
