@@ -270,6 +270,14 @@ not an approval or proof that the server resolves a path in a particular way.
 
 ## Compatibility
 
+`ItemGuardianApprovalReviewStartedNotification.TargetItemID` and
+`ItemGuardianApprovalReviewCompletedNotification.TargetItemID` now use `*string`
+to match the optional nullable schema field. Check for nil before reading an
+item ID, and use `protocol.Ptr("item-id")` when constructing a notification.
+Nil represents no target (including network policy reviews) and serializes as
+null; `protocol.Ptr("")` preserves an explicitly empty string. This is a breaking
+Go API correction in the `appserver/protocol` notification types.
+
 Custom session sources decode as `SessionSourceCustom{Custom: name}` rather than
 `UnknownSessionSource`. The `custom` member must be a non-null string; an empty
 string is valid. Construct the value directly or place it (by value or pointer)

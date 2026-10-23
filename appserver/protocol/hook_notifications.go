@@ -389,7 +389,7 @@ type ItemGuardianApprovalReviewStartedNotification struct {
 	Review       GuardianApprovalReview `json:"review"`
 	ReviewID     string                 `json:"reviewId"`
 	StartedAtMs  int64                  `json:"startedAtMs"`
-	TargetItemID string                 `json:"targetItemId"`
+	TargetItemID *string                `json:"targetItemId"`
 	ThreadID     string                 `json:"threadId"`
 	TurnID       string                 `json:"turnId"`
 }
@@ -419,7 +419,7 @@ type ItemGuardianApprovalReviewCompletedNotification struct {
 	Review         GuardianApprovalReview   `json:"review"`
 	ReviewID       string                   `json:"reviewId"`
 	StartedAtMs    int64                    `json:"startedAtMs"`
-	TargetItemID   string                   `json:"targetItemId"`
+	TargetItemID   *string                  `json:"targetItemId"`
 	ThreadID       string                   `json:"threadId"`
 	TurnID         string                   `json:"turnId"`
 }
