@@ -79,6 +79,9 @@ type AskForApprovalWrapper struct {
 
 // UnmarshalJSON for AskForApprovalWrapper handles the union type
 func (a *AskForApprovalWrapper) UnmarshalJSON(data []byte) error {
+	if isNullJSONValue(data) && json.Valid(data) {
+		return fmt.Errorf("%w: approval policy", ErrNullResultField)
+	}
 	// Try string literal first
 	var literal string
 	if err := jsondecode.Unmarshal(data, &literal); err == nil {

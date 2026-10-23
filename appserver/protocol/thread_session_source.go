@@ -138,6 +138,9 @@ type SessionSourceWrapper struct {
 
 // UnmarshalJSON for SessionSourceWrapper handles the union type
 func (s *SessionSourceWrapper) UnmarshalJSON(data []byte) error {
+	if isNullJSONValue(data) && json.Valid(data) {
+		return fmt.Errorf("%w: session source", ErrNullResultField)
+	}
 	// Try string literal first
 	var literal string
 	if err := jsondecode.Unmarshal(data, &literal); err == nil {
@@ -146,25 +149,32 @@ func (s *SessionSourceWrapper) UnmarshalJSON(data []byte) error {
 	}
 
 	// Try object
-	if raw, err := jsonobject.SelectFields(data, "subAgent"); err == nil {
-		if subAgentRaw, hasKey := raw["subAgent"]; hasKey {
-			subAgent, err := unmarshalSubAgentSource(subAgentRaw)
-			if err != nil {
-				return fmt.Errorf("unmarshal session source subAgent: %w", err)
-			}
-			s.Value = SessionSourceSubAgent{SubAgent: subAgent}
-			return nil
-		}
+	raw, err := jsonobject.SelectFields(data, "subAgent")
+	if err != nil {
+		return fmt.Errorf("unable to unmarshal SessionSource from: %.200s", data)
+	}
+	subAgentRaw, hasKey := raw["subAgent"]
+	if !hasKey {
 		// Unknown object variant — preserve for forward compatibility
 		s.Value = UnknownSessionSource{Raw: append(json.RawMessage(nil), data...)}
 		return nil
 	}
-
-	return fmt.Errorf("unable to unmarshal SessionSource from: %.200s", data)
+	if err := validateRequiredObjectFields(data, "subAgent"); err != nil {
+		return err
+	}
+	subAgent, err := unmarshalSubAgentSource(subAgentRaw)
+	if err != nil {
+		return fmt.Errorf("unmarshal session source subAgent: %w", err)
+	}
+	s.Value = SessionSourceSubAgent{SubAgent: subAgent}
+	return nil
 }
 
 // unmarshalSubAgentSource dispatches the SubAgentSource discriminated union.
 func unmarshalSubAgentSource(data json.RawMessage) (SubAgentSource, error) {
+	if isNullJSONValue(data) && json.Valid(data) {
+		return nil, fmt.Errorf("%w: sub-agent source", ErrNullResultField)
+	}
 	// Try string literal first
 	var literal string
 	if err := jsondecode.Unmarshal(data, &literal); err == nil {
