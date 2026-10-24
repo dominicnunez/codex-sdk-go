@@ -1,10 +1,10 @@
 package protocol_test
 
 import (
+	"go/version"
 	"os"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 	"testing"
 )
@@ -27,7 +27,7 @@ func repoPath(t *testing.T, parts ...string) string {
 	return filepath.Join(pathParts...)
 }
 
-func moduleGoVersion(t *testing.T) (major int, minor int, raw string) {
+func moduleGoVersion(t *testing.T) string {
 	t.Helper()
 
 	data, err := os.ReadFile(repoPath(t, "go.mod"))
@@ -42,24 +42,13 @@ func moduleGoVersion(t *testing.T) (major int, minor int, raw string) {
 			continue
 		}
 
-		versionParts := strings.SplitN(parts[1], ".", 2)
-		if len(versionParts) != 2 {
-			continue
+		if !version.IsValid("go" + parts[1]) {
+			t.Fatalf("invalid go.mod version %q", parts[1])
 		}
-
-		major, err = strconv.Atoi(versionParts[0])
-		if err != nil {
-			t.Fatalf("parse go.mod major version %q: %v", versionParts[0], err)
-		}
-		minor, err = strconv.Atoi(versionParts[1])
-		if err != nil {
-			t.Fatalf("parse go.mod minor version %q: %v", versionParts[1], err)
-		}
-
-		return major, minor, parts[1]
+		return parts[1]
 	}
 
 	t.Fatalf("go.mod is missing a valid go directive")
 
-	return 0, 0, ""
+	return ""
 }

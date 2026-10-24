@@ -1,10 +1,12 @@
 # Thread-state cloning benchmark
 
 Measured on 2026-09-05 with Go 1.25.11, Windows amd64, AMD Ryzen 9 5900X.
+
+For current runs, use Go 1.27.3 with the supported JSON backend:
 Run from the repository root:
 
 ```sh
-go test ./appserver/protocol -run '^$' -bench BenchmarkThreadState -benchmem -benchtime=100ms -count=3
+GOEXPERIMENT=nojsonv2 go test ./appserver/protocol -run '^$' -bench BenchmarkThreadState -benchmem -benchtime=100ms -count=3
 ```
 
 The fixture holds 0, 100, or 1,000 turns with one agent-message item each.
