@@ -183,8 +183,21 @@ func (p *McpServerElicitationRequestParams) UnmarshalJSON(data []byte) error {
 		}
 		decoded.OpenAIRequestedSchema = schema
 	}
+	if err := validateEnumOccurrences(data, "mode", false, validateElicitationMode); err != nil {
+		return err
+	}
 	*p = McpServerElicitationRequestParams(decoded)
 	return nil
+}
+
+func validateElicitationMode(mode McpServerElicitationMode) error {
+	switch mode {
+	case McpServerElicitationModeForm, McpServerElicitationModeURL,
+		McpServerElicitationModeOpenAIForm, McpServerElicitationModeOpenAIFormLegacy:
+		return nil
+	default:
+		return fmt.Errorf("unsupported elicitation mode %s", quotedValueDiagnostic(string(mode)))
+	}
 }
 
 func validateMcpServerElicitationVariant(data []byte, mode McpServerElicitationMode) error {
