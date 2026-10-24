@@ -95,6 +95,15 @@ Unknown account union branches retain raw metadata, and ordinary public scalar
 decoding remains available outside these owners. These metadata checks do not
 establish authentication, billing authority or permission to issue requests.
 
+Plugin summary admission checks every recognized authentication-policy,
+installation-policy and availability enum occurrence across list, installed,
+read and share-list responses. Later duplicates, folded field aliases and outer
+array replacements cannot hide invalid enum values. These checks preserve
+existing final-value errors and partial receiver updates; newly rejected hidden
+enum values restore the prior summary. The existing optional availability
+pointer and its null compatibility remain unchanged. These checks validate
+metadata and do not authorize plugin installation or execution.
+
 Reset-credit consumption, plugin-install, thread-unsubscribe, login-cancel,
 add-credits-email and configuration-write response records also check every
 recognized enum occurrence before returning typed results. Later duplicates
