@@ -50,8 +50,9 @@ The SDK is not a hosted multi-tenant service, browser dashboard, durable audit l
 # 3. Attack surface, mitigations and attacker stories
 
 The JSON admission and bounded-diagnostic controls below describe the legacy
-`encoding/json` backend. Go 1.27 builds require `GOEXPERIMENT=nojsonv2`, as CI
-configures. Its new default backend changes error metadata, traversal after
+`encoding/json` backend. The module requires Go 1.27.3, and builds require
+`GOEXPERIMENT=nojsonv2`, as CI, hooks and the optional dev shell configure.
+The new default backend changes error metadata, traversal after
 custom decoder failures and native formatter messages; current diagnostic bounds
 do not cover all of those messages. That backend remains unsupported pending a
 separate migration and verification of these controls. The compatibility opt-out

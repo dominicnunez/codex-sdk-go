@@ -143,7 +143,7 @@ jobs:
           ### Next Steps
           1. Review the synced \`appserver/protocol/schema/json/\` changes in this PR
           2. Add/update Go types for new/modified schemas
-          3. Run \`go test -run TestSpecCoverage\` to verify
+          3. Run \`GOEXPERIMENT=nojsonv2 go test ./appserver/protocol -run TestSpecCoverage\` to verify
           4. Merge when ready"
 
           # Strip leading whitespace from indented heredoc-style string

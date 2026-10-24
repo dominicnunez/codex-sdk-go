@@ -3,10 +3,10 @@
 Tracks [issue #4](https://github.com/dominicnunez/codex-sdk-go/issues/4).
 Runtime behavior is unchanged by the benchmark harness.
 
-Run on Go 1.25.11:
+For current runs, use Go 1.27.3 with the supported JSON backend:
 
 ```sh
-go test ./appserver/transport -run '^$' -bench 'BenchmarkInbound(Large|Pipeline|ReadLine|EnvelopeDecoder)' -benchmem -benchtime=500ms -count=5
+GOEXPERIMENT=nojsonv2 go test ./appserver/transport -run '^$' -bench 'BenchmarkInbound(Large|Pipeline|ReadLine|EnvelopeDecoder)' -benchmem -benchtime=500ms -count=5
 ```
 
 The Transport benchmarks workflow collects this baseline on Linux and Windows,

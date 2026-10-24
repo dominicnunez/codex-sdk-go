@@ -1,34 +1,19 @@
 package protocol_test
 
 import (
-	"regexp"
+	"go/version"
 	"runtime"
-	"strconv"
+	"strings"
 	"testing"
 )
 
 // TestGoVersion verifies the runtime Go version meets the module's minimum Go directive.
 func TestGoVersion(t *testing.T) {
-	const goVersionPattern = `go(\d+)\.(\d+)`
-	minMajor, minMinor, minVersion := moduleGoVersion(t)
-
-	version := runtime.Version()
-	matches := regexp.MustCompile(goVersionPattern).FindStringSubmatch(version)
-	if len(matches) != 3 {
-		t.Fatalf("failed to parse Go version %q", version)
+	minimum := moduleGoVersion(t)
+	actual := runtime.Version()
+	if version.Compare(strings.TrimPrefix(actual, "devel "), "go"+minimum) < 0 {
+		t.Fatalf("Go %s required, running %s", minimum, actual)
 	}
 
-	major, err := strconv.Atoi(matches[1])
-	if err != nil {
-		t.Fatalf("failed to parse major version %q: %v", matches[1], err)
-	}
-	minor, err := strconv.Atoi(matches[2])
-	if err != nil {
-		t.Fatalf("failed to parse minor version %q: %v", matches[2], err)
-	}
-	if major < minMajor || (major == minMajor && minor < minMinor) {
-		t.Fatalf("Go %s required, running %d.%d", minVersion, major, minor)
-	}
-
-	t.Logf("Go version: %s", version)
+	t.Logf("Go version: %s", actual)
 }

@@ -18,13 +18,14 @@ import codex "github.com/dominicnunez/codex-sdk-go/appserver/protocol"
 
 ## Requirements
 
-- Go 1.25+
+- Go 1.27.3+
 - A Codex CLI binary for `appserver` process helpers
 - An absolute `ProcessOptions.BinaryPath` when spawning Codex from this SDK
 
-With Go 1.27, build and test with `GOEXPERIMENT=nojsonv2` to select the existing
-`encoding/json` backend. CI uses the current stable Go 1.27 release in this mode;
-the module's minimum Go version remains 1.25. The default Go 1.27 JSON backend is
+Build and test with `GOEXPERIMENT=nojsonv2` to select the existing
+`encoding/json` backend. The module requires Go 1.27.3, and CI reads that version
+from `go.mod`. The hook runner and optional dev shell select this backend too.
+The default Go 1.27 JSON backend is
 not yet supported: its error metadata, callback traversal and diagnostic formatting
 change behavior the SDK depends on. In particular, existing bounds on malformed
 numeric diagnostics do not cover that backend. Migrating those contracts is
@@ -297,7 +298,8 @@ Hook behavior:
 - `pre-push`: runs `go test ./...`, `go test -race ./...`, `golangci-lint run ./...`, and `go mod tidy -diff`
 
 The hook runner reuses only golangci-lint v2.14.0, matching CI, and installs that
-version with Go when needed. Nix is optional; without it, hooks use the current
-environment.
+version with Go when needed. Hooks select `nojsonv2` after any caller-supplied
+experiments. Nix is optional; without it, hooks use the current environment's
+Go toolchain, which must meet the Go 1.27.3 minimum.
 
 To bypass hooks intentionally for a one-off operation, use Git's standard `--no-verify` flag.
