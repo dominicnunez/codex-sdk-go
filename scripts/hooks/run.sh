@@ -4,10 +4,6 @@ set -euo pipefail
 repo_root=$(git rev-parse --show-toplevel)
 required_golangci_lint_version="v2.14.0"
 
-# Keep the supported JSON backend while retaining other experiment selections.
-# The last setting wins if the caller explicitly enabled jsonv2.
-export GOEXPERIMENT="${GOEXPERIMENT:+$GOEXPERIMENT,}nojsonv2"
-
 is_pinned_golangci_lint() {
   local binary="$1"
   local version_output

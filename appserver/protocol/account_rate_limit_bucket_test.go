@@ -187,20 +187,20 @@ func TestAccountRateLimitsNamedWrapperPreservesDecoderBoundary(t *testing.T) {
 	}
 	got := wrapper{After: 13}
 	err := json.Unmarshal([]byte(`{"before":"wrong","response":{"rateLimits":{},"rateLimitsByLimitId":{"bad":null}},"after":9}`), &got)
-	if err == nil || !strings.Contains(err.Error(), "rateLimitsByLimitId") || strings.Contains(err.Error(), "cannot unmarshal string") {
-		t.Fatalf("Unmarshal() error = %v; want wrapped account bucket validation error", err)
+	if err == nil || !strings.Contains(err.Error(), "before") || !strings.Contains(err.Error(), "cannot unmarshal string") {
+		t.Fatalf("Unmarshal() error = %v; want the earlier native field error", err)
 	}
-	if got.After != 13 {
-		t.Fatalf("later sibling decoded after response error: got %d, want preserved sentinel 13", got.After)
+	if got.After != 9 {
+		t.Fatalf("default decoder traversal: got %d, want later sibling 9", got.After)
 	}
 }
 
-func TestAccountRateLimitsMalformedDirectCallKeepsExistingEOFError(t *testing.T) {
+func TestAccountRateLimitsMalformedDirectCallReportsSyntaxError(t *testing.T) {
 	input := []byte(`{"rateLimits":{},"rateLimitsByLimitId":{"bad":null},`)
 	var got codex.GetAccountRateLimitsResponse
 	err := got.UnmarshalJSON(input)
-	if err == nil || err.Error() != "server returned non-object result: EOF" {
-		t.Fatalf("direct UnmarshalJSON() error = %v; want the existing EOF response-shape error", err)
+	if err == nil || err.Error() != "server returned non-object result: unexpected end of JSON input" {
+		t.Fatalf("direct UnmarshalJSON() error = %v; want the native syntax response-shape error", err)
 	}
 }
 

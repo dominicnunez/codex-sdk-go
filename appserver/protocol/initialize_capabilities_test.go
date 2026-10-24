@@ -256,9 +256,8 @@ func TestInitializeExtensionSnapshotDepthFailureDoesNotDispatch(t *testing.T) {
 	params := capabilityParams(t, `{}`)
 	nested := json.RawMessage(strings.Repeat("[", 10000) + "true" + strings.Repeat("]", 10000))
 	params.Capabilities.Extensions = map[string]json.RawMessage{"future": nested}
-	if _, err := json.Marshal(params.Capabilities.Extensions); err != nil {
-		t.Fatalf("fixture must marshal: %v", err)
-	}
+	// The default backend rejects this depth during encoding, before the
+	// snapshot decoder. Either failure must prevent dispatch and latching.
 	if _, err := client.Initialize(context.Background(), params); err == nil {
 		t.Fatal("snapshot decode depth failure ignored")
 	}

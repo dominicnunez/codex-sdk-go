@@ -9,11 +9,6 @@ on:
 permissions:
   contents: read
 
-# Preserve the SDK's established encoding/json contract while the Go 1.27
-# default backend migration is handled separately.
-env:
-  GOEXPERIMENT: nojsonv2
-
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

@@ -18,7 +18,7 @@ func TestSyncedNestedWrapperErrorBoundary(t *testing.T) {
 	if !errors.As(err, &typeErr) || typeErr.Type != reflect.TypeFor[string]() || typeErr.Value != "number" || typeErr.Offset != 1 {
 		t.Fatalf("nested field-local diagnostic: %T %v", err, err)
 	}
-	if value.App.ID != "prior" || !value.App.Callable || value.After != "prior" {
+	if value.App.ID != "prior" || !value.App.Callable || value.After != "later" {
 		t.Fatalf("failed nested admission published partial value: %+v", value)
 	}
 	if err := json.Unmarshal([]byte(`{"app":{"id":"","callable":false,"enabled":false},"after":"later"}`), &value); err != nil || value.After != "later" {

@@ -59,7 +59,7 @@ func IDField(data []byte) (string, error) {
 
 func stringField(data []byte, name string) (string, error) {
 	var selected []byte
-	var invalid []byte
+	var invalid, invalidKey []byte
 	var invalidOffset int
 	walkFields(data, true, func(key, value []byte, offset int) {
 		if !FieldMatchesFolded(key, name) {
@@ -69,6 +69,7 @@ func stringField(data []byte, name string) (string, error) {
 			selected = value
 		} else if !bytes.Equal(value, []byte("null")) && invalid == nil {
 			invalid = value
+			invalidKey = key
 			invalidOffset = offset
 		}
 	})
@@ -83,7 +84,11 @@ func stringField(data []byte, name string) (string, error) {
 		err := json.Unmarshal(invalid, &ignored)
 		var typeError *json.UnmarshalTypeError
 		if errors.As(err, &typeError) {
-			typeError.Field = name
+			// The default backend reports the actual decoded wire name,
+			// including folded aliases, rather than the struct tag.
+			if err := json.Unmarshal(invalidKey, &typeError.Field); err != nil {
+				return value, err
+			}
 			typeError.Offset += int64(invalidOffset)
 		}
 		return value, err

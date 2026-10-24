@@ -51,14 +51,14 @@ func readResourcePayload(t *testing.T, payload string) (codex.McpResourceReadRes
 
 func TestMcpResourceReadAdmissionPolicies(t *testing.T) {
 	tests := []struct {
-		name     string
-		payload  string
-		wantErr  bool
-		wantText *string
-		wantBlob *string
-		wantURI  string
-		errField string
-		errValue string
+		name        string
+		payload     string
+		wantErr     bool
+		wantText    *string
+		wantBlob    *string
+		wantURI     string
+		nativeError bool
+		errValue    string
 	}{
 		{name: "text branch accepts incompatible blob extra", payload: `{"contents":[{"uri":"u","text":"t","blob":7}]}`, wantText: stringPointer("t"), wantURI: "u"},
 		{name: "blob branch accepts incompatible text extra", payload: `{"contents":[{"uri":"u","blob":"b","text":{}}]}`, wantBlob: stringPointer("b"), wantURI: "u"},
@@ -66,21 +66,21 @@ func TestMcpResourceReadAdmissionPolicies(t *testing.T) {
 		{name: "blob branch accepts null opposite text", payload: `{"contents":[{"uri":"u","blob":"","text":null}]}`, wantBlob: stringPointer(""), wantURI: "u"},
 		{name: "both bad branches repaired in same source object", payload: `{"contents":[{"uri":"u","text":7,"blob":false,"text":"t","blob":"b"}]}`, wantText: stringPointer("t"), wantBlob: stringPointer("b"), wantURI: "u"},
 		{name: "bad text can use inherited blob at source object end", payload: `{"contents":[{"uri":"u","blob":"b"}],"contents":[{"uri":"v","text":7}]}`, wantBlob: stringPointer("b"), wantURI: "v"},
-		{name: "bad text followed by repair still needs same object blob", payload: `{"contents":[{"uri":"u","text":7,"text":"t"}]}`, wantErr: true, errField: "contents.text", errValue: "number"},
-		{name: "later separate object cannot classify earlier bad text", payload: `{"contents":[{"uri":"u","text":7}],"contents":[{"uri":"v","blob":"b"}]}`, wantErr: true, errField: "contents.text", errValue: "number"},
+		{name: "bad text followed by repair still needs same object blob", payload: `{"contents":[{"uri":"u","text":7,"text":"t"}]}`, wantErr: true, nativeError: true, errValue: "number"},
+		{name: "later separate object cannot classify earlier bad text", payload: `{"contents":[{"uri":"u","text":7}],"contents":[{"uri":"v","blob":"b"}]}`, wantErr: true, nativeError: true, errValue: "number"},
 		{name: "both branches absent", payload: `{"contents":[{"uri":"u"}]}`, wantErr: true},
 		{name: "URI absent", payload: `{"contents":[{"text":"t"}]}`, wantErr: true},
 		{name: "URI null", payload: `{"contents":[{"uri":null,"text":"t"}]}`, wantErr: true},
 		{name: "null content item", payload: `{"contents":[null]}`, wantErr: true},
-		{name: "invalid shared MIME type remains native error", payload: `{"contents":[{"uri":"u","text":"t","mimeType":7}]}`, wantErr: true, errField: "contents.mimeType", errValue: "number"},
-		{name: "invalid MIME type with extra falls back", payload: `{"contents":[{"uri":"u","text":"t","mimeType":7,"blob":false}]}`, wantErr: true, errField: "contents.mimeType", errValue: "number"},
-		{name: "folded invalid MIME type with extra falls back", payload: `{"contents":[{"uri":"u","text":"t","MIMETYPE":7,"blob":false}]}`, wantErr: true, errField: "contents.mimeType", errValue: "number"},
-		{name: "escaped invalid MIME type with extra falls back", payload: `{"contents":[{"uri":"u","text":"t","m\u0069meType":7,"blob":false}]}`, wantErr: true, errField: "contents.mimeType", errValue: "number"},
-		{name: "invalid URI remains native error", payload: `{"contents":[{"uri":7,"text":"t"}]}`, wantErr: true, errField: "contents.uri", errValue: "number"},
-		{name: "invalid origin call ID remains native error", payload: `{"contents":[{"uri":"u","text":"t"}],"originCallId":7,"originCallId":"repaired"}`, wantErr: true, errField: "originCallId", errValue: "number"},
-		{name: "invalid origin call ID with extra falls back", payload: `{"originCallId":7,"contents":[{"uri":"u","text":"t","blob":false}]}`, wantErr: true, errField: "originCallId", errValue: "number"},
-		{name: "folded invalid origin call ID with extra falls back", payload: `{"ORIGINCALLID":7,"contents":[{"uri":"u","text":"t","blob":false}]}`, wantErr: true, errField: "originCallId", errValue: "number"},
-		{name: "escaped invalid origin call ID with extra falls back", payload: `{"or\u0069ginCallId":7,"contents":[{"uri":"u","text":"t","blob":false}]}`, wantErr: true, errField: "originCallId", errValue: "number"},
+		{name: "invalid shared MIME type remains native error", payload: `{"contents":[{"uri":"u","text":"t","mimeType":7}]}`, wantErr: true, nativeError: true, errValue: "number"},
+		{name: "invalid MIME type with extra falls back", payload: `{"contents":[{"uri":"u","text":"t","mimeType":7,"blob":false}]}`, wantErr: true, nativeError: true, errValue: "number"},
+		{name: "folded invalid MIME type with extra falls back", payload: `{"contents":[{"uri":"u","text":"t","MIMETYPE":7,"blob":false}]}`, wantErr: true, nativeError: true, errValue: "number"},
+		{name: "escaped invalid MIME type with extra falls back", payload: `{"contents":[{"uri":"u","text":"t","m\u0069meType":7,"blob":false}]}`, wantErr: true, nativeError: true, errValue: "number"},
+		{name: "invalid URI remains native error", payload: `{"contents":[{"uri":7,"text":"t"}]}`, wantErr: true, nativeError: true, errValue: "number"},
+		{name: "invalid origin call ID remains native error", payload: `{"contents":[{"uri":"u","text":"t"}],"originCallId":7,"originCallId":"repaired"}`, wantErr: true, nativeError: true, errValue: "number"},
+		{name: "invalid origin call ID with extra falls back", payload: `{"originCallId":7,"contents":[{"uri":"u","text":"t","blob":false}]}`, wantErr: true, nativeError: true, errValue: "number"},
+		{name: "folded invalid origin call ID with extra falls back", payload: `{"ORIGINCALLID":7,"contents":[{"uri":"u","text":"t","blob":false}]}`, wantErr: true, nativeError: true, errValue: "number"},
+		{name: "escaped invalid origin call ID with extra falls back", payload: `{"or\u0069ginCallId":7,"contents":[{"uri":"u","text":"t","blob":false}]}`, wantErr: true, nativeError: true, errValue: "number"},
 	}
 
 	for _, tt := range tests {
@@ -92,7 +92,7 @@ func TestMcpResourceReadAdmissionPolicies(t *testing.T) {
 				if directErr == nil || publicErr == nil {
 					t.Fatalf("expected direct and public decode errors; direct=%v public=%v", directErr, publicErr)
 				}
-				if tt.errField != "" {
+				if tt.nativeError {
 					var native nativeResourceReadResponse
 					nativeErr := json.Unmarshal([]byte(tt.payload), &native)
 					var nativeTypeErr *json.UnmarshalTypeError
@@ -105,8 +105,8 @@ func TestMcpResourceReadAdmissionPolicies(t *testing.T) {
 							t.Errorf("%s error %T is not an UnmarshalTypeError: %v", name, err, err)
 							continue
 						}
-						if typeErr.Field != tt.errField || typeErr.Value != tt.errValue {
-							t.Errorf("%s type error = {Field:%q Value:%q}; want {Field:%q Value:%q}", name, typeErr.Field, typeErr.Value, tt.errField, tt.errValue)
+						if typeErr.Field != nativeTypeErr.Field || typeErr.Value != tt.errValue {
+							t.Errorf("%s type error = {Field:%q Value:%q}; want {Field:%q Value:%q}", name, typeErr.Field, typeErr.Value, nativeTypeErr.Field, tt.errValue)
 						}
 						if typeErr.Offset != nativeTypeErr.Offset || typeErr.Type != nativeTypeErr.Type || typeErr.Struct != "ResourceContent" && typeErr.Struct != "wire" {
 							t.Errorf("%s type error context = {Struct:%q Type:%v Offset:%d}; native offset/type={%v %d}", name, typeErr.Struct, typeErr.Type, typeErr.Offset, nativeTypeErr.Type, nativeTypeErr.Offset)

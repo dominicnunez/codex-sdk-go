@@ -6,7 +6,7 @@ Runtime behavior is unchanged by the benchmark harness.
 For current runs, use Go 1.27.3 with the supported JSON backend:
 
 ```sh
-GOEXPERIMENT=nojsonv2 go test ./appserver/transport -run '^$' -bench 'BenchmarkInbound(Large|Pipeline|ReadLine|EnvelopeDecoder)' -benchmem -benchtime=500ms -count=5
+go test ./appserver/transport -run '^$' -bench 'BenchmarkInbound(Large|Pipeline|ReadLine|EnvelopeDecoder)' -benchmem -benchtime=500ms -count=5
 ```
 
 The Transport benchmarks workflow collects this baseline on Linux and Windows,
