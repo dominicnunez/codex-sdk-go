@@ -475,6 +475,19 @@ form-schema errors keep their precedence, and rejected parameters do not replace
 a seeded receiver. These checks validate request shape; they do not authorize
 input collection, choose a trusted URL or fetch external resources.
 
+Standard `form` requests also validate the typed `requestedSchema` before
+callback publication: its root must be an object schema, and property definitions
+must match a supported string, numeric, boolean or select alternative. Closed
+schema objects reject unknown members; required members, nullable metadata,
+array elements, string-format literals and nonnegative integer limits follow the
+checked-in definitions. Numeric limits are checked from their decimal spelling
+without expanding exponent-sized integers. Property definitions and their nested options retain final-member map decoding;
+repeated root property dictionaries retain their merging behavior. Existing
+native and required-field errors take precedence over these added checks, and
+failed validation leaves the receiver unchanged. Both OpenAI form modes retain
+arbitrary JSON schemas. This checks the schema's representation, not submitted
+answers, cross-field consistency or whether collecting the input is authorized.
+
 The selected form branches leave `url` and `elicitationId` unrestricted. Their
 existing Go string fields retain string values and null resets; other JSON kinds
 are ignored without building their object graphs. The URL branch keeps its
