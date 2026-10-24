@@ -45,8 +45,20 @@ func (n *ProcessOutputDeltaNotification) UnmarshalJSON(data []byte) error {
 	if err := validateInboundBase64Field("deltaBase64", decoded.DeltaBase64); err != nil {
 		return err
 	}
+	if err := validateOutputStreamOccurrences(data); err != nil {
+		return err
+	}
 	*n = ProcessOutputDeltaNotification(decoded)
 	return nil
+}
+
+// Both output notification records recognize exact decoded field names. Keep
+// their original errors first, then reject invalid streams hidden by duplicates.
+func validateOutputStreamOccurrences(data []byte) error {
+	return validateFields(data, func(_ string, raw []byte) error {
+		var stream ProcessOutputStream
+		return unmarshalEnumString(raw, "stream", validProcessOutputStreams, &stream)
+	}, false, "stream")
 }
 
 // ProcessExitedNotification is the final exit notification for process/spawn.
