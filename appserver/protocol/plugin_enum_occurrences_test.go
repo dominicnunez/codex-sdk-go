@@ -22,7 +22,7 @@ func pluginEnumCases() []pluginEnumCase {
 	return []pluginEnumCase{
 		{"authPolicy", []string{"ON_INSTALL", "ON_USE"}, false},
 		{"installPolicy", []string{"NOT_AVAILABLE", "AVAILABLE", "INSTALLED_BY_DEFAULT"}, false},
-		{"availability", []string{"DISABLED_BY_ADMIN", "AVAILABLE"}, true},
+		{"availability", []string{"DISABLED_BY_ADMIN", "AVAILABLE"}, false},
 	}
 }
 
@@ -195,9 +195,7 @@ func checkPluginEnum(t *testing.T, s p.PluginSummary, field, want string) {
 	case "installPolicy":
 		got = string(s.InstallPolicy)
 	case "availability":
-		if s.Availability != nil {
-			got = string(*s.Availability)
-		}
+		got = string(s.Availability)
 	}
 	if got != want {
 		t.Fatalf("%s=%q; want %q", field, got, want)

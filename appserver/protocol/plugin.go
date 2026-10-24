@@ -60,8 +60,8 @@ var validPluginAvailabilities = map[PluginAvailability]struct{}{
 	PluginAvailabilityAvailable:       {},
 }
 
-func validateOptionalPluginAvailabilityField(field string, value *PluginAvailability) error {
-	return validateOptionalEnumValue(field, value, validPluginAvailabilities)
+func validatePluginAvailabilityField(field string, value PluginAvailability) error {
+	return validateEnumValue(field, value, validPluginAvailabilities)
 }
 
 // PluginDisabledReason explains why a remote plugin is unavailable.
@@ -456,7 +456,7 @@ type PluginSummary struct {
 	MustShowInstallationInterstitial *bool                      `json:"mustShowInstallationInterstitial,omitempty"`
 	Version                          *string                    `json:"version,omitempty"`
 	AuthPolicy                       PluginAuthPolicy           `json:"authPolicy"`
-	Availability                     *PluginAvailability        `json:"availability,omitempty"`
+	Availability                     PluginAvailability         `json:"availability,omitempty"`
 	Enabled                          bool                       `json:"enabled"`
 	ID                               string                     `json:"id"`
 	InstallPolicy                    PluginInstallPolicy        `json:"installPolicy"`
@@ -513,6 +513,10 @@ func (p *PluginSummary) UnmarshalJSON(data []byte) error {
 	case wire.Source == nil:
 		return errors.New("missing plugin.summary.source")
 	}
+	availability := PluginAvailabilityAvailable
+	if wire.Availability != nil {
+		availability = *wire.Availability
+	}
 	previous := *p
 	p.AuthPolicy = *wire.AuthPolicy
 	p.DisabledReason = wire.DisabledReason
@@ -521,7 +525,7 @@ func (p *PluginSummary) UnmarshalJSON(data []byte) error {
 	p.InstalledAt = wire.InstalledAt
 	p.MustShowInstallationInterstitial = wire.MustShowInstallationInterstitial
 	p.Version = wire.Version
-	p.Availability = wire.Availability
+	p.Availability = availability
 	p.Enabled = *wire.Enabled
 	p.ID = *wire.ID
 	p.InstallPolicy = *wire.InstallPolicy
@@ -539,7 +543,7 @@ func (p *PluginSummary) UnmarshalJSON(data []byte) error {
 	if err := validatePluginInstallPolicyField("plugin.summary.installPolicy", p.InstallPolicy); err != nil {
 		return err
 	}
-	if err := validateOptionalPluginAvailabilityField("plugin.summary.availability", p.Availability); err != nil {
+	if err := validatePluginAvailabilityField("plugin.summary.availability", p.Availability); err != nil {
 		return err
 	}
 	if err := validateOptionalStringArrays(data, "keywords"); err != nil {
@@ -561,7 +565,10 @@ func (p *PluginSummary) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	if err := validateEnumOccurrences(data, "availability", true, func(value *PluginAvailability) error {
-		return validateOptionalPluginAvailabilityField("plugin.summary.availability", value)
+		if value == nil {
+			return errors.New("plugin.summary.availability must not be null")
+		}
+		return validatePluginAvailabilityField("plugin.summary.availability", *value)
 	}); err != nil {
 		*p = previous
 		return err

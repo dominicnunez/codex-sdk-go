@@ -75,6 +75,15 @@ The service cannot recover that distinction, and these path schemas permit empty
 strings. Applications accepting raw JSON must validate its shape before that
 conversion; typed request preparation is not a raw JSON schema validator.
 
+## Plugin availability
+
+`PluginSummary.Availability` is a `PluginAvailability` enum value. An omitted
+JSON member decodes as `PluginAvailabilityAvailable`; explicit values retain
+`AVAILABLE` or `DISABLED_BY_ADMIN`. Null is rejected, including an earlier null
+followed by a valid duplicate. This applies to `Plugin.List`,
+`Plugin.Installed`, `Plugin.Read` and `Plugin.ShareList`. A zero Go field is
+omitted when encoding, selecting the schema default on the next decode.
+
 ## Thread-list filters
 
 `Thread.List` preserves its existing parameter fields. A nil `ModelProviders`

@@ -23,7 +23,7 @@ func TestPluginSummaryDecodeCompatibility(t *testing.T) {
 	}
 	for _, extra := range []string{
 		`,"keywords":[],"keywords":["last"]`,
-		`,"availability":null,"availability":"AVAILABLE"`,
+		`,"availability":"DISABLED_BY_ADMIN","availability":"AVAILABLE"`,
 	} {
 		body := strings.TrimSuffix(issue74PluginSummary, "}") + extra + "}"
 		var summary codex.PluginSummary
@@ -33,7 +33,7 @@ func TestPluginSummaryDecodeCompatibility(t *testing.T) {
 		if strings.Contains(extra, "keywords") && !reflect.DeepEqual(summary.Keywords, []string{"last"}) {
 			t.Fatal("duplicate keywords changed")
 		}
-		if strings.Contains(extra, "availability") && (summary.Availability == nil || *summary.Availability != codex.PluginAvailabilityAvailable) {
+		if strings.Contains(extra, "availability") && summary.Availability != codex.PluginAvailabilityAvailable {
 			t.Fatal("duplicate availability changed")
 		}
 	}
