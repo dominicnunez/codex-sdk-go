@@ -2,6 +2,20 @@
 
 `appserver/protocol` maps the checked-in Codex app-server schemas to Go. The schemas remain the source of truth; this page is a discovery guide for public APIs that are easy to miss in the package index.
 
+## JSON decoding and errors
+
+The SDK uses the default `encoding/json` backend. Direct decoding, including
+inside application envelopes, can partially update the destination before
+returning an error and can visit later fields after a custom decoder fails.
+Discard failed decode results. SDK service methods reject failed admission and
+return zero responses; invalid metadata is not a successful response.
+
+Native error details follow the supported Go runtime. Prefer `errors.As`,
+`errors.Is` and structured fields over matching complete error strings.
+Application codec errors retain their identity and chains. The [threat
+model](threat-model.md#json-rpc-framing-dispatch-and-resource-exhaustion)
+describes SDK diagnostic bounds and their limits.
+
 ## Service map
 
 The main service fields on `Client` include `Thread`, `Turn`, `Account`, `Apps`, `Skills`, and `ExternalAgent`. Recent protocol methods include:

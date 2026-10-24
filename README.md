@@ -23,9 +23,7 @@ import codex "github.com/dominicnunez/codex-sdk-go/appserver/protocol"
 - An absolute `ProcessOptions.BinaryPath` when spawning Codex from this SDK
 
 Build and test with the default Go JSON backend; no experiment setting is
-required. CI reads the Go version from `go.mod`. The legacy `nojsonv2` backend
-is no longer supported. See the [JSON backend migration notes](docs/json-backend-migration.md)
-for changes to native errors and partial decoding after failures.
+required. CI reads the Go version from `go.mod`.
 
 ## Packages
 
@@ -43,6 +41,9 @@ for changes to native errors and partial decoding after failures.
 - [Configuration guide](docs/guides/configuration.md) — single and multiple workspace login restrictions and JSON composition
 - [Spec-sync maintenance](docs/spec-sync.md) — automated schema updates and superseded-PR handling
 - [Threat model](docs/threat-model.md) — trust boundaries, implemented controls, residual risks, and severity calibration
+
+For maintainers, see the [architecture and ownership reference](docs/architecture.md)
+and [protocol maintenance cases](docs/protocol-maintenance.md).
 
 ## Runtime Choice
 
