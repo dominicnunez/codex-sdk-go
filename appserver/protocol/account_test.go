@@ -1112,13 +1112,13 @@ func TestAccountMarshalJSONInjectsTypeDiscriminator(t *testing.T) {
 		},
 		{
 			name:    "ChatgptAccount_with_fields",
-			account: &codex.ChatgptAccount{Email: "a@b.com", PlanType: codex.PlanTypePlus},
+			account: &codex.ChatgptAccount{Email: stringPointer("a@b.com"), PlanType: codex.PlanTypePlus},
 			want:    `{"type":"chatgpt","email":"a@b.com","planType":"plus"}`,
 		},
 		{
 			name:    "ChatgptAccount_zero_value",
 			account: &codex.ChatgptAccount{},
-			want:    `{"type":"chatgpt","email":"","planType":""}`,
+			want:    `{"type":"chatgpt","email":null,"planType":""}`,
 		},
 	}
 
@@ -1148,7 +1148,7 @@ func TestAccountWrapperRoundTrip(t *testing.T) {
 		},
 		{
 			name:    "chatgpt",
-			wrapper: &codex.AccountWrapper{Value: &codex.ChatgptAccount{Email: "a@b.com", PlanType: codex.PlanTypePro}},
+			wrapper: &codex.AccountWrapper{Value: &codex.ChatgptAccount{Email: stringPointer("a@b.com"), PlanType: codex.PlanTypePro}},
 			want:    `{"type":"chatgpt","email":"a@b.com","planType":"pro"}`,
 		},
 	}
