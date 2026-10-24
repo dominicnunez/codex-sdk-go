@@ -466,6 +466,15 @@ closure, and historical results may differ from subsequently published state.
 
 ## Prompt injection, approvals, and tool results
 
+MCP elicitation request admission validates every recognized `mode` occurrence
+against `form`, `url`, `openaiForm` and `openai/form` before invoking the
+application handler. Later valid duplicates cannot hide an unsupported mode.
+Field matching remains exact, including escaped spellings; supported mode
+transitions retain the final branch selection. Existing identity, variant and
+form-schema errors keep their precedence, and rejected parameters do not replace
+a seeded receiver. These checks validate request shape; they do not authorize
+input collection, choose a trusted URL or fetch external resources.
+
 A repository file, retrieved resource, MCP tool response, attachment, or model message may try to persuade an application to authorize commands, disclose secrets, or render executable content. The SDK exposes these values and protocol operations; it does not classify their trustworthiness or implement prompt-injection prevention. Treat text and structured metadata as data, including image identifiers, MCP UI resource URIs, prediction text, and plugin metadata.
 
 [Approval handlers](../appserver/protocol/approval_handlers.go) are application-owned callbacks. Without a matching handler, the client returns a JSON-RPC method-not-found error rather than granting approval. A permissive handler or permissive Codex approval policy can deliberately remove that protection. The application must bind decisions to its actual user, account, workspace, operation, and permitted consequences. Dynamic tool callbacks and token-refresh callbacks are privileged code and must not derive authority solely from model output or a claimed thread ID.
