@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestHookRunnerSelectsLegacyJSON(t *testing.T) {
+func TestHookRunnerPreservesGoExperiments(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Unix shell-hook fixture")
 	}
@@ -29,10 +29,7 @@ func TestHookRunnerSelectsLegacyJSON(t *testing.T) {
 			if err != nil {
 				t.Fatalf("hook runner: %v: %s", err, output)
 			}
-			want := "nojsonv2"
-			if experiment != "" {
-				want = experiment + ",nojsonv2"
-			}
+			want := experiment
 			if strings.TrimSpace(string(output)) != want {
 				t.Fatalf("GOEXPERIMENT=%q, want %q", output, want)
 			}

@@ -360,7 +360,7 @@ func TestMcpCatalogIconsPreserveValidEnvelopeErrorsAndRejectInvalidRoots(t *test
 		}{
 			{name: "valid-icons-preserve-before-error", before: `"bad"`, icons: `[]`, after: `1`, wantSubstr: "before"},
 			{name: "valid-icons-preserve-after-error", before: `1`, icons: `[]`, after: `"bad"`, wantSubstr: "after"},
-			{name: "invalid-icons-preempt-before-error", before: `"bad"`, icons: `"bad"`, after: `1`, wantSubstr: "icons"},
+			{name: "invalid-icons-preserve-before-error", before: `"bad"`, icons: `"bad"`, after: `1`, wantSubstr: "before"},
 			{name: "invalid-icons-preempt-after-error", before: `1`, icons: `"bad"`, after: `"bad"`, wantSubstr: "icons"},
 		} {
 			t.Run(target+"/"+tc.name, func(t *testing.T) {
@@ -383,7 +383,7 @@ func TestMcpCatalogIconsPreserveValidEnvelopeErrorsAndRejectInvalidRoots(t *test
 				if err == nil || !strings.Contains(err.Error(), tc.wantSubstr) {
 					t.Fatalf("envelope error = %v, want error containing %q", err, tc.wantSubstr)
 				}
-				if tc.wantSubstr == "icons" && icons != nil {
+				if tc.icons != `[]` && icons != nil {
 					t.Fatalf("invalid icon value was published through envelope: %#v", icons)
 				}
 				if tc.icons == `[]` && !reflect.DeepEqual(icons, []any{}) {

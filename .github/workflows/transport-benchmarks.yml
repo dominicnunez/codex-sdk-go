@@ -6,9 +6,6 @@ on:
 permissions:
   contents: read
 
-env:
-  GOEXPERIMENT: nojsonv2
-
 concurrency:
   group: transport-benchmarks-${{ github.ref }}
   cancel-in-progress: true

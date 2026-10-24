@@ -18,7 +18,7 @@ type stringTagRecord[T any] struct {
 }
 type stringTagNamedInt[T any] int64
 
-func TestStringTagNamedTargetSuffix(t *testing.T) {
+func TestStringTagNamedTargetMetadata(t *testing.T) {
 	type target = stringTagNamedInt[struct {
 		Label string `json:" into type"`
 	}]
@@ -28,8 +28,9 @@ func TestStringTagNamedTargetSuffix(t *testing.T) {
 	}
 	var value protocol.OptionalNullable[stringTagRecord[target]]
 	err = json.Unmarshal([]byte(`{"n":`+string(quoted)+`}`), &value)
-	if err == nil || len(err.Error()) > 4096 || !strings.HasSuffix(err.Error(), " into "+reflect.TypeFor[target]().String()) {
-		t.Fatal("quoted literal splitting changed application-defined target type")
+	var typed *json.UnmarshalTypeError
+	if err == nil || len(err.Error()) > 4096 || !errors.As(err, &typed) || typed.Type != reflect.TypeFor[target]() {
+		t.Fatal("native diagnostic changed application-defined target type")
 	}
 }
 
@@ -91,7 +92,7 @@ func checkStringTagDiagnostic[T any](t *testing.T, seed T) {
 		if wantErr == nil || gotErr == nil {
 			t.Fatal("invalid string-tag input admitted")
 		}
-		if len(gotErr.Error()) > 4096 || !strings.Contains(gotErr.Error(), "bytes omitted") {
+		if len(gotErr.Error()) > 4096 || (len(wantErr.Error()) > 2048 && !strings.Contains(gotErr.Error(), "bytes omitted")) {
 			t.Fatalf("native string-tag diagnostic unbounded: bytes=%d", len(gotErr.Error()))
 		}
 		if !reflect.DeepEqual(got, want) || value.Value != &got || !value.Present {
@@ -176,13 +177,7 @@ func TestStringTagFailurePrecedence(t *testing.T) {
 			if wantErr == nil || gotErr == nil || !reflect.DeepEqual(got, want) {
 				t.Fatal("duplicate/null/mixed failure receiver changed")
 			}
-			if len(wantErr.Error()) <= 2048 {
-				if gotErr.Error() != wantErr.Error() {
-					t.Fatal("earlier native error lost precedence")
-				}
-			} else if len(gotErr.Error()) > 4096 || !strings.HasSuffix(gotErr.Error(), " into int64") {
-				t.Fatal("later native formatter ownership or target changed")
-			}
+			compareNumericDiagnosticError(t, gotErr, wantErr)
 		}
 	}
 }

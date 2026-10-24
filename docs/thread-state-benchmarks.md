@@ -6,7 +6,7 @@ For current runs, use Go 1.27.3 with the supported JSON backend:
 Run from the repository root:
 
 ```sh
-GOEXPERIMENT=nojsonv2 go test ./appserver/protocol -run '^$' -bench BenchmarkThreadState -benchmem -benchtime=100ms -count=3
+go test ./appserver/protocol -run '^$' -bench BenchmarkThreadState -benchmem -benchtime=100ms -count=3
 ```
 
 The fixture holds 0, 100, or 1,000 turns with one agent-message item each.

@@ -4,30 +4,37 @@ package jsonencode
 
 import (
 	"encoding/json"
-	"errors"
+	"fmt"
+	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/diagnostic"
 )
 
 // Marshal preserves standard serialization and application codec errors. Go
-// wraps value JSON/Text codec failures in MarshalerError; do not traverse that
-// chain or format it here. SDK codecs use this helper inside their own boundary
-// so native failures are bounded before Go adds an enclosing MarshalerError.
+// wraps codec failures in MarshalerError. Only the standard-library Number
+// codec is normalized here; application wrappers and error chains retain their
+// identity. SDK codecs use this helper before enclosing JSON codecs wrap errors.
 func Marshal(value any) ([]byte, error) {
 	data, err := json.Marshal(value)
 	if err == nil {
 		return data, nil
 	}
-	if _, custom := err.(*json.MarshalerError); custom { //nolint:errorlint // Direct ownership, not a search through application error chains.
+	custom, ok := err.(*json.MarshalerError) //nolint:errorlint // Only the direct wrapper establishes the codec owner.
+	if !ok || (custom.Type != reflect.TypeFor[json.Number]() && custom.Type != reflect.TypeFor[*json.Number]()) {
 		return data, err
 	}
-	const prefix = "json: invalid number literal "
-	message := err.Error()
-	if len(message) > 2048 && strings.HasPrefix(message, prefix) {
-		// This direct formatter is owned by encoding/json, with no structured
-		// fields or underlying cause. Keep no reference to its full diagnostic.
-		return data, errors.New(prefix + diagnostic.Display(message[len(prefix):]))
+	// Number is a standard-library streaming marshaler. Application codec
+	// failures have their own outer MarshalerError and must remain untouched.
+	const prefix = "cannot parse "
+	const suffix = " as JSON number: invalid syntax"
+	message := custom.Err.Error()
+	if len(message) <= 2048 || !strings.HasPrefix(message, prefix) || !strings.HasSuffix(message, suffix) {
+		return data, err
 	}
-	return data, err
+	literal := message[len(prefix) : len(message)-len(suffix)]
+	bounded := *custom
+	bounded.Err = fmt.Errorf("cannot parse %s as JSON number: %w", diagnostic.Display(literal), strconv.ErrSyntax)
+	return data, &bounded
 }

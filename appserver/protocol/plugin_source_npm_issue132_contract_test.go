@@ -315,7 +315,7 @@ func TestPluginSourceNPMNativeErrorRepairAndNullableOrdering(t *testing.T) {
 	var mixed codex.PluginSource
 	err := json.Unmarshal([]byte(`{"type":"npm","package":false,"registry":{}}`), &mixed)
 	var metadataTypeError *json.UnmarshalTypeError
-	if !errors.As(err, &metadataTypeError) || metadataTypeError.Field != "registry" || metadataTypeError.Type == nil || metadataTypeError.Type.Kind() != reflect.String {
+	if !errors.As(err, &metadataTypeError) || metadataTypeError.Field != "package" || metadataTypeError.Type == nil || metadataTypeError.Type.Kind() != reflect.String {
 		t.Fatalf("OptionalNullable decoder error precedence/metadata changed: %#v (%T %v)", metadataTypeError, err, err)
 	}
 

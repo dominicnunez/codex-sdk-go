@@ -19,7 +19,7 @@ Do:
 
 **When in doubt:** check the type against the corresponding `appserver/protocol/schema/json/*.json` schema before changing it.
 
-Run `GOEXPERIMENT=nojsonv2 go test ./appserver/protocol -run TestSpecCoverage` to verify all specs have corresponding Go types.
+Run `go test ./appserver/protocol -run TestSpecCoverage` to verify all specs have corresponding Go types.
 
 For schema field changes, inventory properties, requiredness, nullability, enum
 values and union branches, including nested definitions. Check enum-valued fields

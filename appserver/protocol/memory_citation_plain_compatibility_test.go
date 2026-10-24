@@ -121,7 +121,7 @@ func TestMemoryCitationPlainReceiverMatchesNativeDecoding(t *testing.T) {
 	if !errors.As(gotTypeError, &gotUTE) || !errors.As(nativeTypeError, &nativeUTE) {
 		t.Fatalf("type errors actual=%v native=%v", gotTypeError, nativeTypeError)
 	}
-	if gotUTE.Type != nativeUTE.Type || gotUTE.Value != nativeUTE.Value || gotUTE.Offset != nativeUTE.Offset || gotUTE.Field != nativeUTE.Field || gotUTE.Struct != "MemoryCitationEntry" {
+	if gotUTE.Type != nativeUTE.Type || gotUTE.Value != nativeUTE.Value || gotUTE.Offset != nativeUTE.Offset || gotUTE.Field != nativeUTE.Field || gotUTE.Struct != reflect.TypeOf(actual).Name() {
 		t.Fatalf("native diagnostic metadata changed: actual=%+v native=%+v", gotUTE, nativeUTE)
 	}
 	if actual.Entries[0].Note != "after-error" || native.Entries[0].Note != "after-error" || !reflect.DeepEqual(actual.ThreadIDs, want.ThreadIDs) || !reflect.DeepEqual(native.ThreadIDs, want.ThreadIDs) {

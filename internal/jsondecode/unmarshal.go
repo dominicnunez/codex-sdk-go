@@ -1,13 +1,12 @@
-// Package jsondecode bounds native JSON numeric diagnostics at
+// Package jsondecode bounds native JSON value and field diagnostics at
 // audited SDK decoding boundaries before their callers wrap the error.
 package jsondecode
 
 import (
 	"encoding"
 	"encoding/json"
-	"errors"
+	jsonv2 "encoding/json/v2"
 	"reflect"
-	"strconv"
 	"strings"
 
 	"github.com/dominicnunez/codex-sdk-go/internal/diagnostic"
@@ -23,40 +22,27 @@ func Unmarshal(data []byte, dest any) error {
 // to arbitrary callback errors: their concrete type does not prove provenance.
 func NativeError(err error) error {
 	typed, ok := err.(*json.UnmarshalTypeError) //nolint:errorlint // Only direct native errors can be copied without discarding an existing error chain.
-	if !ok && err != nil {
-		// The caller owns a native decoder. This formatter has no original
-		// structured metadata or cause; retain a bounded formatted-literal
-		// preview without keeping the full native error behind a wrapper.
-		const prefix = "json: invalid number literal, trying to unmarshal "
-		const suffix = " into Number"
-		message := err.Error()
-		if len(message) > 2048 && strings.HasPrefix(message, prefix) && strings.HasSuffix(message, suffix) {
-			literal := message[len(prefix) : len(message)-len(suffix)]
-			return errors.New(prefix + diagnostic.Display(literal) + suffix)
-		}
-		const stringTagPrefix = "json: invalid use of ,string struct tag, trying to unmarshal "
-		if len(message) > 2048 && strings.HasPrefix(message, stringTagPrefix) {
-			// Parse the formatter's quoted literal without unquoting or copying
-			// it. Content and application-defined target types can both contain
-			// the delimiter, so text splitting cannot preserve the target suffix.
-			literal, parseErr := strconv.QuotedPrefix(message[len(stringTagPrefix):])
-			end := len(stringTagPrefix) + len(literal)
-			if parseErr == nil && strings.HasPrefix(message[end:], " into ") {
-				return errors.New(stringTagPrefix + diagnostic.Display(literal) + message[end:])
+	if !ok {
+		return err
+	}
+	// Native errors can include the original number or quoted string, as well
+	// as dynamic map keys in Field. Copy only when bounding is necessary and
+	// keep structured locations and native causes for ordinary diagnostics.
+	bounded := *typed
+	if len(typed.Value) > 2048 {
+		for _, prefix := range []string{"number ", "string "} {
+			if strings.HasPrefix(typed.Value, prefix) {
+				bounded.Value = prefix + diagnostic.Display(strings.TrimPrefix(typed.Value, prefix))
+				break
 			}
 		}
 	}
-	// The bounded 256-byte quoted preview is always below this retained-value
-	// limit, even with worst-case escaping. Nested SDK decoders therefore leave
-	// an already bounded error alone instead of repeatedly quoting its preview.
-	if !ok || len(typed.Value) <= 2048 || !strings.HasPrefix(typed.Value, "number ") {
+	if len(typed.Field) > 2048 {
+		bounded.Field = diagnostic.Display(typed.Field)
+	}
+	if bounded.Value == typed.Value && bounded.Field == typed.Field {
 		return err
 	}
-	value := diagnostic.Display(strings.TrimPrefix(typed.Value, "number "))
-	// Copy metadata without retaining or mutating the original error. Returning
-	// the concrete type preserves enclosing encoding/json field propagation.
-	bounded := *typed
-	bounded.Value = "number " + value
 	return &bounded
 }
 
@@ -75,12 +61,21 @@ func UnmarshalStandard(data []byte, dest any) error {
 }
 
 var (
-	unmarshalerType     = reflect.TypeFor[json.Unmarshaler]()
-	textUnmarshalerType = reflect.TypeFor[encoding.TextUnmarshaler]()
+	unmarshalerType      = reflect.TypeFor[json.Unmarshaler]()
+	textUnmarshalerType  = reflect.TypeFor[encoding.TextUnmarshaler]()
+	streamingDecoderType = reflect.TypeFor[jsonv2.UnmarshalerFrom]()
 )
 
 func standardType(t reflect.Type, seen map[reflect.Type]bool) bool {
 	if t == nil {
+		return false
+	}
+	// Number's streaming method belongs to the standard library, rather than
+	// an application callback; its malformed-literal errors are native.
+	if t == reflect.TypeFor[json.Number]() || t == reflect.TypeFor[*json.Number]() {
+		return true
+	}
+	if t.Implements(streamingDecoderType) || reflect.PointerTo(t).Implements(streamingDecoderType) {
 		return false
 	}
 	if t.Implements(unmarshalerType) || t.Implements(textUnmarshalerType) || reflect.PointerTo(t).Implements(unmarshalerType) || reflect.PointerTo(t).Implements(textUnmarshalerType) {

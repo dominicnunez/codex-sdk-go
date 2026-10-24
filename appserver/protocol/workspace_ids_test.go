@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
 	codex "github.com/dominicnunez/codex-sdk-go/appserver/protocol"
@@ -117,8 +118,8 @@ func TestConfigWorkspaceJSONEnvelope(t *testing.T) {
 	if err := json.Unmarshal([]byte(`{"config":{"model":1},"label":"later"}`), &envelope); err == nil {
 		t.Fatal("invalid inner configuration accepted")
 	}
-	if envelope.Label != "kept" {
-		t.Fatal("custom decoder failure did not stop outer traversal")
+	if envelope.Label != "later" {
+		t.Fatal("default decoder did not continue outer traversal")
 	}
 }
 
@@ -148,11 +149,15 @@ func TestConfigWorkspaceMalformedAdmission(t *testing.T) {
 		var config codex.Config
 		err := json.Unmarshal([]byte(body), &config)
 		var failure *json.UnmarshalTypeError
-		if !errors.As(err, &failure) || failure.Value != "bool" {
+		wantValue := "bool"
+		if strings.Contains(body, `"model":1`) {
+			wantValue = "number"
+		}
+		if !errors.As(err, &failure) || failure.Value != wantValue {
 			t.Fatalf("restriction admission error=%v", err)
 		}
-		if config.Instructions != nil {
-			t.Fatal("later configuration decoded after malformed restriction")
+		if config.Instructions == nil || *config.Instructions != "later" {
+			t.Fatal("default decoder did not retain later configuration fields")
 		}
 		if err := json.Unmarshal([]byte(`{"forced_chatgpt_workspace_id":["recovered"],"instructions":"valid"}`), &config); err != nil {
 			t.Fatal(err)

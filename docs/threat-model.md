@@ -49,14 +49,12 @@ The SDK is not a hosted multi-tenant service, browser dashboard, durable audit l
 
 # 3. Attack surface, mitigations and attacker stories
 
-The JSON admission and bounded-diagnostic controls below describe the legacy
-`encoding/json` backend. The module requires Go 1.27.3, and builds require
-`GOEXPERIMENT=nojsonv2`, as CI, hooks and the optional dev shell configure.
-The new default backend changes error metadata, traversal after
-custom decoder failures and native formatter messages; current diagnostic bounds
-do not cover all of those messages. That backend remains unsupported pending a
-separate migration and verification of these controls. The compatibility opt-out
-is temporary, so a future toolchain upgrade must revisit this prerequisite.
+The JSON admission and bounded-diagnostic controls below use Go 1.27.3's default
+`encoding/json` implementation. No experiment override is required. Native error
+paths and enclosing traversal follow that implementation; a failed direct decode
+can leave partial receiver updates and later enclosing fields may be visited.
+Typed SDK service calls reject failed admission before returning a response.
+See the [migration notes](json-backend-migration.md) for compatibility changes.
 
 ## Process startup and local execution
 
@@ -173,7 +171,8 @@ shape when encoded. The legacy public map represents both omitted and null
 roots as nil and omits them during encoding; this is not exact null/absence
 preservation. The guard does not authenticate the account, enforce usage policy,
 or validate every programmatically constructed response. Newly rejected values
-can change error precedence or stop later fields in an enclosing JSON wrapper.
+participate in the default decoder's first-error selection; enclosing fields may
+still be visited, so callers must discard failed decodes.
 
 [Synced record admission](../appserver/protocol/synced_record_validation.go)
 validates app, workspace-message, token-usage, goal, section and import records
@@ -187,8 +186,8 @@ names, accept valid empty and zero values, and retain failures from invalid
 recognized duplicates. A failed decode leaves the record receiver unchanged;
 a successful decode replaces it and resets omitted optional fields. These
 rules differ from ordinary Go JSON receiver merging. Errors use the existing
-strict field decoder's diagnostics and can stop traversal of a containing
-application wrapper. [Scratch-state reuse](../appserver/protocol/synced_object_decode.go)
+strict field decoder's diagnostics. The default decoder may continue through
+later fields in a containing application wrapper after a record fails. [Scratch-state reuse](../appserver/protocol/synced_object_decode.go)
 retains only schema/type metadata between decodes and clears payload references
 and admission flags before reuse; it does not bound the number of valid records
 in an admitted payload. Generic raw notification handlers remain responsible
@@ -319,54 +318,47 @@ truncated. Structured RPC messages remain semantic error data and can retain
 full values. This is not a total response-size, diagnostic-size or heap budget.
 
 At audited SDK-owned protocol, runtime, token-response and JWT-claim decoding
-boundaries, native JSON numeric conversion errors retain at most 2,048 bytes in
-`json.UnmarshalTypeError.Value`. Descriptions exceeding that threshold keep a
-quoted 256-byte source preview and omitted-byte count before SDK wrapping or
-runtime fallback copies. The bounded error keeps the concrete type, target type,
-offset, struct and field context; short diagnostics, error precedence and partial
-receiver updates remain unchanged. Normalization copies metadata without keeping
-the discarded full error as a cause. Standard JSON decoding and numeric parsing
-can still allocate temporary full-token copies; accepted raw or `json.Number`
-values remain complete.
+boundaries, native JSON conversion errors retain at most 2,048 bytes in each of
+`json.UnmarshalTypeError.Value` and `Field`. Oversized number/string descriptions
+and dynamic field paths keep a quoted 256-byte source preview and omitted-byte
+count before SDK wrapping or runtime fallback copies. Normalization copies
+metadata without retaining the discarded full error; it preserves target type,
+offset, root struct and native causes. Short diagnostics and standard decoding
+behavior remain unchanged. Parsing may allocate temporary full-token copies;
+accepted raw or `json.Number` values remain complete.
 
 Unrestricted application decoding and callback errors retain their ownership
 and identity. `OptionalNullable[T]` only normalizes native diagnostics when the
-entire static destination graph lacks custom JSON/text decoders and interface
-slots. Only the exact `json:"-"` tag excludes a field from this ownership check;
-dash-named fields with tag options remain active. Extension-bearing graphs pass
-errors through, even if a native numeric
-failure occurs in another field. Application-selected envelope labels and
-structured RPC data are also outside these bounds.
+entire static destination graph lacks application JSON, text or streaming JSON
+decoders and interface slots. The standard library's `json.Number` codec is
+explicitly recognized as native. Only the exact `json:"-"` tag excludes a field
+from this ownership check; dash-named fields with tag options remain active.
+Extension-bearing graphs pass errors through, including native failures in
+another field. Application-selected envelope labels and structured RPC data
+are outside these bounds.
 
-Native malformed `json.Number` formatter errors have a separate control. At
-audited SDK decoding owners and codec-free `OptionalNullable[T]` destinations,
-and at all SDK-owned protocol JSON serialization calls (including request
-preparation, request/results, inner codecs and wire-only representations),
-formatter messages exceeding 2,048 bytes retain a quoted preview of at
-most 256 bytes of the already formatted literal plus an omitted-byte count.
-Inner SDK marshalers apply this before Go adds its `json.MarshalerError` wrapper.
-The replacement retains no original error as a cause; ordinary short errors,
-JSON admission, partial receiver updates and valid long numeric tokens are
-unchanged, including empty constructed Numbers encoding as zero.
-Union interface embedding can supply application fields without a custom JSON
-codec, including inside accepted concrete variants such as sub-agent session
-sources and scheduled-task summaries. Inner SDK serializers apply the policy
-uniformly. Existing concrete-variant admission rules remain unchanged.
+Malformed `json.Number` serialization has a separate control at SDK-owned
+protocol JSON serialization calls, including request preparation, results,
+inner codecs and wire-only representations. The default backend reports this
+through its built-in Number streaming marshaler. Only a direct
+`json.MarshalerError` owned by that standard-library type is normalized;
+application codec wrappers retain their original chains. Native messages over
+2,048 bytes keep a quoted preview of at most 256 bytes of the formatted literal
+and an omitted-byte count. The replacement preserves wrapper metadata and the
+native syntax sentinel without retaining the full formatter error. Inner SDK
+marshalers apply the policy before enclosing wrappers are added. Valid Numbers,
+including empty constructed Numbers encoding as zero, are unchanged.
+Union interface embedding may supply application fields inside accepted concrete
+variants; the same inner serialization policy applies before SDK publication.
 
-Native invalid-use-of-`,string` formatter errors use the same retained-message
-threshold and formatted-literal preview policy at audited native decoding owners
-and codec-free generic destinations. This includes numeric, boolean and string
-targets. The quoted-literal boundary is parsed without unquoting or copying its
-full content, preserving the target-type suffix even when a named generic type
-contains delimiter text. Normalization runs after standard decoding; saved-error
-versus immediate-error precedence, partial updates, duplicates, null behavior,
-short errors and successful native admission remain unchanged. Some tagged
-`json.Number` strings use a permissive standard-library shortcut; this diagnostic
-control adds no admission check to that path. Current typed SDK schema and
-provider destinations do not use `,string`; the demonstrated route is a
-caller-selected generic destination.
+Native malformed `,string` fields use the typed conversion-error policy,
+including boolean and Number string values. Short syntax diagnostics remain
+short and do not acquire a truncation marker. Standard admission, first-error
+precedence, partial updates, duplicate handling and null behavior follow the
+default backend. Current typed SDK schema and provider destinations do not use
+`,string`; the demonstrated route is a caller-selected generic destination.
 
-Application JSON/Text marshaler error chains pass through unchanged. Generic
+Application JSON, text and streaming marshaler error chains pass through unchanged. Generic
 decoding with interface slots or application codecs also passes errors through,
 including reused interfaces containing a Number, because error text alone cannot
 distinguish a native decoder failure from an application-owned error. Plain

@@ -18,7 +18,6 @@
           golangci-lint
           gopls
         ];
-        GOEXPERIMENT = "nojsonv2";
       };
     };
 }

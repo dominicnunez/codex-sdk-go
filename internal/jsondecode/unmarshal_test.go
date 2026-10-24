@@ -2,6 +2,7 @@ package jsondecode
 
 import (
 	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"reflect"
 	"strings"
@@ -89,5 +90,73 @@ func TestStringTagNativeOwnedError(t *testing.T) {
 	}
 	if NativeError(bounded) != bounded || errors.Unwrap(bounded) != nil {
 		t.Fatal("formatter normalization is not idempotent or retains original cause")
+	}
+}
+
+// The default backend includes quoted string values and dynamic object names
+// in typed errors. Both must be bounded without mutating the native error.
+func TestDefaultNativeDiagnosticBounds(t *testing.T) {
+	for _, tc := range []struct {
+		name, body string
+		target     any
+	}{
+		{"Number string", `"` + strings.Repeat("x", 1<<16) + `"`, new(json.Number)},
+		{"bool string tag", `{"N":"` + strings.Repeat("x", 1<<16) + `"}`, new(struct {
+			N bool `json:",string"`
+		})},
+		{"dynamic key", `{"` + strings.Repeat("k", 1<<16) + `":"bad"}`, new(map[string]int)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			original := json.Unmarshal([]byte(tc.body), tc.target)
+			if original == nil {
+				t.Fatal("native rejection missing")
+			}
+			before := original.Error()
+			bounded := NativeError(original)
+			if len(bounded.Error()) > 4096 || !strings.Contains(bounded.Error(), "bytes omitted") {
+				t.Fatal("native diagnostic not bounded")
+			}
+			if original.Error() != before {
+				t.Fatal("native error mutated")
+			}
+			if NativeError(bounded) != bounded {
+				t.Fatal("bounding is not idempotent")
+			}
+			var native, got *json.UnmarshalTypeError
+			if !errors.As(original, &native) || !errors.As(bounded, &got) || native.Type != got.Type || native.Offset != got.Offset || native.Struct != got.Struct || native.Err != got.Err {
+				t.Fatal("typed cause or location lost")
+			}
+			for e := bounded; e != nil; e = errors.Unwrap(e) {
+				if len(e.Error()) > 4096 {
+					t.Fatal("full diagnostic retained in chain")
+				}
+			}
+		})
+	}
+}
+
+type defaultApplicationCodec int
+
+var errDefaultApplication = &json.UnmarshalTypeError{
+	Value: "number " + strings.Repeat("9", 1<<16), Type: reflect.TypeFor[int64](),
+}
+
+func (*defaultApplicationCodec) UnmarshalJSONFrom(*jsontext.Decoder) error {
+	return errDefaultApplication
+}
+
+func TestDefaultApplicationDecoderOwnership(t *testing.T) {
+	for _, tc := range []struct {
+		body   string
+		target any
+	}{
+		{`1`, new(defaultApplicationCodec)},
+		{`{"N":1}`, new(struct{ N defaultApplicationCodec })},
+		{`[1]`, new([]defaultApplicationCodec)},
+		{`{"key":1}`, new(map[string]defaultApplicationCodec)},
+	} {
+		if err := UnmarshalStandard([]byte(tc.body), tc.target); err != errDefaultApplication {
+			t.Fatalf("application streaming decoder error identity changed: %T", err)
+		}
 	}
 }

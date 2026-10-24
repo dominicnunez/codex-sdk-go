@@ -14,10 +14,9 @@ import (
 
 // UnmarshalJSON retains both workspace restriction branches without changing
 // the legacy single-ID field. Omitted fields retain reused receiver state.
-// Invalid restrictions reject decoding. As with other custom JSON decoders,
-// errors can stop traversal of an enclosing object before its later fields.
-// A restriction error also stops later Config fields and may supersede an
-// earlier saved stdlib type error. Do not consume a partially decoded Config.
+// Invalid restrictions reject decoding. The default decoder retains the first
+// error and may continue through later Config or enclosing fields. Do not
+// consume a partially decoded Config after an error.
 func (c *Config) UnmarshalJSON(data []byte) error {
 	// Keep the original type name for standard field error context.
 	type Config configWithoutMethods
@@ -38,7 +37,7 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 			typeError.Struct = "Config"
 		}
 	}
-	if typeError != nil && typeError.Struct == "" && typeError.Field == "forced_chatgpt_workspace_id" {
+	if typeError != nil && typeError.Struct == "" && typeError.Field != "" {
 		typeError.Struct = "Config"
 	}
 	if err != nil {
