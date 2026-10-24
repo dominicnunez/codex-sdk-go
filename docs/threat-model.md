@@ -466,6 +466,12 @@ elsewhere in the consuming application. Applications must bind any filesystem
 access to their own trusted base and policy rather than treating a catalog path
 as an approved location.
 
+Thread-item admission validates agent delivery, command source, and sub-agent
+activity-kind enums before typed notification delivery or thread-cache
+publication. Omitted command sources default to `agent`, as specified for older
+records; this default does not authenticate who initiated a command or authorize
+execution.
+
 Browser extension request-header requirements, independent speed-mode support,
 turn lineage, sub-agent model metadata, attachment-owner lookup results, and
 misalignment review targets are also protocol data. The SDK does not apply these
