@@ -39,10 +39,11 @@ nested carriers and application extensions. Private marker methods also permit
 embedding; a root concrete-type switch does not seal the complete encoded graph
 against application fields or nested `json.Number` values.
 
-Plain public records retain ordinary JSON behavior when their carriers own
-validation. Adding a JSON method to such a record can promote that method into
-an anonymous application envelope and consume the entire envelope. Named and
-anonymous wrappers therefore exercise different composition boundaries.
+Keep public records method-free when their carriers own validation, preserving
+ordinary JSON behavior. Adding a JSON method to such a record can promote that
+method into an anonymous application envelope and consume the entire envelope.
+Named and anonymous wrappers therefore exercise different composition
+boundaries.
 
 Test constructed union branches separately during serialization. A pointer to a
 nil slice can select a branch explicitly; nullability must not erase that
@@ -75,13 +76,20 @@ invalid JSON. An independent reference model and the prior revision provide
 comparison evidence; reproducing the implementation's own helper is not an
 independent model.
 
-The [default backend](json-backend-migration.md) can continue through enclosing
+The default `encoding/json` backend can continue through enclosing
 fields after a custom decoder fails and retains the first failure. Do not infer
 atomicity or traversal from the presence of a JSON method. Compare named and
-anonymous wrappers, mixed failures and receiver reuse. Existing owner checks run
-before new restrictions so their established errors retain precedence. New
-admission failures still need evidence for their own publication and receiver
-guarantees; those guarantees are not implied by ordinary JSON decoding.
+anonymous wrappers, mixed failures and receiver reuse. Run established owner
+checks before new restrictions and verify mixed failures retain their error
+precedence. New admission failures still need evidence for their own publication
+and receiver guarantees; those guarantees are not implied by ordinary JSON
+decoding.
+
+Native `json.UnmarshalTypeError` paths can contain array indices and the actual
+spelling of aliased JSON keys. Preserve native type, offset and field context;
+the Config decoder restores its public root name after decoding its private
+wire representation. Native error messages and causes follow the supported Go
+runtime. Use structured error checks rather than complete message comparisons.
 
 ## Paths and approvals
 
@@ -94,8 +102,8 @@ For path changes, inventory production `normalize*AbsolutePath*` callers and
 response readers, then check the schema and pinned server behavior at every
 admission stage. Request selectors and returned grouping values belong to the
 same analysis. Existing negative fixtures alone do not establish supported
-inputs. Approval metadata retains opaque path evidence for the application; it
-is not resolved or normalized locally before the approval handler sees it.
+inputs. Preserve approval metadata as opaque path evidence for the application;
+do not resolve or normalize it locally before the approval handler sees it.
 
 ## Diagnostics and JSON selection
 
@@ -109,10 +117,14 @@ JSON, text and streaming application codecs; the shared
 before SDK wrappers retain them. Application error identity and chains remain
 owned by the application.
 
-Diagnostic cases include escaping growth, enclosing error chains, native versus
-application codecs, and the original display spelling of an identifier as well
-as its canonical matching key. A frame limit does not bound diagnostic
-allocation or retained errors by itself.
+For SDK-owned rejected peer-value diagnostics, bound previews before quoting or
+wrapping. Verify escaping growth and enclosing error chains, native versus
+application codec ownership, and the original display spelling of an identifier
+as well as its canonical matching key. Use the shared encoder at every SDK-owned protocol
+marshaling boundary before enclosing codecs wrap errors. Establish ownership
+from the destination and caller; an error type, message prefix or private
+interface marker does not prove native ownership or seal nested extensions. A
+frame limit does not bound diagnostic allocation or retained errors by itself.
 
 Borrowed-field selection in [jsonobject](../internal/jsonobject/selection.go)
 avoids decoding ignored metadata. Preserve duplicate selection, aliases, nulls
@@ -129,7 +141,10 @@ benchmarks](transport-benchmarks.md) provide complete-operation workloads.
 
 Protocol tests use `MockTransport` for immediate responses, recorded requests
 and incoming server messages, and `SlowMockTransport` for delayed responses.
-`TestSpecCoverage` checks that schema names have corresponding Go types. Those
-fixtures and type coverage complement public-call, serialization and receiver
-checks; they do not replace them. [Spec-sync maintenance](spec-sync.md) records
-schema snapshot evidence and the synchronization workflow.
+For schema changes, run
+`go test ./appserver/protocol -run TestSpecCoverage`. This checks that schema
+names have corresponding Go types, not field preservation, enum admission or
+round-trip correctness. Those fixtures and type coverage complement public-call,
+serialization and receiver checks; they do not replace them. [Spec-sync
+maintenance](spec-sync.md) records schema snapshot evidence and the
+synchronization workflow.

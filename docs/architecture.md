@@ -37,9 +37,9 @@ rather than merely successful queue admission.
 Terminal payload release spans the inbound queue, requests stored before handler
 registration, replay, dequeued execution claims and outbound envelopes.
 Admission and draining must remain coordinated so blocked or late producers
-cannot refill stopped queues. A writer or callback already claimed can finish;
-accepted outcomes and notification delivery after reader EOF remain separate
-from cancellation of unclaimed work. [Stdio
+cannot refill stopped queues. A writer or callback already claimed can finish.
+Preserve accepted outcomes and notification delivery after reader EOF when
+verifying cancellation of unclaimed work. [Stdio
 writing](../appserver/transport/stdio_write.go) and [transport
 state](../appserver/transport/stdio.go) own these transitions.
 
@@ -57,16 +57,15 @@ explicit delivery policies for the methods in the checked-in [ServerNotification
 schema](../appserver/protocol/schema/json/ServerNotification.json). Changes to
 ordering or delivery require the schema inventory and typed handlers, including
 methods outside an existing priority switch. Transport selection, typed decoding
-and malformed fallback attribution must agree on owner identity. Queued,
-in-flight, fallback and replay ownership contribute to retained payloads; a
-queue's event count alone does not measure retained bytes.
+and malformed fallback attribution must agree on owner identity. Bound retained
+payload bytes across queued, in-flight, fallback and replay ownership; a queue's
+event count alone does not establish that bound.
 
 Callback fanout isolates each recipient, including initial replay and direct
 service/cache calls. Committed state must still reach later SDK consumers if a
 callback or error reporter panics. Preserve the diagnostic origin. Replay
-failure must return registration
-cleanup, and callback finalization must survive failures in error reporting as
-well as the primary handler. Listener removal clears vacated backing slots and
+failure must return registration cleanup, and callback finalization must survive
+failures in error reporting as well as the primary handler. Listener removal clears vacated backing slots and
 discards empty registries while preserving independent dispatch snapshots and
 lifecycle unsubscription. Verify shutdown releases queued payloads as well as
 preventing further callback admission.
@@ -96,9 +95,9 @@ benchmarks](thread-state-benchmarks.md) for workloads and prior measurements.
 
 Bounded histories need bounded backing storage as well as bounded visible
 lengths. Trimmed substrings can retain their original allocation, and evicted
-slice slots can keep payloads alive. Check every retention writer, completion
-aggregation and snapshot, distinguishing bounded text from complete thread
-items.
+slice slots can keep payloads alive. Own trimmed substrings and clear evicted
+slots. Check every retention writer, completion aggregation and snapshot,
+distinguishing bounded text from complete thread items.
 
 [Stream collection](../appserver/stream_collector.go) also handles opaque
 identity tuples. Storage keys and presentation keys have different consumers.
@@ -111,12 +110,17 @@ completion cleanup for each tuple.
 Initialization extensions are serialized and owned before waiting or child
 launch. Snapshot failure rejects admission rather than retaining a mutable Go
 value as fallback. Process cancellation is rechecked after parameter
-preparation. The [backend migration notes](json-backend-migration.md) describe
-encoding-depth failures and the no-dispatch, no-latch and recovery guarantees.
+preparation. Verify process cancellation after preparation prevents child
+launch, and that snapshot failure sends no request, latches no initialized state
+and permits a later valid attempt. Encoding enforces nesting-depth limits too;
+deep extension payloads can fail before snapshot decoding. Include these
+encoding failures when verifying rejection and recovery.
 
 The [token-response boundary](../login/token.go) validates provider-controlled
 lifetimes before arithmetic and credential publication for all grant paths.
-Failure must not publish partial credentials. The [OAuth threat-model
+Verify each grant rejects invalid lifetimes against the target unit's range
+before arithmetic, and that failures publish no partial credentials. The [OAuth
+threat-model
 section](threat-model.md#oauth-callbacks-provider-routing-and-account-identity)
 documents the implemented range, token-retention behavior and residual trust in
 the provider's claims.

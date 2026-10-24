@@ -54,7 +54,6 @@ The JSON admission and bounded-diagnostic controls below use Go 1.27.3's default
 paths and enclosing traversal follow that implementation; a failed direct decode
 can leave partial receiver updates and later enclosing fields may be visited.
 Typed SDK service calls reject failed admission before returning a response.
-See the [migration notes](json-backend-migration.md) for compatibility changes.
 
 ## Process startup and local execution
 
