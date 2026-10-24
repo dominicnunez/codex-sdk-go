@@ -579,8 +579,9 @@ func (p *PluginMarketplaceEntry) UnmarshalJSON(data []byte) error {
 
 // PluginListParams lists plugins across marketplaces.
 type PluginListParams struct {
-	Cwds             []string                    `json:"cwds,omitempty"`
-	MarketplaceKinds []PluginListMarketplaceKind `json:"marketplaceKinds,omitempty"`
+	Cwds []string `json:"cwds,omitempty"`
+	// A nil filter uses server defaults; a nonnil empty filter selects no kinds.
+	MarketplaceKinds []PluginListMarketplaceKind `json:"marketplaceKinds,omitzero"`
 	ForceRefetch     bool                        `json:"forceRefetch,omitempty"`
 }
 

@@ -274,6 +274,10 @@ not an approval or proof that the server resolves a path in a particular way.
 marketplace kind. `Plugin.List` forwards it unchanged, including in mixed
 marketplace-kind filters.
 
+`PluginListParams.MarketplaceKinds` distinguishes a nil slice (omit the filter
+and use server defaults) from a nonnil empty slice (send `[]` and select no
+marketplace kinds). This applies to direct JSON encoding and `Plugin.List`.
+
 `RemoteControlStatusChangedNotification` accepts only `disabled`, `connecting`,
 `connected`, and `errored` states before typed callback delivery. The status
 remains required and non-null. Validation belongs to the notification record;
