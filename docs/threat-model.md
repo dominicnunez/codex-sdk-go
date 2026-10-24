@@ -100,8 +100,11 @@ installation-policy and availability enum occurrence across list, installed,
 read and share-list responses. Later duplicates, folded field aliases and outer
 array replacements cannot hide invalid enum values. These checks preserve
 existing final-value errors and partial receiver updates; newly rejected hidden
-enum values restore the prior summary. The existing optional availability
-pointer and its null compatibility remain unchanged. These checks validate
+enum values restore the prior summary. Omitted availability defaults to
+`AVAILABLE`, and recognized null occurrences cannot produce successful
+admission. Failures from the new null check restore the prior summary;
+higher-priority existing errors retain their established partial updates.
+Its public representation is a non-null enum value. These checks validate
 metadata and do not authorize plugin installation or execution.
 
 Reset-credit consumption, plugin-install, thread-unsubscribe, login-cancel,
