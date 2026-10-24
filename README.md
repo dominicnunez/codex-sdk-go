@@ -44,6 +44,9 @@ for changes to native errors and partial decoding after failures.
 - [Spec-sync maintenance](docs/spec-sync.md) — automated schema updates and superseded-PR handling
 - [Threat model](docs/threat-model.md) — trust boundaries, implemented controls, residual risks, and severity calibration
 
+For maintainers, see the [architecture and ownership reference](docs/architecture.md)
+and [protocol maintenance cases](docs/protocol-maintenance.md).
+
 ## Runtime Choice
 
 Use `appserver` as the default SDK runtime when you need typed protocol access,

@@ -1,179 +1,75 @@
-# codex-sdk-go project
+# codex-sdk-go agent guidance
 
-## Spec Compliance
+## Repository contracts
 
-**The JSON schemas in `appserver/protocol/schema/json/` are the source of truth for the protocol surface.**
+- The checked-in JSON schemas in `appserver/protocol/schema/json/` define the
+  protocol surface. Inspect the affected carrier's schema, including nested
+  definitions, before changing its Go representation or codec.
+- Preserve schema-backed names, enum values, wire methods and parameter/response
+  shapes. Schema-aligned API corrections may be source-incompatible; document
+  their migration. Do not remove legacy public fields merely because the current
+  schema omits them. File layout, including `enums.go`, is not a wire contract.
+- Use the standard library only. `go.mod` contains the module and Go version,
+  without external dependencies. Use Go 1.27.3 or later with its default JSON
+  backend; do not restore the legacy backend override.
 
-Do NOT:
-- Rename, remove, or change signatures of public methods (they map 1:1 to Codex JSON-RPC methods)
-- Rename public types, fields, or constants that map to spec schemas
-- Change JSON-RPC method names, parameter shapes, or notification types
-- Alter approval request/response type names or structures
-- Remove or restructure `appserver/protocol/enums.go` constants
+## Ownership
 
-Do:
-- Fix internal implementation (error handling, transport, retries, etc.)
-- Add unexported helpers, improve test coverage
-- Align Go field types with the checked-in schemas; document migrations for source-incompatible corrections
-- Fix bugs in request construction, response parsing, or notification dispatch
+| Area | Owner |
+| --- | --- |
+| Protocol types, services, notification admission and schema coverage | `appserver/protocol/` |
+| Stdio framing, request completion and notification queues | `appserver/transport/` |
+| Process management, run/stream helpers and conversations | `appserver/` |
+| Complete reference copying | `internal/deepcopy/` and its existing callers |
+| OAuth flow and credential/token handling | `login/` and `login/auth/` |
 
-**When in doubt:** check the type against the corresponding `appserver/protocol/schema/json/*.json` schema before changing it.
+## Change boundaries
 
-Run `go test ./appserver/protocol -run TestSpecCoverage` to verify all specs have corresponding Go types.
+- Enforce schema admission at the existing owning codec or service boundary,
+  across every public carrier. Keep plain public records method-free when their
+  carriers own validation; JSON method promotion can consume application envelopes.
+- Preserve absent, null, empty and zero values, union branches and schema defaults.
+  Validate each carrier's actual contract; shared Go types can have different
+  constraints. Classify paths by schema, without resolving opaque strings locally.
+- Protocol record codecs and `OptionalNullable[T]` have distinct receiver-update
+  contracts. Check the default `encoding/json` behavior rather than assuming
+  custom decoder errors stop enclosing traversal. Keep existing record checks
+  before new restrictions.
+- Preserve application codec error ownership. Bound peer-controlled diagnostics
+  before wrapping, and use `internal/jsonencode` for SDK-owned protocol marshaling.
+  A concrete error type, message prefix or private marker does not prove ownership.
+- Cache and runtime snapshot helpers use `internal/deepcopy` for complete
+  reference copying. Use those helpers rather than adding partial field-copy paths.
+- `StdioTransport` owns queue admission, response acceptance and terminal payload
+  release. The Client's thread-state cache owns observation listeners and pins;
+  process helpers own parent/descendant cleanup. Preserve these owner boundaries.
 
-For schema field changes, inventory properties, requiredness, nullability, enum
-values and union branches, including nested definitions. Check enum-valued fields
-whose Go scalar types use ordinary string decoding at their record admission
-owners; a named type alone does not enforce its schema. Check custom wire structs and
-assignment lists through public calls; type-name coverage cannot detect field
-loss. Preserve present empty values and legacy public fields without requiring
-fields absent from the current schema.
-For untagged `anyOf` object unions, validate alternatives independently and retain
-their schema order. A property constrained in one alternative can be an
-unconstrained extra in another; test valid alternatives with malformed inactive
-properties as well as malformed shared properties.
-For interface unions, compare marker and JSON method sets: value markers admit
-both values and pointers, while forwarding encoders and type switches may handle
-only one. Exercise both forms, typed nils, unknown raw payloads and nested carriers
-at the owning wrapper without changing application extension behavior.
-For nullable collections, distinguish absent, null, empty and populated values
-with JSON member checks. Trace aliases, duplicate/reset and reused receiver
-behavior; presence state must preserve the shared deep-copy contract.
-Check scalar zero values separately from nullability: schema defaults must not
-silently omit counters, and nonnil optional pointers must retain false or zero.
-Test constructed union branches separately from decoded values, including
-pointers to nil slices. Nullability must not erase an explicitly selected branch.
-For record admission, trace reused public types into each carrier's actual
-schema: legacy shared fields may have different enums in different contexts.
-Trace omitted-field defaults to the owning reference codec and materialize its
-behavioral defaults. Verify both defaults and explicit values survive
-serialization; an omitting encoder can silently change a round trip.
+## Verification
 
-For path-contract changes, inventory production `normalize*AbsolutePath*` callers
-across the protocol package and the affected response readers. Check schema
-references and pinned server resolution at every admission stage; a constructor
-that resolves a `PathBuf` is distinct from `AbsolutePathBuf` JSON deserialization.
-Preserve request selectors and returned grouping values together. Existing
-negative path fixtures do not establish which server inputs are supported.
-An absolute value produced by the pinned server does not narrow a plain-string
-response schema; validate the declared carrier contract as well as the producer.
+The code gates in `.github/workflows/ci.yml` are:
 
-## Architecture
+```sh
+gofmt -l .  # output must be empty
+go mod tidy -diff
+go build ./...
+go vet ./...
+go test ./...
+go test -race ./...
+golangci-lint run --config=.golangci.yml ./...  # v2.14.0, matching CI
+```
 
-### Zero Dependencies
-This SDK uses **stdlib only** — no external dependencies. Do NOT introduce any. Check `go.mod`: it should only have the module line and Go version.
+For schema work, also run
+`go test ./appserver/protocol -run TestSpecCoverage`. This checks type-name
+coverage; it does not prove field preservation, enum admission or round trips.
+Validate links and content for documentation-only changes. Configured hooks,
+required reviews and CI still apply.
 
-### Transport Layer
-- `Transport` interface: `Send`, `Notify`, `OnRequest`, `OnNotify`, `Close`
-- Runtime transports are provided by callers or companion packages
+## Task references
 
-### Client Pattern
-
-For transport completion changes, trace serialization and queue admission through
-writer return, response publication and termination. Acceptance and abandonment
-must share an ownership boundary; a channel peek cannot cover a separate claim
-and publication. Verify accepted outcomes and absent-response failures with both
-writer-pending and simultaneously ready terminal signals. Preserve actual-write
-completion for notifications and internal replies.
-For terminal payload release, coordinate queue admission and draining at one
-ownership boundary. Trace pre-handler storage, replay and dequeued execution
-claims; preserve accepted outcomes and notification delivery after reader EOF.
-
-`Client` wraps a `Transport` and provides typed methods for every JSON-RPC request. Timeout handling, error classification (`RPCError`, `TimeoutError`, `CanceledError`, `TransportError`), and notification dispatch all live here.
-
-### Notification Handlers
-Register via `client.On<EventName>(func(notif <Type>))`. Client dispatches incoming notifications to registered handlers by method name.
-
-For transport ordering or delivery changes, derive the affected inventory from
-`ServerNotification.json` and typed handlers, including methods outside existing
-priority switches. Check that transport, typed and malformed fallback decoders
-agree on owner identity. Verify that shutdown releases queued payloads as well
-as preventing further callback admission. Require an explicit delivery policy
-for every known schema method, and verify that callback finalization survives
-failures in error-reporting hooks as well as in the primary handler.
-For peer-controlled buffers, bound retained data as well as event counts across
-queued, in-flight, fallback and replay ownership.
-For rejected peer values, bound diagnostic previews before quoting and wrapping;
-trace the complete error chain and escaped-value growth. A frame limit does not
-bound allocation amplification or error retention inside the decoder.
-For identifier errors, trace the original display value separately from the
-canonical matching key: accepted alternate spellings can remain large after
-successful normalization.
-For typed JSON diagnostics, establish native error ownership from the decoding
-destination and caller before normalization. Preserve application custom-codec
-error identity; a concrete error type or message prefix does not prove origin.
-For serialization diagnostics, use the shared internal JSON encoder at every
-SDK-owned protocol marshaling boundary, before enclosing JSON codecs wrap errors.
-Private marker methods do not seal exported interfaces against embedding. Trace
-unrestricted nested interface fields inside accepted concrete union branches;
-root type switches alone do not prove the encoded graph cannot contain Numbers.
-For callback fanout, isolate each recipient at the owning boundary, including
-initial replay and direct service/cache calls. Verify committed state reaches
-later SDK consumers after a callback or error reporter panics, and that replay
-failure still returns registration cleanup. Preserve the diagnostic origin.
-For listener removal, clear vacated backing slots and discard empty registries;
-preserve independent dispatch snapshots and trace lifecycle unsubscription.
-For cache observation lifecycles, trace successful response publication through
-initial listener registration and pinning, including callbacks and eviction in
-that acquisition interval. Transfer observation ownership atomically: cache
-absence cannot distinguish ordinary eviction from an evicted closure marker.
-Verify failed startup leaves no listener or pin, and retain an owned initial
-response without overwriting newer delivery or reopening a closed handle.
-For peer-controlled JSON selection, check temporary allocations across ignored
-fields, duplicate selected fields, identity length and nesting depth. Preserve
-the actual duplicate, alias, null and malformed-prefix rules; measure complete
-transport operations as well as isolated selection helpers.
-Follow identity selection into typed callbacks and runtime fallback attribution;
-distinguish ignored-property work from necessary semantic decoding of selected
-payloads. Check malformed semantic fields before and after dense metadata,
-including nested recovery and successful typed/cache paths.
-When replacing shared decoders, compare the complete public error contract,
-including outer wrappers, error precedence and direct receiver calls with invalid
-JSON. Keep reference models independent and verify new regressions against the
-prior revision instead of copying a helper without its calling boundary.
-For map-valued fields, preserve ordered duplicate object merges and null resets,
-including decoding into receivers that already contain map entries.
-Compare receiver updates and retained references on type errors as well as on
-success. Include envelopes and user-defined wrappers: a custom decoder error
-can stop outer traversal and change error precedence, field context and offsets.
-Keep public record representations plain when validation belongs to SDK
-carriers, including newly introduced types: JSON method promotion can consume
-anonymous application envelopes. Use existing admission owners, run established checks
-before new restrictions, and compare mixed failures against the prior revision.
-
-### Approval Flow
-Server→client requests for user approval (command exec, file write, etc.) flow through `Transport.OnRequest`. Each approval type has `*Params` and `*Response` types matching specs.
-Classify path fields by their schema, not their names: opaque legacy strings
-remain request evidence, while AbsolutePathBuf fields have separate validation.
-Do not resolve or normalize approval metadata before the application sees it.
-
-### Test Infrastructure
-- `MockTransport`: instant responses, records calls, supports injection
-- `SlowMockTransport`: delayed responses for timeout testing
-- `TestSpecCoverage`: ensures every spec schema has a Go type
-
-### Runtime Packages
-Protocol types and generated schema coverage stay in `appserver/protocol/`. Process management, single-turn `Run`, streamed run helpers, and conversation helpers live in `appserver/`. Stdio framing lives in `appserver/transport/`.
-
-For shutdown waits, separate parent completion from descendant completion. Remove
-observed terminal signals from repeated selects; verify waiting CPU cost as well
-as deadlines through managed Close, including concurrent Wait/Close and force-kill.
-
-When adding reference-valued protocol fields, trace ownership through cache,
-conversation, collector, emitted events and final result views. Use the existing
-complete copy boundary rather than a partial field list; verify mutation in both
-directions, nil/empty values and representative snapshot cost.
-For bounded histories, verify backing storage as well as visible lengths: own
-trimmed substrings and clear evicted slice slots. Trace every retention writer,
-completion aggregation and snapshots; distinguish bounded text from full items.
-For opaque identity tuples, verify storage and presentation keys separately.
-Reserve compatible bare keys before fallbacks and test adversarial key spellings,
-insertion-order independence, accounting and completion cleanup for each tuple.
-For initialization extensions, own serialized JSON before waiting or child
-launch. A snapshot error must fail admission; do not retain a mutable Go value
-as fallback. Recheck process cancellation after parameter preparation.
-
-### Login Packages
-Codex OAuth login flow lives in `login/`. Credential persistence, token claims, redaction, and `chatgptAuthTokens` payload helpers live in `login/auth/`.
-For provider-controlled lifetimes, check the target unit's range before arithmetic
-at the shared token-response boundary; verify all grants and no partial credentials.
+- Protocol codecs, schema cases and test fixtures: [protocol maintenance](docs/protocol-maintenance.md).
+- Runtime ownership and lifecycle cases: [architecture](docs/architecture.md).
+- Public API behavior, path semantics and migrations: [protocol guide](docs/protocol.md).
+- Security controls and residual limits: [threat model](docs/threat-model.md).
+- JSON compatibility: [backend migration](docs/json-backend-migration.md).
+- Snapshot costs and transport parsing: [thread-state benchmarks](docs/thread-state-benchmarks.md) and [transport benchmarks](docs/transport-benchmarks.md).
+- Schema synchronization: [spec-sync maintenance](docs/spec-sync.md).
