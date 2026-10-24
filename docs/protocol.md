@@ -291,6 +291,11 @@ decision := codex.ReviewDecisionWrapper{
 
 Use `ReviewDecisionApprovedMCPPolicyAmendment` for the MCP policy-amendment string decision. `item/tool/requestUserInput` requests require `isBlocking`; malformed requests are rejected before invoking the handler.
 
+User-input questions default omitted `isSecret` and `isOther` flags to false.
+Declared flag values must be non-null booleans; an invalid question rejects the
+whole request before invoking the approval handler. Options retain their
+nullable array representation.
+
 For `mcpServer/elicitation/request`, standard `form` mode validates the typed
 `requestedSchema`, including its property definitions, before invoking the
 handler. The `openaiForm` and `openai/form` modes retain arbitrary JSON in

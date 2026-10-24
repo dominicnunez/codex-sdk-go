@@ -53,6 +53,9 @@ func (q *ToolRequestUserInputQuestion) UnmarshalJSON(data []byte) error {
 	if err := validateNonEmptyStringField("id", decoded.ID); err != nil {
 		return err
 	}
+	if err := validateInboundObjectFields(data, nil, []string{"isOther", "isSecret"}); err != nil {
+		return err
+	}
 	*q = ToolRequestUserInputQuestion(decoded)
 	return nil
 }
