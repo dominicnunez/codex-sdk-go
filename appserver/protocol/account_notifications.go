@@ -57,6 +57,16 @@ func (n *AccountUpdatedNotification) UnmarshalJSON(data []byte) error {
 	if err := validateOptionalPlanTypeField("account.planType", decoded.PlanType); err != nil {
 		return err
 	}
+	if err := validateEnumOccurrences(data, "authMode", true, func(mode *AuthMode) error {
+		return validateOptionalAuthModeField("account.authMode", mode)
+	}); err != nil {
+		return err
+	}
+	if err := validateEnumOccurrences(data, "planType", true, func(plan *PlanType) error {
+		return validateOptionalPlanTypeField("account.planType", plan)
+	}); err != nil {
+		return err
+	}
 	*n = AccountUpdatedNotification(decoded)
 	return nil
 }

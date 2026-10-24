@@ -270,6 +270,12 @@ not an approval or proof that the server resolves a path in a particular way.
 
 ## Compatibility
 
+Shared account metadata validates every recognized plan, authentication-mode,
+and rate-limit-reason enum occurrence at its record owner. Valid nullable resets
+remain supported; a later value or null cannot erase an earlier invalid enum.
+This covers account reads, rate-limit snapshots and buckets, and account update
+notifications. Unknown account branches retain their raw metadata.
+
 Reset-credit outcomes, plugin-install auth policies, and the status fields of
 thread-unsubscribe, login-cancel, add-credits-email and configuration-write
 responses validate every recognized enum occurrence.
