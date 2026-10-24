@@ -86,6 +86,17 @@ These limits do not constitute a total transport or process heap budget. Frame p
 
 Typed decoders validate required fields, selected non-null fields, enums, unions, and request-specific constraints. [Object validation](../appserver/protocol/json_validation.go) and [schema coverage tests](../appserver/protocol/spec_coverage_test.go) help preserve the wire contract. Session-source, nested sub-agent-source, and approval-policy unions reject null before trying string decoding, including null policy-list elements. A later duplicate sub-agent field cannot erase an earlier null violation. Nullable outer policy pointers and policy lists remain supported. The known custom session-source branch requires a non-null string before typed response or notification admission; unknown source objects remain available for forward compatibility. Invalid source responses fail before thread-cache publication or listener delivery; these shape checks do not authenticate provenance or enforce application approval authority. Validation is not universal semantic authorization or a guarantee of canonical JSON: some semantic leaf types use ordinary `encoding/json`, which can allocate when unquoting escaped field names or decoding known duplicate values, and duplicate-member rejection is not a general SDK control. Selected fallback item/turn payloads, unknown variants, open JSON metadata, application configuration maps, and attachments intentionally retain their semantic data. Consumers must validate any additional security meaning before acting on it.
 
+Shared account metadata checks every recognized plan, authentication-mode and
+rate-limit-reason enum occurrence before typed response or callback publication.
+The owning ChatGPT account, rate-limit snapshot and account-update records share
+these checks across account reads, rate-limit buckets, and On/Add notifications.
+Required plans remain non-null; optional enum pointers preserve absent/null
+states. A later duplicate or map reset cannot hide an earlier invalid value.
+Existing type/final-enum error precedence and receiver atomicity remain intact.
+Unknown account union branches retain raw metadata, and ordinary public scalar
+decoding remains available outside these owners. These metadata checks do not
+establish authentication, billing authority or permission to issue requests.
+
 Reset-credit consumption, plugin-install, thread-unsubscribe, login-cancel,
 add-credits-email and configuration-write response records also check every
 recognized enum occurrence before returning typed results. Later duplicates

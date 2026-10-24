@@ -110,6 +110,11 @@ func (c *ChatgptAccount) UnmarshalJSON(data []byte) error {
 	if err := validatePlanTypeField("account.planType", decoded.PlanType); err != nil {
 		return err
 	}
+	if err := validateEnumOccurrences(data, "planType", true, func(plan PlanType) error {
+		return validatePlanTypeField("account.planType", plan)
+	}); err != nil {
+		return err
+	}
 	*c = ChatgptAccount(decoded)
 	return nil
 }
@@ -334,18 +339,33 @@ func (r *RateLimitSnapshot) UnmarshalJSON(data []byte) error {
 	if err := validateOptionalPlanTypeField("rateLimits.planType", decoded.PlanType); err != nil {
 		return err
 	}
-	if decoded.RateLimitReachedType != nil {
-		switch *decoded.RateLimitReachedType {
+	if err := validateRateLimitReachedType(decoded.RateLimitReachedType); err != nil {
+		return err
+	}
+	if err := validateEnumOccurrences(data, "planType", true, func(plan *PlanType) error {
+		return validateOptionalPlanTypeField("rateLimits.planType", plan)
+	}); err != nil {
+		return err
+	}
+	if err := validateEnumOccurrences(data, "rateLimitReachedType", true, validateRateLimitReachedType); err != nil {
+		return err
+	}
+	*r = RateLimitSnapshot(decoded)
+	return nil
+}
+
+func validateRateLimitReachedType(value *RateLimitReachedType) error {
+	if value != nil {
+		switch *value {
 		case RateLimitReachedTypeRateLimitReached,
 			RateLimitReachedTypeWorkspaceOwnerCreditsDepleted,
 			RateLimitReachedTypeWorkspaceMemberCreditsDepleted,
 			RateLimitReachedTypeWorkspaceOwnerUsageLimitReached,
 			RateLimitReachedTypeWorkspaceMemberUsageLimitReached:
 		default:
-			return fmt.Errorf("invalid rateLimits.rateLimitReachedType %s", quotedValueDiagnostic(string(*decoded.RateLimitReachedType)))
+			return fmt.Errorf("invalid rateLimits.rateLimitReachedType %s", quotedValueDiagnostic(string(*value)))
 		}
 	}
-	*r = RateLimitSnapshot(decoded)
 	return nil
 }
 
