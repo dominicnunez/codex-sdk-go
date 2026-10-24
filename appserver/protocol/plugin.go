@@ -112,6 +112,7 @@ type PluginListMarketplaceKind string
 
 const (
 	PluginListMarketplaceKindLocal              PluginListMarketplaceKind = "local"
+	PluginListMarketplaceKindVertical           PluginListMarketplaceKind = "vertical"
 	PluginListMarketplaceKindWorkspaceDirectory PluginListMarketplaceKind = "workspace-directory"
 	PluginListMarketplaceKindSharedWithMe       PluginListMarketplaceKind = "shared-with-me"
 	PluginListMarketplaceKindCreatedByMeRemote  PluginListMarketplaceKind = "created-by-me-remote"
@@ -119,6 +120,7 @@ const (
 
 var validPluginListMarketplaceKinds = map[PluginListMarketplaceKind]struct{}{
 	PluginListMarketplaceKindLocal:              {},
+	PluginListMarketplaceKindVertical:           {},
 	PluginListMarketplaceKindWorkspaceDirectory: {},
 	PluginListMarketplaceKindSharedWithMe:       {},
 	PluginListMarketplaceKindCreatedByMeRemote:  {},

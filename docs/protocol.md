@@ -270,6 +270,10 @@ not an approval or proof that the server resolves a path in a particular way.
 
 ## Compatibility
 
+`PluginListMarketplaceKindVertical` selects the schema-supported `vertical`
+marketplace kind. `Plugin.List` forwards it unchanged, including in mixed
+marketplace-kind filters.
+
 `RemoteControlStatusChangedNotification` accepts only `disabled`, `connecting`,
 `connected`, and `errored` states before typed callback delivery. The status
 remains required and non-null. Validation belongs to the notification record;
