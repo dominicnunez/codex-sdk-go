@@ -29,6 +29,9 @@ func (s *PermissionProfileSummary) UnmarshalJSON(data []byte) error {
 	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	if err := validateRequiredObjectFields(data, "allowed"); err != nil {
+		return err
+	}
 	*s = PermissionProfileSummary(decoded)
 	return nil
 }

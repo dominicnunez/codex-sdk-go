@@ -265,6 +265,12 @@ for the returned handle even if the cache is explicitly reopened afterward.
 
 Credential-bearing types redact secrets from their formatted and debug JSON representations. Raw JSON-RPC frames still contain wire credentials and must not be logged.
 
+## Permission profiles
+
+Permission profile listings require both `id` and a non-null `allowed` boolean
+for each entry. An explicit false value is preserved; missing or null flags
+reject the response rather than becoming an implicit false value.
+
 ## Approvals
 
 Register server-request handlers with `Client.SetApprovalHandlers`. A protocol-valid denial for legacy apply-patch and exec-command review decisions is an object containing a rejection reason:

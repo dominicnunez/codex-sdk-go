@@ -521,6 +521,12 @@ their prompts. External config imports return the required import ID so callers
 can correlate progress and completion; that ID does not authenticate the peer or
 prove that an import completed.
 
+Permission profile listings require an explicit non-null `allowed` flag for
+every summary before a successful response is returned. Missing or null flags
+cannot silently become false, and one invalid entry rejects the whole public
+response. This validates peer-provided catalog metadata; the flag does not
+authorize profile selection or replace server-side requirements enforcement.
+
 Skill catalog and bundled-plugin skill paths follow the schema's opaque legacy
 string contract. They may be relative or non-normalized and are preserved as
 returned; genuine `AbsolutePathBuf` fields retain their separate validation.
