@@ -265,6 +265,12 @@ for the returned handle even if the cache is explicitly reopened afterward.
 
 Credential-bearing types redact secrets from their formatted and debug JSON representations. Raw JSON-RPC frames still contain wire credentials and must not be logged.
 
+## App metadata
+
+App listings and app-list notifications default omitted `isEnabled` to true and
+`isAccessible` to false. Explicit false/true values are preserved; declared null
+flags reject the listing or typed notification instead of selecting a default.
+
 ## Permission profiles
 
 Permission profile listings require both `id` and a non-null `allowed` boolean
