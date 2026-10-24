@@ -270,6 +270,15 @@ not an approval or proof that the server resolves a path in a particular way.
 
 ## Compatibility
 
+Known thread items validate agent-message `delivery`, command-execution `source`,
+and sub-agent activity `kind` against the checked-in enums before publication.
+Agent-message delivery remains optional and nullable. An omitted command source
+decodes as `agent`, matching the pinned server default; explicit null is rejected.
+Code that previously tested `CommandExecutionThreadItem.Source == nil` to detect
+older records should now treat the decoded default as an agent command. These
+checks belong to `ThreadItemWrapper`; public leaf and scalar types keep their
+existing JSON method sets for application composition.
+
 Guardian review records validate `userAuthorization` as `unknown`, `low`,
 `medium`, or `high`; it may also be absent or null. Completed review records
 require `decisionSource` to be `agent`. These checks run at the notification

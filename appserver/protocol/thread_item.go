@@ -536,6 +536,9 @@ func decodeAgentMessageThreadItem(data []byte) (ThreadItem, error) {
 	if err := validateMemoryCitationAdmission(data, agentMessage); err != nil {
 		return nil, err
 	}
+	if err := validateItemEnumField(data, "delivery", validAgentMessageDeliveries, true); err != nil {
+		return nil, err
+	}
 	return item, nil
 }
 
@@ -555,7 +558,19 @@ func decodeReasoningThreadItem(data []byte) (ThreadItem, error) {
 }
 
 func decodeCommandExecutionThreadItem(data []byte) (ThreadItem, error) {
-	return decodeThreadItemInto(data, &CommandExecutionThreadItem{}, "command", "commandActions", "cwd", "id", "status")
+	command := &CommandExecutionThreadItem{}
+	item, err := decodeThreadItemInto(data, command, "command", "commandActions", "cwd", "id", "status")
+	if err != nil {
+		return nil, err
+	}
+	if err := validateItemEnumField(data, "source", validCommandExecutionSources, false); err != nil {
+		return nil, err
+	}
+	if command.Source == nil {
+		source := CommandExecutionSourceAgent
+		command.Source = &source
+	}
+	return item, nil
 }
 
 func decodeFileChangeThreadItem(data []byte) (ThreadItem, error) {
@@ -592,7 +607,14 @@ func decodeCollabAgentToolCallThreadItem(data []byte) (ThreadItem, error) {
 }
 
 func decodeSubAgentActivityThreadItem(data []byte) (ThreadItem, error) {
-	return decodeThreadItemInto(data, &SubAgentActivityThreadItem{}, "agentPath", "agentThreadId", "id", "kind")
+	item, err := decodeThreadItemInto(data, &SubAgentActivityThreadItem{}, "agentPath", "agentThreadId", "id", "kind")
+	if err != nil {
+		return nil, err
+	}
+	if err := validateItemEnumField(data, "kind", validSubAgentActivityKinds, false); err != nil {
+		return nil, err
+	}
+	return item, nil
 }
 
 func decodeSleepThreadItem(data []byte) (ThreadItem, error) {
