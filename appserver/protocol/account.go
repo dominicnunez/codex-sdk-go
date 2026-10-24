@@ -92,14 +92,14 @@ func (a *ApiKeyAccount) MarshalJSON() ([]byte, error) {
 // ChatgptAccount represents a ChatGPT account
 type ChatgptAccount struct {
 	Type     string   `json:"type"`
-	Email    string   `json:"email"`
+	Email    *string  `json:"email"`
 	PlanType PlanType `json:"planType"`
 }
 
 func (*ChatgptAccount) isAccount() {}
 
 func (c *ChatgptAccount) UnmarshalJSON(data []byte) error {
-	if err := validateRequiredObjectFields(data, "type", "email", "planType"); err != nil {
+	if err := validateObjectFields(data, []string{"type", "email", "planType"}, []string{"type", "planType"}); err != nil {
 		return err
 	}
 	type wire ChatgptAccount
@@ -124,7 +124,7 @@ func (c *ChatgptAccount) UnmarshalJSON(data []byte) error {
 func (c *ChatgptAccount) MarshalJSON() ([]byte, error) {
 	return jsonencode.Marshal(struct {
 		Type     string   `json:"type"`
-		Email    string   `json:"email"`
+		Email    *string  `json:"email"`
 		PlanType PlanType `json:"planType"`
 	}{Type: "chatgpt", Email: c.Email, PlanType: c.PlanType})
 }
