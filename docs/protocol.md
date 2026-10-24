@@ -270,6 +270,11 @@ not an approval or proof that the server resolves a path in a particular way.
 
 ## Compatibility
 
+`RemoteControlStatusChangedNotification` accepts only `disabled`, `connecting`,
+`connected`, and `errored` states before typed callback delivery. The status
+remains required and non-null. Validation belongs to the notification record;
+`RemoteControlConnectionStatus` retains ordinary string decoding outside it.
+
 Known thread items validate agent-message `delivery`, command-execution `source`,
 and sub-agent activity `kind` against the checked-in enums before publication.
 Agent-message delivery remains optional and nullable. An omitted command source

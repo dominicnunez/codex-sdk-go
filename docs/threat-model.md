@@ -466,6 +466,10 @@ elsewhere in the consuming application. Applications must bind any filesystem
 access to their own trusted base and policy rather than treating a catalog path
 as an approved location.
 
+Remote-control status notifications validate the declared connection-state enum
+before typed delivery. A `connected` status and its remote identity fields are
+peer-provided metadata, not proof of an authenticated remote connection.
+
 Thread-item admission validates agent delivery, command source, and sub-agent
 activity-kind enums before typed notification delivery or thread-cache
 publication. Omitted command sources default to `agent`, as specified for older

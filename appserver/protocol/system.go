@@ -242,6 +242,13 @@ const (
 	RemoteControlConnectionStatusErrored    RemoteControlConnectionStatus = "errored"
 )
 
+var validRemoteControlStatuses = map[RemoteControlConnectionStatus]struct{}{
+	RemoteControlConnectionStatusDisabled:   {},
+	RemoteControlConnectionStatusConnecting: {},
+	RemoteControlConnectionStatusConnected:  {},
+	RemoteControlConnectionStatusErrored:    {},
+}
+
 // RemoteControlStatusChangedNotification reports remote-control connection status.
 type RemoteControlStatusChangedNotification struct {
 	EnvironmentID  *string                       `json:"environmentId,omitempty"`
@@ -255,6 +262,12 @@ func (n *RemoteControlStatusChangedNotification) UnmarshalJSON(data []byte) erro
 	var decoded wire
 	required := []string{"installationId", "serverName", "status"}
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
+		return err
+	}
+	if err := validateOptionalFields(data, func(_ string, raw []byte) error {
+		var status RemoteControlConnectionStatus
+		return unmarshalEnumString(raw, "remoteControl.status", validRemoteControlStatuses, &status)
+	}, "status"); err != nil {
 		return err
 	}
 	*n = RemoteControlStatusChangedNotification(decoded)
