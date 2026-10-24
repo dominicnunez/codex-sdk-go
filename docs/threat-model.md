@@ -521,6 +521,14 @@ their prompts. External config imports return the required import ID so callers
 can correlate progress and completion; that ID does not authenticate the peer or
 prove that an import completed.
 
+App metadata admission distinguishes omitted defaulted flags from explicit
+nulls. Exact `isEnabled` and `isAccessible` fields must be non-null booleans;
+omission retains their true/false defaults. Invalid app metadata rejects the
+whole public listing and is reported before either typed app-list notification
+API invokes its callback. Existing metadata errors retain precedence, and
+failed decoding preserves the prior receiver. These peer-provided flags do not
+establish local authorization or whether a connector is safe to invoke.
+
 Permission profile listings require an explicit non-null `allowed` flag for
 every summary before a successful response is returned. Missing or null flags
 cannot silently become false, and one invalid entry rejects the whole public
