@@ -52,20 +52,26 @@ func pluginEnumCarriers(t *testing.T) []pluginEnumCarrier {
 		{"plugin/list", marketplace, func(c *p.Client) (p.PluginSummary, error) {
 			r, e := c.Plugin.List(context.Background(), p.PluginListParams{})
 			if e != nil {
+				if !reflect.DeepEqual(r, p.PluginListResponse{}) {
+					t.Error("failed public call returned a nonzero response")
+				}
 				return p.PluginSummary{}, e
 			}
 			if len(r.Marketplaces) == 0 || len(r.Marketplaces[0].Plugins) == 0 {
-				return p.PluginSummary{}, nil
+				t.Fatal("successful public call omitted the expected plugin")
 			}
 			return r.Marketplaces[0].Plugins[0], nil
 		}},
 		{"plugin/installed", marketplace, func(c *p.Client) (p.PluginSummary, error) {
 			r, e := c.Plugin.Installed(context.Background(), p.PluginInstalledParams{})
 			if e != nil {
+				if !reflect.DeepEqual(r, p.PluginInstalledResponse{}) {
+					t.Error("failed public call returned a nonzero response")
+				}
 				return p.PluginSummary{}, e
 			}
 			if len(r.Marketplaces) == 0 || len(r.Marketplaces[0].Plugins) == 0 {
-				return p.PluginSummary{}, nil
+				t.Fatal("successful public call omitted the expected plugin")
 			}
 			return r.Marketplaces[0].Plugins[0], nil
 		}},
@@ -73,15 +79,21 @@ func pluginEnumCarriers(t *testing.T) []pluginEnumCarrier {
 			return `{"plugin":{"apps":[],"appTemplates":[],"hooks":[],"marketplaceName":"official","mcpServers":[],"skills":[],"summary":` + s + `}}`
 		}, func(c *p.Client) (p.PluginSummary, error) {
 			r, e := c.Plugin.Read(context.Background(), p.PluginReadParams{MarketplacePath: filepath.Join(t.TempDir(), "marketplace"), PluginName: "calendar"})
+			if e != nil && !reflect.DeepEqual(r, p.PluginReadResponse{}) {
+				t.Error("failed public call returned a nonzero response")
+			}
 			return r.Plugin.Summary, e
 		}},
 		{"plugin/share/list", func(s string) string { return `{"data":[{"plugin":` + s + `}]}` }, func(c *p.Client) (p.PluginSummary, error) {
 			r, e := c.Plugin.ShareList(context.Background(), p.PluginShareListParams{})
 			if e != nil {
+				if !reflect.DeepEqual(r, p.PluginShareListResponse{}) {
+					t.Error("failed public call returned a nonzero response")
+				}
 				return p.PluginSummary{}, e
 			}
 			if len(r.Data) == 0 {
-				return p.PluginSummary{}, nil
+				t.Fatal("successful public call omitted the expected plugin")
 			}
 			return r.Data[0].Plugin, nil
 		}},
@@ -256,6 +268,49 @@ func TestPluginSummaryEnumOuterReplacement(t *testing.T) {
 					t.Fatal("outer replacement hid invalid summary")
 				}
 			})
+		}
+	}
+}
+
+func TestPluginSummaryEnumEnvelope(t *testing.T) {
+	for _, owner := range pluginEnumCases() {
+		t.Run(owner.field, func(t *testing.T) {
+			valid := fmt.Sprintf(`%q:%q`, owner.field, owner.values[0])
+			seed := pluginEnumSummary(t, owner.field, valid+`,"keywords":["retained"]`)
+			var envelope struct {
+				Summary p.PluginSummary `json:"summary"`
+				After   string          `json:"after"`
+			}
+			if err := json.Unmarshal([]byte(`{"summary":`+seed+`}`), &envelope); err != nil {
+				t.Fatal(err)
+			}
+			before := envelope.Summary
+			hidden := pluginEnumSummary(t, owner.field, fmt.Sprintf(`%q:"future",%s`, owner.field, valid))
+			err := json.Unmarshal([]byte(`{"summary":`+hidden+`,"after":"visited"}`), &envelope)
+			if err == nil {
+				t.Fatal("envelope accepted hidden enum")
+			}
+			if !reflect.DeepEqual(envelope.Summary, before) || &envelope.Summary.Keywords[0] != &before.Keywords[0] {
+				t.Fatal("new rejection changed the summary or retained references")
+			}
+			if envelope.After != "visited" {
+				t.Fatal("default backend did not continue through the enclosing record")
+			}
+		})
+	}
+}
+
+func TestPluginEnumScalarCompatibility(t *testing.T) {
+	var auth p.PluginAuthPolicy
+	var install p.PluginInstallPolicy
+	var availability p.PluginAvailability
+	for _, value := range []any{&auth, &install, &availability} {
+		if err := json.Unmarshal([]byte(`"future"`), value); err != nil {
+			t.Fatalf("ordinary scalar decoding changed: %v", err)
+		}
+		encoded, err := json.Marshal(value)
+		if err != nil || string(encoded) != `"future"` {
+			t.Fatalf("ordinary scalar encoding changed: %s, %v", encoded, err)
 		}
 	}
 }
