@@ -6,6 +6,7 @@ import (
 
 	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
+	"github.com/dominicnunez/codex-sdk-go/internal/jsonobject"
 )
 
 // AdditionalFileSystemPermissions requests or grants extra filesystem access.
@@ -151,12 +152,28 @@ func (p *McpServerElicitationRequestParams) UnmarshalJSON(data []byte) error {
 	type wire McpServerElicitationRequestParams
 	var decoded wire
 	var schema json.RawMessage
-	w := struct {
+	type elicitationWire struct {
 		*wire
 		RequestedSchema *json.RawMessage `json:"requestedSchema"`
-	}{wire: &decoded, RequestedSchema: &schema}
+	}
+	w := elicitationWire{wire: &decoded, RequestedSchema: &schema}
 	required := []string{"serverName", "threadId"}
-	if err := unmarshalInboundObject(data, &w, required, required); err != nil {
+	// Select only a supported form branch. The actual wire decoder retains
+	// ownership of selector errors and exact field matching.
+	rawMode, _, object := jsonobject.SelectField(data, "mode")
+	form := object && isElicitationFormMode(rawMode)
+	if form {
+		extra := struct {
+			*elicitationWire
+			ElicitationID stringExtra `json:"elicitationId"`
+			URL           stringExtra `json:"url"`
+		}{elicitationWire: &w}
+		if err := unmarshalInboundObject(data, &extra, required, required); err != nil {
+			return err
+		}
+		decoded.ElicitationID = extra.ElicitationID.Value
+		decoded.URL = extra.URL.Value
+	} else if err := unmarshalInboundObject(data, &w, required, required); err != nil {
 		return err
 	}
 	if err := validateNonEmptyStringField("serverName", decoded.ServerName); err != nil {
@@ -188,6 +205,20 @@ func (p *McpServerElicitationRequestParams) UnmarshalJSON(data []byte) error {
 	}
 	*p = McpServerElicitationRequestParams(decoded)
 	return nil
+}
+
+func isElicitationFormMode(raw []byte) bool {
+	// Every character in the longest form mode can use a six-byte Unicode
+	// escape. Longer strings cannot match, so selection stays bounded.
+	const maxFormModeBytes = 6*len(McpServerElicitationModeOpenAIFormLegacy) + 2
+	if len(raw) < 2 || raw[0] != '"' || len(raw) > maxFormModeBytes {
+		return false
+	}
+	var mode McpServerElicitationMode
+	if err := jsondecode.Unmarshal(raw, &mode); err != nil {
+		return false
+	}
+	return mode == McpServerElicitationModeForm || mode == McpServerElicitationModeOpenAIForm || mode == McpServerElicitationModeOpenAIFormLegacy
 }
 
 func validateElicitationMode(mode McpServerElicitationMode) error {

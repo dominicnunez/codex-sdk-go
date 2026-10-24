@@ -475,6 +475,14 @@ form-schema errors keep their precedence, and rejected parameters do not replace
 a seeded receiver. These checks validate request shape; they do not authorize
 input collection, choose a trusted URL or fetch external resources.
 
+The selected form branches leave `url` and `elicitationId` unrestricted. Their
+existing Go string fields retain string values and null resets; other JSON kinds
+are ignored without building their object graphs. The URL branch keeps its
+required, non-null string checks. Branch selection reads the final exact mode
+from borrowed JSON and leaves invalid-selector errors with the original decoder.
+The shared string-extra decoder also preserves plugin-source behavior for its
+unrestricted fields. These rules do not add URL trust or navigation policy.
+
 A repository file, retrieved resource, MCP tool response, attachment, or model message may try to persuade an application to authorize commands, disclose secrets, or render executable content. The SDK exposes these values and protocol operations; it does not classify their trustworthiness or implement prompt-injection prevention. Treat text and structured metadata as data, including image identifiers, MCP UI resource URIs, prediction text, and plugin metadata.
 
 [Approval handlers](../appserver/protocol/approval_handlers.go) are application-owned callbacks. Without a matching handler, the client returns a JSON-RPC method-not-found error rather than granting approval. A permissive handler or permissive Codex approval policy can deliberately remove that protection. The application must bind decisions to its actual user, account, workspace, operation, and permitted consequences. Dynamic tool callbacks and token-refresh callbacks are privileged code and must not derive authority solely from model output or a claimed thread ID.

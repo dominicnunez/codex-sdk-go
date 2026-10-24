@@ -276,27 +276,6 @@ type PluginSource struct {
 	Version OptionalNullable[string] `json:"version,omitzero"`
 }
 
-// pluginSourceExtra preserves the last successfully decoded legacy string
-// occurrence for a selected branch where the source schema permits extras.
-// Wrong JSON types are ignored without changing the prior successful value.
-type pluginSourceExtra struct {
-	Value *string
-}
-
-func (e *pluginSourceExtra) UnmarshalJSON(data []byte) error {
-	var decoded *string
-	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
-		// This decode targets only a native *string. Ignore only its direct
-		// type mismatch; a wrapped error must remain visible to the caller.
-		if _, ok := err.(*json.UnmarshalTypeError); ok { //nolint:errorlint // jsondecode.Unmarshal into this native *string returns a direct mismatch error.
-			return nil
-		}
-		return err
-	}
-	e.Value = decoded
-	return nil
-}
-
 func (p *PluginSource) UnmarshalJSON(data []byte) error {
 	// Select the branch using the native decoder's case folding, duplicate-key,
 	// and null semantics. Selector errors are intentionally discarded: the
@@ -386,11 +365,11 @@ func (p *PluginSource) UnmarshalJSON(data []byte) error {
 
 func (p *PluginSource) unmarshalLocalPluginSource(data []byte) error {
 	type pluginSourceWire struct {
-		Path    *string           `json:"path"`
-		RefName pluginSourceExtra `json:"refName"`
-		SHA     pluginSourceExtra `json:"sha"`
-		Type    *string           `json:"type"`
-		URL     pluginSourceExtra `json:"url"`
+		Path    *string     `json:"path"`
+		RefName stringExtra `json:"refName"`
+		SHA     stringExtra `json:"sha"`
+		Type    *string     `json:"type"`
+		URL     stringExtra `json:"url"`
 	}
 	var wire pluginSourceWire
 	if err := jsondecode.Unmarshal(data, &wire); err != nil {
@@ -421,11 +400,11 @@ func (p *PluginSource) unmarshalLocalPluginSource(data []byte) error {
 
 func (p *PluginSource) unmarshalRemotePluginSource(data []byte) error {
 	type pluginSourceWire struct {
-		Path    pluginSourceExtra `json:"path"`
-		RefName pluginSourceExtra `json:"refName"`
-		SHA     pluginSourceExtra `json:"sha"`
-		Type    *string           `json:"type"`
-		URL     pluginSourceExtra `json:"url"`
+		Path    stringExtra `json:"path"`
+		RefName stringExtra `json:"refName"`
+		SHA     stringExtra `json:"sha"`
+		Type    *string     `json:"type"`
+		URL     stringExtra `json:"url"`
 	}
 	var wire pluginSourceWire
 	if err := jsondecode.Unmarshal(data, &wire); err != nil {
