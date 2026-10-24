@@ -270,6 +270,11 @@ not an approval or proof that the server resolves a path in a particular way.
 
 ## Compatibility
 
+The `process/outputDelta` and `command/exec/outputDelta` decoders validate every
+recognized `stream` occurrence, including escaped field names. A later valid
+duplicate cannot hide an invalid earlier stream. Existing field and base64
+errors retain their precedence, and valid duplicates retain their final value.
+
 `PluginListMarketplaceKindVertical` selects the schema-supported `vertical`
 marketplace kind. `Plugin.List` forwards it unchanged, including in mixed
 marketplace-kind filters.

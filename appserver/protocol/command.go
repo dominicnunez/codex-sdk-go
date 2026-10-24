@@ -115,6 +115,9 @@ func (n *CommandExecOutputDeltaNotification) UnmarshalJSON(data []byte) error {
 	if err := validateInboundBase64Field("deltaBase64", decoded.DeltaBase64); err != nil {
 		return err
 	}
+	if err := validateOutputStreamOccurrences(data); err != nil {
+		return err
+	}
 	*n = CommandExecOutputDeltaNotification(decoded)
 	return nil
 }

@@ -86,6 +86,14 @@ These limits do not constitute a total transport or process heap budget. Frame p
 
 Typed decoders validate required fields, selected non-null fields, enums, unions, and request-specific constraints. [Object validation](../appserver/protocol/json_validation.go) and [schema coverage tests](../appserver/protocol/spec_coverage_test.go) help preserve the wire contract. Session-source, nested sub-agent-source, and approval-policy unions reject null before trying string decoding, including null policy-list elements. A later duplicate sub-agent field cannot erase an earlier null violation. Nullable outer policy pointers and policy lists remain supported. The known custom session-source branch requires a non-null string before typed response or notification admission; unknown source objects remain available for forward compatibility. Invalid source responses fail before thread-cache publication or listener delivery; these shape checks do not authenticate provenance or enforce application approval authority. Validation is not universal semantic authorization or a guarantee of canonical JSON: some semantic leaf types use ordinary `encoding/json`, which can allocate when unquoting escaped field names or decoding known duplicate values, and duplicate-member rejection is not a general SDK control. Selected fallback item/turn payloads, unknown variants, open JSON metadata, application configuration maps, and attachments intentionally retain their semantic data. Consumers must validate any additional security meaning before acting on it.
 
+The process and command output notification decoders reject an invalid recognized
+`stream` occurrence even when a later duplicate supplies `stdout` or `stderr`.
+Checks run before typed callback delivery and preserve existing object, stream
+and base64 error precedence. They match exact decoded field names, including
+escaped spellings; unrelated nested fields and unknown case variants remain
+ignored by these record decoders. This prevents duplicate-field repair from
+hiding a malformed stream without treating stream labels as execution authority.
+
 [Thread-list filters](../appserver/protocol/thread_service.go) preserve an empty
 provider list as a request for all providers. The additive `ListJSON` parameters
 also preserve cwd string/array choices and explicit null selecting unsectioned
