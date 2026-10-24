@@ -21,6 +21,18 @@ func validateOptionalEnumValue[T ~string](field string, value *T, allowed map[T]
 	return validateEnumValue(field, *value, allowed)
 }
 
+// Run after the record's established checks to preserve their error precedence.
+// Field matching must agree with the containing record's decoder.
+func validateEnumOccurrences[T ~string](data []byte, field string, aliases bool, validate func(T) error) error {
+	return validateFields(data, func(_ string, raw []byte) error {
+		var value T
+		if err := jsondecode.Unmarshal(raw, &value); err != nil {
+			return err
+		}
+		return validate(value)
+	}, aliases, field)
+}
+
 func validateStringEnumValue(field string, value string, allowed map[string]struct{}) error {
 	if _, ok := allowed[value]; ok {
 		return nil

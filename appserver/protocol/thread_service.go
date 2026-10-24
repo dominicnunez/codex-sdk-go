@@ -728,6 +728,9 @@ func (r *ThreadUnsubscribeResponse) UnmarshalJSON(data []byte) error {
 	if err := validateThreadUnsubscribeStatus(decoded.Status); err != nil {
 		return err
 	}
+	if err := validateEnumOccurrences(data, "status", true, validateThreadUnsubscribeStatus); err != nil {
+		return err
+	}
 	*r = ThreadUnsubscribeResponse(decoded)
 	return nil
 }

@@ -564,6 +564,11 @@ func (r *ConfigWriteResponse) UnmarshalJSON(data []byte) error {
 	if err := validateWriteStatusField("status", decoded.Status); err != nil {
 		return err
 	}
+	if err := validateEnumOccurrences(data, "status", true, func(status WriteStatus) error {
+		return validateWriteStatusField("status", status)
+	}); err != nil {
+		return err
+	}
 	*r = ConfigWriteResponse(decoded)
 	return nil
 }

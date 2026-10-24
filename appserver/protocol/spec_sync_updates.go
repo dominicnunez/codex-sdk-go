@@ -104,13 +104,23 @@ func (r *ConsumeAccountRateLimitResetCreditResponse) UnmarshalJSON(data []byte) 
 	if err := unmarshalInboundObject(data, &decoded, []string{"outcome"}, []string{"outcome"}); err != nil {
 		return err
 	}
-	switch decoded.Outcome {
-	case ConsumeAccountRateLimitResetCreditOutcomeReset, ConsumeAccountRateLimitResetCreditOutcomeNothingToReset, ConsumeAccountRateLimitResetCreditOutcomeNoCredit, ConsumeAccountRateLimitResetCreditOutcomeAlreadyRedeemed:
-	default:
-		return fmt.Errorf("invalid reset credit outcome %s", quotedValueDiagnostic(string(decoded.Outcome)))
+	if err := validateResetCreditOutcome(decoded.Outcome); err != nil {
+		return err
+	}
+	if err := validateEnumOccurrences(data, "outcome", false, validateResetCreditOutcome); err != nil {
+		return err
 	}
 	*r = ConsumeAccountRateLimitResetCreditResponse(decoded)
 	return nil
+}
+
+func validateResetCreditOutcome(outcome ConsumeAccountRateLimitResetCreditOutcome) error {
+	switch outcome {
+	case ConsumeAccountRateLimitResetCreditOutcomeReset, ConsumeAccountRateLimitResetCreditOutcomeNothingToReset, ConsumeAccountRateLimitResetCreditOutcomeNoCredit, ConsumeAccountRateLimitResetCreditOutcomeAlreadyRedeemed:
+		return nil
+	default:
+		return fmt.Errorf("invalid reset credit outcome %s", quotedValueDiagnostic(string(outcome)))
+	}
 }
 
 // GetAccountTokenUsageParams selects optional thread-scoped token usage.

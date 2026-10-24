@@ -439,6 +439,11 @@ func (r *SendAddCreditsNudgeEmailResponse) UnmarshalJSON(data []byte) error {
 	if err := validateAddCreditsNudgeEmailStatusField("addCreditsNudge.status", decoded.Status); err != nil {
 		return err
 	}
+	if err := validateEnumOccurrences(data, "status", true, func(status AddCreditsNudgeEmailStatus) error {
+		return validateAddCreditsNudgeEmailStatusField("addCreditsNudge.status", status)
+	}); err != nil {
+		return err
+	}
 	*r = SendAddCreditsNudgeEmailResponse(decoded)
 	return nil
 }
@@ -884,13 +889,23 @@ func (r *CancelLoginAccountResponse) UnmarshalJSON(data []byte) error {
 	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
-	switch decoded.Status {
-	case CancelLoginAccountStatusCanceled, CancelLoginAccountStatusNotFound:
-	default:
-		return fmt.Errorf("invalid status %s", quotedValueDiagnostic(string(decoded.Status)))
+	if err := validateCancelLoginStatus(decoded.Status); err != nil {
+		return err
+	}
+	if err := validateEnumOccurrences(data, "status", true, validateCancelLoginStatus); err != nil {
+		return err
 	}
 	*r = CancelLoginAccountResponse(decoded)
 	return nil
+}
+
+func validateCancelLoginStatus(status CancelLoginAccountStatus) error {
+	switch status {
+	case CancelLoginAccountStatusCanceled, CancelLoginAccountStatusNotFound:
+		return nil
+	default:
+		return fmt.Errorf("invalid status %s", quotedValueDiagnostic(string(status)))
+	}
 }
 
 // CancelLoginAccountStatus represents the cancellation status
