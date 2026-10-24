@@ -51,8 +51,6 @@ func TestAppDefaultFlagsValues(t *testing.T) {
 		{`,"isAccessible":false,"isAccessible":true,"isEnabled":true,"isEnabled":false`, true, false},
 		{`,"\u0069sAccessible":true,"\u0069sEnabled":false`, true, false},
 		{`,"ISACCESSIBLE":true,"ISENABLED":false`, true, false},
-		{`,"isEnabled":false,"ISENABLED":null`, false, true},
-		{`,"isAccessible":true,"ISACCESSIBLE":null`, true, true},
 		{`,"isEnabled":false,"isAccessible":true,"description":null,"appMetadata":null,"branding":null`, true, false},
 	} {
 		t.Run(tc.members, func(t *testing.T) {
@@ -112,6 +110,8 @@ func TestAppDefaultFlagsValues(t *testing.T) {
 func TestAppDefaultFlagsFailures(t *testing.T) {
 	for _, field := range []string{"isAccessible", "isEnabled"} {
 		for _, members := range []string{
+			fmt.Sprintf(`%q:null`, strings.ToUpper(field)),
+			fmt.Sprintf(`%q:false,%q:null`, field, strings.ToUpper(field)),
 			fmt.Sprintf(`%q:null`, field),
 			fmt.Sprintf(`%q:null,%q:false`, field, field),
 			fmt.Sprintf(`%q:true,%q:null`, field, field),

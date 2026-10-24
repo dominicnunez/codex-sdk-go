@@ -45,8 +45,13 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 	}
 	// This existing Config owner admits the nested variant. Leave its public
 	// representation method-free so application envelopes keep stdlib decoding.
-	return validateOptionalFields(data, func(_ string, raw []byte) error {
+	if err := validateOptionalFields(data, func(_ string, raw []byte) error {
 		return validateOptionalStringArrays(raw, "writable_roots")
+	}, "sandbox_workspace_write"); err != nil {
+		return err
+	}
+	return validateOptionalFields(data, func(_ string, raw []byte) error {
+		return validateOptionalBooleans(raw, "exclude_slash_tmp", "exclude_tmpdir_env_var", "network_access")
 	}, "sandbox_workspace_write")
 }
 

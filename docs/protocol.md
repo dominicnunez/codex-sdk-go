@@ -268,8 +268,17 @@ Credential-bearing types redact secrets from their formatted and debug JSON repr
 ## App metadata
 
 App listings and app-list notifications default omitted `isEnabled` to true and
-`isAccessible` to false. Explicit false/true values are preserved; declared null
-flags reject the listing or typed notification instead of selecting a default.
+`isAccessible` to false. Explicit false/true values are preserved; recognized null
+flags, including native folded aliases, reject the listing or typed notification
+instead of selecting a default.
+
+The same non-null rule applies to `supportsPersonality` in model metadata,
+workspace-write configuration flags, granular approval's `request_permissions`
+and `skill_approval`, and `workspaceWrite` sandbox flags. Omission retains each
+field's default representation. Validation follows the owning decoder's field
+matching and runs after its existing native, metadata and path checks.
+`SandboxWorkspaceWrite` remains a plain representation; `Config` owns its
+admission checks and retains its documented partial updates on decoding errors.
 
 ## Permission profiles
 

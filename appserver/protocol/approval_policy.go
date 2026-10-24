@@ -54,6 +54,11 @@ func (a *ApprovalPolicyGranular) UnmarshalJSON(data []byte) error {
 	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	if err := validateOptionalFields(data, func(_ string, raw []byte) error {
+		return validateOptionalBooleans(raw, "request_permissions", "skill_approval")
+	}, "granular"); err != nil {
+		return err
+	}
 	*a = ApprovalPolicyGranular(decoded)
 	return nil
 }

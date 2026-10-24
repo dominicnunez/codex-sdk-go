@@ -143,6 +143,9 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 	if err := validateOptionalArrays(data, nil, "inputModalities", "additionalSpeedTiers", "serviceTiers"); err != nil {
 		return err
 	}
+	if err := validateOptionalBooleans(data, "supportsPersonality"); err != nil {
+		return err
+	}
 	*m = Model(decoded)
 	return nil
 }
