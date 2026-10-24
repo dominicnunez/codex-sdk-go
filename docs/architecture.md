@@ -1,9 +1,10 @@
 # Architecture and ownership
 
-This reference describes the runtime boundaries and the cases used to verify
-their maintenance. The [README package map](../README.md#packages) and
-[protocol guide](protocol.md) cover public API discovery; the
-[threat model](threat-model.md) describes security controls and residual risks.
+This reference describes the runtime boundaries and the required cases for
+verifying their maintenance. Apply the relevant contracts and checks when
+changing an affected area. The [README package map](../README.md#packages) and
+[protocol guide](protocol.md) cover public API discovery; the [threat
+model](threat-model.md) describes security controls and residual risks.
 
 ## Package boundaries
 
@@ -19,53 +20,55 @@ The repository includes the [stdio transport](../appserver/transport/stdio.go).
 Callers can also supply their own Transport implementation. Process management,
 [run helpers](../appserver/run.go), streaming collection and
 [conversations](../appserver/conversation.go) live in `appserver/`; protocol
-representations and schema coverage stay in `appserver/protocol/`.
-[OAuth flow](../login/token.go) lives in `login/`, with credential persistence,
-token claims, redaction and auth payload helpers in `login/auth/`.
+representations and schema coverage stay in `appserver/protocol/`. [OAuth
+flow](../login/token.go) lives in `login/`, with credential persistence, token
+claims, redaction and auth payload helpers in `login/auth/`.
 
 ## Transport completion and shutdown
 
 Transport completion spans serialization, queue admission, writer return,
 response publication and termination. Acceptance and abandonment need a shared
 ownership boundary: peeking at a channel cannot coordinate a separate claim and
-publication. Completion cases include accepted responses and absent-response
-failures while the writer is pending, as well as simultaneously ready completion
-and terminal signals. Notifications and internal replies retain actual-write
-completion rather than merely successful queue admission.
+publication. Verify accepted responses and absent-response failures while the
+writer is pending, as well as simultaneously ready completion and terminal
+signals. Notifications and internal replies retain actual-write completion
+rather than merely successful queue admission.
 
 Terminal payload release spans the inbound queue, requests stored before handler
 registration, replay, dequeued execution claims and outbound envelopes.
 Admission and draining must remain coordinated so blocked or late producers
 cannot refill stopped queues. A writer or callback already claimed can finish;
 accepted outcomes and notification delivery after reader EOF remain separate
-from cancellation of unclaimed work. [Stdio writing](../appserver/transport/stdio_write.go)
-and [transport state](../appserver/transport/stdio.go) own these transitions.
+from cancellation of unclaimed work. [Stdio
+writing](../appserver/transport/stdio_write.go) and [transport
+state](../appserver/transport/stdio.go) own these transitions.
 
-Process shutdown has another boundary: parent exit and descendant completion
-are different events. [Process management](../appserver/process.go) and
+Process shutdown has another boundary: parent exit and descendant completion are
+different events. [Process management](../appserver/process.go) and
 [process-tree support](../internal/process/process.go) coordinate managed Close,
-Wait and force-kill. Shutdown cases include concurrent Wait/Close, descendant
-liveness, deadlines and waiting CPU cost. Removing already observed terminal
-signals from repeated selects avoids spinning while other cleanup remains live.
+Wait and force-kill. Verify concurrent Wait/Close, descendant liveness,
+deadlines and waiting CPU cost. Removing already observed terminal signals from
+repeated selects avoids spinning while other cleanup remains live.
 
 ## Notification delivery and listeners
 
 [Notification scheduling](../appserver/transport/stdio_notifications.go) uses
-explicit delivery policies for the methods in the checked-in
-[ServerNotification schema](../appserver/protocol/schema/json/ServerNotification.json).
-Changes to ordering or delivery require the schema inventory and typed handlers,
-including methods outside an existing priority switch. Transport selection,
-typed decoding and malformed fallback attribution must agree on owner identity.
-Queued, in-flight, fallback and replay ownership contribute to retained payloads;
-a queue's event count alone does not measure retained bytes.
+explicit delivery policies for the methods in the checked-in [ServerNotification
+schema](../appserver/protocol/schema/json/ServerNotification.json). Changes to
+ordering or delivery require the schema inventory and typed handlers, including
+methods outside an existing priority switch. Transport selection, typed decoding
+and malformed fallback attribution must agree on owner identity. Queued,
+in-flight, fallback and replay ownership contribute to retained payloads; a
+queue's event count alone does not measure retained bytes.
 
 Callback fanout isolates each recipient, including initial replay and direct
 service/cache calls. Committed state must still reach later SDK consumers if a
-callback or error reporter panics. Replay failure must return registration
+callback or error reporter panics. Preserve the diagnostic origin. Replay
+failure must return registration
 cleanup, and callback finalization must survive failures in error reporting as
 well as the primary handler. Listener removal clears vacated backing slots and
 discards empty registries while preserving independent dispatch snapshots and
-lifecycle unsubscription. Shutdown cases cover payload release as well as
+lifecycle unsubscription. Verify shutdown releases queued payloads as well as
 preventing further callback admission.
 
 ## Cache observation
@@ -77,43 +80,43 @@ atomically: absence from the cache cannot distinguish ordinary eviction from an
 evicted closure marker.
 
 Startup failures must leave neither listeners nor pins. An owned initial
-response must remain available without overwriting newer delivery or reopening
-a closed handle. The acquisition interval and later replay are part of the
-cache lifecycle, rather than independent successful operations.
+response must remain available without overwriting newer delivery or reopening a
+closed handle. The acquisition interval and later replay are part of the cache
+lifecycle, rather than independent successful operations.
 
 ## Snapshots and retention
 
 The shared [deep-copy implementation](../internal/deepcopy/deepcopy.go) and its
 protocol/runtime callers establish reference ownership across cache,
 conversation, collector, emitted event and final result views. New reference
-fields belong in that complete boundary rather than partial field lists.
-Relevant cases mutate both sides of the boundary and include nil, empty and
-populated values. [Thread-state benchmarks](thread-state-benchmarks.md) measure
-representative snapshot costs.
+fields belong in that complete boundary rather than partial field lists. Verify
+mutation isolation in both directions with nil, empty and populated values, and
+measure representative snapshot cost. See [thread-state
+benchmarks](thread-state-benchmarks.md) for workloads and prior measurements.
 
 Bounded histories need bounded backing storage as well as bounded visible
 lengths. Trimmed substrings can retain their original allocation, and evicted
-slice slots can keep payloads alive. Retention cases cover every writer,
-completion aggregation and snapshot, distinguishing bounded text from complete
-thread items.
+slice slots can keep payloads alive. Check every retention writer, completion
+aggregation and snapshot, distinguishing bounded text from complete thread
+items.
 
-[Stream collection](../appserver/stream_collector.go) also handles opaque identity
-tuples. Storage keys and presentation keys have different consumers. Compatible
-bare presentation keys need reservation before fallback selection; adversarial
-spellings, insertion order, accounting and completion cleanup exercise those
-boundaries for each tuple.
+[Stream collection](../appserver/stream_collector.go) also handles opaque
+identity tuples. Storage keys and presentation keys have different consumers.
+Compatible bare presentation keys need reservation before fallback selection;
+test adversarial spellings, insertion-order independence, accounting and
+completion cleanup for each tuple.
 
 ## Initialization and credentials
 
 Initialization extensions are serialized and owned before waiting or child
 launch. Snapshot failure rejects admission rather than retaining a mutable Go
-value as fallback. Process cancellation is rechecked after parameter preparation.
-The [backend migration notes](json-backend-migration.md) describe encoding-depth
-failures and the no-dispatch, no-latch and recovery guarantees.
+value as fallback. Process cancellation is rechecked after parameter
+preparation. The [backend migration notes](json-backend-migration.md) describe
+encoding-depth failures and the no-dispatch, no-latch and recovery guarantees.
 
 The [token-response boundary](../login/token.go) validates provider-controlled
 lifetimes before arithmetic and credential publication for all grant paths.
-Failure must not publish partial credentials. The
-[OAuth threat-model section](threat-model.md#oauth-callbacks-provider-routing-and-account-identity)
+Failure must not publish partial credentials. The [OAuth threat-model
+section](threat-model.md#oauth-callbacks-provider-routing-and-account-identity)
 documents the implemented range, token-retention behavior and residual trust in
 the provider's claims.
