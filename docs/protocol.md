@@ -279,6 +279,12 @@ decision := codex.ReviewDecisionWrapper{
 
 Use `ReviewDecisionApprovedMCPPolicyAmendment` for the MCP policy-amendment string decision. `item/tool/requestUserInput` requests require `isBlocking`; malformed requests are rejected before invoking the handler.
 
+For `mcpServer/elicitation/request`, standard `form` mode validates the typed
+`requestedSchema`, including its property definitions, before invoking the
+handler. The `openaiForm` and `openai/form` modes retain arbitrary JSON in
+`OpenAIRequestedSchema`. Schema admission does not validate answers or decide
+whether the application should collect the requested information.
+
 Legacy additional-filesystem permission paths and approval cwd, command-action,
 parsed-command and grantRoot strings are preserved as supplied. They may be
 relative, empty or contain dot segments. The SDK does not resolve them against

@@ -128,6 +128,9 @@ func (s *McpElicitationSchema) UnmarshalJSON(data []byte) error {
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
+	if err := validateElicitationSchema(data); err != nil {
+		return err
+	}
 	*s = McpElicitationSchema(decoded)
 	return nil
 }
