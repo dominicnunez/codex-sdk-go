@@ -466,6 +466,15 @@ closure, and historical results may differ from subsequently published state.
 
 ## Prompt injection, approvals, and tool results
 
+User-input approval admission distinguishes omitted question flags from explicit
+nulls. Exact `isSecret` and `isOther` occurrences must be non-null booleans;
+omission retains their false defaults. A malformed question rejects the whole
+request before the application handler or a successful reply is published.
+Existing required, native and question-identity errors retain precedence, and
+rejected values do not replace receiver references. Applications own prompt
+rendering and answer handling; these flags do not establish authorization to
+collect input.
+
 MCP elicitation request admission validates every recognized `mode` occurrence
 against `form`, `url`, `openaiForm` and `openai/form` before invoking the
 application handler. Later valid duplicates cannot hide an unsupported mode.
