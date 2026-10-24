@@ -77,7 +77,7 @@ func (a *AppInfo) UnmarshalJSON(data []byte) error {
 	}, "appMetadata"); err != nil {
 		return err
 	}
-	if err := validateObjectFields(data, nil, []string{"isAccessible", "isEnabled"}); err != nil {
+	if err := validateOptionalBooleans(data, "isAccessible", "isEnabled"); err != nil {
 		return err
 	}
 	if decoded.IsEnabled == nil {

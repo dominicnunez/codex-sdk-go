@@ -234,6 +234,9 @@ func (s *SandboxPolicyWrapper) UnmarshalJSON(data []byte) error {
 		if err := validateOptionalStringArrays(data, "writableRoots"); err != nil {
 			return err
 		}
+		if err := validateOptionalBooleans(data, "excludeSlashTmp", "excludeTmpdirEnvVar", "networkAccess"); err != nil {
+			return err
+		}
 		s.Value = validated
 	default:
 		s.Value = UnknownSandboxPolicy{Type: typeField, Raw: append(json.RawMessage(nil), data...)}

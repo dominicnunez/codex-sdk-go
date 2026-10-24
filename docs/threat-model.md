@@ -531,12 +531,25 @@ can correlate progress and completion; that ID does not authenticate the peer or
 prove that an import completed.
 
 App metadata admission distinguishes omitted defaulted flags from explicit
-nulls. Exact `isEnabled` and `isAccessible` fields must be non-null booleans;
-omission retains their true/false defaults. Invalid app metadata rejects the
+nulls. Recognized `isEnabled` and `isAccessible` fields, including escaped,
+folded and Unicode simple-fold aliases accepted by the native decoder, must be
+non-null booleans; omission retains their true/false defaults. Invalid app metadata rejects the
 whole public listing and is reported before either typed app-list notification
 API invokes its callback. Existing metadata errors retain precedence, and
 failed decoding preserves the prior receiver. These peer-provided flags do not
 establish local authorization or whether a connector is safe to invoke.
+
+The native admission owners also reject null defaulted flags in model
+`supportsPersonality`, workspace-write configuration, granular approval
+`request_permissions`/`skill_approval`, and `workspaceWrite` sandbox policy.
+Checks follow native field matching and preserve earlier required, native,
+metadata and path errors. Invalid policy metadata cannot enter successful
+thread-start responses, typed settings callbacks or the thread cache. Plain
+workspace configuration records keep their normal JSON method sets; the
+containing `Config` owns validation. Direct `Config` decoding retains native
+partial updates on errors, while a failed config-read returns no public value.
+These checks validate the supplied representation, not whether a policy should
+be granted or how the server enforces it.
 
 Permission profile listings require an explicit non-null `allowed` flag for
 every summary before a successful response is returned. Missing or null flags
