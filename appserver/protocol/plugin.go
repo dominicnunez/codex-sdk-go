@@ -548,6 +548,24 @@ func (p *PluginSummary) UnmarshalJSON(data []byte) error {
 		*p = previous
 		return err
 	}
+	if err := validateEnumOccurrences(data, "authPolicy", true, func(value PluginAuthPolicy) error {
+		return validatePluginAuthPolicyField("plugin.summary.authPolicy", value)
+	}); err != nil {
+		*p = previous
+		return err
+	}
+	if err := validateEnumOccurrences(data, "installPolicy", true, func(value PluginInstallPolicy) error {
+		return validatePluginInstallPolicyField("plugin.summary.installPolicy", value)
+	}); err != nil {
+		*p = previous
+		return err
+	}
+	if err := validateEnumOccurrences(data, "availability", true, func(value *PluginAvailability) error {
+		return validateOptionalPluginAvailabilityField("plugin.summary.availability", value)
+	}); err != nil {
+		*p = previous
+		return err
+	}
 	return nil
 }
 
