@@ -270,6 +270,12 @@ not an approval or proof that the server resolves a path in a particular way.
 
 ## Compatibility
 
+Reset-credit outcomes, plugin-install auth policies, and the status fields of
+thread-unsubscribe, login-cancel, add-credits-email and configuration-write
+responses validate every recognized enum occurrence.
+A later valid duplicate cannot repair an earlier invalid value. Existing error
+precedence and each record's field-name matching remain unchanged.
+
 The `process/outputDelta` and `command/exec/outputDelta` decoders validate every
 recognized `stream` occurrence, including escaped field names. A later valid
 duplicate cannot hide an invalid earlier stream. Existing field and base64

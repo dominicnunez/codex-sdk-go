@@ -1213,6 +1213,11 @@ func (r *PluginInstallResponse) UnmarshalJSON(data []byte) error {
 	if err := validatePluginAuthPolicyField("plugin.install.authPolicy", decoded.AuthPolicy); err != nil {
 		return err
 	}
+	if err := validateEnumOccurrences(data, "authPolicy", true, func(policy PluginAuthPolicy) error {
+		return validatePluginAuthPolicyField("plugin.install.authPolicy", policy)
+	}); err != nil {
+		return err
+	}
 	*r = PluginInstallResponse(decoded)
 	return nil
 }
