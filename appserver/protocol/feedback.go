@@ -96,6 +96,9 @@ func (r *FeedbackSaveResponse) UnmarshalJSON(data []byte) error {
 	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	if err := validateNativeNonNullFields(data, "savedPath", "threadId"); err != nil {
+		return err
+	}
 	*r = FeedbackSaveResponse(decoded)
 	return nil
 }

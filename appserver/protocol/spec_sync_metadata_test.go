@@ -161,3 +161,21 @@ func syncRequiredProperties(s map[string]any, defs map[string]any) map[string]an
 	}
 	return out
 }
+
+func TestSyncNewRequiredOwnersRejectNullAliases(t *testing.T) {
+	for _, tc := range []struct {
+		raw  string
+		dest any
+	}{
+		{`{"max_bytes":1,"MAX_BYTES":null}`, &OtelToolResultLogConfig{MaxBytes: 9}},
+		{`{"type":"gcp","TYPE":null}`, &GcpAccount{Type: "gcp"}},
+		{`{"savedPath":"p","SAVEDPATH":null,"threadId":"t"}`, &FeedbackSaveResponse{SavedPath: "old", ThreadID: "old"}},
+		{`{"savedPath":"p","threadId":"t","THREADID":null}`, &FeedbackSaveResponse{SavedPath: "old", ThreadID: "old"}},
+	} {
+		before := reflect.ValueOf(tc.dest).Elem().Interface()
+		err := json.Unmarshal([]byte(tc.raw), tc.dest)
+		if err == nil || !reflect.DeepEqual(reflect.ValueOf(tc.dest).Elem().Interface(), before) {
+			t.Errorf("invalid alias published for %T: %s, %v", tc.dest, tc.raw, err)
+		}
+	}
+}

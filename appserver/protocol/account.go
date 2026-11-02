@@ -1060,6 +1060,9 @@ func (a *GcpAccount) UnmarshalJSON(data []byte) error {
 	if decoded.Type != "gcp" {
 		return fmt.Errorf("account: invalid GCP type")
 	}
+	if err := validateNativeNonNullFields(data, "type"); err != nil {
+		return err
+	}
 	*a = GcpAccount(decoded)
 	return nil
 }

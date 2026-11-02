@@ -29,7 +29,7 @@ func TestSyncFeedbackSaveService(t *testing.T) {
 	if string(fields["savePath"]) != `"opaque/archive.zip"` || string(fields["classification"]) != `""` || string(fields["includeLogs"]) != "false" || string(fields["extraLogFiles"]) != "[]" {
 		t.Fatalf("params changed: %s", sent.Params)
 	}
-	for _, raw := range []string{`{}`, `{"savedPath":null,"threadId":"t"}`, `{"savedPath":7,"threadId":"t"}`, `{"savedPath":"p","threadId":null}`} {
+	for _, raw := range []string{`{}`, `{"savedPath":null,"threadId":"t"}`, `{"savedPath":7,"threadId":"t"}`, `{"savedPath":"p","threadId":"t","SAVEDPATH":null}`, `{"savedPath":"p","threadId":"t","THREADID":null}`, `{"savedPath":"p","threadId":null}`} {
 		mock.SetResponse("feedback/save", p.Response{Result: json.RawMessage(raw)})
 		got, err := client.Feedback.Save(context.Background(), p.FeedbackSaveParams{})
 		if err == nil || !reflect.DeepEqual(got, p.FeedbackSaveResponse{}) {
@@ -53,7 +53,7 @@ func TestSyncConfigOtelService(t *testing.T) {
 			t.Fatalf("telemetry requirements lost: %+v, %v", got, err)
 		}
 	}
-	for _, raw := range []string{`{"requirements":{"otel":{"exporter":"future"}}}`, `{"requirements":{"otel":{"exporter":{"otlp-http":{"endpoint":"e","headers":{},"protocol":"future"}}}}}`} {
+	for _, raw := range []string{`{"requirements":{"otel":{"exporter":"future"}}}`, `{"requirements":{"otel":{"tool_result":{"max_bytes":0,"MAX_BYTES":null}}}}`, `{"requirements":{"otel":{"exporter":{"otlp-http":{"endpoint":"e","headers":{},"protocol":"future"}}}}}`} {
 		mock.SetResponse("configRequirements/read", p.Response{Result: json.RawMessage(raw)})
 		got, err := client.Config.ReadRequirements(context.Background())
 		if err == nil || !reflect.DeepEqual(got, p.ConfigRequirementsReadResponse{}) {
@@ -233,5 +233,24 @@ func TestSyncDetachedReviewNeverDispatches(t *testing.T) {
 	_, err := client.Review.Start(context.Background(), p.ReviewStartParams{ThreadID: "t", Target: p.ReviewTargetWrapper{Value: &p.UncommittedChangesReviewTarget{}}, Delivery: ptr(p.ReviewDeliveryDetached)})
 	if err == nil || len(mock.SentRequests) != 0 {
 		t.Fatalf("obsolete delivery dispatched: %v, %+v", err, mock.SentRequests)
+	}
+}
+
+func TestSyncGcpNullAliasHasNoPublicResult(t *testing.T) {
+	mock := NewMockTransport()
+	client := p.NewClient(mock)
+	t.Cleanup(func() { _ = client.Close() })
+	mock.SetResponse("account/read", p.Response{Result: json.RawMessage(`{"requiresOpenaiAuth":true,"account":{"type":"gcp","TYPE":null}}`)})
+	got, err := client.Account.Get(context.Background(), p.GetAccountParams{})
+	if err == nil || !reflect.DeepEqual(got, p.GetAccountResponse{}) {
+		t.Fatalf("invalid GCP account published: %+v, %v", got, err)
+	}
+	mock.SetResponse("account/read", p.Response{Result: json.RawMessage(`{"requiresOpenaiAuth":false,"account":{"type":"gcp"}}`)})
+	got, err = client.Account.Get(context.Background(), p.GetAccountParams{})
+	if err != nil || got.Account == nil {
+		t.Fatalf("recovery: %+v, %v", got, err)
+	}
+	if _, ok := got.Account.Value.(*p.GcpAccount); !ok {
+		t.Fatalf("wrong variant: %T", got.Account.Value)
 	}
 }

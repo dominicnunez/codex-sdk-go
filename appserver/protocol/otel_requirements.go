@@ -104,6 +104,9 @@ func (c *OtelToolResultLogConfig) UnmarshalJSON(data []byte) error {
 	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	if err := validateNativeNonNullFields(data, "max_bytes"); err != nil {
+		return err
+	}
 	*c = OtelToolResultLogConfig(decoded)
 	return nil
 }
@@ -174,12 +177,7 @@ func decodeOtelExporterObject(raw []byte, dest any, required ...string) error {
 	if err := jsondecode.Unmarshal(raw, dest); err != nil {
 		return err
 	}
-	if err := validateOptionalFields(raw, func(name string, value []byte) error {
-		if isNullJSONValue(value) {
-			return responseObjectValidationErrors().null(name)
-		}
-		return nil
-	}, required...); err != nil {
+	if err := validateNativeNonNullFields(raw, required...); err != nil {
 		return err
 	}
 	return validateOptionalFields(raw, func(_ string, headers []byte) error { return validateOtelStringMap(headers, false) }, "headers")
