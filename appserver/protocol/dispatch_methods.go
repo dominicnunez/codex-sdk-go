@@ -195,6 +195,7 @@ const (
 	methodMcpResourceRead                        = "mcpServer/resource/read"
 	methodMcpServerToolCall                      = "mcpServer/tool/call"
 	methodFeedbackUpload                         = "feedback/upload"
+	methodFeedbackSave                           = "feedback/save"
 	methodWindowsSandboxSetupStart               = "windowsSandbox/setupStart"
 	methodWindowsSandboxReadiness                = "windowsSandbox/readiness"
 	methodExperimentalFeatureList                = "experimentalFeature/list"

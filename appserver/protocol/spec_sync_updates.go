@@ -157,6 +157,7 @@ type ThreadUsageBreakdownGroup struct {
 }
 
 type ThreadUsage struct {
+	NativeUsageUSDMicros        *int64                      `json:"nativeUsageUsdMicros,omitempty"`
 	EstimatedUsageCreditsMicros int64                       `json:"estimatedUsageCreditsMicros"`
 	EstimatedUsageUSDMicros     *int64                      `json:"estimatedUsageUsdMicros,omitempty"`
 	Groups                      []ThreadUsageBreakdownGroup `json:"groups"`

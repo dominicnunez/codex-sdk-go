@@ -455,6 +455,7 @@ type ConfigRequirementsReadResponse struct {
 
 // ConfigRequirements represents configuration requirements
 type ConfigRequirements struct {
+	Otel                                 *OtelRequirements         `json:"otel,omitempty"`
 	AllowedLoginMethods                  json.RawMessage           `json:"allowedLoginMethods,omitempty"`
 	AdditionalDeveloperInstructions      *string                   `json:"additionalDeveloperInstructions,omitempty"`
 	AllowBrowserAndComputerUse           *bool                     `json:"allowBrowserAndComputerUse,omitempty"`

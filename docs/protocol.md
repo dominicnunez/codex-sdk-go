@@ -428,3 +428,37 @@ permits negative values. These field changes apply through the public `appserver
 type alias too.
 
 Unknown discriminated-union variants are preserved where the public type exposes an `Unknown...` form. Outbound responses are validated more strictly because the SDK must not send a shape rejected by the current server schema.
+
+## Synced metadata and feedback archives
+
+Thread items carry optional `StartedAtMs` and `CompletedAtMs` lifecycle times
+independently of item-notification envelope times. These fields survive history,
+typed notifications and runtime snapshots. Image-generation items also expose
+`GenerationID`. Unknown item branches continue to retain their raw payloads.
+
+`Hooks.List` accepts an optional `ThreadID` to inspect a loaded thread's hooks;
+omit `Cwds` in this mode. Hook metadata exposes the owning `EnvironmentID`.
+Hook execution summaries preserve `SourcePath` as an opaque server string.
+Configured hook metadata retains its absolute-path contract.
+
+New nullable observation metadata uses the usual SDK pointer representation:
+omitted and null both mean unavailable; explicit false, zero and empty strings
+remain distinguishable from that unavailable state.
+
+`ProcessExitedNotification.OutputDrainTimedOut` reports incomplete output
+collection after process exit. Nil means unavailable; false is a reported
+negative result. Account metadata exposes the selected ChatGPT `WorkspaceName`
+and typed `GcpAccount`. Account thread usage exposes `NativeUsageUSDMicros`;
+nil means unknown and a pointer to zero means known zero.
+
+`Config.ReadRequirements` exposes managed `OtelRequirements`. `OtelExporter`
+selects one of `Kind` (`none` or `statsig`), `HTTP` or `GRPC`; TLS strings remain
+opaque server metadata. These records do not activate local telemetry.
+
+`Feedback.Save` sends `FeedbackSaveParams` to `feedback/save` and returns the
+server's saved path, thread ID and optional prompt hash. The caller owns the ZIP
+on the server host, including after an interrupted RPC. The SDK preserves server
+path strings without local resolution.
+
+Reviews run inline. The retained `ReviewDeliveryDetached` constant is rejected
+by encoding and decoding because it is absent from the current schema.

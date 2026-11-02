@@ -67,3 +67,48 @@ func (s *FeedbackService) Upload(ctx context.Context, params FeedbackUploadParam
 	}
 	return resp, nil
 }
+
+// FeedbackSaveParams saves feedback to a caller-owned ZIP file on the server host.
+// SavePath and ExtraLogFiles are server path strings; the SDK does not resolve them.
+type FeedbackSaveParams struct {
+	Classification string            `json:"classification"`
+	SavePath       string            `json:"savePath"`
+	IncludeLogs    *bool             `json:"includeLogs,omitempty"`
+	Reason         *string           `json:"reason,omitempty"`
+	Tags           map[string]string `json:"tags,omitempty"`
+	ThreadID       *string           `json:"threadId,omitempty"`
+	ExtraLogFiles  *[]string         `json:"extraLogFiles,omitempty"`
+}
+
+// FeedbackSaveResponse identifies the saved feedback archive.
+type FeedbackSaveResponse struct {
+	SavedPath  string  `json:"savedPath"`
+	ThreadID   string  `json:"threadId"`
+	PromptHash *string `json:"promptHash,omitempty"`
+}
+
+func (r *FeedbackSaveResponse) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "savedPath", "threadId"); err != nil {
+		return err
+	}
+	type wire FeedbackSaveResponse
+	var decoded wire
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	if err := validateNativeNonNullFields(data, "savedPath", "threadId"); err != nil {
+		return err
+	}
+	*r = FeedbackSaveResponse(decoded)
+	return nil
+}
+
+// Save asks the server to write a feedback archive. The caller owns the file,
+// including when the RPC disconnects before a response arrives.
+func (s *FeedbackService) Save(ctx context.Context, params FeedbackSaveParams) (FeedbackSaveResponse, error) {
+	var response FeedbackSaveResponse
+	if err := s.client.sendRequest(ctx, methodFeedbackSave, params, &response); err != nil {
+		return FeedbackSaveResponse{}, err
+	}
+	return response, nil
+}

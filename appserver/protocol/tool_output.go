@@ -51,10 +51,12 @@ func (b *FunctionCallOutputBody) UnmarshalJSON(data []byte) error {
 
 // FunctionCallOutputThreadItem is an externally supplied tool result in history.
 type FunctionCallOutputThreadItem struct {
-	ID        string                 `json:"id"`
-	Name      string                 `json:"name"`
-	Namespace *string                `json:"namespace,omitempty"`
-	Output    FunctionCallOutputBody `json:"output"`
+	StartedAtMs   *int64                 `json:"startedAtMs,omitempty"`
+	CompletedAtMs *int64                 `json:"completedAtMs,omitempty"`
+	ID            string                 `json:"id"`
+	Name          string                 `json:"name"`
+	Namespace     *string                `json:"namespace,omitempty"`
+	Output        FunctionCallOutputBody `json:"output"`
 }
 
 func (FunctionCallOutputThreadItem) threadItem() {}

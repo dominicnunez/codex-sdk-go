@@ -63,12 +63,13 @@ func validateOutputStreamOccurrences(data []byte) error {
 
 // ProcessExitedNotification is the final exit notification for process/spawn.
 type ProcessExitedNotification struct {
-	ExitCode         int32  `json:"exitCode"`
-	ProcessHandle    string `json:"processHandle"`
-	Stderr           string `json:"stderr"`
-	StderrCapReached bool   `json:"stderrCapReached"`
-	Stdout           string `json:"stdout"`
-	StdoutCapReached bool   `json:"stdoutCapReached"`
+	OutputDrainTimedOut *bool  `json:"outputDrainTimedOut,omitempty"`
+	ExitCode            int32  `json:"exitCode"`
+	ProcessHandle       string `json:"processHandle"`
+	Stderr              string `json:"stderr"`
+	StderrCapReached    bool   `json:"stderrCapReached"`
+	Stdout              string `json:"stdout"`
+	StdoutCapReached    bool   `json:"stdoutCapReached"`
 }
 
 func (n *ProcessExitedNotification) UnmarshalJSON(data []byte) error {

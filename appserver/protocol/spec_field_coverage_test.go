@@ -1195,7 +1195,7 @@ func testEnumValues(t *testing.T) {
 			specPath: "schema/json/v2/ReviewStartParams.json",
 			defName:  "ReviewDelivery",
 			goValues: enumStrings(
-				ReviewDeliveryInline, ReviewDeliveryDetached,
+				ReviewDeliveryInline,
 			),
 		},
 		{

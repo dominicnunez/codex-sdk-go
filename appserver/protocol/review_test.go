@@ -122,13 +122,13 @@ func TestReviewStart(t *testing.T) {
 			},
 		},
 		{
-			name: "detached review",
+			name: "explicit inline review",
 			params: codex.ReviewStartParams{
 				ThreadID: "thread-123",
 				Target: codex.ReviewTargetWrapper{
 					Value: &codex.UncommittedChangesReviewTarget{},
 				},
-				Delivery: ptr(codex.ReviewDeliveryDetached),
+				Delivery: ptr(codex.ReviewDeliveryInline),
 			},
 			response: map[string]interface{}{
 				"reviewThreadId": "review-thread-999",
@@ -140,7 +140,7 @@ func TestReviewStart(t *testing.T) {
 			},
 			wantJSON: map[string]interface{}{
 				"threadId": "thread-123",
-				"delivery": "detached",
+				"delivery": "inline",
 				"target": map[string]interface{}{
 					"type": "uncommittedChanges",
 				},

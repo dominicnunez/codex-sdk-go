@@ -15,9 +15,11 @@ type ThreadItem interface {
 
 // UserMessageThreadItem represents a user message in a thread.
 type UserMessageThreadItem struct {
-	ID       string      `json:"id"`
-	Content  []UserInput `json:"content"`
-	ClientID *string     `json:"clientId,omitempty"`
+	StartedAtMs   *int64      `json:"startedAtMs,omitempty"`
+	CompletedAtMs *int64      `json:"completedAtMs,omitempty"`
+	ID            string      `json:"id"`
+	Content       []UserInput `json:"content"`
+	ClientID      *string     `json:"clientId,omitempty"`
 }
 
 func (UserMessageThreadItem) threadItem() {}
@@ -36,11 +38,14 @@ func (u *UserMessageThreadItem) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	return jsonencode.Marshal(struct {
-		Type     string          `json:"type"`
-		ID       string          `json:"id"`
-		Content  json.RawMessage `json:"content"`
-		ClientID *string         `json:"clientId,omitempty"`
+		StartedAtMs   *int64          `json:"startedAtMs,omitempty"`
+		CompletedAtMs *int64          `json:"completedAtMs,omitempty"`
+		Type          string          `json:"type"`
+		ID            string          `json:"id"`
+		Content       json.RawMessage `json:"content"`
+		ClientID      *string         `json:"clientId,omitempty"`
 	}{
+		StartedAtMs: u.StartedAtMs, CompletedAtMs: u.CompletedAtMs,
 		Type:     "userMessage",
 		ID:       u.ID,
 		Content:  contentBytes,
@@ -50,6 +55,8 @@ func (u *UserMessageThreadItem) MarshalJSON() ([]byte, error) {
 
 // AgentMessageThreadItem represents an agent message in a thread.
 type AgentMessageThreadItem struct {
+	StartedAtMs    *int64                    `json:"startedAtMs,omitempty"`
+	CompletedAtMs  *int64                    `json:"completedAtMs,omitempty"`
 	Questions      *[]AsyncUserInputQuestion `json:"questions,omitempty"`
 	ID             string                    `json:"id"`
 	MemoryCitation *MemoryCitation           `json:"memoryCitation,omitempty"`
@@ -73,8 +80,10 @@ func (a *AgentMessageThreadItem) MarshalJSON() ([]byte, error) {
 
 // PlanThreadItem represents a plan in a thread.
 type PlanThreadItem struct {
-	ID   string `json:"id"`
-	Text string `json:"text"`
+	StartedAtMs   *int64 `json:"startedAtMs,omitempty"`
+	CompletedAtMs *int64 `json:"completedAtMs,omitempty"`
+	ID            string `json:"id"`
+	Text          string `json:"text"`
 }
 
 func (PlanThreadItem) threadItem() {}
@@ -92,9 +101,11 @@ func (p *PlanThreadItem) MarshalJSON() ([]byte, error) {
 
 // ReasoningThreadItem represents reasoning content in a thread.
 type ReasoningThreadItem struct {
-	ID      string   `json:"id"`
-	Content []string `json:"content,omitempty"`
-	Summary []string `json:"summary,omitempty"`
+	StartedAtMs   *int64   `json:"startedAtMs,omitempty"`
+	CompletedAtMs *int64   `json:"completedAtMs,omitempty"`
+	ID            string   `json:"id"`
+	Content       []string `json:"content,omitempty"`
+	Summary       []string `json:"summary,omitempty"`
 }
 
 func (ReasoningThreadItem) threadItem() {}
@@ -112,6 +123,8 @@ func (r *ReasoningThreadItem) MarshalJSON() ([]byte, error) {
 
 // CommandExecutionThreadItem represents a command execution in a thread.
 type CommandExecutionThreadItem struct {
+	StartedAtMs      *int64                  `json:"startedAtMs,omitempty"`
+	CompletedAtMs    *int64                  `json:"completedAtMs,omitempty"`
 	ID               string                  `json:"id"`
 	Command          string                  `json:"command"`
 	CommandActions   []CommandActionWrapper  `json:"commandActions"`
@@ -141,9 +154,11 @@ func (c *CommandExecutionThreadItem) MarshalJSON() ([]byte, error) {
 
 // FileChangeThreadItem represents a file change in a thread.
 type FileChangeThreadItem struct {
-	ID      string             `json:"id"`
-	Changes []FileUpdateChange `json:"changes"`
-	Status  PatchApplyStatus   `json:"status"`
+	StartedAtMs   *int64             `json:"startedAtMs,omitempty"`
+	CompletedAtMs *int64             `json:"completedAtMs,omitempty"`
+	ID            string             `json:"id"`
+	Changes       []FileUpdateChange `json:"changes"`
+	Status        PatchApplyStatus   `json:"status"`
 }
 
 func (FileChangeThreadItem) threadItem() {}
@@ -161,6 +176,8 @@ func (f *FileChangeThreadItem) MarshalJSON() ([]byte, error) {
 
 // McpToolCallThreadItem represents an MCP tool call in a thread.
 type McpToolCallThreadItem struct {
+	StartedAtMs       *int64                 `json:"startedAtMs,omitempty"`
+	CompletedAtMs     *int64                 `json:"completedAtMs,omitempty"`
 	ID                string                 `json:"id"`
 	Server            string                 `json:"server"`
 	Tool              string                 `json:"tool"`
@@ -228,14 +245,16 @@ func (m *McpToolCallThreadItem) MarshalJSON() ([]byte, error) {
 
 // DynamicToolCallThreadItem represents a dynamic tool call in a thread.
 type DynamicToolCallThreadItem struct {
-	ID           string                                    `json:"id"`
-	Tool         string                                    `json:"tool"`
-	Namespace    *string                                   `json:"namespace,omitempty"`
-	Status       DynamicToolCallStatus                     `json:"status"`
-	Arguments    interface{}                               `json:"arguments"`
-	ContentItems []DynamicToolCallOutputContentItemWrapper `json:"contentItems,omitempty"`
-	Success      *bool                                     `json:"success,omitempty"`
-	DurationMs   *int64                                    `json:"durationMs,omitempty"`
+	StartedAtMs   *int64                                    `json:"startedAtMs,omitempty"`
+	CompletedAtMs *int64                                    `json:"completedAtMs,omitempty"`
+	ID            string                                    `json:"id"`
+	Tool          string                                    `json:"tool"`
+	Namespace     *string                                   `json:"namespace,omitempty"`
+	Status        DynamicToolCallStatus                     `json:"status"`
+	Arguments     interface{}                               `json:"arguments"`
+	ContentItems  []DynamicToolCallOutputContentItemWrapper `json:"contentItems,omitempty"`
+	Success       *bool                                     `json:"success,omitempty"`
+	DurationMs    *int64                                    `json:"durationMs,omitempty"`
 }
 
 func (DynamicToolCallThreadItem) threadItem() {}
@@ -253,6 +272,8 @@ func (d *DynamicToolCallThreadItem) MarshalJSON() ([]byte, error) {
 
 // CollabAgentToolCallThreadItem represents a collaboration agent tool call in a thread.
 type CollabAgentToolCallThreadItem struct {
+	StartedAtMs       *int64                      `json:"startedAtMs,omitempty"`
+	CompletedAtMs     *int64                      `json:"completedAtMs,omitempty"`
 	ID                string                      `json:"id"`
 	Tool              CollabAgentTool             `json:"tool"`
 	Status            CollabAgentToolCallStatus   `json:"status"`
@@ -292,6 +313,8 @@ const (
 
 // SubAgentActivityThreadItem represents activity from a sub-agent thread.
 type SubAgentActivityThreadItem struct {
+	StartedAtMs     *int64               `json:"startedAtMs,omitempty"`
+	CompletedAtMs   *int64               `json:"completedAtMs,omitempty"`
 	AgentPath       string               `json:"agentPath"`
 	AgentThreadID   string               `json:"agentThreadId"`
 	ID              string               `json:"id"`
@@ -312,8 +335,10 @@ func (s *SubAgentActivityThreadItem) MarshalJSON() ([]byte, error) {
 
 // SleepThreadItem represents an interruptible clock.sleep display item.
 type SleepThreadItem struct {
-	DurationMs uint64 `json:"durationMs"`
-	ID         string `json:"id"`
+	StartedAtMs   *int64 `json:"startedAtMs,omitempty"`
+	CompletedAtMs *int64 `json:"completedAtMs,omitempty"`
+	DurationMs    uint64 `json:"durationMs"`
+	ID            string `json:"id"`
 }
 
 func (SleepThreadItem) threadItem() {}
@@ -328,10 +353,12 @@ func (s *SleepThreadItem) MarshalJSON() ([]byte, error) {
 
 // WebSearchThreadItem represents a web search in a thread.
 type WebSearchThreadItem struct {
-	ID      string                  `json:"id"`
-	Query   string                  `json:"query"`
-	Action  *WebSearchActionWrapper `json:"action,omitempty"`
-	Results *[]json.RawMessage      `json:"results,omitempty"`
+	StartedAtMs   *int64                  `json:"startedAtMs,omitempty"`
+	CompletedAtMs *int64                  `json:"completedAtMs,omitempty"`
+	ID            string                  `json:"id"`
+	Query         string                  `json:"query"`
+	Action        *WebSearchActionWrapper `json:"action,omitempty"`
+	Results       *[]json.RawMessage      `json:"results,omitempty"`
 }
 
 func (WebSearchThreadItem) threadItem() {}
@@ -349,8 +376,10 @@ func (w *WebSearchThreadItem) MarshalJSON() ([]byte, error) {
 
 // ImageViewThreadItem represents an image view in a thread.
 type ImageViewThreadItem struct {
-	ID   string `json:"id"`
-	Path string `json:"path"`
+	StartedAtMs   *int64 `json:"startedAtMs,omitempty"`
+	CompletedAtMs *int64 `json:"completedAtMs,omitempty"`
+	ID            string `json:"id"`
+	Path          string `json:"path"`
 }
 
 func (ImageViewThreadItem) threadItem() {}
@@ -368,8 +397,10 @@ func (i *ImageViewThreadItem) MarshalJSON() ([]byte, error) {
 
 // EnteredReviewModeThreadItem represents entering review mode in a thread.
 type EnteredReviewModeThreadItem struct {
-	ID     string `json:"id"`
-	Review string `json:"review"`
+	StartedAtMs   *int64 `json:"startedAtMs,omitempty"`
+	CompletedAtMs *int64 `json:"completedAtMs,omitempty"`
+	ID            string `json:"id"`
+	Review        string `json:"review"`
 }
 
 func (EnteredReviewModeThreadItem) threadItem() {}
@@ -387,8 +418,10 @@ func (e *EnteredReviewModeThreadItem) MarshalJSON() ([]byte, error) {
 
 // ExitedReviewModeThreadItem represents exiting review mode in a thread.
 type ExitedReviewModeThreadItem struct {
-	ID     string `json:"id"`
-	Review string `json:"review"`
+	StartedAtMs   *int64 `json:"startedAtMs,omitempty"`
+	CompletedAtMs *int64 `json:"completedAtMs,omitempty"`
+	ID            string `json:"id"`
+	Review        string `json:"review"`
 }
 
 func (ExitedReviewModeThreadItem) threadItem() {}
@@ -406,19 +439,19 @@ func (e *ExitedReviewModeThreadItem) MarshalJSON() ([]byte, error) {
 
 // ContextCompactionThreadItem represents a context compaction event in a thread.
 type ContextCompactionThreadItem struct {
-	ID string `json:"id"`
+	StartedAtMs   *int64 `json:"startedAtMs,omitempty"`
+	CompletedAtMs *int64 `json:"completedAtMs,omitempty"`
+	ID            string `json:"id"`
 }
 
 func (ContextCompactionThreadItem) threadItem() {}
 
 func (c *ContextCompactionThreadItem) MarshalJSON() ([]byte, error) {
+	type wire ContextCompactionThreadItem
 	return jsonencode.Marshal(struct {
 		Type string `json:"type"`
-		ID   string `json:"id"`
-	}{
-		Type: "contextCompaction",
-		ID:   c.ID,
-	})
+		*wire
+	}{Type: "contextCompaction", wire: (*wire)(c)})
 }
 
 // UnmarshalErrorItemType is the Type value assigned to synthetic UnknownThreadItem
@@ -499,9 +532,11 @@ func decodeThreadItemIntoWithValidation(
 
 func decodeUserMessageThreadItem(data []byte) (ThreadItem, error) {
 	var raw struct {
-		ID       string            `json:"id"`
-		Content  []json.RawMessage `json:"content"`
-		ClientID *string           `json:"clientId,omitempty"`
+		StartedAtMs   *int64            `json:"startedAtMs,omitempty"`
+		CompletedAtMs *int64            `json:"completedAtMs,omitempty"`
+		ID            string            `json:"id"`
+		Content       []json.RawMessage `json:"content"`
+		ClientID      *string           `json:"clientId,omitempty"`
 	}
 	if err := validateRequiredTaggedObjectFields(data, "id", "content"); err != nil {
 		return nil, err
@@ -513,7 +548,7 @@ func decodeUserMessageThreadItem(data []byte) (ThreadItem, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &UserMessageThreadItem{ID: raw.ID, Content: inputs, ClientID: raw.ClientID}, nil
+	return &UserMessageThreadItem{ID: raw.ID, Content: inputs, ClientID: raw.ClientID, StartedAtMs: raw.StartedAtMs, CompletedAtMs: raw.CompletedAtMs}, nil
 }
 
 func decodeAgentMessageThreadItem(data []byte) (ThreadItem, error) {

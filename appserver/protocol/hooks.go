@@ -32,7 +32,8 @@ func (s *HookTrustStatus) UnmarshalJSON(data []byte) error {
 
 // HooksListParams lists configured hooks for working directories.
 type HooksListParams struct {
-	Cwds []string `json:"cwds,omitempty"`
+	Cwds     []string `json:"cwds,omitempty"`
+	ThreadID *string  `json:"threadId,omitempty"`
 }
 
 // HookErrorInfo describes a hook configuration error.
@@ -43,6 +44,7 @@ type HookErrorInfo struct {
 
 // HookMetadata describes a configured hook.
 type HookMetadata struct {
+	EnvironmentID *string `json:"environmentId,omitempty"`
 	// A nil limit uses the server default; zero disables context spilling.
 	AdditionalContextLimit *uint           `json:"additionalContextLimit,omitempty"`
 	Async                  *bool           `json:"async,omitempty"`
