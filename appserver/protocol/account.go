@@ -1063,6 +1063,14 @@ func (a *GcpAccount) UnmarshalJSON(data []byte) error {
 	if err := validateNativeNonNullFields(data, "type"); err != nil {
 		return err
 	}
+	if err := validateEnumOccurrences(data, "type", true, func(kind string) error {
+		if kind != "gcp" {
+			return fmt.Errorf("account: invalid GCP type")
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
 	*a = GcpAccount(decoded)
 	return nil
 }

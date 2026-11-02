@@ -254,3 +254,25 @@ func TestSyncGcpNullAliasHasNoPublicResult(t *testing.T) {
 		t.Fatalf("wrong variant: %T", got.Account.Value)
 	}
 }
+
+func TestSyncGcpRejectsHiddenDiscriminators(t *testing.T) {
+	for _, raw := range []string{`{"type":"bogus","TYPE":"gcp"}`, `{"type":"gcp","type":"bogus","TYPE":"gcp"}`, `{"type":"bogus","ty\u0070e":"gcp"}`} {
+		direct := p.GcpAccount{Type: "old"}
+		if err := json.Unmarshal([]byte(raw), &direct); err == nil || direct.Type != "old" {
+			t.Errorf("invalid discriminator admitted directly: %s", raw)
+		}
+		prior := &p.ApiKeyAccount{}
+		wrapper := p.AccountWrapper{Value: prior}
+		if err := json.Unmarshal([]byte(raw), &wrapper); err == nil || wrapper.Value != prior {
+			t.Errorf("invalid discriminator replaced wrapper: %s", raw)
+		}
+		mock := NewMockTransport()
+		client := p.NewClient(mock)
+		t.Cleanup(func() { _ = client.Close() })
+		mock.SetResponse("account/read", p.Response{Result: json.RawMessage(`{"requiresOpenaiAuth":true,"account":` + raw + `}`)})
+		got, err := client.Account.Get(context.Background(), p.GetAccountParams{})
+		if err == nil || !reflect.DeepEqual(got, p.GetAccountResponse{}) {
+			t.Errorf("invalid discriminator published by service: %+v %v", got, err)
+		}
+	}
+}
