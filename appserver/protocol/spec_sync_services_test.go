@@ -205,3 +205,33 @@ func TestSyncLifecyclePublicRoutes(t *testing.T) {
 		}
 	}
 }
+
+func TestSyncThreadHookService(t *testing.T) {
+	mock := NewMockTransport()
+	client := p.NewClient(mock)
+	t.Cleanup(func() { _ = client.Close() })
+	hook := issue74HookPayload(`,"handlerType":"command","command":"hook","async":false,"environmentId":"env"`)
+	mock.SetResponse("hooks/list", p.Response{Result: json.RawMessage(`{"data":[{"cwd":"opaque","errors":[],"warnings":[],"hooks":[` + hook + `]}]}`)})
+	got, err := client.Hooks.List(context.Background(), p.HooksListParams{ThreadID: ptr("t")})
+	if err != nil || len(got.Data) != 1 || len(got.Data[0].Hooks) != 1 {
+		t.Fatalf("thread hooks: %+v, %v", got, err)
+	}
+	env := got.Data[0].Hooks[0].EnvironmentID
+	if env == nil || *env != "env" {
+		t.Fatalf("environment lost: %+v", got)
+	}
+	request := mock.GetSentRequest(0)
+	if request == nil || string(request.Params) != `{"threadId":"t"}` {
+		t.Fatalf("thread hook params: %+v", request)
+	}
+}
+
+func TestSyncDetachedReviewNeverDispatches(t *testing.T) {
+	mock := NewMockTransport()
+	client := p.NewClient(mock)
+	t.Cleanup(func() { _ = client.Close() })
+	_, err := client.Review.Start(context.Background(), p.ReviewStartParams{ThreadID: "t", Target: p.ReviewTargetWrapper{Value: &p.UncommittedChangesReviewTarget{}}, Delivery: ptr(p.ReviewDeliveryDetached)})
+	if err == nil || len(mock.SentRequests) != 0 {
+		t.Fatalf("obsolete delivery dispatched: %v, %+v", err, mock.SentRequests)
+	}
+}
