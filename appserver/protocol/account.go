@@ -91,9 +91,10 @@ func (a *ApiKeyAccount) MarshalJSON() ([]byte, error) {
 
 // ChatgptAccount represents a ChatGPT account
 type ChatgptAccount struct {
-	Type     string   `json:"type"`
-	Email    *string  `json:"email"`
-	PlanType PlanType `json:"planType"`
+	Type          string   `json:"type"`
+	Email         *string  `json:"email"`
+	WorkspaceName *string  `json:"workspaceName,omitempty"`
+	PlanType      PlanType `json:"planType"`
 }
 
 func (*ChatgptAccount) isAccount() {}
@@ -123,10 +124,11 @@ func (c *ChatgptAccount) UnmarshalJSON(data []byte) error {
 // other discriminated union variants in the codebase.
 func (c *ChatgptAccount) MarshalJSON() ([]byte, error) {
 	return jsonencode.Marshal(struct {
-		Type     string   `json:"type"`
-		Email    *string  `json:"email"`
-		PlanType PlanType `json:"planType"`
-	}{Type: "chatgpt", Email: c.Email, PlanType: c.PlanType})
+		Type          string   `json:"type"`
+		Email         *string  `json:"email"`
+		WorkspaceName *string  `json:"workspaceName,omitempty"`
+		PlanType      PlanType `json:"planType"`
+	}{Type: "chatgpt", Email: c.Email, PlanType: c.PlanType, WorkspaceName: c.WorkspaceName})
 }
 
 // UnknownAccount represents an unrecognized account type from a newer protocol version.
@@ -225,6 +227,12 @@ func (a *AccountWrapper) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		a.Value = &apiKey
+	case "gcp":
+		var gcp GcpAccount
+		if err := jsondecode.Unmarshal(data, &gcp); err != nil {
+			return err
+		}
+		a.Value = &gcp
 	case "chatgpt":
 		var chatgpt ChatgptAccount
 		if err := jsondecode.Unmarshal(data, &chatgpt); err != nil {
@@ -1032,4 +1040,31 @@ func (s *AccountService) Logout(ctx context.Context) (LogoutAccountResponse, err
 		return LogoutAccountResponse{}, err
 	}
 	return LogoutAccountResponse{}, nil
+}
+
+// GcpAccount represents externally managed Google Cloud Vertex AI credentials.
+type GcpAccount struct {
+	Type string `json:"type"`
+}
+
+func (*GcpAccount) isAccount() {}
+func (a *GcpAccount) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "type"); err != nil {
+		return err
+	}
+	type wire GcpAccount
+	var decoded wire
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	if decoded.Type != "gcp" {
+		return fmt.Errorf("account: invalid GCP type")
+	}
+	*a = GcpAccount(decoded)
+	return nil
+}
+func (*GcpAccount) MarshalJSON() ([]byte, error) {
+	return jsonencode.Marshal(struct {
+		Type string `json:"type"`
+	}{Type: "gcp"})
 }

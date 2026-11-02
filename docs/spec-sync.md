@@ -44,3 +44,28 @@ union and remains excluded as documented in `TestSpecCoverage`. The changed
 `ManagedHooksRequirements` and realtime-voice definitions, and the new
 `ThreadReadStateOperation` definition, have no referencing wire entry points in
 this snapshot; they do not establish new SDK service methods.
+
+## Schema snapshot 26ad281fd1ca
+
+This snapshot adds feedback saving, item lifecycle times, image generation IDs,
+process output-drain status, workspace account names, GCP account selection,
+native usage cost, thread-scoped hooks and hook environment IDs. Hook run paths
+are now opaque legacy strings, and review delivery permits only inline.
+Managed OpenTelemetry requirements have typed exporter, protocol, TLS and
+logging-limit representations.
+
+| Contract | Owner and callers | Evidence | Decision |
+| --- | --- | --- | --- |
+| New nullable metadata and zero/false preservation | Account, usage, hook and process codecs | `TestSyncMetadataFields`, `TestSyncAccountAndUsageServices`, `TestSyncProcessDrainCallbacks` | Preserve supplied values; omitted nullable metadata remains unavailable |
+| Flat item lifecycle times across variants | Item union and each concrete encoder, history/read and notifications | `TestSyncEveryItemLifecycle`, `TestSyncLifecyclePublicRoutes`, existing snapshot ownership tests | Preserve both common fields through value/pointer union forms and deep copies |
+| Opaque hook execution paths | Run decoder and both hook listener APIs | `TestSyncLegacyHookPath`, `TestSyncOpaqueHookCallbacks` | Preserve spelling; configured hook metadata keeps its distinct absolute-path schema |
+| Removed review delivery | Enum codec before request dispatch | `TestSyncRemovedReviewDelivery`, review and enum coverage tests | Retain the constant but reject its obsolete wire value |
+| Feedback archive operation | Feedback service and required response admission | `TestSyncFeedbackSaveService`, request/type coverage | Send server path strings; leave server file lifecycle with the caller |
+| Managed telemetry metadata | Requirements response and exporter union | `TestSyncOtelRetention`, `TestOtelExporterValidation`, `FuzzOtelExporterContract`, `TestSyncConfigOtelService` | Validate shapes before public success; perform no telemetry connections |
+
+`AccountSession` and workspace/session definitions, application storage
+requirements, network review domains and additional-context names have no
+referencing wire entry points in this snapshot. Their presence in the combined
+schema does not add SDK methods. New error-info strings already survive the
+existing opaque `CodexErrorInfo` carrier. Existing opaque item variants retain
+lifecycle fields in their raw payloads.

@@ -15,13 +15,13 @@ type ReviewDelivery string
 const (
 	// ReviewDeliveryInline runs the review on the current thread (default).
 	ReviewDeliveryInline ReviewDelivery = "inline"
-	// ReviewDeliveryDetached runs the review on a new thread.
+	// ReviewDeliveryDetached is retained for source compatibility but is rejected on the wire.
+	// Deprecated: only inline delivery is supported.
 	ReviewDeliveryDetached ReviewDelivery = "detached"
 )
 
 var validReviewDeliveries = map[ReviewDelivery]struct{}{
-	ReviewDeliveryInline:   {},
-	ReviewDeliveryDetached: {},
+	ReviewDeliveryInline: {},
 }
 
 func (d ReviewDelivery) MarshalJSON() ([]byte, error) {
@@ -258,7 +258,7 @@ type ReviewStartParams struct {
 type ReviewStartResponse struct {
 	// ReviewThreadID identifies the thread where the review runs.
 	// For inline reviews, this is the original thread id.
-	// For detached reviews, this is the id of the new review thread.
+	// Reviews run inline on the supplied thread.
 	ReviewThreadID string `json:"reviewThreadId"`
 	Turn           Turn   `json:"turn"`
 }

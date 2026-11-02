@@ -123,6 +123,9 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 	})
 
 	// Verify Feedback service
+	verified["feedback/save"] = verifyMethod(t, transport, "feedback/save", func() {
+		_, _ = client.Feedback.Save(context.Background(), codex.FeedbackSaveParams{Classification: "bug", SavePath: "/tmp/feedback.zip"})
+	})
 	verified["feedback/upload"] = verifyMethod(t, transport, "feedback/upload", func() {
 		_, _ = client.Feedback.Upload(context.Background(), codex.FeedbackUploadParams{Classification: "bug"})
 	})

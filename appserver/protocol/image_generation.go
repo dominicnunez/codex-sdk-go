@@ -31,6 +31,9 @@ func (i *ImageGenerationInputImage) UnmarshalJSON(data []byte) error {
 // ImageGenerationThreadItem contains inline image data or a durable file reference.
 // FileID is authoritative when a rollout contains both FileID and Result.
 type ImageGenerationThreadItem struct {
+	StartedAtMs           *int64                         `json:"startedAtMs,omitempty"`
+	CompletedAtMs         *int64                         `json:"completedAtMs,omitempty"`
+	GenerationID          *string                        `json:"generationId,omitempty"`
 	ID                    string                         `json:"id"`
 	Status                string                         `json:"status"`
 	FileID                *string                        `json:"fileId,omitempty"`

@@ -19,9 +19,6 @@ func TestHookRunSummaryRejectsInvalidSourceAndSourcePath(t *testing.T) {
 				{"source", `"bogus"`, `invalid hook.source`},
 				{"source", `""`, `invalid hook.source`},
 				{"source", `null`, `hook.source`},
-				{"sourcePath", `"relative/hook"`, `must be an absolute path`},
-				{"sourcePath", `""`, `must be an absolute path`},
-				{"sourcePath", `"/tmp/a/../hook"`, `must be normalized`},
 			} {
 				t.Run(method+"/"+registration+"/"+field.name+"/"+strings.Trim(field.value, `"`), func(t *testing.T) {
 					transport := NewMockTransport()
@@ -401,7 +398,7 @@ func TestHookRunSummarySourceOccurrencesUseExactJSONFieldSemantics(t *testing.T)
 		{"invalid duplicate before valid", `"source":"bogus","source":"user"`, "/tmp/hook", "", "invalid hook.source"},
 		{"explicit null remains invalid before valid duplicate", `"source":null,"source":"user"`, "/tmp/hook", "", "hook.source"},
 		{"folded alias ignored and omitted source defaults", `"SOURCE":"bogus"`, "/tmp/hook", "unknown", ""},
-		{"path error precedes enum restriction", `"source":"bogus"`, "relative/hook", "", "must be an absolute path"},
+		{"opaque path retains enum restriction", `"source":"bogus"`, "relative/hook", "", "invalid hook.source"},
 		{"native type error precedes new restrictions", `"source":7`, "relative/hook", "", "cannot unmarshal number"},
 	}
 	for _, tt := range tests {

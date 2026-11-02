@@ -95,6 +95,15 @@ Unknown account union branches retain raw metadata, and ordinary public scalar
 decoding remains available outside these owners. These metadata checks do not
 establish authentication, billing authority or permission to issue requests.
 
+Managed OpenTelemetry requirements expose exporter choices, logging limits and
+server-reported TLS strings as metadata. Admission checks exporter union shapes,
+required members, protocol enums and unsigned byte limits before publishing a
+successful requirements response. The SDK does not configure exporters, connect
+to these endpoints or read certificate/key paths. Feedback saving sends a
+caller-selected server path to the app server; the server writes the ZIP and the
+caller owns its cleanup even if the RPC disconnects. The SDK does not resolve
+these opaque paths or gain local filesystem authority from them.
+
 Plugin summary admission checks every recognized authentication-policy,
 installation-policy and availability enum occurrence across list, installed,
 read and share-list responses. Later duplicates, folded field aliases and outer
@@ -262,8 +271,9 @@ handler variants leave it unset. Explicit command booleans survive decoding.
 Run summaries materialize omitted optional `source` as an owned `unknown`, and
 both carriers reject explicit null or unrecognized source values while validating
 the 11 schema enum values. Constructed nil `source` and `async` pointers remain
-omitted by encoding. Their `sourcePath` fields must be normalized absolute
-paths, while `HookErrorInfo.path` remains an opaque string. `HookSource` and
+omitted by encoding. Hook metadata `sourcePath` remains a normalized absolute
+path; run-summary `sourcePath` and `HookErrorInfo.path` are opaque server path
+strings. Run summaries preserve relative, empty and non-normalized spellings. `HookSource` and
 `HookErrorInfo` stay plain Go representations, so direct decoding and anonymous
 envelopes retain standard JSON behavior. These checks admit record shape; they
 do not authenticate hook provenance, authorize or execute hooks, or set a total
