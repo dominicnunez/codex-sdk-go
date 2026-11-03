@@ -95,6 +95,11 @@ Fields declared as `AbsolutePathBuf`, such as Windows sandbox setup's cwd,
 retain their existing SDK absolute-path checks. Legacy fields absent from the
 current schemas retain their existing public representations and validation.
 
+Initialization also checks the selected `codexHome` as an absolute, normalized
+path before returning or caching the handshake. Invalid spellings fail without
+latching a session, so a later valid response can be retried. The SDK preserves
+accepted path text without checking existence or resolving symlinks.
+
 Service methods receive typed Go parameters. Plain parameter structs retain
 standard `encoding/json` decoding behavior: for example, decoding a null array
 element into a fresh `[]string` produces an empty string before the SDK receives it.

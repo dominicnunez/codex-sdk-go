@@ -167,8 +167,12 @@ partial object to contain the final required set. Existing decoding and semantic
 checks keep their precedence; new rejection paths preserve prior receiver
 references and prevent response, cache and typed callback publication. The private
 initialization carrier checks the response before latching a session and releases
-its borrowed input after validation. These checks validate message shape, not the
-truth of metadata supplied by the peer.
+its borrowed input after validation. After existing required-value and non-null
+checks, it rejects a selected `codexHome` that is not an absolute, normalized
+path. Rejected responses publish no handshake metadata or cached session and
+permit a valid retry. This lexical check neither accesses the filesystem nor
+resolves symlinks. These checks validate message shape, not the truth of metadata
+supplied by the peer.
 
 Async user-input questions reject undeclared properties before typed response,
 notification or cache publication, including invalid questions hidden by later
