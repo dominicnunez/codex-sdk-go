@@ -16,7 +16,11 @@ func (s *PackagedDefaultsConfigLayerSource) UnmarshalJSON(data []byte) error {
 	if err := validateRequiredObjectFields(data, "type", "file"); err != nil {
 		return err
 	}
-	type wire PackagedDefaultsConfigLayerSource
+	// Schema property selection is exact. Differently cased properties are
+	// unconstrained extras, so they must not overwrite the selected file.
+	type wire struct {
+		File string `json:"file,case:strict"`
+	}
 	var decoded wire
 	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
@@ -57,7 +61,10 @@ func (s *EnterpriseManagedConfigLayerSource) UnmarshalJSON(data []byte) error {
 	if err := validateRequiredObjectFields(data, "type", "id", "name"); err != nil {
 		return err
 	}
-	type wire EnterpriseManagedConfigLayerSource
+	type wire struct {
+		ID   string `json:"id,case:strict"`
+		Name string `json:"name,case:strict"`
+	}
 	var decoded wire
 	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err

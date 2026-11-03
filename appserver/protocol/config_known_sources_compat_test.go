@@ -137,3 +137,40 @@ func TestKnownConfigSourceReceiversAndEarlierErrors(t *testing.T) {
 		t.Fatal("path diagnostic unbounded or missing")
 	}
 }
+
+func TestKnownConfigSourceExtrasCannotOverrideCanonicalFields(t *testing.T) {
+	for _, tc := range []struct {
+		raw  string
+		want p.ConfigLayerSource
+	}{
+		{`{"type":"packagedDefaults","file":"/defaults.toml","FILE":"/other.toml"}`, p.PackagedDefaultsConfigLayerSource{File: "/defaults.toml"}},
+		{`{"type":"packagedDefaults","file":"/defaults.toml","FILE":"relative"}`, p.PackagedDefaultsConfigLayerSource{File: "/defaults.toml"}},
+		{`{"type":"packagedDefaults","file":"/defaults.toml","FI\u004ce":{"ignored":true}}`, p.PackagedDefaultsConfigLayerSource{File: "/defaults.toml"}},
+		{`{"type":"enterpriseManaged","id":"id","ID":"different","name":"Policy","NAME":"Different"}`, p.EnterpriseManagedConfigLayerSource{ID: "id", Name: "Policy"}},
+		{`{"type":"enterpriseManaged","id":"id","I\u0044":null,"name":"Policy","NA\u004dE":[]}`, p.EnterpriseManagedConfigLayerSource{ID: "id", Name: "Policy"}},
+	} {
+		t.Run(tc.raw, func(t *testing.T) {
+			direct := reflect.New(reflect.TypeOf(tc.want))
+			if err := json.Unmarshal([]byte(tc.raw), direct.Interface()); err != nil || !reflect.DeepEqual(direct.Elem().Interface(), tc.want) {
+				t.Errorf("extra replaced direct canonical source: err=%v value=%+v", err, direct.Elem().Interface())
+			}
+			var wrapper p.ConfigLayerSourceWrapper
+			if err := json.Unmarshal([]byte(tc.raw), &wrapper); err != nil || !reflect.DeepEqual(wrapper.Value, tc.want) {
+				t.Errorf("extra replaced canonical source: err=%v value=%+v", err, wrapper.Value)
+			}
+			for _, route := range []string{"origins", "layers", "write", "batch"} {
+				mock := NewMockTransport()
+				client := p.NewClient(mock)
+				result, err := configSourceCall(t, client, mock, route, tc.raw)
+				client.Close()
+				if err != nil {
+					t.Errorf("valid extra rejected by%s: %v", route, err)
+					continue
+				}
+				if !reflect.DeepEqual(resultConfigSource(t, route, result).Value, tc.want) {
+					t.Errorf("%s published extra instead of canonical source", route)
+				}
+			}
+		})
+	}
+}

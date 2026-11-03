@@ -382,7 +382,9 @@ Config metadata exposes typed `PackagedDefaultsConfigLayerSource` and
 `EnterpriseManagedConfigLayerSource` values. Packaged defaults require an absolute,
 normalized file path; enterprise IDs and names require non-null strings and may be
 empty. These checks cover config origins, included layers and write override
-metadata. Returned paths are checked lexically without resolution or filesystem
+metadata. Only exact schema property names, including escaped spellings, supply
+these source fields; differently cased extras cannot replace them. Returned paths
+are checked lexically without resolution or filesystem
 access. Rejection of metadata from a completed write does not roll back that write.
 Future source types retain owned raw JSON, and other branches keep unrelated
 extras unconstrained.

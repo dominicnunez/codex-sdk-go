@@ -81,6 +81,8 @@ metadata before read or write results are published. Packaged file paths must
 already be absolute and normalized, including earlier canonical occurrences;
 validation does not resolve, open or canonicalize them. Enterprise identifiers and
 display names may be empty, but not null. Unknown future sources remain opaque.
+Decoded source fields use exact schema-name matching, so differently cased extras
+cannot replace the metadata being validated.
 These checks do not authenticate policy origin or undo a configuration write whose
 returned override metadata fails validation.
 
