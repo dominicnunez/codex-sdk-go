@@ -395,6 +395,17 @@ duplicate occurrences; empty-string identities remain valid. Validation uses the
 settings owner's exact property matching before callbacks or cache updates. These
 saved IDs are descriptive metadata and do not enforce plugin capabilities.
 
+`Config.ReadRequirements` validates the six structured raw fields
+`allowedPermissionProfiles`, `autoReview`, `browserUse`, `feedback`, `models` and
+`modelProviders` before returning success. Known nested constraints include
+non-null boolean map values, origin-policy enums, complete request headers and
+non-empty reasoning-effort strings. Nullable values and open properties remain
+valid; provider-map values are unconstrained. Admission checks every recognized
+occurrence without rewriting retained raw JSON. Outer field matching follows the
+existing Go records, while property names inside raw objects match the schema
+exactly. Public requirements records retain ordinary JSON behavior. These checks
+validate reported metadata; they do not enforce managed policy locally.
+
 Config metadata exposes typed `PackagedDefaultsConfigLayerSource` and
 `EnterpriseManagedConfigLayerSource` values. Packaged defaults require an absolute,
 normalized file path; enterprise IDs and names require non-null strings and may be
