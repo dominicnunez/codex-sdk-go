@@ -33,12 +33,17 @@ func (r *requirementsReadResult) validate() error {
 	}, "requirements"); err != nil {
 		return err
 	}
-	return validateOptionalFields(r.raw, func(_ string, raw []byte) error {
+	if err := validateOptionalFields(r.raw, func(_ string, raw []byte) error {
 		if isNullJSONValue(raw) {
 			return nil
 		}
 		return validateOptionalFields(raw, validateRequirementEnum,
 			"cliAuthCredentialsStore", "allowedLoginMethods", "allowedWindowsSandboxImplementations")
+	}, "requirements"); err != nil {
+		return err
+	}
+	return validateOptionalFields(r.raw, func(_ string, raw []byte) error {
+		return validateMapEntries(raw, true, "featureRequirements")
 	}, "requirements")
 }
 

@@ -84,6 +84,18 @@ existing lifecycle validation first and releases borrowed input after admission.
 Public collaboration records retain ordinary JSON behavior; these checks do not
 change constructed request encoding or grant authority to reported settings.
 
+Typed app label/icon maps, configuration feature-requirement and browser-origin
+maps, and feature-enablement results reject null entries at their existing
+admission owners before successful responses or typed callbacks. Duplicate
+entries, later maps and nullable resets cannot hide a forbidden occurrence.
+Whole-map nullability and native valid map merging remain owner-specific. Guards
+run after established checks without retaining dynamic keys in diagnostics.
+Fresh-value owners preserve prior receivers on new failures; standalone `Config`
+decoding keeps its documented native partial updates, and callers must discard
+that partial value after an error. Service admission publishes no partial result.
+These shape checks do not interpret origin strings, enforce feature policy or
+roll back a feature update performed by the server before its response.
+
 Login-completion onboarding and MCP startup-failure metadata validate their
 nullable enum values before typed callbacks. Configuration-requirements admission
 also validates credential-store enums and login-method/sandbox-implementation

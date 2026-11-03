@@ -106,6 +106,9 @@ func (r *ExperimentalFeatureEnablementSetResponse) UnmarshalJSON(data []byte) er
 	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	if err := validateMapEntries(data, false, "enablement"); err != nil {
+		return err
+	}
 	*r = ExperimentalFeatureEnablementSetResponse(decoded)
 	return nil
 }

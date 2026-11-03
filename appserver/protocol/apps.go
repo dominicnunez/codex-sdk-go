@@ -88,6 +88,9 @@ func (a *AppInfo) UnmarshalJSON(data []byte) error {
 	if appInfo.PluginDisplayNames == nil {
 		appInfo.PluginDisplayNames = []string{}
 	}
+	if err := validateMapEntries(data, true, "labels", "iconAssets", "iconDarkAssets"); err != nil {
+		return err
+	}
 	*a = appInfo
 	return nil
 }
