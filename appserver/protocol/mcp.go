@@ -376,6 +376,11 @@ func (n *McpServerStatusUpdatedNotification) UnmarshalJSON(data []byte) error {
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
+	if err := validateEnumOccurrences(data, "failureReason", false, func(value *string) error {
+		return validateOptionalEnumValue("failureReason", value, validMcpStartupFailureReasons)
+	}); err != nil {
+		return err
+	}
 	*n = McpServerStatusUpdatedNotification(decoded)
 	return nil
 }

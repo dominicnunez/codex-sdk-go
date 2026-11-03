@@ -84,6 +84,16 @@ existing lifecycle validation first and releases borrowed input after admission.
 Public collaboration records retain ordinary JSON behavior; these checks do not
 change constructed request encoding or grant authority to reported settings.
 
+Login-completion onboarding and MCP startup-failure metadata validate their
+nullable enum values before typed callbacks. Configuration-requirements admission
+also validates credential-store enums and login-method/sandbox-implementation
+arrays, including invalid earlier occurrences and non-null elements. Native and
+existing structured requirements checks retain priority, and failures do not
+publish partial responses or overwrite prior notification receivers. SDK-owned
+enum diagnostics bound rejected values before wrapping. These controls validate
+reported metadata; they do not authenticate a login, select a credential store,
+contact an MCP server or enforce managed policy locally.
+
 Configuration-requirements admission validates the known nested shapes of six
 raw object fields before response publication, including malformed earlier
 duplicates. Existing typed-field errors keep their precedence. Nullable fields,

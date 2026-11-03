@@ -24,12 +24,21 @@ func (r *requirementsReadResult) UnmarshalJSON(data []byte) error {
 
 func (r *requirementsReadResult) validate() error {
 	defer func() { r.raw = nil }()
-	return validateOptionalFields(r.raw, func(_ string, raw []byte) error {
+	if err := validateOptionalFields(r.raw, func(_ string, raw []byte) error {
 		if isNullJSONValue(raw) {
 			return nil
 		}
 		return validateOptionalFields(raw, validateRequirement,
 			"allowedPermissionProfiles", "autoReview", "browserUse", "feedback", "models", "modelProviders")
+	}, "requirements"); err != nil {
+		return err
+	}
+	return validateOptionalFields(r.raw, func(_ string, raw []byte) error {
+		if isNullJSONValue(raw) {
+			return nil
+		}
+		return validateOptionalFields(raw, validateRequirementEnum,
+			"cliAuthCredentialsStore", "allowedLoginMethods", "allowedWindowsSandboxImplementations")
 	}, "requirements")
 }
 
