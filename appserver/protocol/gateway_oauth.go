@@ -93,10 +93,10 @@ func (s *AccountService) GatewayOAuthCancel(ctx context.Context) (GatewayOAuthCa
 
 func (c *Client) OnGatewayOAuthChanged(handler func(GatewayOAuthChangedNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyGatewayOAuthChanged, nil)
+		c.onNotification(notifyGatewayOAuthChanged, nil)
 		return
 	}
-	c.OnNotification(notifyGatewayOAuthChanged, func(_ context.Context, notif Notification) {
+	c.onNotification(notifyGatewayOAuthChanged, func(_ context.Context, notif Notification) {
 		var value GatewayOAuthChangedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &value); err != nil {
 			c.reportHandlerError(notifyGatewayOAuthChanged, fmt.Errorf("unmarshal %s: %w", notifyGatewayOAuthChanged, err))

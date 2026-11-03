@@ -291,10 +291,10 @@ func (s *FsService) Unwatch(ctx context.Context, params FsUnwatchParams) (FsUnwa
 // OnFsChanged registers a listener for fs/changed notifications.
 func (c *Client) OnFsChanged(handler func(FsChangedNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyFsChanged, nil)
+		c.onNotification(notifyFsChanged, nil)
 		return
 	}
-	c.OnNotification(notifyFsChanged, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyFsChanged, func(ctx context.Context, notif Notification) {
 		var n FsChangedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyFsChanged, fmt.Errorf("unmarshal %s: %w", notifyFsChanged, err))

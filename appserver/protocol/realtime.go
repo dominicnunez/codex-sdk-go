@@ -198,10 +198,10 @@ func (n *ThreadRealtimeTranscriptDoneNotification) UnmarshalJSON(data []byte) er
 // OnThreadRealtimeStarted registers a listener for thread/realtime/started notifications.
 func (c *Client) OnThreadRealtimeStarted(handler func(ThreadRealtimeStartedNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyRealtimeStarted, nil)
+		c.onNotification(notifyRealtimeStarted, nil)
 		return
 	}
-	c.OnNotification(notifyRealtimeStarted, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyRealtimeStarted, func(ctx context.Context, notif Notification) {
 		var params ThreadRealtimeStartedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyRealtimeStarted, fmt.Errorf("unmarshal %s: %w", notifyRealtimeStarted, err))
@@ -214,10 +214,10 @@ func (c *Client) OnThreadRealtimeStarted(handler func(ThreadRealtimeStartedNotif
 // OnThreadRealtimeClosed registers a listener for thread/realtime/closed notifications.
 func (c *Client) OnThreadRealtimeClosed(handler func(ThreadRealtimeClosedNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyRealtimeClosed, nil)
+		c.onNotification(notifyRealtimeClosed, nil)
 		return
 	}
-	c.OnNotification(notifyRealtimeClosed, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyRealtimeClosed, func(ctx context.Context, notif Notification) {
 		var params ThreadRealtimeClosedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyRealtimeClosed, fmt.Errorf("unmarshal %s: %w", notifyRealtimeClosed, err))
@@ -230,10 +230,10 @@ func (c *Client) OnThreadRealtimeClosed(handler func(ThreadRealtimeClosedNotific
 // OnThreadRealtimeError registers a listener for thread/realtime/error notifications.
 func (c *Client) OnThreadRealtimeError(handler func(ThreadRealtimeErrorNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyRealtimeError, nil)
+		c.onNotification(notifyRealtimeError, nil)
 		return
 	}
-	c.OnNotification(notifyRealtimeError, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyRealtimeError, func(ctx context.Context, notif Notification) {
 		var params ThreadRealtimeErrorNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyRealtimeError, fmt.Errorf("unmarshal %s: %w", notifyRealtimeError, err))
@@ -246,10 +246,10 @@ func (c *Client) OnThreadRealtimeError(handler func(ThreadRealtimeErrorNotificat
 // OnThreadRealtimeItemAdded registers a listener for thread/realtime/itemAdded notifications.
 func (c *Client) OnThreadRealtimeItemAdded(handler func(ThreadRealtimeItemAddedNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyRealtimeItemAdded, nil)
+		c.onNotification(notifyRealtimeItemAdded, nil)
 		return
 	}
-	c.OnNotification(notifyRealtimeItemAdded, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyRealtimeItemAdded, func(ctx context.Context, notif Notification) {
 		var params ThreadRealtimeItemAddedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyRealtimeItemAdded, fmt.Errorf("unmarshal %s: %w", notifyRealtimeItemAdded, err))
@@ -262,10 +262,10 @@ func (c *Client) OnThreadRealtimeItemAdded(handler func(ThreadRealtimeItemAddedN
 // OnThreadRealtimeOutputAudioDelta registers a listener for thread/realtime/outputAudio/delta notifications.
 func (c *Client) OnThreadRealtimeOutputAudioDelta(handler func(ThreadRealtimeOutputAudioDeltaNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyRealtimeOutputAudioDelta, nil)
+		c.onNotification(notifyRealtimeOutputAudioDelta, nil)
 		return
 	}
-	c.OnNotification(notifyRealtimeOutputAudioDelta, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyRealtimeOutputAudioDelta, func(ctx context.Context, notif Notification) {
 		var params ThreadRealtimeOutputAudioDeltaNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyRealtimeOutputAudioDelta, fmt.Errorf("unmarshal %s: %w", notifyRealtimeOutputAudioDelta, err))
@@ -278,10 +278,10 @@ func (c *Client) OnThreadRealtimeOutputAudioDelta(handler func(ThreadRealtimeOut
 // OnThreadRealtimeSdp registers a listener for thread/realtime/sdp notifications.
 func (c *Client) OnThreadRealtimeSdp(handler func(ThreadRealtimeSdpNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyRealtimeSdp, nil)
+		c.onNotification(notifyRealtimeSdp, nil)
 		return
 	}
-	c.OnNotification(notifyRealtimeSdp, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyRealtimeSdp, func(ctx context.Context, notif Notification) {
 		var params ThreadRealtimeSdpNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyRealtimeSdp, fmt.Errorf("unmarshal %s: %w", notifyRealtimeSdp, err))
@@ -294,10 +294,10 @@ func (c *Client) OnThreadRealtimeSdp(handler func(ThreadRealtimeSdpNotification)
 // OnThreadRealtimeTranscriptDelta registers a listener for thread/realtime/transcript/delta notifications.
 func (c *Client) OnThreadRealtimeTranscriptDelta(handler func(ThreadRealtimeTranscriptDeltaNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyRealtimeTranscriptDelta, nil)
+		c.onNotification(notifyRealtimeTranscriptDelta, nil)
 		return
 	}
-	c.OnNotification(notifyRealtimeTranscriptDelta, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyRealtimeTranscriptDelta, func(ctx context.Context, notif Notification) {
 		var params ThreadRealtimeTranscriptDeltaNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyRealtimeTranscriptDelta, fmt.Errorf("unmarshal %s: %w", notifyRealtimeTranscriptDelta, err))
@@ -310,10 +310,10 @@ func (c *Client) OnThreadRealtimeTranscriptDelta(handler func(ThreadRealtimeTran
 // OnThreadRealtimeTranscriptDone registers a listener for thread/realtime/transcript/done notifications.
 func (c *Client) OnThreadRealtimeTranscriptDone(handler func(ThreadRealtimeTranscriptDoneNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyRealtimeTranscriptDone, nil)
+		c.onNotification(notifyRealtimeTranscriptDone, nil)
 		return
 	}
-	c.OnNotification(notifyRealtimeTranscriptDone, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyRealtimeTranscriptDone, func(ctx context.Context, notif Notification) {
 		var params ThreadRealtimeTranscriptDoneNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyRealtimeTranscriptDone, fmt.Errorf("unmarshal %s: %w", notifyRealtimeTranscriptDone, err))

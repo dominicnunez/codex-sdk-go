@@ -273,10 +273,10 @@ type SkillsChangedNotification struct{}
 // OnSkillsChanged registers a listener for skills invalidation notifications.
 func (c *Client) OnSkillsChanged(handler func(SkillsChangedNotification)) {
 	if handler == nil {
-		c.OnNotification(notifySkillsChanged, nil)
+		c.onNotification(notifySkillsChanged, nil)
 		return
 	}
-	c.OnNotification(notifySkillsChanged, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifySkillsChanged, func(ctx context.Context, notif Notification) {
 		var params SkillsChangedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifySkillsChanged, fmt.Errorf("unmarshal %s: %w", notifySkillsChanged, err))

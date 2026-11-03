@@ -450,10 +450,10 @@ func (n *ItemGuardianApprovalReviewCompletedNotification) UnmarshalJSON(data []b
 // OnHookStarted registers a listener for hook/started notifications.
 func (c *Client) OnHookStarted(handler func(HookStartedNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyHookStarted, nil)
+		c.onNotification(notifyHookStarted, nil)
 		return
 	}
-	c.OnNotification(notifyHookStarted, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyHookStarted, func(ctx context.Context, notif Notification) {
 		var params HookStartedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyHookStarted, fmt.Errorf("unmarshal %s: %w", notifyHookStarted, err))
@@ -466,10 +466,10 @@ func (c *Client) OnHookStarted(handler func(HookStartedNotification)) {
 // OnHookCompleted registers a listener for hook/completed notifications.
 func (c *Client) OnHookCompleted(handler func(HookCompletedNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyHookCompleted, nil)
+		c.onNotification(notifyHookCompleted, nil)
 		return
 	}
-	c.OnNotification(notifyHookCompleted, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyHookCompleted, func(ctx context.Context, notif Notification) {
 		var params HookCompletedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyHookCompleted, fmt.Errorf("unmarshal %s: %w", notifyHookCompleted, err))
@@ -482,10 +482,10 @@ func (c *Client) OnHookCompleted(handler func(HookCompletedNotification)) {
 // OnItemGuardianApprovalReviewStarted registers a listener for guardian review start notifications.
 func (c *Client) OnItemGuardianApprovalReviewStarted(handler func(ItemGuardianApprovalReviewStartedNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyItemGuardianApprovalReviewStarted, nil)
+		c.onNotification(notifyItemGuardianApprovalReviewStarted, nil)
 		return
 	}
-	c.OnNotification(notifyItemGuardianApprovalReviewStarted, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyItemGuardianApprovalReviewStarted, func(ctx context.Context, notif Notification) {
 		var params ItemGuardianApprovalReviewStartedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyItemGuardianApprovalReviewStarted, fmt.Errorf("unmarshal %s: %w", notifyItemGuardianApprovalReviewStarted, err))
@@ -498,10 +498,10 @@ func (c *Client) OnItemGuardianApprovalReviewStarted(handler func(ItemGuardianAp
 // OnItemGuardianApprovalReviewCompleted registers a listener for guardian review completion notifications.
 func (c *Client) OnItemGuardianApprovalReviewCompleted(handler func(ItemGuardianApprovalReviewCompletedNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyItemGuardianApprovalReviewCompleted, nil)
+		c.onNotification(notifyItemGuardianApprovalReviewCompleted, nil)
 		return
 	}
-	c.OnNotification(notifyItemGuardianApprovalReviewCompleted, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyItemGuardianApprovalReviewCompleted, func(ctx context.Context, notif Notification) {
 		var params ItemGuardianApprovalReviewCompletedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyItemGuardianApprovalReviewCompleted, fmt.Errorf("unmarshal %s: %w", notifyItemGuardianApprovalReviewCompleted, err))

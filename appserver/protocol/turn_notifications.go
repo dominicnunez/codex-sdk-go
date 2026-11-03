@@ -29,10 +29,10 @@ func (n *TurnStartedNotification) UnmarshalJSON(data []byte) error {
 // OnTurnStarted registers a listener for turn/started notifications
 func (c *Client) OnTurnStarted(handler func(TurnStartedNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyTurnStarted, nil)
+		c.onNotification(notifyTurnStarted, nil)
 		return
 	}
-	c.OnNotification(notifyTurnStarted, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyTurnStarted, func(ctx context.Context, notif Notification) {
 		var params TurnStartedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyTurnStarted, fmt.Errorf("unmarshal %s: %w", notifyTurnStarted, err))
@@ -64,10 +64,10 @@ func (n *TurnCompletedNotification) UnmarshalJSON(data []byte) error {
 // OnTurnCompleted registers a listener for turn/completed notifications
 func (c *Client) OnTurnCompleted(handler func(TurnCompletedNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyTurnCompleted, nil)
+		c.onNotification(notifyTurnCompleted, nil)
 		return
 	}
-	c.OnNotification(notifyTurnCompleted, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyTurnCompleted, func(ctx context.Context, notif Notification) {
 		var params TurnCompletedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyTurnCompleted, fmt.Errorf("unmarshal %s: %w", notifyTurnCompleted, err))
@@ -137,10 +137,10 @@ func (s *TurnPlanStep) UnmarshalJSON(data []byte) error {
 // OnTurnPlanUpdated registers a listener for turn/plan/updated notifications
 func (c *Client) OnTurnPlanUpdated(handler func(TurnPlanUpdatedNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyTurnPlanUpdated, nil)
+		c.onNotification(notifyTurnPlanUpdated, nil)
 		return
 	}
-	c.OnNotification(notifyTurnPlanUpdated, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyTurnPlanUpdated, func(ctx context.Context, notif Notification) {
 		var params TurnPlanUpdatedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyTurnPlanUpdated, fmt.Errorf("unmarshal %s: %w", notifyTurnPlanUpdated, err))
@@ -173,10 +173,10 @@ func (n *TurnDiffUpdatedNotification) UnmarshalJSON(data []byte) error {
 // OnTurnDiffUpdated registers a listener for turn/diff/updated notifications
 func (c *Client) OnTurnDiffUpdated(handler func(TurnDiffUpdatedNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyTurnDiffUpdated, nil)
+		c.onNotification(notifyTurnDiffUpdated, nil)
 		return
 	}
-	c.OnNotification(notifyTurnDiffUpdated, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyTurnDiffUpdated, func(ctx context.Context, notif Notification) {
 		var params TurnDiffUpdatedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyTurnDiffUpdated, fmt.Errorf("unmarshal %s: %w", notifyTurnDiffUpdated, err))

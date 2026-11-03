@@ -139,10 +139,10 @@ func (s *FuzzyFileSearchService) Search(ctx context.Context, params FuzzyFileSea
 // OnFuzzyFileSearchSessionCompleted registers a listener for fuzzyFileSearch/sessionCompleted notifications.
 func (c *Client) OnFuzzyFileSearchSessionCompleted(handler func(FuzzyFileSearchSessionCompletedNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyFuzzyFileSearchSessionCompleted, nil)
+		c.onNotification(notifyFuzzyFileSearchSessionCompleted, nil)
 		return
 	}
-	c.OnNotification(notifyFuzzyFileSearchSessionCompleted, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyFuzzyFileSearchSessionCompleted, func(ctx context.Context, notif Notification) {
 		var params FuzzyFileSearchSessionCompletedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyFuzzyFileSearchSessionCompleted, fmt.Errorf("unmarshal %s: %w", notifyFuzzyFileSearchSessionCompleted, err))
@@ -155,10 +155,10 @@ func (c *Client) OnFuzzyFileSearchSessionCompleted(handler func(FuzzyFileSearchS
 // OnFuzzyFileSearchSessionUpdated registers a listener for fuzzyFileSearch/sessionUpdated notifications.
 func (c *Client) OnFuzzyFileSearchSessionUpdated(handler func(FuzzyFileSearchSessionUpdatedNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyFuzzyFileSearchSessionUpdated, nil)
+		c.onNotification(notifyFuzzyFileSearchSessionUpdated, nil)
 		return
 	}
-	c.OnNotification(notifyFuzzyFileSearchSessionUpdated, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyFuzzyFileSearchSessionUpdated, func(ctx context.Context, notif Notification) {
 		var params FuzzyFileSearchSessionUpdatedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyFuzzyFileSearchSessionUpdated, fmt.Errorf("unmarshal %s: %w", notifyFuzzyFileSearchSessionUpdated, err))

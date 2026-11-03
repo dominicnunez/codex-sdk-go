@@ -109,10 +109,10 @@ func (n *AccountRateLimitsUpdatedNotification) UnmarshalJSON(data []byte) error 
 // OnAccountUpdated registers a listener for account/updated notifications
 func (c *Client) OnAccountUpdated(handler func(AccountUpdatedNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyAccountUpdated, nil)
+		c.onNotification(notifyAccountUpdated, nil)
 		return
 	}
-	c.OnNotification(notifyAccountUpdated, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyAccountUpdated, func(ctx context.Context, notif Notification) {
 		var n AccountUpdatedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyAccountUpdated, fmt.Errorf("unmarshal %s: %w", notifyAccountUpdated, err))
@@ -125,10 +125,10 @@ func (c *Client) OnAccountUpdated(handler func(AccountUpdatedNotification)) {
 // OnAccountLoginCompleted registers a listener for account/login/completed notifications
 func (c *Client) OnAccountLoginCompleted(handler func(AccountLoginCompletedNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyAccountLoginCompleted, nil)
+		c.onNotification(notifyAccountLoginCompleted, nil)
 		return
 	}
-	c.OnNotification(notifyAccountLoginCompleted, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyAccountLoginCompleted, func(ctx context.Context, notif Notification) {
 		var n AccountLoginCompletedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyAccountLoginCompleted, fmt.Errorf("unmarshal %s: %w", notifyAccountLoginCompleted, err))
@@ -141,10 +141,10 @@ func (c *Client) OnAccountLoginCompleted(handler func(AccountLoginCompletedNotif
 // OnAccountRateLimitsUpdated registers a listener for account/rateLimits/updated notifications
 func (c *Client) OnAccountRateLimitsUpdated(handler func(AccountRateLimitsUpdatedNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyAccountRateLimitsUpdated, nil)
+		c.onNotification(notifyAccountRateLimitsUpdated, nil)
 		return
 	}
-	c.OnNotification(notifyAccountRateLimitsUpdated, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyAccountRateLimitsUpdated, func(ctx context.Context, notif Notification) {
 		var n AccountRateLimitsUpdatedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyAccountRateLimitsUpdated, fmt.Errorf("unmarshal %s: %w", notifyAccountRateLimitsUpdated, err))

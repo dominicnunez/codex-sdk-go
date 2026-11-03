@@ -319,10 +319,10 @@ func (s *SystemService) WindowsSandboxReadiness(ctx context.Context) (WindowsSan
 // OnWindowsSandboxSetupCompleted registers a listener for windowsSandbox/setupCompleted notifications
 func (c *Client) OnWindowsSandboxSetupCompleted(handler func(WindowsSandboxSetupCompletedNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyWindowsSandboxSetupCompleted, nil)
+		c.onNotification(notifyWindowsSandboxSetupCompleted, nil)
 		return
 	}
-	c.OnNotification(notifyWindowsSandboxSetupCompleted, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyWindowsSandboxSetupCompleted, func(ctx context.Context, notif Notification) {
 		var params WindowsSandboxSetupCompletedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyWindowsSandboxSetupCompleted, fmt.Errorf("unmarshal %s: %w", notifyWindowsSandboxSetupCompleted, err))
@@ -335,10 +335,10 @@ func (c *Client) OnWindowsSandboxSetupCompleted(handler func(WindowsSandboxSetup
 // OnWindowsWorldWritableWarning registers a listener for windows/worldWritableWarning notifications
 func (c *Client) OnWindowsWorldWritableWarning(handler func(WindowsWorldWritableWarningNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyWindowsWorldWritableWarning, nil)
+		c.onNotification(notifyWindowsWorldWritableWarning, nil)
 		return
 	}
-	c.OnNotification(notifyWindowsWorldWritableWarning, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyWindowsWorldWritableWarning, func(ctx context.Context, notif Notification) {
 		var params WindowsWorldWritableWarningNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyWindowsWorldWritableWarning, fmt.Errorf("unmarshal %s: %w", notifyWindowsWorldWritableWarning, err))
@@ -352,10 +352,10 @@ func (c *Client) OnWindowsWorldWritableWarning(handler func(WindowsWorldWritable
 // OnContextCompacted registers a listener for thread/compacted notifications.
 func (c *Client) OnContextCompacted(handler func(ContextCompactedNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyThreadCompacted, nil)
+		c.onNotification(notifyThreadCompacted, nil)
 		return
 	}
-	c.OnNotification(notifyThreadCompacted, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyThreadCompacted, func(ctx context.Context, notif Notification) {
 		var params ContextCompactedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyThreadCompacted, fmt.Errorf("unmarshal %s: %w", notifyThreadCompacted, err))
@@ -368,10 +368,10 @@ func (c *Client) OnContextCompacted(handler func(ContextCompactedNotification)) 
 // OnDeprecationNotice registers a listener for deprecationNotice notifications
 func (c *Client) OnDeprecationNotice(handler func(DeprecationNoticeNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyDeprecationNotice, nil)
+		c.onNotification(notifyDeprecationNotice, nil)
 		return
 	}
-	c.OnNotification(notifyDeprecationNotice, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyDeprecationNotice, func(ctx context.Context, notif Notification) {
 		var params DeprecationNoticeNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyDeprecationNotice, fmt.Errorf("unmarshal %s: %w", notifyDeprecationNotice, err))
@@ -384,10 +384,10 @@ func (c *Client) OnDeprecationNotice(handler func(DeprecationNoticeNotification)
 // OnError registers a listener for error notifications
 func (c *Client) OnError(handler func(ErrorNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyError, nil)
+		c.onNotification(notifyError, nil)
 		return
 	}
-	c.OnNotification(notifyError, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyError, func(ctx context.Context, notif Notification) {
 		var params ErrorNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyError, fmt.Errorf("unmarshal %s: %w", notifyError, err))
@@ -400,10 +400,10 @@ func (c *Client) OnError(handler func(ErrorNotification)) {
 // OnWarning registers a listener for warning notifications.
 func (c *Client) OnWarning(handler func(WarningNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyWarning, nil)
+		c.onNotification(notifyWarning, nil)
 		return
 	}
-	c.OnNotification(notifyWarning, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyWarning, func(ctx context.Context, notif Notification) {
 		var params WarningNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyWarning, fmt.Errorf("unmarshal %s: %w", notifyWarning, err))
@@ -416,10 +416,10 @@ func (c *Client) OnWarning(handler func(WarningNotification)) {
 // OnGuardianWarning registers a listener for guardianWarning notifications.
 func (c *Client) OnGuardianWarning(handler func(GuardianWarningNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyGuardianWarning, nil)
+		c.onNotification(notifyGuardianWarning, nil)
 		return
 	}
-	c.OnNotification(notifyGuardianWarning, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyGuardianWarning, func(ctx context.Context, notif Notification) {
 		var params GuardianWarningNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyGuardianWarning, fmt.Errorf("unmarshal %s: %w", notifyGuardianWarning, err))
@@ -432,10 +432,10 @@ func (c *Client) OnGuardianWarning(handler func(GuardianWarningNotification)) {
 // OnRemoteControlStatusChanged registers a listener for remote-control status changes.
 func (c *Client) OnRemoteControlStatusChanged(handler func(RemoteControlStatusChangedNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyRemoteControlStatusChanged, nil)
+		c.onNotification(notifyRemoteControlStatusChanged, nil)
 		return
 	}
-	c.OnNotification(notifyRemoteControlStatusChanged, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyRemoteControlStatusChanged, func(ctx context.Context, notif Notification) {
 		var params RemoteControlStatusChangedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyRemoteControlStatusChanged, fmt.Errorf("unmarshal %s: %w", notifyRemoteControlStatusChanged, err))
@@ -448,10 +448,10 @@ func (c *Client) OnRemoteControlStatusChanged(handler func(RemoteControlStatusCh
 // OnTerminalInteraction registers a listener for item/commandExecution/terminalInteraction notifications
 func (c *Client) OnTerminalInteraction(handler func(TerminalInteractionNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyTerminalInteraction, nil)
+		c.onNotification(notifyTerminalInteraction, nil)
 		return
 	}
-	c.OnNotification(notifyTerminalInteraction, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyTerminalInteraction, func(ctx context.Context, notif Notification) {
 		var params TerminalInteractionNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyTerminalInteraction, fmt.Errorf("unmarshal %s: %w", notifyTerminalInteraction, err))

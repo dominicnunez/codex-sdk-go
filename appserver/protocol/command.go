@@ -186,10 +186,10 @@ func (s *CommandService) Resize(ctx context.Context, params CommandExecResizePar
 // OnCommandExecutionOutputDelta registers a listener for command execution output delta notifications
 func (c *Client) OnCommandExecutionOutputDelta(handler func(CommandExecutionOutputDeltaNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyCommandExecutionOutputDelta, nil)
+		c.onNotification(notifyCommandExecutionOutputDelta, nil)
 		return
 	}
-	c.OnNotification(notifyCommandExecutionOutputDelta, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyCommandExecutionOutputDelta, func(ctx context.Context, notif Notification) {
 		var notification CommandExecutionOutputDeltaNotification
 		if err := jsondecode.Unmarshal(notif.Params, &notification); err != nil {
 			c.reportHandlerError(notifyCommandExecutionOutputDelta, fmt.Errorf("unmarshal %s: %w", notifyCommandExecutionOutputDelta, err))
@@ -202,10 +202,10 @@ func (c *Client) OnCommandExecutionOutputDelta(handler func(CommandExecutionOutp
 // OnCommandExecOutputDelta registers a listener for standalone command/exec output streaming.
 func (c *Client) OnCommandExecOutputDelta(handler func(CommandExecOutputDeltaNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyCommandExecOutputDelta, nil)
+		c.onNotification(notifyCommandExecOutputDelta, nil)
 		return
 	}
-	c.OnNotification(notifyCommandExecOutputDelta, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyCommandExecOutputDelta, func(ctx context.Context, notif Notification) {
 		var notification CommandExecOutputDeltaNotification
 		if err := jsondecode.Unmarshal(notif.Params, &notification); err != nil {
 			c.reportHandlerError(notifyCommandExecOutputDelta, fmt.Errorf("unmarshal %s: %w", notifyCommandExecOutputDelta, err))

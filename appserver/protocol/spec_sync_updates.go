@@ -572,10 +572,10 @@ type McpToolCallAppContext struct {
 
 func setTypedNotificationHandler[T any](c *Client, method string, handler func(T)) {
 	if handler == nil {
-		c.OnNotification(method, nil)
+		c.onNotification(method, nil)
 		return
 	}
-	c.OnNotification(method, func(_ context.Context, notif Notification) {
+	c.onNotification(method, func(_ context.Context, notif Notification) {
 		var params T
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(method, fmt.Errorf("unmarshal %s: %w", method, err))

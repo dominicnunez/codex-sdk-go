@@ -407,6 +407,14 @@ Close or eventual runtime cleanup. A dispatch snapshot admitted before removal
 may still invoke its callbacks and retain captured data until fanout finishes.
 This is reference release, not secure erasure or cancellation of admitted callbacks.
 
+Public raw client notification callbacks receive independent `Params` bytes on
+each invocation. A callback may retain or modify them without changing the
+transport input, later raw or typed callbacks, or SDK runtime/cache decoding.
+Private protocol listeners borrow the original input for read-only decoding. Copies
+add allocation proportional to payload size and raw callback count; application
+retention remains outside the transport's retained-byte budget and does not
+establish a total client heap limit.
+
 The stream collector copies a retained suffix when trimming oversized plan text
 or command delta history and clears evicted delta/raw-chunk backing slots. Its
 existing byte/count limits therefore release the discarded text references in

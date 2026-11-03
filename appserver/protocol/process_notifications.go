@@ -86,10 +86,10 @@ func (n *ProcessExitedNotification) UnmarshalJSON(data []byte) error {
 // OnProcessOutputDelta registers a listener for process/outputDelta notifications.
 func (c *Client) OnProcessOutputDelta(handler func(ProcessOutputDeltaNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyProcessOutputDelta, nil)
+		c.onNotification(notifyProcessOutputDelta, nil)
 		return
 	}
-	c.OnNotification(notifyProcessOutputDelta, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyProcessOutputDelta, func(ctx context.Context, notif Notification) {
 		var notification ProcessOutputDeltaNotification
 		if err := jsondecode.Unmarshal(notif.Params, &notification); err != nil {
 			c.reportHandlerError(notifyProcessOutputDelta, fmt.Errorf("unmarshal %s: %w", notifyProcessOutputDelta, err))
@@ -102,10 +102,10 @@ func (c *Client) OnProcessOutputDelta(handler func(ProcessOutputDeltaNotificatio
 // OnProcessExited registers a listener for process/exited notifications.
 func (c *Client) OnProcessExited(handler func(ProcessExitedNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyProcessExited, nil)
+		c.onNotification(notifyProcessExited, nil)
 		return
 	}
-	c.OnNotification(notifyProcessExited, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyProcessExited, func(ctx context.Context, notif Notification) {
 		var notification ProcessExitedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &notification); err != nil {
 			c.reportHandlerError(notifyProcessExited, fmt.Errorf("unmarshal %s: %w", notifyProcessExited, err))
