@@ -84,6 +84,16 @@ existing lifecycle validation first and releases borrowed input after admission.
 Public collaboration records retain ordinary JSON behavior; these checks do not
 change constructed request encoding or grant authority to reported settings.
 
+Configuration-requirements admission validates the known nested shapes of six
+raw object fields before response publication, including malformed earlier
+duplicates. Existing typed-field errors keep their precedence. Nullable fields,
+open extensions and arbitrary provider-map values remain accepted and retain
+owned raw JSON. Nested schema properties use exact matching; differently cased
+extras remain unconstrained. Diagnostics identify fixed schema fields and array
+positions without retaining dynamic origin/provider keys or rejected values.
+These checks do not authenticate policy origin, interpret origin strings, enforce
+managed requirements locally or contact providers.
+
 Known packaged-default and enterprise-managed config sources validate required
 metadata before read or write results are published. Packaged file paths must
 already be absolute and normalized, including earlier canonical occurrences;

@@ -679,11 +679,11 @@ func (s *ConfigService) Read(ctx context.Context, params ConfigReadParams) (Conf
 
 // ReadRequirements reads configuration requirements
 func (s *ConfigService) ReadRequirements(ctx context.Context) (ConfigRequirementsReadResponse, error) {
-	var resp ConfigRequirementsReadResponse
+	var resp requirementsReadResult
 	if err := s.client.sendRequest(ctx, methodConfigRequirementsRead, nil, &resp); err != nil {
 		return ConfigRequirementsReadResponse{}, err
 	}
-	return resp, nil
+	return resp.value, nil
 }
 
 // Write writes a single config value
