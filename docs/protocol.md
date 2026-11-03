@@ -25,6 +25,15 @@ string remains explicit. Standalone values require JSON strings. The distinct
 The server interprets service tiers; accepting a name does not establish its
 availability for a model or provider.
 
+Service-tier overrides in thread start/fork/resume and turn start, goal token
+budgets, and the `SHA`, `Branch` and `OriginURL` fields of Git metadata updates
+use `OptionalNullable[T]` to preserve absent/null/value states. Its zero value
+omits the field; `Present: true` with a nil `Value` emits explicit null, and a
+nonnil `Value` supplies a replacement, including a zero budget or empty tier.
+Omitted Git metadata leaves stored values unchanged, while null requests a
+clear. A null goal budget requests removing the budget; omission keeps it.
+The SDK preserves these requests without performing a server-side update locally.
+
 ## Transport termination
 
 Custom transports can implement the optional `TransportLifecycle` capability.

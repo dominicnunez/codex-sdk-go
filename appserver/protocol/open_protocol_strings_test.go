@@ -21,16 +21,17 @@ func callOpenTierRequest(t *testing.T, method string, tier *p.ServiceTier) error
 		t.Fatal(err)
 	}
 	ctx := context.Background()
+	selection := p.OptionalNullable[p.ServiceTier]{Present: tier != nil, Value: tier}
 	var err error
 	switch method {
 	case "thread/start":
-		_, err = c.Thread.Start(ctx, p.ThreadStartParams{ServiceTier: tier})
+		_, err = c.Thread.Start(ctx, p.ThreadStartParams{ServiceTier: selection})
 	case "thread/fork":
-		_, err = c.Thread.Fork(ctx, p.ThreadForkParams{ThreadID: "thread", ServiceTier: tier})
+		_, err = c.Thread.Fork(ctx, p.ThreadForkParams{ThreadID: "thread", ServiceTier: selection})
 	case "thread/resume":
-		_, err = c.Thread.Resume(ctx, p.ThreadResumeParams{ThreadID: "thread", ServiceTier: tier})
+		_, err = c.Thread.Resume(ctx, p.ThreadResumeParams{ThreadID: "thread", ServiceTier: selection})
 	case "turn/start":
-		_, err = c.Turn.Start(ctx, p.TurnStartParams{ThreadID: "thread", Input: []p.UserInput{}, ServiceTier: tier})
+		_, err = c.Turn.Start(ctx, p.TurnStartParams{ThreadID: "thread", Input: []p.UserInput{}, ServiceTier: selection})
 	}
 	if err != nil {
 		return err

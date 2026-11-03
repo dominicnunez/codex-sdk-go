@@ -288,6 +288,14 @@ Optional carriers retain nullability, standalone codecs reject non-string
 values, and the separate thread-source-kind filter remains a closed enum.
 These metadata strings do not establish origin, authorization or service-tier
 availability; their interpretation belongs to the server and application.
+Request overrides preserve explicit null independently of omission for service
+tiers, goal token budgets and each Git metadata update field. Omission remains
+the default, so an unset Go field does not accidentally request clearing stored
+state. Constructed values, decoded requests and Turn.Start's custom wire record
+retain the three states, including zero budgets and null-reset histories.
+These controls preserve update intent; the server owns authorization and the
+actual state change. Goal budgets remain signed 64-bit protocol integers rather
+than local duration or spending controls.
 Plain string paths in thread, turn, command, config, permission-profile, skills,
 hooks, fuzzy-search and migration requests pass unchanged to the server, which
 owns relative-path resolution and operation-specific restrictions. Skill grouping

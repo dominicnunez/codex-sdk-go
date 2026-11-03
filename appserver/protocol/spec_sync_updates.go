@@ -235,7 +235,7 @@ type ThreadGoalSetParams struct {
 	Objective   *string                   `json:"objective,omitempty"`
 	Status      *ThreadGoalStatus         `json:"status,omitempty"`
 	ThreadID    string                    `json:"threadId"`
-	TokenBudget *int64                    `json:"tokenBudget,omitempty"`
+	TokenBudget OptionalNullable[int64]   `json:"tokenBudget,omitzero"`
 	Origin      *ThreadGoalMutationOrigin `json:"origin,omitempty"`
 }
 type ThreadGoalSetResponse struct {
