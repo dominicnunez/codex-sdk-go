@@ -36,39 +36,39 @@ type TurnStartParams struct {
 	Effort              *ReasoningEffort   `json:"effort,omitempty"`
 	Model               *string            `json:"model,omitempty"`
 	// OutputSchema optionally constrains the model's structured output to conform to a JSON Schema.
-	OutputSchema      interface{}              `json:"outputSchema,omitempty"`
-	Personality       *Personality             `json:"personality,omitempty"`
-	SandboxPolicy     *SandboxPolicy           `json:"sandboxPolicy,omitempty"`
-	ServiceTier       *ServiceTier             `json:"serviceTier,omitempty"`
-	Summary           *ReasoningSummaryWrapper `json:"summary,omitempty"`
-	CollaborationMode *CollaborationMode       `json:"collaborationMode,omitempty"`
-	DisabledPluginIDs *[]string                `json:"disabledPluginIds,omitempty"`
+	OutputSchema      interface{}                   `json:"outputSchema,omitempty"`
+	Personality       *Personality                  `json:"personality,omitempty"`
+	SandboxPolicy     *SandboxPolicy                `json:"sandboxPolicy,omitempty"`
+	ServiceTier       OptionalNullable[ServiceTier] `json:"serviceTier,omitzero"`
+	Summary           *ReasoningSummaryWrapper      `json:"summary,omitempty"`
+	CollaborationMode *CollaborationMode            `json:"collaborationMode,omitempty"`
+	DisabledPluginIDs *[]string                     `json:"disabledPluginIds,omitempty"`
 }
 
 // MarshalJSON ensures union fields use wrapper marshalers so wire payloads
 // include required discriminator fields (for example sandboxPolicy.type).
 func (p TurnStartParams) MarshalJSON() ([]byte, error) {
 	type wireTurnStartParams struct {
-		ServiceTierForTurn  *string                  `json:"serviceTierForTurn,omitempty"`
-		ToolOutput          *TurnToolOutput          `json:"toolOutput,omitempty"`
-		TurnTrigger         *string                  `json:"turnTrigger,omitempty"`
-		ThreadID            string                   `json:"threadId"`
-		Input               []UserInput              `json:"input"`
-		ClientUserMessageID *string                  `json:"clientUserMessageId,omitempty"`
-		ApprovalPolicy      *AskForApprovalWrapper   `json:"approvalPolicy,omitempty"`
-		ApprovalsReviewer   *ApprovalsReviewer       `json:"approvalsReviewer,omitempty"`
-		Cwd                 *string                  `json:"cwd,omitempty"`
-		Effort              *ReasoningEffort         `json:"effort,omitempty"`
-		Model               *string                  `json:"model,omitempty"`
-		OutputSchema        interface{}              `json:"outputSchema,omitempty"`
-		Personality         *Personality             `json:"personality,omitempty"`
-		SandboxPolicy       *SandboxPolicyWrapper    `json:"sandboxPolicy,omitempty"`
-		ServiceTier         *ServiceTier             `json:"serviceTier,omitempty"`
-		Summary             *ReasoningSummaryWrapper `json:"summary,omitempty"`
-		CollaborationMode   *CollaborationMode       `json:"collaborationMode,omitempty"`
-		DisabledPluginIDs   *[]string                `json:"disabledPluginIds,omitempty"`
-		ParentTurnID        *string                  `json:"parentTurnId,omitempty"`
-		RootTurnID          *string                  `json:"rootTurnId,omitempty"`
+		ServiceTierForTurn  *string                       `json:"serviceTierForTurn,omitempty"`
+		ToolOutput          *TurnToolOutput               `json:"toolOutput,omitempty"`
+		TurnTrigger         *string                       `json:"turnTrigger,omitempty"`
+		ThreadID            string                        `json:"threadId"`
+		Input               []UserInput                   `json:"input"`
+		ClientUserMessageID *string                       `json:"clientUserMessageId,omitempty"`
+		ApprovalPolicy      *AskForApprovalWrapper        `json:"approvalPolicy,omitempty"`
+		ApprovalsReviewer   *ApprovalsReviewer            `json:"approvalsReviewer,omitempty"`
+		Cwd                 *string                       `json:"cwd,omitempty"`
+		Effort              *ReasoningEffort              `json:"effort,omitempty"`
+		Model               *string                       `json:"model,omitempty"`
+		OutputSchema        interface{}                   `json:"outputSchema,omitempty"`
+		Personality         *Personality                  `json:"personality,omitempty"`
+		SandboxPolicy       *SandboxPolicyWrapper         `json:"sandboxPolicy,omitempty"`
+		ServiceTier         OptionalNullable[ServiceTier] `json:"serviceTier,omitzero"`
+		Summary             *ReasoningSummaryWrapper      `json:"summary,omitempty"`
+		CollaborationMode   *CollaborationMode            `json:"collaborationMode,omitempty"`
+		DisabledPluginIDs   *[]string                     `json:"disabledPluginIds,omitempty"`
+		ParentTurnID        *string                       `json:"parentTurnId,omitempty"`
+		RootTurnID          *string                       `json:"rootTurnId,omitempty"`
 	}
 
 	wire := wireTurnStartParams{
@@ -114,26 +114,26 @@ func unmarshalUserInputSlice(raw []json.RawMessage) ([]UserInput, error) {
 // UnmarshalJSON implements custom unmarshaling for TurnStartParams
 func (p *TurnStartParams) UnmarshalJSON(data []byte) error {
 	type wireTurnStartParams struct {
-		ServiceTierForTurn  *string                  `json:"serviceTierForTurn,omitempty"`
-		ToolOutput          *TurnToolOutput          `json:"toolOutput,omitempty"`
-		TurnTrigger         *string                  `json:"turnTrigger,omitempty"`
-		ThreadID            string                   `json:"threadId"`
-		Input               []json.RawMessage        `json:"input"`
-		ClientUserMessageID *string                  `json:"clientUserMessageId,omitempty"`
-		ApprovalPolicy      *AskForApprovalWrapper   `json:"approvalPolicy,omitempty"`
-		ApprovalsReviewer   *ApprovalsReviewer       `json:"approvalsReviewer,omitempty"`
-		Cwd                 *string                  `json:"cwd,omitempty"`
-		Effort              *ReasoningEffort         `json:"effort,omitempty"`
-		Model               *string                  `json:"model,omitempty"`
-		OutputSchema        interface{}              `json:"outputSchema,omitempty"`
-		Personality         *Personality             `json:"personality,omitempty"`
-		SandboxPolicy       *SandboxPolicyWrapper    `json:"sandboxPolicy,omitempty"`
-		ServiceTier         *ServiceTier             `json:"serviceTier,omitempty"`
-		Summary             *ReasoningSummaryWrapper `json:"summary,omitempty"`
-		CollaborationMode   *CollaborationMode       `json:"collaborationMode,omitempty"`
-		DisabledPluginIDs   *[]string                `json:"disabledPluginIds,omitempty"`
-		ParentTurnID        *string                  `json:"parentTurnId,omitempty"`
-		RootTurnID          *string                  `json:"rootTurnId,omitempty"`
+		ServiceTierForTurn  *string                       `json:"serviceTierForTurn,omitempty"`
+		ToolOutput          *TurnToolOutput               `json:"toolOutput,omitempty"`
+		TurnTrigger         *string                       `json:"turnTrigger,omitempty"`
+		ThreadID            string                        `json:"threadId"`
+		Input               []json.RawMessage             `json:"input"`
+		ClientUserMessageID *string                       `json:"clientUserMessageId,omitempty"`
+		ApprovalPolicy      *AskForApprovalWrapper        `json:"approvalPolicy,omitempty"`
+		ApprovalsReviewer   *ApprovalsReviewer            `json:"approvalsReviewer,omitempty"`
+		Cwd                 *string                       `json:"cwd,omitempty"`
+		Effort              *ReasoningEffort              `json:"effort,omitempty"`
+		Model               *string                       `json:"model,omitempty"`
+		OutputSchema        interface{}                   `json:"outputSchema,omitempty"`
+		Personality         *Personality                  `json:"personality,omitempty"`
+		SandboxPolicy       *SandboxPolicyWrapper         `json:"sandboxPolicy,omitempty"`
+		ServiceTier         OptionalNullable[ServiceTier] `json:"serviceTier,omitzero"`
+		Summary             *ReasoningSummaryWrapper      `json:"summary,omitempty"`
+		CollaborationMode   *CollaborationMode            `json:"collaborationMode,omitempty"`
+		DisabledPluginIDs   *[]string                     `json:"disabledPluginIds,omitempty"`
+		ParentTurnID        *string                       `json:"parentTurnId,omitempty"`
+		RootTurnID          *string                       `json:"rootTurnId,omitempty"`
 	}
 
 	wire := &wireTurnStartParams{}

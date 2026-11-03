@@ -21,21 +21,21 @@ func newThreadService(client *Client) *ThreadService {
 
 // ThreadStartParams are parameters for starting a new thread
 type ThreadStartParams struct {
-	ApprovalPolicy        *AskForApproval    `json:"approvalPolicy,omitempty"`
-	ApprovalsReviewer     *ApprovalsReviewer `json:"approvalsReviewer,omitempty"`
-	BaseInstructions      *string            `json:"baseInstructions,omitempty"`
-	Config                json.RawMessage    `json:"config,omitempty"`
-	Cwd                   *string            `json:"cwd,omitempty"`
-	DeveloperInstructions *string            `json:"developerInstructions,omitempty"`
-	Ephemeral             *bool              `json:"ephemeral,omitempty"`
-	Model                 *string            `json:"model,omitempty"`
-	ModelProvider         *string            `json:"modelProvider,omitempty"`
-	Personality           *Personality       `json:"personality,omitempty"`
-	Sandbox               *SandboxMode       `json:"sandbox,omitempty"`
-	ServiceName           *string            `json:"serviceName,omitempty"`
-	ServiceTier           *ServiceTier       `json:"serviceTier,omitempty"`
-	SessionStartSource    *ThreadStartSource `json:"sessionStartSource,omitempty"`
-	ThreadSource          *ThreadSource      `json:"threadSource,omitempty"`
+	ApprovalPolicy        *AskForApproval               `json:"approvalPolicy,omitempty"`
+	ApprovalsReviewer     *ApprovalsReviewer            `json:"approvalsReviewer,omitempty"`
+	BaseInstructions      *string                       `json:"baseInstructions,omitempty"`
+	Config                json.RawMessage               `json:"config,omitempty"`
+	Cwd                   *string                       `json:"cwd,omitempty"`
+	DeveloperInstructions *string                       `json:"developerInstructions,omitempty"`
+	Ephemeral             *bool                         `json:"ephemeral,omitempty"`
+	Model                 *string                       `json:"model,omitempty"`
+	ModelProvider         *string                       `json:"modelProvider,omitempty"`
+	Personality           *Personality                  `json:"personality,omitempty"`
+	Sandbox               *SandboxMode                  `json:"sandbox,omitempty"`
+	ServiceName           *string                       `json:"serviceName,omitempty"`
+	ServiceTier           OptionalNullable[ServiceTier] `json:"serviceTier,omitzero"`
+	SessionStartSource    *ThreadStartSource            `json:"sessionStartSource,omitempty"`
+	ThreadSource          *ThreadSource                 `json:"threadSource,omitempty"`
 }
 
 // ThreadStartSource identifies why a thread was started.
@@ -412,19 +412,19 @@ func (s *ThreadService) InjectItems(ctx context.Context, params ThreadInjectItem
 
 // ThreadResumeParams are parameters for resuming a thread
 type ThreadResumeParams struct {
-	ThreadID              string             `json:"threadId"`
-	ApprovalPolicy        *AskForApproval    `json:"approvalPolicy,omitempty"`
-	ApprovalsReviewer     *ApprovalsReviewer `json:"approvalsReviewer,omitempty"`
-	BaseInstructions      *string            `json:"baseInstructions,omitempty"`
-	Config                json.RawMessage    `json:"config,omitempty"`
-	Cwd                   *string            `json:"cwd,omitempty"`
-	DeveloperInstructions *string            `json:"developerInstructions,omitempty"`
-	ExcludeTurns          *bool              `json:"excludeTurns,omitempty"`
-	Model                 *string            `json:"model,omitempty"`
-	ModelProvider         *string            `json:"modelProvider,omitempty"`
-	Personality           *Personality       `json:"personality,omitempty"`
-	Sandbox               *SandboxMode       `json:"sandbox,omitempty"`
-	ServiceTier           *ServiceTier       `json:"serviceTier,omitempty"`
+	ThreadID              string                        `json:"threadId"`
+	ApprovalPolicy        *AskForApproval               `json:"approvalPolicy,omitempty"`
+	ApprovalsReviewer     *ApprovalsReviewer            `json:"approvalsReviewer,omitempty"`
+	BaseInstructions      *string                       `json:"baseInstructions,omitempty"`
+	Config                json.RawMessage               `json:"config,omitempty"`
+	Cwd                   *string                       `json:"cwd,omitempty"`
+	DeveloperInstructions *string                       `json:"developerInstructions,omitempty"`
+	ExcludeTurns          *bool                         `json:"excludeTurns,omitempty"`
+	Model                 *string                       `json:"model,omitempty"`
+	ModelProvider         *string                       `json:"modelProvider,omitempty"`
+	Personality           *Personality                  `json:"personality,omitempty"`
+	Sandbox               *SandboxMode                  `json:"sandbox,omitempty"`
+	ServiceTier           OptionalNullable[ServiceTier] `json:"serviceTier,omitzero"`
 }
 
 // ThreadResumeResponse is the response from resuming a thread
@@ -492,21 +492,21 @@ func (s *ThreadService) Resume(ctx context.Context, params ThreadResumeParams) (
 
 // ThreadForkParams are parameters for forking a thread
 type ThreadForkParams struct {
-	ThreadID              string             `json:"threadId"`
-	ApprovalPolicy        *AskForApproval    `json:"approvalPolicy,omitempty"`
-	ApprovalsReviewer     *ApprovalsReviewer `json:"approvalsReviewer,omitempty"`
-	BaseInstructions      *string            `json:"baseInstructions,omitempty"`
-	Config                json.RawMessage    `json:"config,omitempty"`
-	Cwd                   *string            `json:"cwd,omitempty"`
-	DeveloperInstructions *string            `json:"developerInstructions,omitempty"`
-	Ephemeral             *bool              `json:"ephemeral,omitempty"`
-	ExcludeTurns          *bool              `json:"excludeTurns,omitempty"`
-	LastTurnID            *string            `json:"lastTurnId,omitempty"`
-	Model                 *string            `json:"model,omitempty"`
-	ModelProvider         *string            `json:"modelProvider,omitempty"`
-	Sandbox               *SandboxMode       `json:"sandbox,omitempty"`
-	ServiceTier           *ServiceTier       `json:"serviceTier,omitempty"`
-	ThreadSource          *ThreadSource      `json:"threadSource,omitempty"`
+	ThreadID              string                        `json:"threadId"`
+	ApprovalPolicy        *AskForApproval               `json:"approvalPolicy,omitempty"`
+	ApprovalsReviewer     *ApprovalsReviewer            `json:"approvalsReviewer,omitempty"`
+	BaseInstructions      *string                       `json:"baseInstructions,omitempty"`
+	Config                json.RawMessage               `json:"config,omitempty"`
+	Cwd                   *string                       `json:"cwd,omitempty"`
+	DeveloperInstructions *string                       `json:"developerInstructions,omitempty"`
+	Ephemeral             *bool                         `json:"ephemeral,omitempty"`
+	ExcludeTurns          *bool                         `json:"excludeTurns,omitempty"`
+	LastTurnID            *string                       `json:"lastTurnId,omitempty"`
+	Model                 *string                       `json:"model,omitempty"`
+	ModelProvider         *string                       `json:"modelProvider,omitempty"`
+	Sandbox               *SandboxMode                  `json:"sandbox,omitempty"`
+	ServiceTier           OptionalNullable[ServiceTier] `json:"serviceTier,omitzero"`
+	ThreadSource          *ThreadSource                 `json:"threadSource,omitempty"`
 }
 
 // ThreadForkResponse is the response from forking a thread
@@ -617,9 +617,9 @@ func (s *ThreadService) SetName(ctx context.Context, params ThreadSetNameParams)
 
 // ThreadMetadataGitInfoUpdateParams patches stored Git metadata for a thread.
 type ThreadMetadataGitInfoUpdateParams struct {
-	Branch    *string `json:"branch,omitempty"`
-	OriginURL *string `json:"originUrl,omitempty"`
-	SHA       *string `json:"sha,omitempty"`
+	Branch    OptionalNullable[string] `json:"branch,omitzero"`
+	OriginURL OptionalNullable[string] `json:"originUrl,omitzero"`
+	SHA       OptionalNullable[string] `json:"sha,omitzero"`
 }
 
 // ThreadMetadataUpdateParams updates thread metadata.
