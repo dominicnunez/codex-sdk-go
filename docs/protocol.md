@@ -378,6 +378,15 @@ not an approval or proof that the server resolves a path in a particular way.
 
 ## Compatibility
 
+Required non-null thread, plugin and sharing metadata rejects every canonical
+null occurrence, including escaped property names, even when a later duplicate
+has a valid value. The same checks cover required fields inside repeated granular
+approval and thread-spawn objects. Earlier partial objects may still omit members;
+valid duplicate selection, nullable fields and open metadata retain their existing
+behavior. Initialize validates required response occurrences before caching a
+successful handshake, so a rejected response can be retried. Its public response
+record remains method-free; handshake admission owns these checks.
+
 Known object alternatives for session sources (`custom`, `subAgent`), sub-agent
 sources (`other`, `thread_spawn`) and approval policies (`granular`) have closed
 outer shapes. Extra properties or competing branch keys fail before successful

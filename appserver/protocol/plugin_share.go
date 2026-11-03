@@ -157,6 +157,9 @@ func (p *PluginSharePrincipal) UnmarshalJSON(data []byte) error {
 	case wire.Role == nil:
 		return errors.New("missing plugin.sharePrincipal.role")
 	}
+	if err := validateObjectFields(data, nil, []string{"name", "principalId", "principalType", "role"}); err != nil {
+		return err
+	}
 
 	p.Name = *wire.Name
 	p.PrincipalID = *wire.PrincipalID
@@ -195,6 +198,9 @@ func (c *PluginShareContext) UnmarshalJSON(data []byte) error {
 	}
 	if wire.RemotePluginID == nil {
 		return errors.New("missing plugin.shareContext.remotePluginId")
+	}
+	if err := validateObjectFields(data, nil, []string{"remotePluginId"}); err != nil {
+		return err
 	}
 
 	c.CreatorAccountUserID = wire.CreatorAccountUserID

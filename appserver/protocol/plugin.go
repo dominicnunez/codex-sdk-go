@@ -552,6 +552,10 @@ func (p *PluginSummary) UnmarshalJSON(data []byte) error {
 		*p = previous
 		return err
 	}
+	if err := validateObjectFields(data, nil, []string{"enabled", "id", "installed", "name", "source"}); err != nil {
+		*p = previous
+		return err
+	}
 	return nil
 }
 
@@ -745,6 +749,9 @@ func (a *AppSummary) UnmarshalJSON(data []byte) error {
 		return errors.New("missing plugin.app.id")
 	case wire.Name == nil:
 		return errors.New("missing plugin.app.name")
+	}
+	if err := validateObjectFields(data, nil, []string{"id", "name"}); err != nil {
+		return err
 	}
 
 	a.Description = wire.Description
@@ -1073,6 +1080,9 @@ func (s *SkillSummary) UnmarshalJSON(data []byte) error {
 	case wire.Name == nil:
 		return errors.New("missing plugin.skill.name")
 	}
+	if err := validateObjectFields(data, nil, []string{"description", "enabled", "name"}); err != nil {
+		return err
+	}
 
 	s.Description = *wire.Description
 	s.Enabled = *wire.Enabled
@@ -1160,6 +1170,9 @@ func (p *PluginDetail) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	if err := validatePluginHookSummaryRecords(data); err != nil {
+		return err
+	}
+	if err := validateObjectFields(data, nil, []string{"appTemplates", "apps", "marketplaceName", "skills", "summary"}); err != nil {
 		return err
 	}
 	*receiver = staged
