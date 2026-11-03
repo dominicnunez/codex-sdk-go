@@ -21,10 +21,19 @@ func (approvalPolicyLiteral) isAskForApproval() {}
 
 const (
 	ApprovalPolicyUntrusted approvalPolicyLiteral = "untrusted"
+	// ApprovalPolicyOnFailure is retained for source compatibility but rejected on the wire.
+	// Deprecated: the current protocol no longer supports on-failure approval.
 	ApprovalPolicyOnFailure approvalPolicyLiteral = "on-failure"
 	ApprovalPolicyOnRequest approvalPolicyLiteral = "on-request"
 	ApprovalPolicyNever     approvalPolicyLiteral = "never"
 )
+
+func (p approvalPolicyLiteral) MarshalJSON() ([]byte, error) {
+	if p == ApprovalPolicyOnFailure {
+		return nil, fmt.Errorf("approvalPolicy %q is no longer supported", string(p))
+	}
+	return jsonencode.Marshal(string(p))
+}
 
 // ApprovalPolicyGranular represents granular approval policy overrides.
 type ApprovalPolicyGranular struct {
@@ -119,7 +128,7 @@ func (a AskForApprovalWrapper) MarshalJSON() ([]byte, error) {
 	}
 	switch v := value.(type) {
 	case approvalPolicyLiteral:
-		return jsonencode.Marshal(string(v))
+		return v.MarshalJSON()
 	case ApprovalPolicyGranular:
 		return jsonencode.Marshal(v)
 	case UnknownAskForApproval:

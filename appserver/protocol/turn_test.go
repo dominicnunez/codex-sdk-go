@@ -582,9 +582,10 @@ func TestTurnDiffUpdatedNotification(t *testing.T) {
 // each AskForApproval variant marshals correctly for the wire protocol.
 func TestTurnStartParamsApprovalPolicyMarshal(t *testing.T) {
 	tests := []struct {
-		name   string
-		policy codex.AskForApproval
-		want   string
+		name      string
+		policy    codex.AskForApproval
+		want      string
+		wantError bool
 	}{
 		{
 			name:   "never",
@@ -597,9 +598,9 @@ func TestTurnStartParamsApprovalPolicyMarshal(t *testing.T) {
 			want:   `"untrusted"`,
 		},
 		{
-			name:   "on-failure",
-			policy: codex.ApprovalPolicyOnFailure,
-			want:   `"on-failure"`,
+			name:      "on-failure",
+			policy:    codex.ApprovalPolicyOnFailure,
+			wantError: true,
 		},
 		{
 			name:   "on-request",
@@ -616,6 +617,12 @@ func TestTurnStartParamsApprovalPolicyMarshal(t *testing.T) {
 				ApprovalPolicy: &tt.policy,
 			}
 			data, err := json.Marshal(params)
+			if tt.wantError {
+				if err == nil || len(data) != 0 {
+					t.Fatal("removed approval policy serialized")
+				}
+				return
+			}
 			if err != nil {
 				t.Fatalf("Marshal error: %v", err)
 			}

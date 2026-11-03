@@ -520,6 +520,15 @@ closure, and historical results may differ from subsequently published state.
 
 ## Prompt injection, approvals, and tool results
 
+The retained `ApprovalPolicyOnFailure` constant cannot be encoded as a typed
+approval policy because the checked-in schemas removed that known value. The
+shared literal encoder and wrapper reject it before request dispatch, including
+pointer forms. This prevents accidental obsolete requests rather than enforcing
+an application authorization policy: current policies, deliberately compatible
+future/empty strings and explicit raw unknown variants retain their behavior.
+Inbound string decoding remains permissive, including the legacy value; encoding
+that decoded known literal rejects it at the same outbound boundary.
+
 User-input approval admission distinguishes omitted question flags from explicit
 nulls. Exact `isSecret` and `isOther` occurrences must be non-null booleans;
 omission retains their false defaults. A malformed question rejects the whole
