@@ -63,6 +63,17 @@ The application controls the working directory and stderr destination. Codex and
 
 Process shutdown uses Unix process groups or Windows Job Objects through [internal/process](../internal/process/). These support cleanup of an owned runtime and its tracked children. Unix graceful shutdown waits for both parent completion and group disappearance, polling surviving descendants at a fixed interval after disabling the completed parent signal. Grace expiry still triggers a group kill; OS termination and reaping may finish after that signal returns. These controls do not establish containment of a hostile program, termination of escaped Unix descendants, termination of remote work, or rollback of completed filesystem/network effects. A process wrapped with `NewProcessFromClient` is externally owned; closing that wrapper does not terminate an external runtime.
 
+If cancellation prevents publication after process-tree attachment, startup
+force-kills the attached tree and closes its handle before killing and reaping the
+direct child. This prevents tracked descendants from surviving a parent-only
+startup cleanup and lets kill-on-close act before a wait on inherited pipes.
+Expected already-stopped outcomes preserve the cancellation error; material tree
+termination or handle-release failures are retained alongside it. Startup failure
+before attachment has no initialized tree owner, and attachment releases any
+provisional handles before returning failure. Descendant reaping remains with its
+process adopter where the SDK is not the direct parent. Arbitrary blocked
+application stderr writers still require application cooperation.
+
 ## JSON-RPC framing, dispatch, and resource exhaustion
 
 Numeric request IDs retain signed 64-bit integer identity across serialization,

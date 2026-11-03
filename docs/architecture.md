@@ -100,6 +100,16 @@ Wait and force-kill. Verify concurrent Wait/Close, descendant liveness,
 deadlines and waiting CPU cost. Removing already observed terminal signals from
 repeated selects avoids spinning while other cleanup remains live.
 
+Cancellation observed after tree attachment but before process publication uses
+that attached owner for force-kill, then releases its handle before the parent
+fallback kill and wait. Handle release can supply kill-on-close fallback if
+explicit tree termination fails; descendants must not keep inherited pipes open
+while the SDK waits for the parent. All cleanup steps are attempted, ordinary
+cleanup preserves the original cancellation error, and material tree cleanup
+failures are joined to it. Before successful attachment, failure cleanup has only
+the command parent to own; current attachment implementations release provisional
+handles on failure. No transport is published on these failed-startup paths.
+
 ## Notification delivery and listeners
 
 [Notification scheduling](../appserver/transport/stdio_notifications.go) uses
