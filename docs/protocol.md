@@ -370,6 +370,12 @@ Declared flag values must be non-null booleans; an invalid question rejects the
 whole request before invoking the approval handler. Options retain their
 nullable array representation.
 
+The deprecated `AutoResolutionMs` field is a nullable unsigned 64-bit value.
+Omission or null means no value; a present zero remains explicit, and the full
+`uint64` range is retained without a floating-point conversion. Negative or
+out-of-range recognized values reject the request before the handler, including
+invalid earlier duplicates. Use `IsBlocking` to decide whether a request blocks.
+
 For `mcpServer/elicitation/request`, standard `form` mode validates the typed
 `requestedSchema`, including its property definitions, before invoking the
 handler. The `openaiForm` and `openai/form` modes retain arbitrary JSON in

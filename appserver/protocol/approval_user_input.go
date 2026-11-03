@@ -7,7 +7,8 @@ import (
 
 // ToolRequestUserInputParams represents parameters for requesting user input for a tool.
 type ToolRequestUserInputParams struct {
-	AutoResolutionMs *int64                         `json:"autoResolutionMs,omitempty"`
+	// Deprecated: Use IsBlocking to decide whether the request should block.
+	AutoResolutionMs *uint64                        `json:"autoResolutionMs,omitempty"`
 	IsBlocking       bool                           `json:"isBlocking"`
 	ItemID           string                         `json:"itemId"`
 	ThreadID         string                         `json:"threadId"`
