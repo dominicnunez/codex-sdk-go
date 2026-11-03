@@ -67,6 +67,9 @@ func (n *AccountUpdatedNotification) UnmarshalJSON(data []byte) error {
 	}); err != nil {
 		return err
 	}
+	if err := validateInboundObjectFields(data, nil, nil); err != nil {
+		return err
+	}
 	*n = AccountUpdatedNotification(decoded)
 	return nil
 }

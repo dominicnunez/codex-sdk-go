@@ -311,7 +311,7 @@ func (c *Client) AddConfigWarningListener(handler func(ConfigWarningNotification
 
 // AddSkillsChangedListener appends a listener for skills/changed notifications.
 func (c *Client) AddSkillsChangedListener(handler func(SkillsChangedNotification)) func() {
-	return addTypedNotificationListener(c, notifySkillsChanged, handler)
+	return c.addNotificationListener(notifySkillsChanged, c.skillsChangedHandler(handler))
 }
 
 // AddHookStartedListener appends a listener for hook/started notifications.

@@ -414,6 +414,13 @@ existing Go records, while property names inside raw objects match the schema
 exactly. Public requirements records retain ordinary JSON behavior. These checks
 validate reported metadata; they do not enforce managed policy locally.
 
+`skills/changed` and `account/updated` require object payloads on both typed
+listener APIs, even though every declared member is optional. Empty objects and
+unconstrained extra metadata remain valid, as do null account field values. A
+null payload rejects with method-specific diagnostics before either typed callback.
+Raw subscriptions keep their existing payload behavior. The empty skills record
+remains method-free for ordinary application JSON and embedding.
+
 Typed app label/icon maps, configuration feature requirements, configured browser
 origin policies and feature-enablement results reject null map entries before
 successful response or typed notification publication. Earlier null entries remain
