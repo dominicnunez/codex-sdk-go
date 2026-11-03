@@ -130,6 +130,14 @@ initialization carrier checks the response before latching a session and release
 its borrowed input after validation. These checks validate message shape, not the
 truth of metadata supplied by the peer.
 
+Async user-input questions reject undeclared properties before typed response,
+notification or cache publication, including invalid questions hidden by later
+duplicate arrays. Their existing required-title and option checks retain priority,
+and new failures preserve prior receiver references. The check is limited to the
+closed question object; surrounding messages and notification metadata remain
+open. Rejected property names are not retained in diagnostics. Schema-valid
+questions remain untrusted prompts and do not confer application authority.
+
 Known source and approval object alternatives reject schema-forbidden outer
 properties and competing discriminators before response, cache or typed callback
 publication. Validation follows their established required/native checks and

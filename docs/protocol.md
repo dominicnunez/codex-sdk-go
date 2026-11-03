@@ -442,6 +442,13 @@ behavior. Initialize validates required response occurrences before caching a
 successful handshake, so a rejected response can be retried. Its public response
 record remains method-free; handshake admission owns these checks.
 
+Async agent-message questions allow only `title` and `options`. Undeclared
+question properties, including differently cased names, fail at the shared
+question decoder before response, notification or cache publication. Existing
+title/option validation, nullable options, empty strings and valid duplicate
+selection remain unchanged. Surrounding agent messages and notifications retain
+their allowed extension metadata.
+
 Known object alternatives for session sources (`custom`, `subAgent`), sub-agent
 sources (`other`, `thread_spawn`) and approval policies (`granular`) have closed
 outer shapes. Extra properties or competing branch keys fail before successful
