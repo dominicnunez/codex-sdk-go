@@ -138,16 +138,33 @@ through the public raw APIs receive the same owned copies as application listene
 
 ## Cache observation
 
-[Thread-state caching](../appserver/protocol/thread_state_cache.go) bridges
-response publication, initial listener registration and pinning. Callbacks and
-eviction can occur during acquisition. Observation ownership must transfer
-atomically: absence from the cache cannot distinguish ordinary eviction from an
-evicted closure marker.
+[Thread-state caching](../appserver/protocol/thread_state_cache.go) bridges the
+pre-request interval, response publication, initial listener registration and
+pinning. Each pending thread start captures at most 64 candidate identities,
+their first admitted incarnation and sticky closure evidence before callbacks
+or eviction. Temporary reference-counted pins share the latest cache snapshots;
+the pending requests do not clone a snapshot per candidate. Settings supplied by
+notifications, including explicit empty plugin lists, supersede response
+settings. The response fills only settings absent from a started notification.
+
+The handoff to a listener happens under the cache lock before temporary pins are
+released. Closure of the captured incarnation remains terminal even if a manual
+cache publication reopens the identity. A candidate missing after capacity
+overflow, a closure without its start, or distinct remote startup incarnations
+using the same ID fails conservatively with `ErrThreadStartObservationLost`.
+The schema supplies no request correlation or remote revision to resolve such
+ambiguity. This mechanism does not order unrelated reads or refreshes globally.
 
 Startup failures must leave neither listeners nor pins. An owned initial
 response must remain available without overwriting newer delivery or reopening a
 closed handle. The acquisition interval and later replay are part of the cache
 lifecycle, rather than independent successful operations.
+Every exit releases temporary pins and candidate maps; cache eviction and order
+backing-storage compaction run after release. Active pending requests can retain
+additional shared cache entries, bounded by 64 candidate references per request;
+the application controls concurrent pending starts. A valid response accompanied
+by observation loss remains available to the direct caller, with no registered
+listener, because local acquisition failure does not undo a remote start.
 
 ## Snapshots and retention
 

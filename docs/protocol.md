@@ -259,15 +259,26 @@ skipped. Each successful call appends once, without turn-ID deduplication. These
 helpers support runtime snapshot ownership; generations are local best-effort
 cache state, not remote revisions, durable identity or authorization.
 
-`Thread.StartWithStateListener` couples a successful start response's cache
-publication, generation and listener registration before eviction or callbacks.
-It returns the response, that publication's generation and unsubscribe function;
-initial callback diagnostics use `thread/start`. Request failures admit no new
-subscription or publication, and both nil callbacks create no subscription.
-Ordinary `Thread.Start` retains its existing signature and behavior. Runtime
-Conversations use the coupled helper so cache pressure cannot discard the newly
-started thread before observation, while a close during startup remains terminal
-for the returned handle even if the cache is explicitly reopened afterward.
+`Thread.StartWithStateListener` starts observing before sending the request and
+atomically transfers that observation to its returned generation and listener.
+Notifications admitted while the request is pending take precedence over the
+initial response in the cache. The returned response remains an independent
+initial snapshot. Initial update diagnostics use `thread/start`; replayed closure
+diagnostics use `thread/closed`. Both nil callbacks create no subscription.
+Conversations use this helper so a close during startup remains terminal for the
+returned handle even if the cache is explicitly reopened afterward.
+
+Each pending start retains at most 64 candidate thread identities and temporarily
+pins their cache entries. A returned identity outside that bound, or ambiguous
+same-ID start/close history without a correlating start, produces
+`ErrThreadStartObservationLost`. Both `Thread.Start` and
+`Thread.StartWithStateListener` then return the valid, owned initial response with
+the error; the latter returns generation zero and a no-op unsubscribe function.
+No listener or response-derived cache publication is created. The remote start
+may have succeeded, so callers must not interpret this error as remote failure or
+automatically retry. Runtime run, stream and Conversation helpers propagate the
+error without dispatching a turn. Request, decoding and schema-admission failures
+still return zero responses and leave no startup subscription or temporary pins.
 
 ## Login variants
 

@@ -19,13 +19,14 @@ const (
 )
 
 var (
-	ErrNilContext           = protocol.ErrNilContext
-	ErrInvalidParams        = protocol.ErrInvalidParams
-	NewTransportError       = protocol.NewTransportError
-	ApprovalPolicyNever     = protocol.ApprovalPolicyNever
-	ApprovalPolicyOnFailure = protocol.ApprovalPolicyOnFailure
-	ApprovalPolicyOnRequest = protocol.ApprovalPolicyOnRequest
-	ApprovalPolicyUntrusted = protocol.ApprovalPolicyUntrusted
+	ErrNilContext                 = protocol.ErrNilContext
+	ErrInvalidParams              = protocol.ErrInvalidParams
+	ErrThreadStartObservationLost = protocol.ErrThreadStartObservationLost
+	NewTransportError             = protocol.NewTransportError
+	ApprovalPolicyNever           = protocol.ApprovalPolicyNever
+	ApprovalPolicyOnFailure       = protocol.ApprovalPolicyOnFailure
+	ApprovalPolicyOnRequest       = protocol.ApprovalPolicyOnRequest
+	ApprovalPolicyUntrusted       = protocol.ApprovalPolicyUntrusted
 )
 
 type (
