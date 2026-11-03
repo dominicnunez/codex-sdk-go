@@ -675,6 +675,14 @@ without `TransportLifecycle` expose only client-close notification entry and
 retirement; autonomous termination and their internal queues remain outside the
 SDK's observation. No synthetic remote thread closure is produced.
 
+A matching terminal turn with `failed` status produces a runtime error even if
+the peer omits diagnostic details or supplies null. Missing diagnostics cannot
+turn a known failed outcome into success. Terminal history bookkeeping precedes
+classification, and streamed completion remains visible before the failure.
+Detailed peer errors retain their existing wrapping; absent details remain absent
+in protocol snapshots. This is outcome reporting, not proof that remote side
+effects were rolled back or that a failed turn is safe to retry.
+
 Transport termination does not discard runtime-owned startup replay or final
 stream events. An attached, stalled stream consumer therefore retains ordinary
 backpressure even after EOF; consumer progress, detachment or caller cancellation
