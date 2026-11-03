@@ -100,6 +100,13 @@ path before returning or caching the handshake. Invalid spellings fail without
 latching a session, so a later valid response can be retried. The SDK preserves
 accepted path text without checking existence or resolving symlinks.
 
+Local skill icons (`SkillInterface.IconSmall` and `IconLarge`) are nullable
+absolute, normalized paths. Skill listings and plugin responses, including
+onboarding skills, validate them before successful publication. Their URL
+siblings remain opaque strings; the SDK neither fetches icons nor resolves
+local paths. `SkillInterface` retains ordinary JSON behavior when decoded
+outside its containing skill records.
+
 Service methods receive typed Go parameters. Plain parameter structs retain
 standard `encoding/json` decoding behavior: for example, decoding a null array
 element into a fresh `[]string` produces an empty string before the SDK receives it.

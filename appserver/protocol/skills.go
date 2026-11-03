@@ -41,6 +41,17 @@ type SkillInterface struct {
 	IconLargeURL     *string `json:"iconLargeUrl,omitempty"`
 }
 
+func validateSkillIconPaths(field string, face *SkillInterface) error {
+	if face == nil {
+		return nil
+	}
+	if _, err := validateInboundAbsolutePathPointerField(field+".iconSmall", face.IconSmall); err != nil {
+		return err
+	}
+	_, err := validateInboundAbsolutePathPointerField(field+".iconLarge", face.IconLarge)
+	return err
+}
+
 // SkillToolDependency represents a tool that a skill depends on
 type SkillToolDependency struct {
 	Type        string  `json:"type"`
@@ -102,6 +113,9 @@ func (m *SkillMetadata) UnmarshalJSON(data []byte) error {
 	type wire SkillMetadata
 	var decoded wire
 	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	if err := validateSkillIconPaths("skill.interface", decoded.Interface); err != nil {
 		return err
 	}
 	*m = SkillMetadata(decoded)
