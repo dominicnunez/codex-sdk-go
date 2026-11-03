@@ -76,6 +76,15 @@ application stderr writers still require application cooperation.
 
 ## JSON-RPC framing, dispatch, and resource exhaustion
 
+The known hook-prompt item validates required fragment strings and array entries
+at the item union before response, notification or cache publication. Fragment
+presence follows native duplicate-array storage reuse, while forbidden null
+occurrences remain visible. Empty arrays reset that presence history. Known
+lifecycle fields retain native numeric validation, and snapshots and callbacks
+own independent fragment and timestamp references. Future unknown item types
+remain opaque; this shape validation does not establish the trustworthiness of
+text supplied by a hook.
+
 The known Bedrock account branch validates its optional managed-credentials flag
 as a non-null boolean before account-read publication, including recognized
 duplicate and escaped names. Omission means false. Other account branches keep
