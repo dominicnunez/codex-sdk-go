@@ -167,6 +167,7 @@ func TestNumericDiagnosticNotificationAndRequests(t *testing.T) {
 	large := "1" + strings.Repeat("0", 1<<18)
 	mock := NewMockTransport()
 	reports, notifications, requests := 0, 0, 0
+	var toolArguments any
 	client := codex.NewClient(mock, codex.WithHandlerErrorCallback(func(_ string, err error) {
 		reports++
 		var typed *json.UnmarshalTypeError
@@ -177,8 +178,9 @@ func TestNumericDiagnosticNotificationAndRequests(t *testing.T) {
 	t.Cleanup(func() { _ = client.Close() })
 	client.OnThreadTokenUsageUpdated(func(codex.ThreadTokenUsageUpdatedNotification) { notifications++ })
 	client.SetApprovalHandlers(codex.ApprovalHandlers{
-		OnDynamicToolCall: func(context.Context, codex.DynamicToolCallParams) (codex.DynamicToolCallResponse, error) {
+		OnDynamicToolCall: func(_ context.Context, params codex.DynamicToolCallParams) (codex.DynamicToolCallResponse, error) {
 			requests++
+			toolArguments = params.Arguments
 			return codex.DynamicToolCallResponse{Success: true, ContentItems: []codex.DynamicToolCallOutputContentItemWrapper{}}, nil
 		},
 		OnPermissionsRequestApproval: func(context.Context, codex.PermissionsRequestApprovalParams) (codex.PermissionsRequestApprovalResponse, error) {
@@ -198,21 +200,39 @@ func TestNumericDiagnosticNotificationAndRequests(t *testing.T) {
 	if reports != 1 || notifications != 1 {
 		t.Fatal("typed notification did not recover")
 	}
+	// Arbitrary tool arguments have no float64 range restriction. Their
+	// complete numeric token reaches the callback without a diagnostic.
+	response, err := mock.InjectServerRequest(context.Background(), codex.Request{ID: codex.RequestID{Value: "exact"}, Method: "item/tool/call", Params: json.RawMessage(`{"arguments":{"n":` + large + `},"callId":"c","threadId":"t","tool":"tool","turnId":"u"}`)})
+	if err != nil || response.Error != nil || requests != 1 || reports != 1 {
+		t.Fatalf("valid large argument rejected: %v", err)
+	}
+	if n, ok := toolArguments.(map[string]any)["n"].(json.Number); !ok || string(n) != large {
+		t.Fatal("large argument token changed")
+	}
 	for _, test := range []struct {
-		method, prefix, suffix string
-		target                 reflect.Type
+		method, prefix, suffix, valid string
+		target                        reflect.Type
 	}{
-		{"item/tool/call", `{"arguments":{"n":`, `},"callId":"c","threadId":"t","tool":"tool","turnId":"u"}`, reflect.TypeFor[float64]()},
-		{"item/permissions/requestApproval", `{"cwd":"/tmp","itemId":"i","permissions":{},"startedAtMs":`, `,"threadId":"t","turnId":"u"}`, reflect.TypeFor[int64]()},
+		{"item/tool/call", `{"arguments":{},"callId":`, `,"threadId":"t","tool":"tool","turnId":"u"}`, `"c"`, reflect.TypeFor[string]()},
+		{"item/permissions/requestApproval", `{"cwd":"/tmp","itemId":"i","permissions":{},"startedAtMs":`, `,"threadId":"t","turnId":"u"}`, "1", reflect.TypeFor[int64]()},
 	} {
 		t.Run(test.method, func(t *testing.T) {
 			before := requests
 			response, err := mock.InjectServerRequest(context.Background(), codex.Request{ID: codex.RequestID{Value: "r"}, Method: test.method, Params: json.RawMessage(test.prefix + large + test.suffix)})
-			requireNumericDiagnostic(t, err, test.target)
+			if test.target == reflect.TypeFor[string]() {
+				// A numeric identifier is a kind error, so the runtime can
+				// reject it without retaining the oversized numeric spelling.
+				var typed *json.UnmarshalTypeError
+				if !errors.As(err, &typed) || typed.Type != test.target || len(typed.Value) > 2048 || len(err.Error()) > 4096 {
+					t.Fatal("numeric identifier lost bounded typed rejection")
+				}
+			} else {
+				requireNumericDiagnostic(t, err, test.target)
+			}
 			if !errors.Is(err, codex.ErrInvalidParams) || requests != before || response.Result != nil {
 				t.Fatal("rejected request lost classification or published handler output")
 			}
-			_, err = mock.InjectServerRequest(context.Background(), codex.Request{ID: codex.RequestID{Value: "r"}, Method: test.method, Params: json.RawMessage(test.prefix + "1" + test.suffix)})
+			_, err = mock.InjectServerRequest(context.Background(), codex.Request{ID: codex.RequestID{Value: "r"}, Method: test.method, Params: json.RawMessage(test.prefix + test.valid + test.suffix)})
 			if err != nil || requests != before+1 {
 				t.Fatal("valid approval request did not recover")
 			}

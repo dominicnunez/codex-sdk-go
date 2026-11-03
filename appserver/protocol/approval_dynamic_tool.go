@@ -22,9 +22,13 @@ type DynamicToolCallParams struct {
 func (p *DynamicToolCallParams) UnmarshalJSON(data []byte) error {
 	type wire DynamicToolCallParams
 	var decoded wire
+	exact := struct {
+		*wire
+		Arguments exactJSONValue `json:"arguments"`
+	}{wire: &decoded}
 	required := []string{"arguments", "callId", "threadId", "tool", "turnId"}
 	nonNull := []string{"callId", "threadId", "tool", "turnId"}
-	if err := unmarshalInboundObject(data, &decoded, required, nonNull); err != nil {
+	if err := unmarshalInboundObject(data, &exact, required, nonNull); err != nil {
 		return err
 	}
 	if err := validateNonEmptyStringFields(map[string]string{
@@ -35,6 +39,7 @@ func (p *DynamicToolCallParams) UnmarshalJSON(data []byte) error {
 	}); err != nil {
 		return err
 	}
+	decoded.Arguments = exact.Arguments.value
 	*p = DynamicToolCallParams(decoded)
 	return nil
 }

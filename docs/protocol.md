@@ -231,6 +231,16 @@ accept built-in values or pointers, including a pointer to a literal enum value.
 Known nil pointers encode as null, matching a missing wrapper value. Unsupported
 application-defined variants remain errors in these closed wire unions.
 
+Dynamic-tool request arguments and MCP/dynamic-tool history-item arguments
+preserve numeric JSON tokens as `json.Number`, including inside maps and arrays.
+The public `interface{}` fields also retain strings, booleans, arrays, objects
+and null. Number values can be serialized without a float64 conversion; callers
+choose any later numeric conversion. This policy applies before tool callbacks,
+typed item notifications and history publication. Direct ordinary JSON decoding
+of the plain history-item records retains its existing float64 behavior; use the
+item union or SDK service admission for the number-preserving representation.
+Unrelated metadata and application-selected codecs keep their existing policy.
+
 `ImageUserInput.URL` and `InputImageFunctionCallOutputContentItem.ImageURL`
 are optional string pointers. A nonnil pointer, including one to an empty string,
 selects an explicit URL; nil leaves that alternative absent. Both image codecs

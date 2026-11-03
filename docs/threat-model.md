@@ -774,6 +774,15 @@ AbsolutePathBuf fields retain their separate typed validation. An application
 must distinguish the schema contracts when deriving display paths or applying
 policy; preserved strings do not authenticate a target or grant filesystem access.
 
+Dynamic-tool callback admission and MCP/dynamic-tool item admission preserve
+arbitrary argument numbers as `json.Number` before callbacks or typed history
+publication, including nested numbers and values outside float64 range. This
+prevents silent numeric rounding at those three owners. Nullable arguments and
+existing field admission remain unchanged; numeric conversion and interpreting
+tool arguments remain the application's responsibility. The policy does not
+change direct ordinary decoding of plain item records, unrelated metadata or
+application-selected codecs. Exact numeric tokens are data, not tool authority.
+
 Image input and function-call image output codecs evaluate their URL/file-ID
 alternatives independently, matching the open schema alternatives. Invalid
 inactive properties are discarded; a valid shared image detail is still required
