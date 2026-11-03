@@ -98,7 +98,7 @@ func TestImageDetailCarriers(t *testing.T) {
 
 func TestImageDetailConstructionAndValidation(t *testing.T) {
 	for _, detail := range []p.ImageDetail{p.ImageDetailAuto, p.ImageDetailLow, p.ImageDetailHigh, p.ImageDetailOriginal} {
-		for _, input := range []p.UserInput{&p.ImageUserInput{URL: "https://example.invalid/image", Detail: &detail}, &p.ImageUserInput{FileID: strPtr(""), Detail: &detail}, &p.LocalImageUserInput{Path: "", Detail: &detail}} {
+		for _, input := range []p.UserInput{&p.ImageUserInput{URL: p.Ptr("https://example.invalid/image"), Detail: &detail}, &p.ImageUserInput{FileID: strPtr(""), Detail: &detail}, &p.LocalImageUserInput{Path: "", Detail: &detail}} {
 			encoded, err := json.Marshal(input)
 			if err != nil {
 				t.Fatal(err)

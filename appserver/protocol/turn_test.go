@@ -38,7 +38,7 @@ func TestTurnStart(t *testing.T) {
 				ThreadID: "thread-123",
 				Input: []codex.UserInput{
 					&codex.TextUserInput{Text: "Hello"},
-					&codex.ImageUserInput{URL: "https://example.com/image.png"},
+					&codex.ImageUserInput{URL: codex.Ptr("https://example.com/image.png")},
 				},
 				Model: strPtr("claude-opus-4"),
 				Cwd:   strPtr("/workspace"),
@@ -93,7 +93,7 @@ func TestTurnStartWireInputFormat(t *testing.T) {
 		ThreadID: "thread-123",
 		Input: []codex.UserInput{
 			&codex.TextUserInput{Text: "Hello"},
-			&codex.ImageUserInput{URL: "https://example.com/img.png"},
+			&codex.ImageUserInput{URL: codex.Ptr("https://example.com/img.png")},
 		},
 	}
 
@@ -857,7 +857,7 @@ func TestTurnUserInputTypes(t *testing.T) {
 		},
 		{
 			name:  "image input",
-			input: &codex.ImageUserInput{URL: "https://example.com/image.png"},
+			input: &codex.ImageUserInput{URL: codex.Ptr("https://example.com/image.png")},
 			want:  `{"type":"image","url":"https://example.com/image.png"}`,
 		},
 		{

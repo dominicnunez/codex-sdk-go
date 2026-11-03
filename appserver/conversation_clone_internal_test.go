@@ -55,3 +55,49 @@ func TestCloneImageDetailOwnership(t *testing.T) {
 		}
 	}
 }
+
+func TestCloneImageURLPresence(t *testing.T) {
+	for _, url := range []*string{nil, Ptr(""), Ptr("opaque")} {
+		input := &ImageUserInput{URL: url, FileID: Ptr("file")}
+		copied := cloneUserInput(input).(*ImageUserInput)
+		if url == nil {
+			if copied.URL != nil {
+				t.Fatal("nil URL changed")
+			}
+		} else {
+			original := *url
+			if copied.URL == nil || *copied.URL != original || copied.URL == url {
+				t.Fatal("image URL not independently copied")
+			}
+			*copied.URL = "copy"
+			if *url != original {
+				t.Fatal("copy mutation reached source")
+			}
+			*url = "source"
+			if *copied.URL != "copy" {
+				t.Fatal("source mutation reached copy")
+			}
+		}
+		output := &protocol.InputImageFunctionCallOutputContentItem{ImageURL: url, FileID: Ptr("file")}
+		item := ThreadItemWrapper{Value: &protocol.FunctionCallOutputThreadItem{Output: protocol.FunctionCallOutputBody{Content: []protocol.FunctionCallOutputContentItemWrapper{{Value: output}}}}}
+		cloned := cloneThreadItemWrapper(item).Value.(*protocol.FunctionCallOutputThreadItem).Output.Content[0].Value.(*protocol.InputImageFunctionCallOutputContentItem)
+		if url == nil {
+			if cloned.ImageURL != nil {
+				t.Fatal("nil tool URL changed")
+			}
+		} else {
+			if cloned.ImageURL == nil || cloned.ImageURL == url || *cloned.ImageURL != *url {
+				t.Fatal("tool URL not copied")
+			}
+			old := *url
+			*cloned.ImageURL = "tool-copy"
+			if *url != old {
+				t.Fatal("tool URL copy aliases source")
+			}
+			*url = "tool-source"
+			if *cloned.ImageURL != "tool-copy" {
+				t.Fatal("tool source aliases copy")
+			}
+		}
+	}
+}
