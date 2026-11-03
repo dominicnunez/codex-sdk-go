@@ -204,9 +204,7 @@ func StartProcess(ctx context.Context, opts *ProcessOptions) (*Process, error) {
 	if err := ctx.Err(); err != nil {
 		_ = stdout.Close()
 		_ = stdin.Close()
-		stopStartedCommand(cmd)
-		_ = processTree.Close()
-		return nil, err
+		return nil, stopCanceledCommand(cmd, &processTree, err)
 	}
 
 	transport := codextransport.NewStdioTransport(stdout, stdin)
@@ -312,6 +310,27 @@ func stopStartedCommand(cmd *exec.Cmd) {
 	}
 	_ = cmd.Process.Kill()
 	_ = cmd.Wait()
+}
+
+type startupProcessTree interface {
+	ForceKill(*os.Process) error
+	Close() error
+}
+
+func stopCanceledCommand(cmd *exec.Cmd, tree startupProcessTree, cause error) error {
+	if cmd != nil && cmd.Process != nil {
+		if err := tree.ForceKill(cmd.Process); err != nil && !isExpectedProcessStopError(err) {
+			cause = errors.Join(cause, fmt.Errorf("kill startup process tree: %w", err))
+		}
+	}
+	// Release the attached owner before Wait: kill-on-close can still stop
+	// descendants if explicit tree termination failed. They may hold pipes
+	// that os/exec must drain before its parent wait can finish.
+	if err := tree.Close(); err != nil {
+		cause = errors.Join(cause, fmt.Errorf("close startup process tree: %w", err))
+	}
+	stopStartedCommand(cmd)
+	return cause
 }
 
 // Initialize performs the app-server initialize handshake and sends the
