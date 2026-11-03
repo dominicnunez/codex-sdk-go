@@ -376,6 +376,13 @@ paths, retain their individual absolute-path validation. Approval handlers own
 authorization and any interpretation of opaque strings; schema-valid metadata is
 not an approval or proof that the server resolves a path in a particular way.
 
+`attestation/generate` requires an object before the application callback runs.
+Empty objects and open extension metadata remain valid; null parameters reject
+with `ErrInvalidParams` and the transport's invalid-params reply under the original
+request ID. Rejection produces no token result and leaves the connection usable.
+The public empty parameters record remains method-free for ordinary application
+JSON. Existing handler errors and non-empty-token response validation still apply.
+
 Command approval input arrays reject null string entries before application
 handlers run, including earlier entries hidden by duplicate properties. This
 covers the current `proposedExecpolicyAmendment` and legacy `command` arrays.

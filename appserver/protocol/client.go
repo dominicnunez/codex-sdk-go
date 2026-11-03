@@ -636,7 +636,9 @@ func (c *Client) dispatchApproval(ctx context.Context, req Request) (Response, e
 		if handlers.OnAttestationGenerate == nil {
 			return methodNotFoundResponse(req.ID), nil
 		}
-		return handleApproval(ctx, req, handlers.OnAttestationGenerate)
+		return handleApproval(ctx, req, func(ctx context.Context, params attestationParams) (AttestationGenerateResponse, error) {
+			return handlers.OnAttestationGenerate(ctx, params.value)
+		})
 
 	default:
 		// Unknown method - return method not found error

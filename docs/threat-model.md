@@ -621,6 +621,15 @@ closure, and historical results may differ from subsequently published state.
 
 ## Prompt injection, approvals, and tool results
 
+Attestation request admission requires an object root before invoking the
+application's token-generation callback. Null parameters retain invalid-params
+classification, and the stdio transport returns a sanitized error under the
+request ID without a token result. Empty/open objects remain valid; this is shape
+validation rather than proof of the requesting peer's authority. The application
+still owns attestation generation and authorization. A private carrier preserves
+the public empty record's ordinary JSON behavior and reuses existing handler-error
+and non-empty-token response validation.
+
 Current and legacy command-approval admission rejects null string elements in
 proposed execpolicy amendments and command argument arrays before application
 callbacks. A valid later duplicate cannot hide a malformed occurrence. Existing
