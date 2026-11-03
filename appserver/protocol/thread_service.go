@@ -118,7 +118,6 @@ func validateThreadLifecycleResponseFields(
 	model string,
 	modelProvider string,
 	sandbox SandboxPolicyWrapper,
-	serviceTier *ServiceTier,
 	thread Thread,
 ) error {
 	switch {
@@ -134,9 +133,6 @@ func validateThreadLifecycleResponseFields(
 		return errors.New("missing sandbox")
 	case thread.ID == "":
 		return errors.New("missing thread.id")
-	}
-	if err := validateOptionalEnumValue("serviceTier", serviceTier, validServiceTiers); err != nil {
-		return err
 	}
 	return validateApprovalsReviewer(approvalsReviewer)
 }
@@ -156,7 +152,6 @@ func (r ThreadStartResponse) validate() error {
 		r.Model,
 		r.ModelProvider,
 		r.Sandbox,
-		r.ServiceTier,
 		r.Thread,
 	)
 }
@@ -479,7 +474,6 @@ func (r ThreadResumeResponse) validate() error {
 		r.Model,
 		r.ModelProvider,
 		r.Sandbox,
-		r.ServiceTier,
 		r.Thread,
 	)
 }
@@ -559,7 +553,6 @@ func (r ThreadForkResponse) validate() error {
 		r.Model,
 		r.ModelProvider,
 		r.Sandbox,
-		r.ServiceTier,
 		r.Thread,
 	)
 }

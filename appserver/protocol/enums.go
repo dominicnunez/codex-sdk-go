@@ -7,8 +7,8 @@ import (
 	"github.com/dominicnunez/codex-sdk-go/internal/jsonencode"
 )
 
-// This file contains typed string enums defined in the protocol spec that are
-// referenced by fields across multiple domain files.
+// This file contains typed protocol strings referenced across multiple domain
+// files, including closed enums and open string classifications.
 
 // TurnStatus represents the status of a turn.
 type TurnStatus string
@@ -86,7 +86,7 @@ func (r *ApprovalsReviewer) UnmarshalJSON(data []byte) error {
 	return unmarshalEnumString(data, "approvalsReviewer", validApprovalsReviewers, r)
 }
 
-// ServiceTier selects the runtime service tier.
+// ServiceTier selects a server-defined runtime service tier. Values are open strings.
 type ServiceTier string
 
 const (
@@ -94,17 +94,12 @@ const (
 	ServiceTierFlex ServiceTier = "flex"
 )
 
-var validServiceTiers = map[ServiceTier]struct{}{
-	ServiceTierFast: {},
-	ServiceTierFlex: {},
-}
-
 func (s ServiceTier) MarshalJSON() ([]byte, error) {
-	return marshalEnumString("serviceTier", s, validServiceTiers)
+	return jsonencode.Marshal(string(s))
 }
 
 func (s *ServiceTier) UnmarshalJSON(data []byte) error {
-	return unmarshalEnumString(data, "serviceTier", validServiceTiers, s)
+	return unmarshalOpenString(data, "serviceTier", s)
 }
 
 // ModeKind represents the initial collaboration mode.
@@ -399,7 +394,7 @@ func (k *ThreadSourceKind) UnmarshalJSON(data []byte) error {
 	return unmarshalEnumString(data, "sourceKinds", validThreadSourceKinds, k)
 }
 
-// ThreadSource is an analytics source classification for a thread.
+// ThreadSource is an open analytics source classification for a thread.
 type ThreadSource string
 
 const (
@@ -408,18 +403,12 @@ const (
 	ThreadSourceMemoryConsolidation ThreadSource = "memory_consolidation"
 )
 
-var validThreadSources = map[ThreadSource]struct{}{
-	ThreadSourceUser:                {},
-	ThreadSourceSubagent:            {},
-	ThreadSourceMemoryConsolidation: {},
-}
-
 func (s ThreadSource) MarshalJSON() ([]byte, error) {
-	return marshalEnumString("threadSource", s, validThreadSources)
+	return jsonencode.Marshal(string(s))
 }
 
 func (s *ThreadSource) UnmarshalJSON(data []byte) error {
-	return unmarshalEnumString(data, "threadSource", validThreadSources, s)
+	return unmarshalOpenString(data, "threadSource", s)
 }
 
 // ForcedLoginMethod represents the forced login method for account authentication.

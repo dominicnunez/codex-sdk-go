@@ -16,6 +16,15 @@ Application codec errors retain their identity and chains. The [threat
 model](threat-model.md#json-rpc-framing-dispatch-and-resource-exhaustion)
 describes SDK diagnostic bounds and their limits.
 
+`ServiceTier` and `ThreadSource` are open protocol strings. Their named constants
+are conveniences rather than exhaustive lists; custom and empty strings retain
+their spelling through requests, responses and thread state. A nil optional
+pointer remains absent or null according to its carrier, while a present empty
+string remains explicit. Standalone values require JSON strings. The distinct
+`ThreadSourceKind` filter and other schema enums retain their closed validation.
+The server interprets service tiers; accepting a name does not establish its
+availability for a model or provider.
+
 ## Transport termination
 
 Custom transports can implement the optional `TransportLifecycle` capability.

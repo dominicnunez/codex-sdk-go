@@ -38,17 +38,6 @@ func TestProtocolEnumsRejectInvalidMarshalAndUnmarshal(t *testing.T) {
 			wantErr: `invalid approvalsReviewer "totally-invalid"`,
 		},
 		{
-			name: "service tier",
-			marshal: func() ([]byte, error) {
-				return json.Marshal(codex.ServiceTier("totally-invalid"))
-			},
-			unmarshal: func(data []byte) error {
-				var value codex.ServiceTier
-				return json.Unmarshal(data, &value)
-			},
-			wantErr: `invalid serviceTier "totally-invalid"`,
-		},
-		{
 			name: "mode kind",
 			marshal: func() ([]byte, error) {
 				return json.Marshal(codex.ModeKind("totally-invalid"))

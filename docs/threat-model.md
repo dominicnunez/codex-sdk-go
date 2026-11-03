@@ -281,6 +281,13 @@ uses the same response admission and cache publication as the legacy method.
 Selected collection values backed by nil slices remain empty arrays during
 request preparation. Explicit null for the nonnullable useStateDbOnly filter
 fails before transport rather than becoming omission.
+Service tiers and thread analytics sources follow their open string schemas,
+including custom and empty strings. Request preparation, lifecycle admission,
+typed notifications and thread caches preserve those peer-controlled values.
+Optional carriers retain nullability, standalone codecs reject non-string
+values, and the separate thread-source-kind filter remains a closed enum.
+These metadata strings do not establish origin, authorization or service-tier
+availability; their interpretation belongs to the server and application.
 Plain string paths in thread, turn, command, config, permission-profile, skills,
 hooks, fuzzy-search and migration requests pass unchanged to the server, which
 owns relative-path resolution and operation-specific restrictions. Skill grouping

@@ -62,3 +62,15 @@ func marshalEnumString[T ~string](field string, value T, allowed map[T]struct{})
 	}
 	return jsonencode.Marshal(string(value))
 }
+
+func unmarshalOpenString[T ~string](data []byte, field string, dest *T) error {
+	var value string
+	if err := jsondecode.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	if isNullJSONValue(data) {
+		return fmt.Errorf("%s must not be null", field)
+	}
+	*dest = T(value)
+	return nil
+}
