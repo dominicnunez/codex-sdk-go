@@ -414,6 +414,17 @@ existing Go records, while property names inside raw objects match the schema
 exactly. Public requirements records retain ordinary JSON behavior. These checks
 validate reported metadata; they do not enforce managed policy locally.
 
+Typed app label/icon maps, configuration feature requirements, configured browser
+origin policies and feature-enablement results reject null map entries before
+successful response or typed notification publication. Earlier null entries remain
+invalid after duplicate entries, maps or nullable resets. Nullable whole maps stay
+supported where declared; feature-enablement results require a non-null map.
+Empty maps, empty strings, explicit false and empty origin-policy objects retain
+their native merge/selection behavior. Dynamic keys remain opaque. Public nested
+configuration records stay method-free; direct `Config` decoding retains its
+established partial-update behavior on errors, while service calls return zero
+results on failure.
+
 Nullable enum metadata is checked before publication: login-completion
 `onboardingEntrypoint` and MCP startup `failureReason` at their notification
 owners, and `cliAuthCredentialsStore`, `allowedLoginMethods` and

@@ -50,9 +50,14 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 	}, "sandbox_workspace_write"); err != nil {
 		return err
 	}
-	return validateOptionalFields(data, func(_ string, raw []byte) error {
+	if err := validateOptionalFields(data, func(_ string, raw []byte) error {
 		return validateOptionalBooleans(raw, "exclude_slash_tmp", "exclude_tmpdir_env_var", "network_access")
-	}, "sandbox_workspace_write")
+	}, "sandbox_workspace_write"); err != nil {
+		return err
+	}
+	return validateOptionalFields(data, func(_ string, raw []byte) error {
+		return validateMapEntries(raw, true, "origins")
+	}, "browser_use")
 }
 
 type configWithoutMethods Config
