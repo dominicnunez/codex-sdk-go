@@ -319,6 +319,13 @@ matching and runs after its existing native, metadata and path checks.
 `SandboxWorkspaceWrite` remains a plain representation; `Config` owns its
 admission checks and retains its documented partial updates on decoding errors.
 
+`SandboxPolicyReadOnly.NetworkAccess` carries the schema's optional, non-null
+boolean. Nil preserves omission and the server's false default; a nonnil pointer
+preserves explicit true or false through thread responses, settings callbacks
+and outgoing turn/command policies. The legacy `Access` member stays optional.
+The record keeps ordinary Go JSON behavior; `SandboxPolicyWrapper` owns strict
+admission, including rejection of null and wrong-type recognized occurrences.
+
 ## Permission profiles
 
 Permission profile listings require both `id` and a non-null `allowed` boolean

@@ -20,7 +20,8 @@ func (SandboxPolicyDangerFullAccess) isSandboxPolicy() {}
 
 // SandboxPolicyReadOnly allows read-only access
 type SandboxPolicyReadOnly struct {
-	Access *ReadOnlyAccessWrapper `json:"access,omitempty"`
+	Access        *ReadOnlyAccessWrapper `json:"access,omitempty"`
+	NetworkAccess *bool                  `json:"networkAccess,omitempty"` // Defaults to false when omitted.
 }
 
 func (SandboxPolicyReadOnly) isSandboxPolicy() {}
@@ -204,10 +205,16 @@ func (s *SandboxPolicyWrapper) UnmarshalJSON(data []byte) error {
 		if err := jsondecode.Unmarshal(data, &policy); err != nil {
 			return err
 		}
-		s.Value, err = validateInboundSandboxPolicyField("sandboxPolicy", policy)
+		var validated SandboxPolicy
+		validated, err = validateInboundSandboxPolicyField("sandboxPolicy", policy)
 		if err != nil {
+			s.Value = validated
 			return err
 		}
+		if err := validateOptionalBooleans(data, "networkAccess"); err != nil {
+			return err
+		}
+		s.Value = validated
 	case "externalSandbox":
 		var policy SandboxPolicyExternalSandbox
 		if err := validateRequiredTaggedObjectFields(data); err != nil {

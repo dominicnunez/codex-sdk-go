@@ -595,7 +595,10 @@ establish local authorization or whether a connector is safe to invoke.
 
 The native admission owners also reject null defaulted flags in model
 `supportsPersonality`, workspace-write configuration, granular approval
-`request_permissions`/`skill_approval`, and `workspaceWrite` sandbox policy.
+`request_permissions`/`skill_approval`, and `workspaceWrite` and `readOnly`
+sandbox policies. Read-only network access retains explicit true/false values
+through response, notification and request carriers; omission retains the
+schema's false default. Its supported legacy access metadata stays optional.
 Checks follow native field matching and preserve earlier required, native,
 metadata and path errors. Invalid policy metadata cannot enter successful
 thread-start responses, typed settings callbacks or the thread cache. Plain
