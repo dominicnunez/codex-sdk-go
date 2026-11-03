@@ -318,10 +318,10 @@ func (s *ModelService) List(ctx context.Context, params ModelListParams) (ModelL
 // OnModelRerouted registers a listener for model reroute notifications.
 func (c *Client) OnModelRerouted(handler func(ModelReroutedNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyModelRerouted, nil)
+		c.onNotification(notifyModelRerouted, nil)
 		return
 	}
-	c.OnNotification(notifyModelRerouted, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyModelRerouted, func(ctx context.Context, notif Notification) {
 		var n ModelReroutedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyModelRerouted, fmt.Errorf("unmarshal %s: %w", notifyModelRerouted, err))
@@ -334,10 +334,10 @@ func (c *Client) OnModelRerouted(handler func(ModelReroutedNotification)) {
 // OnModelVerification registers a listener for model/verification notifications.
 func (c *Client) OnModelVerification(handler func(ModelVerificationNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyModelVerification, nil)
+		c.onNotification(notifyModelVerification, nil)
 		return
 	}
-	c.OnNotification(notifyModelVerification, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyModelVerification, func(ctx context.Context, notif Notification) {
 		var n ModelVerificationNotification
 		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyModelVerification, fmt.Errorf("unmarshal %s: %w", notifyModelVerification, err))

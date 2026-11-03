@@ -70,6 +70,12 @@ discards empty registries while preserving independent dispatch snapshots and
 lifecycle unsubscription. Verify shutdown releases queued payloads as well as
 preventing further callback admission.
 
+Raw client notification callbacks receive an owned copy of `Params` on each
+invocation, so retaining or modifying it cannot change another callback's input
+or SDK decoding. Private protocol listeners decode the original bytes without
+an extra copy; their payload input remains read-only. Runtime listeners registered
+through the public raw APIs receive the same owned copies as application listeners.
+
 ## Cache observation
 
 [Thread-state caching](../appserver/protocol/thread_state_cache.go) bridges

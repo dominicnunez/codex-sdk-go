@@ -210,10 +210,10 @@ func (s *ExternalAgentService) ConfigImport(ctx context.Context, params External
 // OnExternalAgentConfigImportCompleted registers a listener for config import completion notifications.
 func (c *Client) OnExternalAgentConfigImportCompleted(handler func(ExternalAgentConfigImportCompletedNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyExternalAgentConfigImportCompleted, nil)
+		c.onNotification(notifyExternalAgentConfigImportCompleted, nil)
 		return
 	}
-	c.OnNotification(notifyExternalAgentConfigImportCompleted, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyExternalAgentConfigImportCompleted, func(ctx context.Context, notif Notification) {
 		var params ExternalAgentConfigImportCompletedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyExternalAgentConfigImportCompleted, fmt.Errorf("unmarshal %s: %w", notifyExternalAgentConfigImportCompleted, err))

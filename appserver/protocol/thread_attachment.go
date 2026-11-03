@@ -243,10 +243,10 @@ func (s *ThreadService) AttachmentOwnerList(ctx context.Context, params ThreadAt
 
 func (c *Client) OnThreadAttachmentUpdated(handler func(ThreadAttachmentUpdatedNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyThreadAttachmentUpdated, nil)
+		c.onNotification(notifyThreadAttachmentUpdated, nil)
 		return
 	}
-	c.OnNotification(notifyThreadAttachmentUpdated, func(_ context.Context, notif Notification) {
+	c.onNotification(notifyThreadAttachmentUpdated, func(_ context.Context, notif Notification) {
 		var value ThreadAttachmentUpdatedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &value); err != nil {
 			c.reportHandlerError(notifyThreadAttachmentUpdated, fmt.Errorf("unmarshal %s: %w", notifyThreadAttachmentUpdated, err))

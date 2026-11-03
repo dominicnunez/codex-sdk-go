@@ -695,10 +695,10 @@ func (s *ConfigService) BatchWrite(ctx context.Context, params ConfigBatchWriteP
 // OnConfigWarning registers a listener for config warning notifications
 func (c *Client) OnConfigWarning(handler func(ConfigWarningNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyConfigWarning, nil)
+		c.onNotification(notifyConfigWarning, nil)
 		return
 	}
-	c.OnNotification(notifyConfigWarning, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyConfigWarning, func(ctx context.Context, notif Notification) {
 		var n ConfigWarningNotification
 		if err := jsondecode.Unmarshal(notif.Params, &n); err != nil {
 			c.reportHandlerError(notifyConfigWarning, fmt.Errorf("unmarshal %s: %w", notifyConfigWarning, err))

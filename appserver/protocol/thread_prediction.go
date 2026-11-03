@@ -74,10 +74,10 @@ func (n *ThreadPredictionUpdatedNotification) UnmarshalJSON(data []byte) error {
 }
 func (c *Client) OnThreadPredictionUpdated(handler func(ThreadPredictionUpdatedNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyThreadPredictionUpdated, nil)
+		c.onNotification(notifyThreadPredictionUpdated, nil)
 		return
 	}
-	c.OnNotification(notifyThreadPredictionUpdated, func(_ context.Context, notif Notification) {
+	c.onNotification(notifyThreadPredictionUpdated, func(_ context.Context, notif Notification) {
 		var v ThreadPredictionUpdatedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &v); err != nil {
 			c.reportHandlerError(notifyThreadPredictionUpdated, fmt.Errorf("unmarshal %s: %w", notifyThreadPredictionUpdated, err))

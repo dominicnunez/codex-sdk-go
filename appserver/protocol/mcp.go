@@ -475,10 +475,10 @@ func (s *McpService) ToolCall(ctx context.Context, params McpServerToolCallParam
 // OnMcpServerOauthLoginCompleted registers a listener for OAuth login completion notifications.
 func (c *Client) OnMcpServerOauthLoginCompleted(handler func(McpServerOauthLoginCompletedNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyMcpServerOauthLoginCompleted, nil)
+		c.onNotification(notifyMcpServerOauthLoginCompleted, nil)
 		return
 	}
-	c.OnNotification(notifyMcpServerOauthLoginCompleted, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyMcpServerOauthLoginCompleted, func(ctx context.Context, notif Notification) {
 		var params McpServerOauthLoginCompletedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyMcpServerOauthLoginCompleted, fmt.Errorf("unmarshal %s: %w", notifyMcpServerOauthLoginCompleted, err))
@@ -491,10 +491,10 @@ func (c *Client) OnMcpServerOauthLoginCompleted(handler func(McpServerOauthLogin
 // OnMcpServerStatusUpdated registers a listener for MCP server startup status updates.
 func (c *Client) OnMcpServerStatusUpdated(handler func(McpServerStatusUpdatedNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyMcpServerStatusUpdated, nil)
+		c.onNotification(notifyMcpServerStatusUpdated, nil)
 		return
 	}
-	c.OnNotification(notifyMcpServerStatusUpdated, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyMcpServerStatusUpdated, func(ctx context.Context, notif Notification) {
 		var params McpServerStatusUpdatedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyMcpServerStatusUpdated, fmt.Errorf("unmarshal %s: %w", notifyMcpServerStatusUpdated, err))
@@ -507,10 +507,10 @@ func (c *Client) OnMcpServerStatusUpdated(handler func(McpServerStatusUpdatedNot
 // OnMcpToolCallProgress registers a listener for MCP tool call progress notifications.
 func (c *Client) OnMcpToolCallProgress(handler func(McpToolCallProgressNotification)) {
 	if handler == nil {
-		c.OnNotification(notifyMcpToolCallProgress, nil)
+		c.onNotification(notifyMcpToolCallProgress, nil)
 		return
 	}
-	c.OnNotification(notifyMcpToolCallProgress, func(ctx context.Context, notif Notification) {
+	c.onNotification(notifyMcpToolCallProgress, func(ctx context.Context, notif Notification) {
 		var params McpToolCallProgressNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifyMcpToolCallProgress, fmt.Errorf("unmarshal %s: %w", notifyMcpToolCallProgress, err))

@@ -378,7 +378,13 @@ func (c *Client) Send(ctx context.Context, req Request) (Response, error) {
 // When a notification with this method arrives from the server, the handler will be called.
 // Only one handler can be registered per method; subsequent calls replace the previous handler.
 // Passing nil removes the handler for the given method.
+// Each invocation owns its Params bytes, which the handler may retain or modify.
 func (c *Client) OnNotification(method string, handler NotificationHandler) {
+	c.onNotification(method, ownedNotificationHandler(handler))
+}
+
+// SDK typed handlers decode borrowed input before calling application code.
+func (c *Client) onNotification(method string, handler NotificationHandler) {
 	c.listenersMu.Lock()
 	defer c.listenersMu.Unlock()
 	if handler == nil {
@@ -494,8 +500,21 @@ func (c *Client) addNotificationListener(method string, handler NotificationHand
 
 // AddNotificationListener appends a notification listener for method and returns
 // an unsubscribe function for that specific listener.
+// Each invocation owns its Params bytes, which the handler may retain or modify.
 func (c *Client) AddNotificationListener(method string, handler NotificationHandler) func() {
-	return c.addNotificationListener(method, handler)
+	return c.addNotificationListener(method, ownedNotificationHandler(handler))
+}
+
+// Public raw callbacks own their mutable input. SDK-only listeners registered
+// through the private APIs decode the original payload without copying it.
+func ownedNotificationHandler(handler NotificationHandler) NotificationHandler {
+	if handler == nil {
+		return nil
+	}
+	return func(ctx context.Context, notification Notification) {
+		notification.Params = bytes.Clone(notification.Params)
+		handler(ctx, notification)
+	}
 }
 
 func addTypedNotificationListener[T any](c *Client, method string, handler func(T)) func() {
