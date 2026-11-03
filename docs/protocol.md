@@ -568,6 +568,15 @@ remain supported; a later value or null cannot erase an earlier invalid enum.
 This covers account reads, rate-limit snapshots and buckets, and account update
 notifications. Unknown account branches retain their raw metadata.
 
+Rate-limit reads keep reset-credit metadata as complete raw JSON while
+validating its known summary and detail fields before success. Null summaries
+and null/empty detail lists remain distinct; detail rows may be fewer than the
+reported count. Counts and timestamps use the schema's signed 64-bit range,
+empty IDs and display strings are supported, and declared `unknown` enum
+sentinels remain valid. Open extras and original raw values are preserved.
+Recognized malformed occurrences cannot be hidden by later duplicates. These
+reads do not consume a credit or establish permission to do so.
+
 ChatGPT account `email` is required and nullable. `ChatgptAccount.Email` uses a
 `*string`: nil encodes as an explicit null, and a nonnil pointer preserves an
 empty or populated string. Account reads reject a missing email key.
