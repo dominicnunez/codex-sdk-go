@@ -105,6 +105,7 @@ func (t *Thread) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
+	previous := *t
 	t.ID = *wire.ID
 	t.Originator = wire.Originator
 	t.ForkedFromID = wire.ForkedFromID
@@ -141,6 +142,10 @@ func (t *Thread) UnmarshalJSON(data []byte) error {
 	t.Name = wire.Name
 	t.Path = wire.Path
 	t.DisabledPluginIDs = nil
+	if err := validateObjectFields(data, nil, []string{"cliVersion", "createdAt", "cwd", "ephemeral", "id", "modelProvider", "preview", "source", "status", "turns", "updatedAt"}); err != nil {
+		*t = previous
+		return err
+	}
 
 	return nil
 }

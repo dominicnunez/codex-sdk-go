@@ -88,6 +88,9 @@ func (s *SubAgentSourceThreadSpawn) UnmarshalJSON(data []byte) error {
 	if err := validateClosedObjectFields(data, "thread_spawn"); err != nil {
 		return err
 	}
+	if err := validateNestedNonNullFields(data, "thread_spawn", "depth", "parent_thread_id"); err != nil {
+		return err
+	}
 	*s = SubAgentSourceThreadSpawn(decoded)
 	return nil
 }
@@ -192,6 +195,11 @@ func (s *SessionSourceWrapper) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("unmarshal session source subAgent: %w", err)
 	}
 	if err := validateClosedObjectFields(data, "subAgent"); err != nil {
+		return fmt.Errorf("unmarshal session source subAgent: %w", err)
+	}
+	if err := validateFields(data, func(_ string, raw []byte) error {
+		return validateNestedNonNullFields(raw, "thread_spawn", "depth", "parent_thread_id")
+	}, false, "subAgent"); err != nil {
 		return fmt.Errorf("unmarshal session source subAgent: %w", err)
 	}
 	s.Value = SessionSourceSubAgent{SubAgent: subAgent}

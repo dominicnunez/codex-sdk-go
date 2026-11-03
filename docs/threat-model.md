@@ -76,6 +76,16 @@ application stderr writers still require application cooperation.
 
 ## JSON-RPC framing, dispatch, and resource exhaustion
 
+Required non-null fields in thread, plugin, sharing and initialization responses
+cannot hide a canonical null behind a later valid duplicate. Nested granular and
+thread-spawn checks inspect repeated objects without requiring each earlier
+partial object to contain the final required set. Existing decoding and semantic
+checks keep their precedence; new rejection paths preserve prior receiver
+references and prevent response, cache and typed callback publication. The private
+initialization carrier checks the response before latching a session and releases
+its borrowed input after validation. These checks validate message shape, not the
+truth of metadata supplied by the peer.
+
 Known source and approval object alternatives reject schema-forbidden outer
 properties and competing discriminators before response, cache or typed callback
 publication. Validation follows their established required/native checks and

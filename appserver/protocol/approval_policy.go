@@ -71,6 +71,9 @@ func (a *ApprovalPolicyGranular) UnmarshalJSON(data []byte) error {
 	if err := validateClosedObjectFields(data, "granular"); err != nil {
 		return err
 	}
+	if err := validateNestedNonNullFields(data, "granular", "mcp_elicitations", "rules", "sandbox_approval"); err != nil {
+		return err
+	}
 	*a = ApprovalPolicyGranular(decoded)
 	return nil
 }

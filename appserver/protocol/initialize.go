@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"slices"
 
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 	"github.com/dominicnunez/codex-sdk-go/internal/jsonvalue"
 )
 
@@ -53,6 +54,29 @@ type InitializeResponse struct {
 	PlatformFamily string `json:"platformFamily"`
 	PlatformOS     string `json:"platformOs"`
 	UserAgent      string `json:"userAgent"`
+}
+
+// The handshake carrier owns raw occurrence checks. Keep InitializeResponse
+// method-free for ordinary decoding and embedding in application records.
+type initializeResult struct {
+	value InitializeResponse
+	raw   []byte
+}
+
+func (r *initializeResult) UnmarshalJSON(data []byte) error {
+	if err := jsondecode.Unmarshal(data, &r.value); err != nil {
+		return err
+	}
+	r.raw = data
+	return nil
+}
+
+func (r *initializeResult) validate() error {
+	defer func() { r.raw = nil }()
+	if err := r.value.validate(); err != nil {
+		return err
+	}
+	return validateObjectFields(r.raw, nil, []string{"codexHome", "platformFamily", "platformOs", "userAgent"})
 }
 
 // InitializeParamsMismatchError reports that a later initialize call attempted
@@ -238,14 +262,14 @@ func (c *Client) Initialize(ctx context.Context, params InitializeParams) (Initi
 		c.initializeWait = wait
 		c.initializeMu.Unlock()
 
-		var result InitializeResponse
+		var result initializeResult
 		err := c.sendRequest(ctx, methodInitialize, requested, &result)
 
 		c.initializeMu.Lock()
 		if err == nil {
 			c.initializeDone = true
 			c.initializeParams = requested
-			c.initializeResp = result
+			c.initializeResp = result.value
 		}
 		c.initializeWait = nil
 		close(wait)
@@ -254,6 +278,6 @@ func (c *Client) Initialize(ctx context.Context, params InitializeParams) (Initi
 		if err != nil {
 			return InitializeResponse{}, err
 		}
-		return result, nil
+		return result.value, nil
 	}
 }
