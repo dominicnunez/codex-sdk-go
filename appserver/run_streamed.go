@@ -310,13 +310,13 @@ func newErrorStream(err error) *Stream {
 
 func streamIterator(g *guardedChan) iter.Seq2[Event, error] {
 	return func(yield func(Event, error) bool) {
+		defer g.detachConsumer()
 		for {
 			eoe, ok := g.recv()
 			if !ok {
 				break
 			}
 			if !yield(eoe.event, eoe.err) {
-				g.detachConsumer()
 				return
 			}
 		}
