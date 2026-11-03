@@ -366,15 +366,6 @@ func streamListenDecoded[N any](on func(string, NotificationHandler), method str
 	})
 }
 
-// streamListen registers a notification listener that unmarshals the
-// notification params into N, filters by thread, converts it to an Event,
-// and sends it on g.
-func streamListen[N any](on func(string, NotificationHandler), method string, g *guardedChan, threadID string, reportErr func(string, error), onEvent func(Event), threadIDOf func(N) string, convert func(N) Event) {
-	streamListenDecoded(on, method, threadID, reportErr, threadIDOf, convert, func(_ N, ev Event) {
-		emitStreamEvent(g, onEvent, ev)
-	})
-}
-
 func (p *Process) runStreamedLifecycle(ctx context.Context, opts RunOptions, g *guardedChan, s *Stream, collector *StreamCollector) {
 	defer g.closeOnce()
 	defer close(s.done)
