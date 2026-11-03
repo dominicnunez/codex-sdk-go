@@ -535,6 +535,13 @@ behavior. Initialize validates required response occurrences before caching a
 successful handshake, so a rejected response can be retried. Its public response
 record remains method-free; handshake admission owns these checks.
 
+`Marketplace.Upgrade` validates required `marketplaceName` and `message` fields
+on each visible error record before returning success. Empty strings and open
+extras remain valid; null records or required members reject the response even
+when later duplicates supply values. Presence follows native duplicate-array
+reuse and empty-array resets. The plain `MarketplaceUpgradeErrorInfo` record
+keeps ordinary JSON behavior outside its response carrier.
+
 `Plugin.ShareUpdateTargets` supports `LISTED`, `UNLISTED` and `PRIVATE` through
 `PluginShareUpdateDiscoverability`, including `PluginShareUpdateDiscoverabilityListed`. Target
 identities, principal types and target roles are checked before dispatch. The

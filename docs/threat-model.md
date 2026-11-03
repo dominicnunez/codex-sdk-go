@@ -174,6 +174,14 @@ permit a valid retry. This lexical check neither accesses the filesystem nor
 resolves symlinks. These checks validate message shape, not the truth of metadata
 supplied by the peer.
 
+Marketplace upgrade admission requires both declared strings on each visible
+error record and rejects null elements or required-member occurrences, including
+ones hidden by later duplicates. Presence follows native array storage reuse;
+empty strings and open extras remain valid. Existing path and string-array
+failures keep priority, failed admission preserves the prior response, and the
+public method returns no successful typed result. These are peer-reported
+operation results; validation does not establish whether remote files changed.
+
 Plugin-share target updates accept the declared `LISTED`, `UNLISTED` and
 `PRIVATE` visibility values. Remote plugin and principal IDs, principal types
 and target roles remain validated before dispatch; unknown visibility values
