@@ -50,6 +50,12 @@ not choose the terminal error: a completion already selected by the lifecycle
 retains its result or error. The cancellation registration is removed when that
 lifecycle finishes.
 
+Stream iteration releases consumer ownership on every exit, including an
+application panic or goroutine exit inside the iterator callback. Detachment
+discards queued events and wakes blocked producers so collection and lifecycle
+completion can continue. Application panics propagate unchanged; detachment does
+not cancel the turn or permit a second `Events()` consumer.
+
 Process shutdown has another boundary: parent exit and descendant completion are
 different events. [Process management](../appserver/process.go) and
 [process-tree support](../internal/process/process.go) coordinate managed Close,
