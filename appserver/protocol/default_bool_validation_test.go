@@ -20,6 +20,7 @@ var nativeDefaultBools = []defaultBoolCase{
 	{"config", "exclude_slash_tmp"}, {"config", "exclude_tmpdir_env_var"}, {"config", "network_access"},
 	{"approval", "request_permissions"}, {"approval", "skill_approval"},
 	{"sandbox", "excludeSlashTmp"}, {"sandbox", "excludeTmpdirEnvVar"}, {"sandbox", "networkAccess"},
+	{"readOnly", "networkAccess"},
 }
 
 func defaultBoolBody(owner, members string) string {
@@ -34,6 +35,8 @@ func defaultBoolBody(owner, members string) string {
 		return `{"granular":{"mcp_elicitations":false,"rules":false,"sandbox_approval":false` + members + `}}`
 	case "sandbox":
 		return `{"type":"workspaceWrite"` + members + `}`
+	case "readOnly":
+		return `{"type":"readOnly"` + members + `}`
 	default:
 		panic(owner)
 	}
@@ -48,7 +51,7 @@ func defaultBoolTarget(owner string) any {
 		return &p.Config{}
 	case "approval":
 		return &p.ApprovalPolicyGranular{}
-	case "sandbox":
+	case "sandbox", "readOnly":
 		return &p.SandboxPolicyWrapper{}
 	default:
 		panic(owner)
@@ -119,7 +122,7 @@ func defaultBoolValue(owner, field string, target any) (bool, bool) {
 		value = value.Elem()
 	case "approval":
 		value = value.FieldByName("Granular")
-	case "sandbox":
+	case "sandbox", "readOnly":
 		value = reflect.ValueOf(target.(*p.SandboxPolicyWrapper).Value)
 		if value.Kind() == reflect.Pointer {
 			value = value.Elem()
@@ -154,7 +157,7 @@ func defaultBoolPublicValue(owner, field string, response any) (bool, bool) {
 	case "approval":
 		value := response.(p.ThreadStartResponse).ApprovalPolicy.Value
 		return defaultBoolValue(owner, field, value)
-	case "sandbox":
+	case "sandbox", "readOnly":
 		value := response.(p.ThreadStartResponse).Sandbox
 		return defaultBoolValue(owner, field, &value)
 	default:
@@ -251,6 +254,7 @@ func TestNativeDefaultBooleansUnicodeAndOuterAliases(t *testing.T) {
 		{"config", `{"sandbox_workspace_write":{"NETWORK_ACCESS":null},"SANDBOX_WORKSPACE_WRITE":{"network_access":true}}`},
 		{"approval", `{"granular":{"mcp_elicitations":false,"rules":false,"sandbox_approval":false},"GRANULAR":{"reque\u017ft_permissions":null}}`},
 		{"sandbox", defaultBoolBody("sandbox", `,"networ\u212aAccess":null`)},
+		{"readOnly", defaultBoolBody("readOnly", `,"networ\u212aAccess":null`)},
 	} {
 		if err := json.Unmarshal([]byte(tc.raw), defaultBoolTarget(tc.owner)); !errors.Is(err, p.ErrNullResultField) {
 			t.Fatalf("recognized alias null accepted: owner=%s err=%v", tc.owner, err)
@@ -267,7 +271,7 @@ func TestNativeDefaultBooleansUnicodeAndOuterAliases(t *testing.T) {
 }
 
 func TestNativeDefaultBooleanNotifications(t *testing.T) {
-	for _, owner := range []string{"approval", "sandbox"} {
+	for _, owner := range []string{"approval", "sandbox", "readOnly"} {
 		mock := NewMockTransport()
 		on, add := 0, 0
 		reported := 0
@@ -318,7 +322,7 @@ func TestNativeDefaultBooleanNotifications(t *testing.T) {
 }
 
 func TestNativeDefaultBooleanNoCachePublication(t *testing.T) {
-	for _, owner := range []string{"approval", "sandbox"} {
+	for _, owner := range []string{"approval", "sandbox", "readOnly"} {
 		field := "networkAccess"
 		if owner == "approval" {
 			field = "request_permissions"
@@ -429,6 +433,8 @@ func TestNativeDefaultBooleanPriorErrorsAndReceivers(t *testing.T) {
 		{"approval", defaultBoolBody("approval", `,"REQUEST_PERMISSIONS":null,"rules":1`), "cannot unmarshal number", true},
 		{"sandbox", defaultBoolBody("sandbox", `,"networkAccess":null,"writableRoots":["relative"]`), "writableRoots", false},
 		{"sandbox", defaultBoolBody("sandbox", `,"networkAccess":null,"excludeSlashTmp":1`), "cannot unmarshal number", true},
+		{"readOnly", defaultBoolBody("readOnly", `,"networkAccess":null,"access":{"type":"restricted","readableRoots":["relative"]}`), "readableRoots", false},
+		{"readOnly", defaultBoolBody("readOnly", `,"networkAccess":null,"access":1`), "non-object", false},
 	} {
 		err := json.Unmarshal([]byte(tc.raw), defaultBoolTarget(tc.owner))
 		if err == nil || !strings.Contains(err.Error(), tc.want) {
