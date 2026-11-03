@@ -318,7 +318,7 @@ func (t *TextUserInput) MarshalJSON() ([]byte, error) {
 
 // ImageUserInput represents image input
 type ImageUserInput struct {
-	URL    string       `json:"url,omitempty"`
+	URL    *string      `json:"url,omitempty"`
 	FileID *string      `json:"fileId,omitempty"`
 	Detail *ImageDetail `json:"detail,omitempty"`
 }
@@ -326,7 +326,7 @@ type ImageUserInput struct {
 func (i *ImageUserInput) userInput() {}
 
 func (i *ImageUserInput) MarshalJSON() ([]byte, error) {
-	if i.URL == "" && i.FileID == nil {
+	if i.URL == nil && i.FileID == nil {
 		return nil, errors.New("image input requires url or fileId")
 	}
 	type Alias ImageUserInput
@@ -341,14 +341,44 @@ func (i *ImageUserInput) MarshalJSON() ([]byte, error) {
 
 func (i *ImageUserInput) UnmarshalJSON(data []byte) error {
 	type wire ImageUserInput
-	var decoded wire
-	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
-		return err
+	// Ordinary records need only one native pass. Retry independent views
+	// only when an inactive alternative may own the native failure.
+	var original wire
+	originalErr := jsondecode.Unmarshal(data, &original)
+	if originalErr == nil {
+		if original.URL == nil && original.FileID == nil {
+			return errors.New("image input requires url or fileId")
+		}
+		*i = ImageUserInput(original)
+		return nil
 	}
-	if decoded.URL == "" && decoded.FileID == nil {
-		return errors.New("image input requires url or fileId")
+	// Each anyOf alternative constrains only its own string property.
+	var decoded ImageUserInput
+	common := struct {
+		*wire
+		URL    discardedImageAlternative `json:"url"`
+		FileID discardedImageAlternative `json:"fileId"`
+	}{wire: (*wire)(&decoded)}
+	commonErr := jsondecode.Unmarshal(data, &common)
+	var url struct {
+		URL *string `json:"url"`
 	}
-	*i = ImageUserInput(decoded)
+	if err := jsondecode.Unmarshal(data, &url); err == nil {
+		decoded.URL = url.URL
+	}
+	var file struct {
+		FileID *string `json:"fileId"`
+	}
+	if err := jsondecode.Unmarshal(data, &file); err == nil {
+		decoded.FileID = file.FileID
+	}
+	if decoded.URL == nil && decoded.FileID == nil {
+		return originalErr
+	}
+	if commonErr != nil {
+		return commonErr
+	}
+	*i = decoded
 	return nil
 }
 

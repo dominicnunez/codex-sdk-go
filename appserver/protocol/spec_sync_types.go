@@ -325,26 +325,56 @@ func (v *ImageDetail) UnmarshalJSON(data []byte) error {
 // InputImageFunctionCallOutputContentItem follows the upstream InputImageFunctionCallOutputContentItem schema.
 type InputImageFunctionCallOutputContentItem struct {
 	Detail   *ImageDetail `json:"detail,omitempty"`
-	ImageURL string       `json:"image_url,omitempty"`
+	ImageURL *string      `json:"image_url,omitempty"`
 	FileID   *string      `json:"file_id,omitempty"`
 }
 
 func (v *InputImageFunctionCallOutputContentItem) UnmarshalJSON(data []byte) error {
 	type wire InputImageFunctionCallOutputContentItem
-	var decoded wire
-	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
-		return err
+	// Ordinary records need only one native pass. Retry independent views
+	// only when an inactive alternative may own the native failure.
+	var original wire
+	originalErr := jsondecode.Unmarshal(data, &original)
+	if originalErr == nil {
+		if original.ImageURL == nil && original.FileID == nil {
+			return fmt.Errorf("input image requires image_url or file_id")
+		}
+		*v = InputImageFunctionCallOutputContentItem(original)
+		return nil
 	}
-	if decoded.ImageURL == "" && decoded.FileID == nil {
-		return fmt.Errorf("input image requires image_url or file_id")
+	// Each anyOf alternative constrains only its own string property.
+	var decoded InputImageFunctionCallOutputContentItem
+	common := struct {
+		*wire
+		ImageURL discardedImageAlternative `json:"image_url"`
+		FileID   discardedImageAlternative `json:"file_id"`
+	}{wire: (*wire)(&decoded)}
+	commonErr := jsondecode.Unmarshal(data, &common)
+	var url struct {
+		ImageURL *string `json:"image_url"`
 	}
-	*v = InputImageFunctionCallOutputContentItem(decoded)
+	if err := jsondecode.Unmarshal(data, &url); err == nil {
+		decoded.ImageURL = url.ImageURL
+	}
+	var file struct {
+		FileID *string `json:"file_id"`
+	}
+	if err := jsondecode.Unmarshal(data, &file); err == nil {
+		decoded.FileID = file.FileID
+	}
+	if decoded.ImageURL == nil && decoded.FileID == nil {
+		return originalErr
+	}
+	if commonErr != nil {
+		return commonErr
+	}
+	*v = decoded
 	return nil
 }
 
 func (*InputImageFunctionCallOutputContentItem) isFunctionCallOutputContentItem() {}
 func (v *InputImageFunctionCallOutputContentItem) MarshalJSON() ([]byte, error) {
-	if v.ImageURL == "" && v.FileID == nil {
+	if v.ImageURL == nil && v.FileID == nil {
 		return nil, fmt.Errorf("input image requires image_url or file_id")
 	}
 	type wire InputImageFunctionCallOutputContentItem

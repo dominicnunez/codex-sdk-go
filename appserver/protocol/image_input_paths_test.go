@@ -13,7 +13,7 @@ func TestFileImageDecodePaths(t *testing.T) {
 	check := func(t *testing.T, input codex.UserInput) {
 		t.Helper()
 		got, ok := input.(*codex.ImageUserInput)
-		if !ok || got.FileID == nil || *got.FileID != "file-1" || got.URL != "" {
+		if !ok || got.FileID == nil || *got.FileID != "file-1" || got.URL != nil {
 			t.Fatalf("decoded image = %#v", input)
 		}
 		encoded, err := json.Marshal(input)
@@ -82,7 +82,7 @@ func TestFileImageDecodePaths(t *testing.T) {
 			t.Fatalf("accepted invalid image %s", payload)
 		}
 	}
-	if input, err := codex.UnmarshalUserInput([]byte(`{"type":"image","url":"https://example.com/image.png"}`)); err != nil || input.(*codex.ImageUserInput).URL == "" {
+	if input, err := codex.UnmarshalUserInput([]byte(`{"type":"image","url":"https://example.com/image.png"}`)); err != nil || input.(*codex.ImageUserInput).URL == nil {
 		t.Fatalf("URL image compatibility: input %#v, err %v", input, err)
 	}
 	var output codex.FunctionCallOutputContentItemWrapper

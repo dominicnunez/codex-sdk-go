@@ -774,6 +774,15 @@ AbsolutePathBuf fields retain their separate typed validation. An application
 must distinguish the schema contracts when deriving display paths or applying
 policy; preserved strings do not authenticate a target or grant filesystem access.
 
+Image input and function-call image output codecs evaluate their URL/file-ID
+alternatives independently, matching the open schema alternatives. Invalid
+inactive properties are discarded; a valid shared image detail is still required
+when supplied. Missing or invalid alternatives reject the record without
+publishing a partial receiver. Empty strings retain explicit presence, and the
+shared copy boundary owns URL pointers in snapshots. Admission establishes wire
+shape only: URLs and file IDs remain opaque peer data, and the SDK does not fetch
+or verify their contents.
+
 The SDK does not fetch or render MCP app UI metadata, execute attachment payloads, or provide an HTML sanitizer. An application that renders model text, links, images, or tool metadata must use appropriate escaping and destination checks. Exposing SDK service methods through HTTP or another remote interface requires a separate authorization boundary.
 
 Typed MCP results preserve arbitrary `_meta` JSON, including explicit null and

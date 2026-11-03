@@ -138,8 +138,8 @@ func TestTurnSteerParamsUnmarshalJSON(t *testing.T) {
 				if !ok {
 					t.Fatalf("Input[0] type = %T, want *ImageUserInput", p.Input[0])
 				}
-				if img.URL != "https://example.com/img.png" {
-					t.Errorf("Input[0].URL = %q, want https://example.com/img.png", img.URL)
+				if img.URL == nil || *img.URL != "https://example.com/img.png" {
+					t.Errorf("Input[0].URL = %v, want https://example.com/img.png", img.URL)
 				}
 			},
 		},
@@ -244,7 +244,7 @@ func TestTurnSteerParamsUnmarshalJSON(t *testing.T) {
 			ExpectedTurnID: "rt-turn",
 			Input: []codex.UserInput{
 				&codex.TextUserInput{Text: "round trip"},
-				&codex.ImageUserInput{URL: "https://example.com/rt.png"},
+				&codex.ImageUserInput{URL: codex.Ptr("https://example.com/rt.png")},
 			},
 		}
 
@@ -280,8 +280,8 @@ func TestTurnSteerParamsUnmarshalJSON(t *testing.T) {
 		if !ok {
 			t.Fatalf("Input[1] type = %T, want *ImageUserInput", restored.Input[1])
 		}
-		if img.URL != "https://example.com/rt.png" {
-			t.Errorf("Input[1].URL = %q, want %q", img.URL, "https://example.com/rt.png")
+		if img.URL == nil || *img.URL != "https://example.com/rt.png" {
+			t.Errorf("Input[1].URL = %v, want %q", img.URL, "https://example.com/rt.png")
 		}
 	})
 }

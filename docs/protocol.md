@@ -231,6 +231,15 @@ accept built-in values or pointers, including a pointer to a literal enum value.
 Known nil pointers encode as null, matching a missing wrapper value. Unsupported
 application-defined variants remain errors in these closed wire unions.
 
+`ImageUserInput.URL` and `InputImageFunctionCallOutputContentItem.ImageURL`
+are optional string pointers. A nonnil pointer, including one to an empty string,
+selects an explicit URL; nil leaves that alternative absent. Both image codecs
+evaluate URL and file-ID alternatives independently. A malformed inactive
+property does not reject a valid alternative; shared image-detail restrictions
+still apply. If both alternatives are valid, both are retained. The SDK preserves
+opaque URL text without fetching it or checking whether it identifies a usable
+image. Empty file IDs remain representable as nonnil pointers.
+
 `UserInput` supports text, remote and local images, remote and local audio, skills, and mentions. For example:
 
 ```go
