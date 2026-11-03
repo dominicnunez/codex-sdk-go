@@ -414,6 +414,15 @@ existing Go records, while property names inside raw objects match the schema
 exactly. Public requirements records retain ordinary JSON behavior. These checks
 validate reported metadata; they do not enforce managed policy locally.
 
+Nullable enum metadata is checked before publication: login-completion
+`onboardingEntrypoint` and MCP startup `failureReason` at their notification
+owners, and `cliAuthCredentialsStore`, `allowedLoginMethods` and
+`allowedWindowsSandboxImplementations` at `Config.ReadRequirements`. Unsupported
+values cannot hide behind later valid duplicates or nulls. Requirements arrays
+may be absent, null or empty, but their elements must be declared non-null enum
+strings; an empty login-method list still means no method is permitted. Public
+string/raw representations and existing matching rules remain unchanged.
+
 Config metadata exposes typed `PackagedDefaultsConfigLayerSource` and
 `EnterpriseManagedConfigLayerSource` values. Packaged defaults require an absolute,
 normalized file path; enterprise IDs and names require non-null strings and may be

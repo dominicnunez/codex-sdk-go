@@ -86,6 +86,11 @@ func (n *AccountLoginCompletedNotification) UnmarshalJSON(data []byte) error {
 	if err := unmarshalInboundObject(data, &decoded, required, required); err != nil {
 		return err
 	}
+	if err := validateEnumOccurrences(data, "onboardingEntrypoint", false, func(value *string) error {
+		return validateOptionalEnumValue("onboardingEntrypoint", value, validOnboardingEntrypoints)
+	}); err != nil {
+		return err
+	}
 	*n = AccountLoginCompletedNotification(decoded)
 	return nil
 }
