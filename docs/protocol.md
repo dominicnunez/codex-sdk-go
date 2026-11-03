@@ -43,6 +43,11 @@ overwritten occurrences. The separate `Config.WebSearch` mode and the legacy
 `ToolsV2.ViewImage` flag retain their own meanings. The public tool and location
 records keep ordinary JSON behavior when decoded outside Config.
 
+Realtime startup notifications support versions `v1`, `v2` and `v3` through
+`OnThreadRealtimeStarted` and `AddThreadRealtimeStartedListener`. The optional
+session ID remains nullable. Missing/null required fields and undeclared
+versions reject delivery and report to the configured handler-error callback.
+
 ## Transport termination
 
 Custom transports can implement the optional `TransportLifecycle` capability.

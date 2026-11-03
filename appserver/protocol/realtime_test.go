@@ -134,7 +134,7 @@ func TestThreadRealtimeStartedMissingRequiredFieldReportsHandlerError(t *testing
 
 func TestThreadRealtimeStartedRejectsInvalidVersion(t *testing.T) {
 	var notif codex.ThreadRealtimeStartedNotification
-	err := json.Unmarshal([]byte(`{"threadId":"thread_test","version":"v3"}`), &notif)
+	err := json.Unmarshal([]byte(`{"threadId":"thread_test","version":"bogus"}`), &notif)
 	if err == nil || !strings.Contains(err.Error(), "invalid thread.realtime.version") {
 		t.Fatalf("json.Unmarshal error = %v; want invalid version failure", err)
 	}
@@ -160,7 +160,7 @@ func TestThreadRealtimeStartedInvalidVersionReportsHandlerError(t *testing.T) {
 	mock.InjectServerNotification(context.Background(), codex.Notification{
 		JSONRPC: "2.0",
 		Method:  "thread/realtime/started",
-		Params:  json.RawMessage(`{"threadId":"thread_test","version":"v3"}`),
+		Params:  json.RawMessage(`{"threadId":"thread_test","version":"bogus"}`),
 	})
 
 	if called {

@@ -14,11 +14,13 @@ type RealtimeConversationVersion string
 const (
 	RealtimeConversationVersionV1 RealtimeConversationVersion = "v1"
 	RealtimeConversationVersionV2 RealtimeConversationVersion = "v2"
+	RealtimeConversationVersionV3 RealtimeConversationVersion = "v3"
 )
 
 var validRealtimeConversationVersions = map[RealtimeConversationVersion]struct{}{
 	RealtimeConversationVersionV1: {},
 	RealtimeConversationVersionV2: {},
+	RealtimeConversationVersionV3: {},
 }
 
 func (v *RealtimeConversationVersion) UnmarshalJSON(data []byte) error {
