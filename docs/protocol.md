@@ -146,6 +146,13 @@ The service cannot recover that distinction, and these path schemas permit empty
 strings. Applications accepting raw JSON must validate its shape before that
 conversion; typed request preparation is not a raw JSON schema validator.
 
+Fuzzy-search result `indices` may be omitted, null, empty or populated with
+unsigned 32-bit integers, including zero. The shared result decoder rejects
+null elements before search responses or typed session-update listeners publish
+them, including earlier occurrences hidden by later duplicates or array resets.
+Existing folded and escaped field aliases remain supported. Paths and other
+plain strings retain their original text.
+
 ## Plugin availability
 
 `PluginSummary.Availability` is a `PluginAvailability` enum value. An omitted
