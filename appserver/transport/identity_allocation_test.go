@@ -111,11 +111,46 @@ func FuzzInboundRPCError(f *testing.F) {
 			var reference Error
 			err := json.Unmarshal(data, &reference)
 			got, ok := decodeInboundRPCError(data)
-			if ok != (err == nil) || (ok && !reflect.DeepEqual(got, reference)) {
+			wantOK := err == nil && referenceRequiredErrorFields(data)
+			if ok != wantOK || (ok && !reflect.DeepEqual(got, reference)) {
 				t.Fatalf("RPC error differs: got=%+v/%v want=%+v/%v data=%s", got, ok, reference, err, data)
 			}
 		}
 	})
+}
+
+// Independently read decoded member names with the standard streaming decoder.
+// Requiredness is separate from native scalar zero values and null-no-clear
+// behavior; the public Error representation keeps those ordinary JSON rules.
+func referenceRequiredErrorFields(data []byte) bool {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	root, err := decoder.Token()
+	if err != nil || root != json.Delim('{') {
+		return false
+	}
+	var code, message bool
+	for decoder.More() {
+		name, err := decoder.Token()
+		if err != nil {
+			return false
+		}
+		var value json.RawMessage
+		if decoder.Decode(&value) != nil {
+			return false
+		}
+		key, ok := name.(string)
+		if !ok {
+			return false
+		}
+		if strings.EqualFold(key, "code") || strings.EqualFold(key, "message") {
+			if bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
+				return false
+			}
+			code = code || strings.EqualFold(key, "code")
+			message = message || strings.EqualFold(key, "message")
+		}
+	}
+	return code && message
 }
 
 func referenceRecoverID(data []byte) (RequestID, bool, bool) {

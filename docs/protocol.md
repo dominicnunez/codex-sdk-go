@@ -393,6 +393,15 @@ validation does not resolve or normalize approval evidence.
 
 ## Compatibility
 
+Inbound stdio error records require non-null `code` and `message` members.
+Explicit code zero and an empty message remain valid. Missing members or a null
+recognized occurrence, including one hidden by a later duplicate, use the existing
+correlated parse-error path (`-32700`, `failed to parse server response`) with no
+peer error data. Field matching retains native aliases and escaped names; valid
+duplicates and unconstrained data keep their selected values. The enclosing
+frame's final error-field selection remains unchanged. The public `Error` record
+retains ordinary JSON behavior, including scalar null-no-clear semantics.
+
 Collaboration metadata requires non-null `mode`, `settings` and `settings.model`
 before `Thread.Resume` publishes a response or thread-settings callbacks run.
 An empty model string remains valid, as do nullable developer instructions and
