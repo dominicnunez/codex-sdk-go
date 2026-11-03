@@ -378,6 +378,14 @@ not an approval or proof that the server resolves a path in a particular way.
 
 ## Compatibility
 
+`HookPromptThreadItem` exposes hook-generated prompt fragments through
+`HookPromptFragment` records and retains optional nullable lifecycle times.
+The item union validates required IDs, fragment arrays and fragment strings before
+responses, typed callbacks or caches publish them. Empty strings and arrays remain
+valid. Repeated fragment arrays follow native record reuse, including shrink/regrow
+and empty-array resets, without hiding forbidden null occurrences. Fragment records
+remain method-free; future unknown item types retain owned raw JSON.
+
 Required non-null thread, plugin and sharing metadata rejects every canonical
 null occurrence, including escaped property names, even when a later duplicate
 has a valid value. The same checks cover required fields inside repeated granular

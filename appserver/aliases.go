@@ -103,6 +103,8 @@ type (
 	PatchChangeKindWrapper                     = protocol.PatchChangeKindWrapper
 	Personality                                = protocol.Personality
 	PlanThreadItem                             = protocol.PlanThreadItem
+	HookPromptFragment                         = protocol.HookPromptFragment
+	HookPromptThreadItem                       = protocol.HookPromptThreadItem
 	ReasoningEffort                            = protocol.ReasoningEffort
 	ReasoningThreadItem                        = protocol.ReasoningThreadItem
 	ReadCommandAction                          = protocol.ReadCommandAction

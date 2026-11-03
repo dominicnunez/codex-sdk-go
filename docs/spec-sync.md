@@ -67,5 +67,6 @@ logging-limit representations.
 requirements, network review domains and additional-context names have no
 referencing wire entry points in this snapshot. Their presence in the combined
 schema does not add SDK methods. New error-info strings already survive the
-existing opaque `CodexErrorInfo` carrier. Existing opaque item variants retain
-lifecycle fields in their raw payloads.
+existing opaque `CodexErrorInfo` carrier. Unrecognized future item variants retain
+lifecycle fields in their raw payloads. The known `hookPrompt` branch uses typed
+fragments and lifecycle fields, with admission checks at the item union.

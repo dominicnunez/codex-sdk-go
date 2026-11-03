@@ -491,6 +491,7 @@ func (u *UnknownThreadItem) MarshalJSON() ([]byte, error) {
 type threadItemDecoder func([]byte) (ThreadItem, error)
 
 var threadItemDecoders = map[string]threadItemDecoder{
+	"hookPrompt":          decodeHookPromptThreadItem,
 	"imageGeneration":     decodeImageGenerationThreadItem,
 	"functionCallOutput":  decodeFunctionCallOutputThreadItem,
 	"userMessage":         decodeUserMessageThreadItem,
@@ -710,6 +711,8 @@ func (w ThreadItemWrapper) MarshalJSON() ([]byte, error) {
 	case AgentMessageThreadItem:
 		return jsonencode.Marshal(&v)
 	case PlanThreadItem:
+		return jsonencode.Marshal(&v)
+	case HookPromptThreadItem:
 		return jsonencode.Marshal(&v)
 	case ReasoningThreadItem:
 		return jsonencode.Marshal(&v)
