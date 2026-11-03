@@ -376,6 +376,14 @@ paths, retain their individual absolute-path validation. Approval handlers own
 authorization and any interpretation of opaque strings; schema-valid metadata is
 not an approval or proof that the server resolves a path in a particular way.
 
+Command approval input arrays reject null string entries before application
+handlers run, including earlier entries hidden by duplicate properties. This
+covers the current `proposedExecpolicyAmendment` and legacy `command` arrays.
+The current optional amendment may be absent or null; the legacy command array
+remains required and non-null. Empty arrays, empty arguments and opaque strings
+retain their values. Field matching follows each existing approval owner and
+validation does not resolve or normalize approval evidence.
+
 ## Compatibility
 
 Collaboration metadata requires non-null `mode`, `settings` and `settings.model`

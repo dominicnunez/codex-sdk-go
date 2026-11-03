@@ -49,6 +49,9 @@ func (p *CommandExecutionRequestApprovalParams) UnmarshalJSON(data []byte) error
 			}
 		}
 	}
+	if err := validateNullableStringArrays(data, false, "proposedExecpolicyAmendment"); err != nil {
+		return err
+	}
 	*p = CommandExecutionRequestApprovalParams(decoded)
 	return nil
 }
@@ -433,6 +436,9 @@ func (p *ExecCommandApprovalParams) UnmarshalJSON(data []byte) error {
 		"callId":         decoded.CallID,
 		"conversationId": decoded.ConversationID,
 	}); err != nil {
+		return err
+	}
+	if err := validateStringArrays(data, false, "command"); err != nil {
 		return err
 	}
 	*p = ExecCommandApprovalParams(decoded)
