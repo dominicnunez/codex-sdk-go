@@ -1342,34 +1342,34 @@ func TestThreadFork(t *testing.T) {
 	}
 }
 
-func TestThreadLifecycleRejectsInvalidServiceTier(t *testing.T) {
+func TestThreadLifecycleAcceptsCustomServiceTier(t *testing.T) {
 	tests := []struct {
 		name   string
 		method string
-		call   func(client *codex.Client) error
+		call   func(client *codex.Client) (*codex.ServiceTier, error)
 	}{
 		{
 			name:   "start",
 			method: "thread/start",
-			call: func(client *codex.Client) error {
-				_, err := client.Thread.Start(context.Background(), codex.ThreadStartParams{})
-				return err
+			call: func(client *codex.Client) (*codex.ServiceTier, error) {
+				response, err := client.Thread.Start(context.Background(), codex.ThreadStartParams{})
+				return response.ServiceTier, err
 			},
 		},
 		{
 			name:   "resume",
 			method: "thread/resume",
-			call: func(client *codex.Client) error {
-				_, err := client.Thread.Resume(context.Background(), codex.ThreadResumeParams{ThreadID: "thread-123"})
-				return err
+			call: func(client *codex.Client) (*codex.ServiceTier, error) {
+				response, err := client.Thread.Resume(context.Background(), codex.ThreadResumeParams{ThreadID: "thread-123"})
+				return response.ServiceTier, err
 			},
 		},
 		{
 			name:   "fork",
 			method: "thread/fork",
-			call: func(client *codex.Client) error {
-				_, err := client.Thread.Fork(context.Background(), codex.ThreadForkParams{ThreadID: "thread-123"})
-				return err
+			call: func(client *codex.Client) (*codex.ServiceTier, error) {
+				response, err := client.Thread.Fork(context.Background(), codex.ThreadForkParams{ThreadID: "thread-123"})
+				return response.ServiceTier, err
 			},
 		},
 	}
@@ -1403,12 +1403,9 @@ func TestThreadLifecycleRejectsInvalidServiceTier(t *testing.T) {
 				},
 			})
 
-			err := tt.call(client)
-			if err == nil {
-				t.Fatal("expected error, got nil")
-			}
-			if !strings.Contains(err.Error(), `invalid serviceTier "totally-invalid"`) {
-				t.Fatalf("error = %q, want invalid serviceTier", err.Error())
+			tier, err := tt.call(client)
+			if err != nil || tier == nil || *tier != "totally-invalid" {
+				t.Fatalf("custom tier lost or rejected: %v %v", tier, err)
 			}
 		})
 	}

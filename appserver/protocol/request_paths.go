@@ -777,9 +777,6 @@ func (p ThreadStartParams) prepareRequest() (interface{}, error) {
 	if err := validateOptionalEnumValue("sessionStartSource", p.SessionStartSource, validThreadStartSources); err != nil {
 		return nil, err
 	}
-	if err := validateOptionalEnumValue("threadSource", p.ThreadSource, validThreadSources); err != nil {
-		return nil, err
-	}
 	return p, nil
 }
 
@@ -925,9 +922,6 @@ func (p ThreadForkParams) prepareRequest() (interface{}, error) {
 		return nil, err
 	}
 	if err := validateOptionalRawJSONObjectField("config", p.Config); err != nil {
-		return nil, err
-	}
-	if err := validateOptionalEnumValue("threadSource", p.ThreadSource, validThreadSources); err != nil {
 		return nil, err
 	}
 	return p, nil
