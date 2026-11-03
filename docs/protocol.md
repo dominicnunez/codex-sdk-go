@@ -530,6 +530,11 @@ behavior. Initialize validates required response occurrences before caching a
 successful handshake, so a rejected response can be retried. Its public response
 record remains method-free; handshake admission owns these checks.
 
+`Plugin.ShareUpdateTargets` supports `LISTED`, `UNLISTED` and `PRIVATE` through
+`PluginShareUpdateDiscoverability`, including `PluginShareUpdateDiscoverabilityListed`. Target
+identities, principal types and target roles are checked before dispatch. The
+server decides whether the caller may change sharing and applies visibility.
+
 Async agent-message questions allow only `title` and `options`. Undeclared
 question properties, including differently cased names, fail at the shared
 question decoder before response, notification or cache publication. Existing

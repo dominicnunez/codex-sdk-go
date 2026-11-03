@@ -174,6 +174,12 @@ permit a valid retry. This lexical check neither accesses the filesystem nor
 resolves symlinks. These checks validate message shape, not the truth of metadata
 supplied by the peer.
 
+Plugin-share target updates accept the declared `LISTED`, `UNLISTED` and
+`PRIVATE` visibility values. Remote plugin and principal IDs, principal types
+and target roles remain validated before dispatch; unknown visibility values
+are rejected. This validates the requested representation, while the server
+owns sharing authorization and the effect of changing discoverability.
+
 Async user-input questions reject undeclared properties before typed response,
 notification or cache publication, including invalid questions hidden by later
 duplicate arrays. Their existing required-title and option checks retain priority,
