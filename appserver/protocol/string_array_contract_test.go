@@ -13,7 +13,7 @@ import (
 
 type stringArrayContractCase struct {
 	name, field, body, validItem string
-	nullable, aliases            bool
+	nullable, aliases, closed    bool
 	newValue                     func() any
 }
 
@@ -184,26 +184,26 @@ func stringArrayContractCases() []stringArrayContractCase {
 		return strings.Replace(body, `"`+field+`":[]`, `"`+field+`":@VALUE@`, 1)
 	}
 	return []stringArrayContractCase{
-		{"loaded", "data", `{"data":@VALUE@}`, `""`, false, true, func() any { return new(protocol.ThreadLoadedListResponse) }},
-		{"hooks", "warnings", `{"cwd":"relative","errors":[],"hooks":[],"warnings":@VALUE@}`, `""`, false, false, func() any { return new(protocol.HooksListEntry) }},
-		{"marketplace selection", "selectedMarketplaces", `{"errors":[],"selectedMarketplaces":@VALUE@,"upgradedRoots":[]}`, `""`, false, true, func() any { return new(protocol.MarketplaceUpgradeResponse) }},
-		{"marketplace roots", "upgradedRoots", `{"errors":[],"selectedMarketplaces":[],"upgradedRoots":@VALUE@}`, `"/tmp"`, false, true, func() any { return new(protocol.MarketplaceUpgradeResponse) }},
-		{"reconcile materialization", "failedMaterializationRemotePluginIds", `{"changedPlugins":[],"failedMaterializationRemotePluginIds":@VALUE@,"failedRemotePluginIds":[]}`, `""`, false, true, func() any { return new(protocol.PluginReconcileResponse) }},
-		{"reconcile remote", "failedRemotePluginIds", `{"changedPlugins":[],"failedMaterializationRemotePluginIds":[],"failedRemotePluginIds":@VALUE@}`, `""`, false, true, func() any { return new(protocol.PluginReconcileResponse) }},
-		{"capabilities", "capabilities", iface("capabilities"), `""`, false, true, func() any { return new(protocol.PluginInterface) }},
-		{"screenshot URLs", "screenshotUrls", iface("screenshotUrls"), `""`, false, true, func() any { return new(protocol.PluginInterface) }},
-		{"screenshots", "screenshots", iface("screenshots"), `"/tmp"`, false, true, func() any { return new(protocol.PluginInterface) }},
-		{"MCP server names", "mcpServers", `{"apps":[],"appTemplates":[],"hooks":[],"marketplaceName":"M","mcpServers":@VALUE@,"skills":[],"summary":` + issue74PluginSummary + `}`, `""`, false, true, func() any { return new(protocol.PluginDetail) }},
-		{"citation threads", "threadIds", `{"type":"agentMessage","id":"i","text":"","memoryCitation":{"entries":[],"threadIds":@VALUE@}}`, `""`, false, true, func() any { return new(protocol.ThreadItemWrapper) }},
-		{"collab receivers", "receiverThreadIds", `{"type":"collabAgentToolCall","id":"i","agentsStates":{},"receiverThreadIds":@VALUE@,"senderThreadId":"t","status":"completed","tool":"spawnAgent"}`, `""`, false, true, func() any { return new(protocol.ThreadItemWrapper) }},
-		{"Windows paths", "samplePaths", `{"extraCount":0,"failedScan":false,"samplePaths":@VALUE@}`, `""`, false, false, func() any { return new(protocol.WindowsWorldWritableWarningNotification) }},
-		{"verification", "verifications", `{"threadId":"t","turnId":"u","verifications":@VALUE@}`, `"trustedAccessForCyber"`, false, false, func() any { return new(protocol.ModelVerificationNotification) }},
-		{"filesystem paths", "changedPaths", `{"watchId":"w","changedPaths":@VALUE@}`, `"/tmp"`, false, false, func() any { return new(protocol.FsChangedNotification) }},
-		{"default prompt", "defaultPrompt", iface("defaultPrompt"), `""`, true, true, func() any { return new(protocol.PluginInterface) }},
-		{"question options", "options", `{"title":"q","options":@VALUE@}`, `""`, true, false, func() any { return new(protocol.AsyncUserInputQuestion) }},
-		{"app categories", "categories", `{"id":"a","name":"A","appMetadata":{"categories":@VALUE@}}`, `""`, true, true, func() any { return new(protocol.AppInfo) }},
-		{"app subcategories", "subCategories", `{"id":"a","name":"A","appMetadata":{"subCategories":@VALUE@}}`, `""`, true, true, func() any { return new(protocol.AppInfo) }},
-		{"web queries", "queries", `{"type":"search","queries":@VALUE@}`, `""`, true, true, func() any { return new(protocol.WebSearchActionWrapper) }},
+		{"loaded", "data", `{"data":@VALUE@}`, `""`, false, true, false, func() any { return new(protocol.ThreadLoadedListResponse) }},
+		{"hooks", "warnings", `{"cwd":"relative","errors":[],"hooks":[],"warnings":@VALUE@}`, `""`, false, false, false, func() any { return new(protocol.HooksListEntry) }},
+		{"marketplace selection", "selectedMarketplaces", `{"errors":[],"selectedMarketplaces":@VALUE@,"upgradedRoots":[]}`, `""`, false, true, false, func() any { return new(protocol.MarketplaceUpgradeResponse) }},
+		{"marketplace roots", "upgradedRoots", `{"errors":[],"selectedMarketplaces":[],"upgradedRoots":@VALUE@}`, `"/tmp"`, false, true, false, func() any { return new(protocol.MarketplaceUpgradeResponse) }},
+		{"reconcile materialization", "failedMaterializationRemotePluginIds", `{"changedPlugins":[],"failedMaterializationRemotePluginIds":@VALUE@,"failedRemotePluginIds":[]}`, `""`, false, true, false, func() any { return new(protocol.PluginReconcileResponse) }},
+		{"reconcile remote", "failedRemotePluginIds", `{"changedPlugins":[],"failedMaterializationRemotePluginIds":[],"failedRemotePluginIds":@VALUE@}`, `""`, false, true, false, func() any { return new(protocol.PluginReconcileResponse) }},
+		{"capabilities", "capabilities", iface("capabilities"), `""`, false, true, false, func() any { return new(protocol.PluginInterface) }},
+		{"screenshot URLs", "screenshotUrls", iface("screenshotUrls"), `""`, false, true, false, func() any { return new(protocol.PluginInterface) }},
+		{"screenshots", "screenshots", iface("screenshots"), `"/tmp"`, false, true, false, func() any { return new(protocol.PluginInterface) }},
+		{"MCP server names", "mcpServers", `{"apps":[],"appTemplates":[],"hooks":[],"marketplaceName":"M","mcpServers":@VALUE@,"skills":[],"summary":` + issue74PluginSummary + `}`, `""`, false, true, false, func() any { return new(protocol.PluginDetail) }},
+		{"citation threads", "threadIds", `{"type":"agentMessage","id":"i","text":"","memoryCitation":{"entries":[],"threadIds":@VALUE@}}`, `""`, false, true, false, func() any { return new(protocol.ThreadItemWrapper) }},
+		{"collab receivers", "receiverThreadIds", `{"type":"collabAgentToolCall","id":"i","agentsStates":{},"receiverThreadIds":@VALUE@,"senderThreadId":"t","status":"completed","tool":"spawnAgent"}`, `""`, false, true, false, func() any { return new(protocol.ThreadItemWrapper) }},
+		{"Windows paths", "samplePaths", `{"extraCount":0,"failedScan":false,"samplePaths":@VALUE@}`, `""`, false, false, false, func() any { return new(protocol.WindowsWorldWritableWarningNotification) }},
+		{"verification", "verifications", `{"threadId":"t","turnId":"u","verifications":@VALUE@}`, `"trustedAccessForCyber"`, false, false, false, func() any { return new(protocol.ModelVerificationNotification) }},
+		{"filesystem paths", "changedPaths", `{"watchId":"w","changedPaths":@VALUE@}`, `"/tmp"`, false, false, false, func() any { return new(protocol.FsChangedNotification) }},
+		{"default prompt", "defaultPrompt", iface("defaultPrompt"), `""`, true, true, false, func() any { return new(protocol.PluginInterface) }},
+		{"question options", "options", `{"title":"q","options":@VALUE@}`, `""`, true, false, true, func() any { return new(protocol.AsyncUserInputQuestion) }},
+		{"app categories", "categories", `{"id":"a","name":"A","appMetadata":{"categories":@VALUE@}}`, `""`, true, true, false, func() any { return new(protocol.AppInfo) }},
+		{"app subcategories", "subCategories", `{"id":"a","name":"A","appMetadata":{"subCategories":@VALUE@}}`, `""`, true, true, false, func() any { return new(protocol.AppInfo) }},
+		{"web queries", "queries", `{"type":"search","queries":@VALUE@}`, `""`, true, true, false, func() any { return new(protocol.WebSearchActionWrapper) }},
 	}
 }
 
@@ -244,8 +244,10 @@ func TestStringArrayOwnerContract(t *testing.T) {
 			}
 			aliasValue := valid + `,"` + strings.ToUpper(tc.field) + `":[null]`
 			err := json.Unmarshal([]byte(strings.Replace(tc.body, "@VALUE@", aliasValue, 1)), tc.newValue())
-			if (err != nil) != tc.aliases {
-				t.Fatalf("alias recognition mismatch: %v", err)
+			// A folded alias binds at native owners; an undeclared spelling
+			// is independently forbidden by a closed owner's property set.
+			if (err != nil) != (tc.aliases || tc.closed) {
+				t.Fatalf("alias or closed-property rejection mismatch: %v", err)
 			}
 			escapedName := fmt.Sprintf(`\u%04x%s`, tc.field[0], tc.field[1:])
 			escapedBody := strings.Replace(tc.body, `"`+tc.field+`":@VALUE@`, `"`+escapedName+`":@VALUE@`, 1)

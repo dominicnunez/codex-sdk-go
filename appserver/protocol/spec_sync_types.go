@@ -60,6 +60,9 @@ func (v *AsyncUserInputQuestion) UnmarshalJSON(data []byte) error {
 	if err := validateNullableStringArrays(data, false, "options"); err != nil {
 		return err
 	}
+	if err := validateClosedObjectFields(data, "title", "options"); err != nil {
+		return err
+	}
 	*v = AsyncUserInputQuestion(decoded)
 	return nil
 }
