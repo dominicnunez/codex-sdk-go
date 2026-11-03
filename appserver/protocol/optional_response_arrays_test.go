@@ -189,7 +189,12 @@ func TestOptionalArraySiblingOwners(t *testing.T) {
 				t.Fatal(err)
 			}
 			array := optionalArrayValue(t, receiver, tc.field)
-			if array.Len() != 0 {
+			if tc.name == "model" {
+				want := []codex.InputModality{codex.InputModalityText, codex.InputModalityImage}
+				if !reflect.DeepEqual(array.Interface(), want) {
+					t.Fatal("omission did not restore the model modality default")
+				}
+			} else if array.Len() != 0 {
 				t.Fatal("fresh owner omission retained prior array")
 			}
 			if err := json.Unmarshal([]byte(body("[]", "")), receiver); err != nil {

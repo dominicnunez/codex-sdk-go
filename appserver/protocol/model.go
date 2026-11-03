@@ -63,7 +63,9 @@ type Model struct {
 	// Supported reasoning effort options for this model.
 	SupportedReasoningEfforts []ReasoningEffortOption `json:"supportedReasoningEfforts"`
 	// Input modalities supported by this model (e.g., "text", "image").
-	InputModalities []InputModality `json:"inputModalities,omitempty"`
+	// Omission defaults to text and image. A constructed nil slice omits the
+	// property; a nonnil empty slice preserves an explicitly empty list.
+	InputModalities []InputModality `json:"inputModalities,omitzero"`
 	// Whether the model supports personality customization.
 	SupportsPersonality bool `json:"supportsPersonality"`
 	// Optional model ID to upgrade to.
@@ -145,6 +147,9 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 	}
 	if err := validateOptionalBooleans(data, "supportsPersonality"); err != nil {
 		return err
+	}
+	if decoded.InputModalities == nil {
+		decoded.InputModalities = []InputModality{InputModalityText, InputModalityImage}
 	}
 	*m = Model(decoded)
 	return nil
