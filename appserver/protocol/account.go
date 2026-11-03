@@ -56,7 +56,7 @@ type AccountWrapper struct {
 	Value Account
 }
 
-// Account represents an account (apiKey or chatgpt)
+// Account represents an API key, ChatGPT, Bedrock or GCP account.
 type Account interface {
 	isAccount()
 }
@@ -233,6 +233,12 @@ func (a *AccountWrapper) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		a.Value = &gcp
+	case "amazonBedrock":
+		var bedrock AmazonBedrockAccount
+		if err := jsondecode.Unmarshal(data, &bedrock); err != nil {
+			return err
+		}
+		a.Value = &bedrock
 	case "chatgpt":
 		var chatgpt ChatgptAccount
 		if err := jsondecode.Unmarshal(data, &chatgpt); err != nil {
@@ -244,6 +250,51 @@ func (a *AccountWrapper) UnmarshalJSON(data []byte) error {
 	}
 
 	return nil
+}
+
+// AmazonBedrockAccount describes Bedrock credential management reported by the server.
+type AmazonBedrockAccount struct {
+	Type                        string `json:"type"`
+	UsesCodexManagedCredentials bool   `json:"usesCodexManagedCredentials"`
+}
+
+func (*AmazonBedrockAccount) isAccount() {}
+
+func (a *AmazonBedrockAccount) UnmarshalJSON(data []byte) error {
+	if err := validateRequiredObjectFields(data, "type"); err != nil {
+		return err
+	}
+	type wire AmazonBedrockAccount
+	var decoded wire
+	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	if decoded.Type != "amazonBedrock" {
+		return errors.New("account: invalid Bedrock type")
+	}
+	if err := validateNativeNonNullFields(data, "type"); err != nil {
+		return err
+	}
+	if err := validateEnumOccurrences(data, "type", true, func(kind string) error {
+		if kind != "amazonBedrock" {
+			return errors.New("account: invalid Bedrock type")
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	if err := validateOptionalBooleans(data, "usesCodexManagedCredentials"); err != nil {
+		return err
+	}
+	*a = AmazonBedrockAccount(decoded)
+	return nil
+}
+
+func (a *AmazonBedrockAccount) MarshalJSON() ([]byte, error) {
+	return jsonencode.Marshal(struct {
+		Type                        string `json:"type"`
+		UsesCodexManagedCredentials bool   `json:"usesCodexManagedCredentials"`
+	}{Type: "amazonBedrock", UsesCodexManagedCredentials: a.UsesCodexManagedCredentials})
 }
 
 // MarshalJSON implements custom marshaling for AccountWrapper
