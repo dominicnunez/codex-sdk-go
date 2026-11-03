@@ -272,16 +272,25 @@ type SkillsChangedNotification struct{}
 
 // OnSkillsChanged registers a listener for skills invalidation notifications.
 func (c *Client) OnSkillsChanged(handler func(SkillsChangedNotification)) {
+	c.onNotification(notifySkillsChanged, c.skillsChangedHandler(handler))
+}
+
+// Both typed registrations share admission without adding a JSON method to
+// the public empty record or constraining raw notification listeners.
+func (c *Client) skillsChangedHandler(handler func(SkillsChangedNotification)) NotificationHandler {
 	if handler == nil {
-		c.onNotification(notifySkillsChanged, nil)
-		return
+		return nil
 	}
-	c.onNotification(notifySkillsChanged, func(ctx context.Context, notif Notification) {
+	return func(ctx context.Context, notif Notification) {
 		var params SkillsChangedNotification
 		if err := jsondecode.Unmarshal(notif.Params, &params); err != nil {
 			c.reportHandlerError(notifySkillsChanged, fmt.Errorf("unmarshal %s: %w", notifySkillsChanged, err))
 			return
 		}
+		if err := validateInboundObjectFields(notif.Params, nil, nil); err != nil {
+			c.reportHandlerError(notifySkillsChanged, fmt.Errorf("unmarshal %s: %w", notifySkillsChanged, err))
+			return
+		}
 		handler(params)
-	})
+	}
 }

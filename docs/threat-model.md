@@ -84,6 +84,14 @@ existing lifecycle validation first and releases borrowed input after admission.
 Public collaboration records retain ordinary JSON behavior; these checks do not
 change constructed request encoding or grant authority to reported settings.
 
+Optional-member skills-changed and account-updated notifications still require
+object roots before typed delivery. Null roots produce diagnostics under their
+actual methods without invoking either replacement or additive callbacks. Valid
+empty objects, open metadata and nullable account members remain accepted. The
+skills registrations share a private admission handler, preserving the public
+empty record's ordinary JSON composition and raw subscription behavior. This
+validates payload shape without refreshing skills or authenticating an account.
+
 Typed app label/icon maps, configuration feature-requirement and browser-origin
 maps, and feature-enablement results reject null entries at their existing
 admission owners before successful responses or typed callbacks. Duplicate
