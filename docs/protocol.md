@@ -334,6 +334,13 @@ reject the response rather than becoming an implicit false value.
 
 ## Approvals
 
+`ApprovalPolicyOnFailure` retains its exported name and value, but encoding that
+known removed policy returns an error before typed thread/turn request dispatch.
+Current literals and granular policies remain supported. Approval-policy string
+decoding still preserves unknown, empty and legacy literals; re-encoding the
+specific removed `on-failure` literal fails. Explicit raw unknown variants keep
+their existing forwarding behavior.
+
 Register server-request handlers with `Client.SetApprovalHandlers`. A protocol-valid denial for legacy apply-patch and exec-command review decisions is an object containing a rejection reason:
 
 ```go
