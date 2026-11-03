@@ -13,9 +13,13 @@ const maxRetainedNotificationBytes = 64 * 1024 * 1024
 var errNotificationByteLimit = errors.New("retained notification byte limit exceeded")
 
 type notificationBudget struct {
-	mu      sync.Mutex
-	bytes   int
-	stopped atomic.Bool
+	mu       sync.Mutex
+	bytes    int
+	active   int
+	ended    bool
+	done     chan struct{}
+	finished bool
+	stopped  atomic.Bool
 }
 
 type notificationReservation struct {
@@ -33,13 +37,14 @@ type bufferedNotification struct {
 func (b *notificationBudget) reserve(size int) (*notificationReservation, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.stopped.Load() {
+	if b.stopped.Load() || b.ended {
 		return nil, errTransportClosed
 	}
 	if size > maxRetainedNotificationBytes-b.bytes {
 		return nil, errNotificationByteLimit
 	}
 	b.bytes += size
+	b.active++
 	return &notificationReservation{budget: b, bytes: size}, nil
 }
 
@@ -48,9 +53,38 @@ func (n bufferedNotification) release() {
 		r.once.Do(func() {
 			r.budget.mu.Lock()
 			r.budget.bytes -= r.bytes
+			r.budget.active--
+			r.budget.finishLocked()
 			r.budget.mu.Unlock()
 		})
 	}
+}
+
+func (b *notificationBudget) end() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.ended = true
+	b.finishLocked()
+}
+
+func (b *notificationBudget) doneSignal() <-chan struct{} {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.done == nil {
+		b.done = make(chan struct{})
+	}
+	return b.done
+}
+
+func (b *notificationBudget) finishLocked() {
+	if !b.ended || b.active != 0 || b.finished {
+		return
+	}
+	if b.done == nil {
+		b.done = make(chan struct{})
+	}
+	close(b.done)
+	b.finished = true
 }
 
 func (t *StdioTransport) stopNotificationWorkers() {

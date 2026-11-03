@@ -43,6 +43,23 @@ verifying cancellation of unclaimed work. [Stdio
 writing](../appserver/transport/stdio_write.go) and [transport
 state](../appserver/transport/stdio.go) own these transitions.
 
+`TransportLifecycle` is an optional `Done()`/`Err()` capability. Stdio's `Done`
+closes after notification admission ends and every reservation has retired,
+including queued notifications, pending handler replay and executing callbacks.
+A separate reservation count covers zero-byte payloads. EOF preserves accepted
+delivery; explicit close discards unclaimed notifications while claimed callbacks
+can finish. Close does not synchronously wait for callbacks, so it can be called
+from a callback. `ReaderStopped()` is an earlier boundary.
+
+The client uses a capable transport's delivery boundary. For a custom transport
+without the capability, `Client.Close` seals client notification entry and waits
+asynchronously for entered dispatches to retire. It cannot observe that custom
+transport's autonomous termination or its internal queues. Runtime helpers observe
+`Client.Done()` after startup replay and prefer an already admitted matching
+completion over transport failure. Transport termination does not disable stream
+publication: runtime-owned replay and final events retain ordinary bounded
+backpressure, so an attached consumer must drain, detach or cancel to make progress.
+
 Streaming event publication observes caller cancellation independently of the
 lifecycle's completion select. This releases backpressure while the lifecycle
 replays startup events or publishes a terminal event. Releasing publication does

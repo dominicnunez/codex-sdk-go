@@ -185,6 +185,8 @@ type threadStateEntry struct {
 // for all protocol operations.
 type Client struct {
 	transport Transport
+	lifecycle TransportLifecycle
+	closeGate *clientCloseGate
 
 	// Request timeout (optional, can be overridden per-request via context)
 	requestTimeout time.Duration
@@ -289,6 +291,12 @@ func NewClient(transport Transport, opts ...ClientOption) *Client {
 		threadStates:          make(map[string]threadStateEntry),
 		threadStateListeners:  make(map[string][]threadStateListener),
 	}
+	if lifecycle, ok := transport.(TransportLifecycle); ok {
+		c.lifecycle = lifecycle
+	} else {
+		c.closeGate = &clientCloseGate{done: make(chan struct{})}
+		c.lifecycle = c.closeGate
+	}
 
 	// Apply options
 	for _, opt := range opts {
@@ -320,7 +328,11 @@ func NewClient(transport Transport, opts ...ClientOption) *Client {
 	c.installThreadStateCache()
 
 	// Register the transport's notification handler to route to our listeners
-	transport.OnNotify(c.handleNotification)
+	if c.closeGate == nil {
+		transport.OnNotify(c.handleNotification)
+	} else {
+		transport.OnNotify(c.handleLegacyNotification)
+	}
 
 	// Register the transport's request handler for server→client approval requests
 	transport.OnRequest(c.handleRequest)
@@ -673,6 +685,9 @@ func handleApproval[P any, R any](ctx context.Context, req Request, handler func
 
 // Close closes the underlying transport and releases resources.
 func (c *Client) Close() error {
+	if c.closeGate != nil {
+		c.closeGate.close()
+	}
 	return c.transport.Close()
 }
 

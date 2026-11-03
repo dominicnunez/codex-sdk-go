@@ -55,15 +55,6 @@ func runAcceptedStartAtEOF(t *testing.T, streamed, complete bool) {
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if !complete {
-		go func() {
-			select {
-			case <-tr.ReaderStopped():
-				cancel()
-			case <-ctx.Done():
-			}
-		}()
-	}
 	peerDone := make(chan error, 1)
 	go func() {
 		scanner := bufio.NewScanner(peerInput)
@@ -142,8 +133,9 @@ func runAcceptedStartAtEOF(t *testing.T, streamed, complete bool) {
 		result, runErr = process.Run(ctx, codex.RunOptions{Prompt: "complete"})
 	}
 	if !complete {
-		if result != nil || !errors.Is(runErr, context.Canceled) {
-			t.Fatalf("start became completion: result=%+v err=%v", result, runErr)
+		var terminal *codex.TransportError
+		if result != nil || !errors.As(runErr, &terminal) || !errors.Is(runErr, io.EOF) {
+			t.Fatalf("missing completion did not retain EOF: result=%+v err=%v", result, runErr)
 		}
 	} else if runErr != nil || result == nil || result.Thread.ID != "thread-1" || result.Turn.ID != "turn-1" || result.Turn.Status != codex.TurnStatusCompleted || result.Response != "complete" || len(result.Items) != 1 {
 		t.Fatalf("wrong result: %+v", result)
