@@ -76,6 +76,14 @@ application stderr writers still require application cooperation.
 
 ## JSON-RPC framing, dispatch, and resource exhaustion
 
+Collaboration response/settings admission rejects incomplete mode/settings/model
+records and forbidden nested null occurrences before response, callback or cache
+publication. Presence follows existing alias and duplicate-object decoding rules,
+including allowed nullable resume resets. The private resume carrier applies
+existing lifecycle validation first and releases borrowed input after admission.
+Public collaboration records retain ordinary JSON behavior; these checks do not
+change constructed request encoding or grant authority to reported settings.
+
 Known packaged-default and enterprise-managed config sources validate required
 metadata before read or write results are published. Packaged file paths must
 already be absolute and normalized, including earlier canonical occurrences;

@@ -53,6 +53,9 @@ func (s *ThreadSettings) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	decoded.Cwd = validatedCwd
+	if err := validateCollaborationModeField(data, false, false); err != nil {
+		return err
+	}
 	*s = ThreadSettings(decoded)
 	return nil
 }
