@@ -614,21 +614,35 @@ func decodeFileChangeThreadItem(data []byte) (ThreadItem, error) {
 }
 
 func decodeMcpToolCallThreadItem(data []byte) (ThreadItem, error) {
-	return decodeThreadItemIntoWithValidation(
-		data,
-		&McpToolCallThreadItem{},
-		[]string{"arguments", "id", "server", "status", "tool"},
-		[]string{"id", "server", "status", "tool"},
-	)
+	if err := validateTaggedObjectFields(data, []string{"arguments", "id", "server", "status", "tool"}, []string{"id", "server", "status", "tool"}); err != nil {
+		return nil, err
+	}
+	decoded := &McpToolCallThreadItem{}
+	wire := struct {
+		*McpToolCallThreadItem
+		Arguments exactJSONValue `json:"arguments"`
+	}{McpToolCallThreadItem: decoded}
+	if err := jsondecode.Unmarshal(data, &wire); err != nil {
+		return nil, toolArgumentDecodeError(err, "McpToolCallThreadItem")
+	}
+	decoded.Arguments = wire.Arguments.value
+	return decoded, nil
 }
 
 func decodeDynamicToolCallThreadItem(data []byte) (ThreadItem, error) {
-	return decodeThreadItemIntoWithValidation(
-		data,
-		&DynamicToolCallThreadItem{},
-		[]string{"arguments", "id", "status", "tool"},
-		[]string{"id", "status", "tool"},
-	)
+	if err := validateTaggedObjectFields(data, []string{"arguments", "id", "status", "tool"}, []string{"id", "status", "tool"}); err != nil {
+		return nil, err
+	}
+	decoded := &DynamicToolCallThreadItem{}
+	wire := struct {
+		*DynamicToolCallThreadItem
+		Arguments exactJSONValue `json:"arguments"`
+	}{DynamicToolCallThreadItem: decoded}
+	if err := jsondecode.Unmarshal(data, &wire); err != nil {
+		return nil, toolArgumentDecodeError(err, "DynamicToolCallThreadItem")
+	}
+	decoded.Arguments = wire.Arguments.value
+	return decoded, nil
 }
 
 func decodeCollabAgentToolCallThreadItem(data []byte) (ThreadItem, error) {
