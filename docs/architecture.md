@@ -43,6 +43,13 @@ verifying cancellation of unclaimed work. [Stdio
 writing](../appserver/transport/stdio_write.go) and [transport
 state](../appserver/transport/stdio.go) own these transitions.
 
+Streaming event publication observes caller cancellation independently of the
+lifecycle's completion select. This releases backpressure while the lifecycle
+replays startup events or publishes a terminal event. Releasing publication does
+not choose the terminal error: a completion already selected by the lifecycle
+retains its result or error. The cancellation registration is removed when that
+lifecycle finishes.
+
 Process shutdown has another boundary: parent exit and descendant completion are
 different events. [Process management](../appserver/process.go) and
 [process-tree support](../internal/process/process.go) coordinate managed Close,

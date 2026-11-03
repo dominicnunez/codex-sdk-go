@@ -633,6 +633,13 @@ An accepted turn-start response does not complete a runtime turn. If the peer
 terminates without a matching terminal notification, Run and RunStreamed still
 wait for the caller's context to end; callers must bound that context as needed.
 
+Caller cancellation releases blocked streaming event publication during startup
+replay and terminal-event delivery, even when the lifecycle itself is applying
+backpressure. This stops further queue admission without choosing a terminal
+error or replacing an already selected completion's result. The lifecycle keeps
+ownership of its result, error and listener cleanup. The queue remains bounded;
+cancellation does not force an application iterator callback to return.
+
 A stale or unrelated notification could contaminate a turn result. [Turn lifecycle handling](../appserver/turn_lifecycle.go) registers listeners before starting a turn, filters thread/turn identities, bounds pending start notifications, and checks terminal status. Its ordering assumptions must also hold for custom transports. Matching IDs prevent accidental cross-talk; a malicious connected peer can still claim those IDs, so correlation does not authenticate completion or independently prove an external effect.
 
 [Conversation snapshots](../appserver/conversation.go), the [protocol cache](../appserver/protocol/clone_helpers.go), collector item ingestion and summaries use shared [deep-copy helpers](../internal/deepcopy/deepcopy.go) for complete reference-valued protocol shapes. Streamed completion retains an owned item before exposing public events; derived collaboration events and turn-completion events have separate references. Result item/turn/thread views and repeated `Stream.Result()` snapshots remain independent. These copies preserve nil versus present empty values, dynamic union types and raw metadata without a serialization round trip. Lifecycle responses and settings notifications supply cached disabled plugin IDs separately from the Thread wire object; later Thread-only refreshes preserve those saved settings. Cloning the IDs prevents mutation of a returned snapshot from changing cached metadata. The schema describes them as a saved list that does not yet filter plugin capabilities; they are not an SDK enforcement control. Snapshot isolation covers supported protocol shapes; arbitrary application-provided values containing unexported internals, channels, functions, or other opaque references are not a general isolation mechanism. The cache is best-effort state, not durable evidence or an authorization source.
