@@ -758,6 +758,12 @@ authorize profile selection or replace server-side requirements enforcement.
 Skill catalog and bundled-plugin skill paths follow the schema's opaque legacy
 string contract. They may be relative or non-normalized and are preserved as
 returned; genuine `AbsolutePathBuf` fields retain their separate validation.
+The skill metadata and bundled-skill admission owners reject non-null local
+`iconSmall` and `iconLarge` values that are not absolute, normalized paths,
+including icons on a plugin's onboarding skill. Failure preserves each skill
+receiver and prevents public response success. Nullable icons and opaque URL
+siblings remain supported. These lexical checks neither read icon files nor
+fetch URLs; the plain `SkillInterface` record keeps ordinary JSON behavior.
 A malicious peer could supply a path that looks safe in a catalog but resolves
 elsewhere in the consuming application. Applications must bind any filesystem
 access to their own trusted base and policy rather than treating a catalog path

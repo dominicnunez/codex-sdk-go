@@ -1083,6 +1083,9 @@ func (s *SkillSummary) UnmarshalJSON(data []byte) error {
 	if err := validateObjectFields(data, nil, []string{"description", "enabled", "name"}); err != nil {
 		return err
 	}
+	if err := validateSkillIconPaths("plugin.skill.interface", wire.Interface); err != nil {
+		return err
+	}
 
 	s.Description = *wire.Description
 	s.Enabled = *wire.Enabled
