@@ -180,6 +180,12 @@ and target roles remain validated before dispatch; unknown visibility values
 are rejected. This validates the requested representation, while the server
 owns sharing authorization and the effect of changing discoverability.
 
+Realtime startup admission accepts the declared `v1`, `v2` and `v3` versions
+before either typed listener API receives a notification. Required-field, null
+and unknown-version failures prevent callbacks and retain diagnostic origin.
+The version and optional session ID are peer reports of startup acceptance;
+they do not independently prove an authenticated or usable provider connection.
+
 Async user-input questions reject undeclared properties before typed response,
 notification or cache publication, including invalid questions hidden by later
 duplicate arrays. Their existing required-title and option checks retain priority,
