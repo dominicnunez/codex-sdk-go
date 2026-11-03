@@ -101,6 +101,7 @@ type StdioTransport struct {
 	criticalNotifQueue  chan bufferedNotification
 	notifQueue          chan bufferedNotification
 	writeQueue          chan writeEnvelope
+	rejectionBudget     rejectionBudget
 	queueAdmissionMu    sync.RWMutex
 	queuesStopped       bool // guarded by queueAdmissionMu
 	readerStopped       chan struct{}
@@ -644,7 +645,7 @@ func (t *StdioTransport) rejectInvalidRequestIDWithMessage(idField inboundID, me
 	if parsed, ok := idField.requestID(); ok {
 		id = parsed
 	}
-	t.writeErrorResponse(id, ErrCodeInvalidRequest, message)
+	t.enqueueRejection(id, ErrCodeInvalidRequest, message)
 }
 
 func (t *StdioTransport) failPendingWithInvalidProtocolVersion(idField inboundID) {
@@ -720,7 +721,7 @@ func (t *StdioTransport) enqueueRequest(req Request) {
 	case t.requestQueue <- req:
 	default:
 		t.queueAdmissionMu.RUnlock()
-		t.rejectRequestForOverload(req)
+		t.enqueueRejection(req.ID, ErrCodeInternalError, "too many pending inbound requests")
 		return
 	}
 	t.queueAdmissionMu.RUnlock()
@@ -939,7 +940,7 @@ func (t *StdioTransport) resolveRequestHandler(req Request) (RequestHandler, fun
 	return nil, nil, requestHandlerQueued
 }
 
-// handleInvalidRequestObject sends an invalid-request response for a structurally
+// handleInvalidRequestObject queues an invalid-request response for a structurally
 // invalid inbound request object. It returns true when the frame looked like a
 // request (had a top-level method field), in which case the caller should stop
 // further processing.
@@ -953,6 +954,6 @@ func (t *StdioTransport) handleInvalidRequestObject(data []byte) bool {
 		id = RequestID{Value: nil}
 	}
 
-	t.writeErrorResponse(id, ErrCodeInvalidRequest, errInvalidServerRequest)
+	t.enqueueRejection(id, ErrCodeInvalidRequest, errInvalidServerRequest)
 	return true
 }

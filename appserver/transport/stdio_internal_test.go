@@ -130,6 +130,7 @@ func TestHandleInvalidRequestObjectInvalidIDUsesNullID(t *testing.T) {
 	if handled := transport.handleInvalidRequestObject(data); !handled {
 		t.Fatal("expected invalid request object to be handled")
 	}
+	awaitPayloadCondition(t, func() bool { return strings.HasSuffix(buf.String(), "\n") })
 
 	output := strings.TrimSpace(buf.String())
 	if output == "" {
@@ -167,6 +168,7 @@ func TestHandleInvalidRequestObjectValidIDPreservesID(t *testing.T) {
 	if handled := transport.handleInvalidRequestObject(data); !handled {
 		t.Fatal("expected invalid request object to be handled")
 	}
+	awaitPayloadCondition(t, func() bool { return strings.HasSuffix(buf.String(), "\n") })
 
 	output := strings.TrimSpace(buf.String())
 	if output == "" {

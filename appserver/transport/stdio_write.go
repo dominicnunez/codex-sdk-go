@@ -7,8 +7,17 @@ import (
 )
 
 type writeEnvelope struct {
-	payload []byte
-	done    chan error
+	payload   []byte
+	done      chan error
+	rejection *rejectionReservation
+}
+
+func (e *writeEnvelope) releasePayload() {
+	e.payload = nil
+	if e.rejection != nil {
+		e.rejection.release()
+		e.rejection = nil
+	}
 }
 
 var errZeroByteWrite = errors.New("writer returned zero bytes written without error")
@@ -61,6 +70,10 @@ func (t *StdioTransport) queueWrite(ctx context.Context, msg interface{}, op str
 }
 
 func (t *StdioTransport) queuePayload(ctx context.Context, data []byte, op string, watchReaderStop bool) (writeEnvelope, error) {
+	return t.queueReservedPayload(ctx, data, op, watchReaderStop, nil)
+}
+
+func (t *StdioTransport) queueReservedPayload(ctx context.Context, data []byte, op string, watchReaderStop bool, rejection *rejectionReservation) (writeEnvelope, error) {
 	if err := ctx.Err(); err != nil {
 		return writeEnvelope{}, err
 	}
@@ -75,8 +88,9 @@ func (t *StdioTransport) queuePayload(ctx context.Context, data []byte, op strin
 		return writeEnvelope{}, NewTransportError(op, errTransportClosed)
 	}
 	env := writeEnvelope{
-		payload: data,
-		done:    make(chan error, 1),
+		payload:   data,
+		done:      make(chan error, 1),
+		rejection: rejection,
 	}
 
 	// Keep the reader-stopped aware branches explicit. Request/notification
@@ -237,9 +251,15 @@ func recvWhileRunning[T any](ctx context.Context, queue <-chan T) (T, bool) {
 
 func (t *StdioTransport) writeLoop() {
 	for {
-		env, ok := recvWhileRunning(t.ctx, t.writeQueue)
-		if !ok {
+		var env writeEnvelope
+		select {
+		case <-t.ctx.Done():
 			return
+		case next, ok := <-t.writeQueue:
+			if !ok {
+				return
+			}
+			env = next
 		}
 		// Claim execution at the terminal-state boundary. A write claimed before
 		// stop may finish afterward, but a dequeued abandoned write cannot start.
@@ -247,15 +267,22 @@ func (t *StdioTransport) writeLoop() {
 		stopped := t.closed || t.ctx.Err() != nil
 		t.mu.Unlock()
 		if stopped {
+			env.releasePayload()
+			select {
+			case env.done <- t.transportStopError("write message"):
+			default:
+			}
 			return
 		}
 
 		err := t.writeRawMessage(env.payload)
 		if err != nil {
 			t.handleWriteFailure(err)
+			env.releasePayload()
 			env.done <- err
 			return
 		}
+		env.releasePayload()
 		env.done <- nil
 	}
 }
@@ -281,6 +308,7 @@ writes:
 			if !ok {
 				return
 			}
+			env.releasePayload()
 			select {
 			case env.done <- t.transportStopError("write message"):
 			default:
