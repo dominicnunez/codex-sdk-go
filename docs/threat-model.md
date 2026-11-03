@@ -76,6 +76,15 @@ application stderr writers still require application cooperation.
 
 ## JSON-RPC framing, dispatch, and resource exhaustion
 
+Known source and approval object alternatives reject schema-forbidden outer
+properties and competing discriminators before response, cache or typed callback
+publication. Validation follows their established required/native checks and
+leaves prior receivers intact on new failures. It checks borrowed property names
+without decoding unknown values or retaining peer names in diagnostics. Open
+nested granular/thread-spawn metadata and future root source objects retain
+their existing acceptance; the latter preserve owned raw JSON. These shape
+checks do not authenticate source identity or grant application authority.
+
 Numeric request IDs retain signed 64-bit integer identity across serialization,
 equality and pending-response correlation. Caller-provided floating values must
 be finite, integral and in [-2^63, 2^63); the upper boundary is rejected before

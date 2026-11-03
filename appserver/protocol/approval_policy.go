@@ -68,6 +68,9 @@ func (a *ApprovalPolicyGranular) UnmarshalJSON(data []byte) error {
 	}, "granular"); err != nil {
 		return err
 	}
+	if err := validateClosedObjectFields(data, "granular"); err != nil {
+		return err
+	}
 	*a = ApprovalPolicyGranular(decoded)
 	return nil
 }

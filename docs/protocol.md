@@ -378,6 +378,14 @@ not an approval or proof that the server resolves a path in a particular way.
 
 ## Compatibility
 
+Known object alternatives for session sources (`custom`, `subAgent`), sub-agent
+sources (`other`, `thread_spawn`) and approval policies (`granular`) have closed
+outer shapes. Extra properties or competing branch keys fail before successful
+response or typed notification publication. Nested `thread_spawn` and `granular`
+records remain open to additional metadata. Future root source objects still use
+`UnknownSessionSource` with owned raw JSON. `SessionSourceCustom` stays a plain
+record; its union wrapper owns admission rather than a promoted JSON method.
+
 Shared account metadata validates every recognized plan, authentication-mode,
 and rate-limit-reason enum occurrence at its record owner. Valid nullable resets
 remain supported; a later value or null cannot erase an earlier invalid enum.
