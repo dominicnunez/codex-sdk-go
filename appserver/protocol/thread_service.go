@@ -486,10 +486,11 @@ func (r ThreadResumeResponse) validate() error {
 
 // Resume resumes an existing thread
 func (s *ThreadService) Resume(ctx context.Context, params ThreadResumeParams) (ThreadResumeResponse, error) {
-	var response ThreadResumeResponse
-	if err := s.client.sendRequest(ctx, methodThreadResume, params, &response); err != nil {
+	var result threadResumeResult
+	if err := s.client.sendRequest(ctx, methodThreadResume, params, &result); err != nil {
 		return ThreadResumeResponse{}, err
 	}
+	response := result.value
 	response.Thread = threadWithDisabledPlugins(response.Thread, response.DisabledPluginIDs)
 	s.client.cacheThreadStateForMethod(methodThreadResume, response.Thread)
 	return response, nil

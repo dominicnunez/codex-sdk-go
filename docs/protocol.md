@@ -378,6 +378,17 @@ not an approval or proof that the server resolves a path in a particular way.
 
 ## Compatibility
 
+Collaboration metadata requires non-null `mode`, `settings` and `settings.model`
+before `Thread.Resume` publishes a response or thread-settings callbacks run.
+An empty model string remains valid, as do nullable developer instructions and
+reasoning effort. Resume allows an absent or null collaboration mode; the required
+thread-settings member does not. Partial duplicate objects retain native merging,
+and a nullable resume reset starts fresh presence without erasing forbidden nested
+null occurrences. Matching follows each existing owner: native aliases inside the
+plain records and at the resume root, exact matching at the thread-settings root.
+The collaboration records remain method-free for ordinary application JSON and
+constructed turn requests. Existing lifecycle response errors keep their priority.
+
 Config metadata exposes typed `PackagedDefaultsConfigLayerSource` and
 `EnterpriseManagedConfigLayerSource` values. Packaged defaults require an absolute,
 normalized file path; enterprise IDs and names require non-null strings and may be
