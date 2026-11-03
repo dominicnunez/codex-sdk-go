@@ -389,6 +389,12 @@ plain records and at the resume root, exact matching at the thread-settings root
 The collaboration records remain method-free for ordinary application JSON and
 constructed turn requests. Existing lifecycle response errors keep their priority.
 
+Saved `disabledPluginIds` metadata defaults to an empty list when omitted.
+Supplied arrays and their string elements must be non-null, including earlier
+duplicate occurrences; empty-string identities remain valid. Validation uses the
+settings owner's exact property matching before callbacks or cache updates. These
+saved IDs are descriptive metadata and do not enforce plugin capabilities.
+
 Config metadata exposes typed `PackagedDefaultsConfigLayerSource` and
 `EnterpriseManagedConfigLayerSource` values. Packaged defaults require an absolute,
 normalized file path; enterprise IDs and names require non-null strings and may be

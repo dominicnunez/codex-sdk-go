@@ -56,6 +56,9 @@ func (s *ThreadSettings) UnmarshalJSON(data []byte) error {
 	if err := validateCollaborationModeField(data, false, false); err != nil {
 		return err
 	}
+	if err := validateStringArrays(data, false, "disabledPluginIds"); err != nil {
+		return err
+	}
 	*s = ThreadSettings(decoded)
 	return nil
 }
