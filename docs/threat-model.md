@@ -76,6 +76,16 @@ application stderr writers still require application cooperation.
 
 ## JSON-RPC framing, dispatch, and resource exhaustion
 
+Inbound error-response admission requires non-null code and message members,
+including recognized aliases and duplicate occurrences. Malformed records resolve
+only the correlated pending request through the existing sanitized parse-error
+path, discard peer error data and increment malformed-frame accounting. Valid
+zero codes, empty messages and arbitrary data remain supported. Requiredness is
+tracked during the existing borrowed-field pass before selected data is copied;
+public error records retain ordinary application JSON behavior. This distinguishes
+malformed envelopes from valid server errors without authenticating the peer or
+changing the existing outer-envelope selection and code-width rules.
+
 Collaboration response/settings admission rejects incomplete mode/settings/model
 records and forbidden nested null occurrences before response, callback or cache
 publication. Presence follows existing alias and duplicate-object decoding rules,

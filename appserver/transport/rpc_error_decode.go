@@ -6,11 +6,13 @@ import (
 	"strconv"
 )
 
-// Preserve the standard Error struct's aliases, sticky type errors and
-// null-no-clear scalar semantics without allocating per overwritten field.
+// Preserve native aliases, sticky type errors and final field selection while
+// enforcing the response carrier's required/non-null code and message. Decode
+// selected strings/data once, without allocating per overwritten field.
 func decodeInboundRPCError(data []byte) (Error, bool) {
 	var parsed Error
 	var message, extra json.RawMessage
+	var hasCode, hasMessage bool
 	invalid := false
 	ok := walkJSONObjectFields(data, true, func(key, value []byte) {
 		if invalid {
@@ -18,7 +20,9 @@ func decodeInboundRPCError(data []byte) (Error, bool) {
 		}
 		switch {
 		case jsonFieldMatchesFolded(key, "code"):
+			hasCode = true
 			if bytes.Equal(value, []byte("null")) {
+				invalid = true
 				return
 			}
 			if len(value) > 20 {
@@ -32,16 +36,17 @@ func decodeInboundRPCError(data []byte) (Error, bool) {
 			}
 			parsed.Code = int(code)
 		case jsonFieldMatchesFolded(key, "message"):
+			hasMessage = true
 			if value[0] == '"' {
 				message = value
-			} else if !bytes.Equal(value, []byte("null")) {
+			} else {
 				invalid = true
 			}
 		case jsonFieldMatchesFolded(key, "data"):
 			extra = value
 		}
 	})
-	if !ok || invalid {
+	if !ok || invalid || !hasCode || !hasMessage {
 		return Error{}, false
 	}
 	if len(message) > 0 {
