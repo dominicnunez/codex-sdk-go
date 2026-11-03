@@ -21,6 +21,7 @@ var nativeDefaultBools = []defaultBoolCase{
 	{"approval", "request_permissions"}, {"approval", "skill_approval"},
 	{"sandbox", "excludeSlashTmp"}, {"sandbox", "excludeTmpdirEnvVar"}, {"sandbox", "networkAccess"},
 	{"readOnly", "networkAccess"},
+	{"bedrock", "usesCodexManagedCredentials"},
 }
 
 func defaultBoolBody(owner, members string) string {
@@ -37,6 +38,8 @@ func defaultBoolBody(owner, members string) string {
 		return `{"type":"workspaceWrite"` + members + `}`
 	case "readOnly":
 		return `{"type":"readOnly"` + members + `}`
+	case "bedrock":
+		return `{"type":"amazonBedrock"` + members + `}`
 	default:
 		panic(owner)
 	}
@@ -53,6 +56,8 @@ func defaultBoolTarget(owner string) any {
 		return &p.ApprovalPolicyGranular{}
 	case "sandbox", "readOnly":
 		return &p.SandboxPolicyWrapper{}
+	case "bedrock":
+		return &p.AmazonBedrockAccount{}
 	default:
 		panic(owner)
 	}
@@ -76,6 +81,9 @@ func defaultBoolCaller(t *testing.T, owner string) func(string) (any, error) {
 		case "config":
 			mock.SetResponse("config/read", p.Response{JSONRPC: "2.0", Result: json.RawMessage(`{"config":` + raw + `,"origins":{}}`)})
 			return client.Config.Read(context.Background(), p.ConfigReadParams{})
+		case "bedrock":
+			mock.SetResponse("account/read", p.Response{Result: json.RawMessage(`{"requiresOpenaiAuth":false,"account":` + raw + `}`)})
+			return client.Account.Get(context.Background(), p.GetAccountParams{})
 		default:
 			body := validThreadLifecycleResponse(validProcessThreadPayload("bool-thread"))
 			field := "sandbox"
@@ -146,6 +154,9 @@ func defaultBoolValue(owner, field string, target any) (bool, bool) {
 
 func defaultBoolPublicValue(owner, field string, response any) (bool, bool) {
 	switch owner {
+	case "bedrock":
+		value := response.(p.GetAccountResponse).Account.Value.(*p.AmazonBedrockAccount)
+		return defaultBoolValue(owner, field, value)
 	case "app":
 		value := response.(p.AppsListResponse).Data[0]
 		return defaultBoolValue(owner, field, &value)
@@ -255,6 +266,7 @@ func TestNativeDefaultBooleansUnicodeAndOuterAliases(t *testing.T) {
 		{"approval", `{"granular":{"mcp_elicitations":false,"rules":false,"sandbox_approval":false},"GRANULAR":{"reque\u017ft_permissions":null}}`},
 		{"sandbox", defaultBoolBody("sandbox", `,"networ\u212aAccess":null`)},
 		{"readOnly", defaultBoolBody("readOnly", `,"networ\u212aAccess":null`)},
+		{"bedrock", defaultBoolBody("bedrock", `,"u\u017fesCodexManagedCredentials":null`)},
 	} {
 		if err := json.Unmarshal([]byte(tc.raw), defaultBoolTarget(tc.owner)); !errors.Is(err, p.ErrNullResultField) {
 			t.Fatalf("recognized alias null accepted: owner=%s err=%v", tc.owner, err)

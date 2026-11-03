@@ -518,7 +518,12 @@ remain distinguishable from that unavailable state.
 `ProcessExitedNotification.OutputDrainTimedOut` reports incomplete output
 collection after process exit. Nil means unavailable; false is a reported
 negative result. Account metadata exposes the selected ChatGPT `WorkspaceName`
-and typed `GcpAccount`. Account thread usage exposes `NativeUsageUSDMicros`;
+and typed `GcpAccount`. `AmazonBedrockAccount.UsesCodexManagedCredentials`
+reports the server's Bedrock credential-management mode, defaulting to false when
+omitted. Present values must be booleans; null or a wrong JSON kind fails before
+`Account.Get` returns success. Unknown future account types retain owned raw JSON,
+and the Bedrock flag remains an unconstrained extra on other account branches.
+Account thread usage exposes `NativeUsageUSDMicros`;
 nil means unknown and a pointer to zero means known zero.
 
 `Config.ReadRequirements` exposes managed `OtelRequirements`. `OtelExporter`

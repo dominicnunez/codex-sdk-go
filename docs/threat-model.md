@@ -76,6 +76,13 @@ application stderr writers still require application cooperation.
 
 ## JSON-RPC framing, dispatch, and resource exhaustion
 
+The known Bedrock account branch validates its optional managed-credentials flag
+as a non-null boolean before account-read publication, including recognized
+duplicate and escaped names. Omission means false. Other account branches keep
+that extra field unconstrained, and unknown future account types retain raw JSON.
+This validates reported metadata; it does not authenticate the server's claim,
+grant credential access or change the credential exchange flow.
+
 Required non-null fields in thread, plugin, sharing and initialization responses
 cannot hide a canonical null behind a later valid duplicate. Nested granular and
 thread-spawn checks inspect repeated objects without requiring each earlier
