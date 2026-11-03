@@ -206,6 +206,16 @@ completion cleanup for each tuple.
 
 ## Initialization and credentials
 
+Authorization query parsing owns syntax validation for pasted full redirect
+URLs, recognized raw queries and browser callbacks. Any malformed pair rejects the whole
+query before code extraction, state comparison or authorization publication;
+partial values from `url.ParseQuery` are discarded. Manual bare-code input still
+uses its trusted-user exception for absent state, and a lower-level callback
+with no expected state retains its comparison opt-out for valid queries.
+Malformed input must send no token request or publish credentials. Authorization
+endpoint configuration is caller-owned and remains separate from inbound query
+parsing.
+
 Initialization extensions are serialized and owned before waiting or child
 launch. Snapshot failure rejects admission rather than retaining a mutable Go
 value as fallback. Process cancellation is rechecked after parameter

@@ -724,6 +724,18 @@ the cleanup change affects only callback server lifetime.
 
 Callback host, authorization/token endpoints, redirect URI, and HTTP client are [configurable](../login/config.go), including a callback-host environment override. Non-loopback binding and nonstandard endpoints are caller-controlled exposure decisions. The SDK does not require every configured endpoint to use HTTPS, pin endpoint identity, enforce exact browser Origin/Host, or limit callback connections per user. It must not be exposed as a general authenticated HTTP API. The [manual-input parser](../login/parse.go) supports a bare code without state; supplying a manual code relies on the application's trusted user interaction and the flow's PKCE verifier. A provided mismatched state is rejected.
 
+Recognized inbound authorization queries are parsed strictly for pasted redirect URLs
+and browser callbacks. A malformed escape or unescaped semicolon in any pair
+rejects the whole query before authorization-code publication or token exchange,
+even when other code/state pairs are valid. This prevents a malformed supplied
+state from being silently treated as absent. Trusted bare-code input and valid
+lower-level callbacks without an expected state retain their existing policy.
+Configured authorization endpoints are caller-controlled configuration, separate
+from inbound redirect validation.
+The manual parser selects raw query input by a literal `code=` spelling; other
+non-URL input retains its trusted bare-code or code/state grammar. Strict query
+validation does not change that separate input selection policy.
+
 The manual-input state comparison uses the complete received value. A rejected
 state is displayed through a bounded diagnostic preview before error formatting,
 so an unusually large pasted value is not copied into the retained error in

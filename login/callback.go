@@ -115,7 +115,10 @@ func callbackHandler(expectedState string, codeCh chan<- callbackResult) http.Ha
 }
 
 func parseCallbackQuery(r *http.Request, expectedState string) (string, string, error) {
-	query := r.URL.Query()
+	query, err := parseAuthorizationQuery(r.URL.RawQuery)
+	if err != nil {
+		return "", "", err
+	}
 	code := query.Get("code")
 	state := query.Get("state")
 	if expectedState != "" && state != expectedState {

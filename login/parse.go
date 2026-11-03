@@ -13,6 +13,9 @@ type AuthorizationCode struct {
 	State string
 }
 
+// ParseAuthorizationInput accepts a redirect URL, query, code/state pair or
+// trusted bare code. Malformed query pairs fail before the missing-state
+// exception is considered; no partial authorization values are returned.
 func ParseAuthorizationInput(input string, expectedState string) (AuthorizationCode, error) {
 	trimmed := strings.TrimSpace(input)
 	if trimmed == "" {
@@ -36,15 +39,18 @@ func ParseAuthorizationInput(input string, expectedState string) (AuthorizationC
 
 func parseAuthorizationInput(input string) (string, string, error) {
 	if parsed, err := url.Parse(input); err == nil && parsed.Scheme != "" && parsed.Host != "" {
-		q := parsed.Query()
-		return q.Get("code"), q.Get("state"), nil
+		values, err := parseAuthorizationQuery(parsed.RawQuery)
+		if err != nil {
+			return "", "", err
+		}
+		return values.Get("code"), values.Get("state"), nil
 	}
 
 	if strings.Contains(input, "code=") {
 		query := strings.TrimPrefix(input, "?")
-		values, err := url.ParseQuery(query)
+		values, err := parseAuthorizationQuery(query)
 		if err != nil {
-			return "", "", fmt.Errorf("parse authorization query: %w", err)
+			return "", "", err
 		}
 		return values.Get("code"), values.Get("state"), nil
 	}
@@ -55,4 +61,12 @@ func parseAuthorizationInput(input string) (string, string, error) {
 	}
 
 	return input, "", nil
+}
+
+func parseAuthorizationQuery(query string) (url.Values, error) {
+	values, err := url.ParseQuery(query)
+	if err != nil {
+		return nil, fmt.Errorf("parse authorization query: %w", err)
+	}
+	return values, nil
 }
