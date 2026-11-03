@@ -80,6 +80,18 @@ func (r *FuzzyFileSearchResult) UnmarshalJSON(data []byte) error {
 	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	// Native uint32 decoding owns numeric type/range errors, but turns null
+	// elements into zero. Check all recognized occurrences before publication.
+	if err := validateOptionalFields(data, func(_ string, raw []byte) error {
+		return validateArrayElements(raw, func(index int, element []byte) error {
+			if isNullJSONValue(element) {
+				return fmt.Errorf("index at position %d must not be null", index)
+			}
+			return nil
+		})
+	}, "indices"); err != nil {
+		return err
+	}
 	*r = FuzzyFileSearchResult(decoded)
 	return nil
 }

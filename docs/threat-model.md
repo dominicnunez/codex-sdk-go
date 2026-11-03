@@ -397,6 +397,15 @@ and admission flags before reuse; it does not bound the number of valid records
 in an admitted payload. Generic raw notification handlers remain responsible
 for their own decoding and validation.
 
+Fuzzy-search result admission rejects null `indices` elements before a search
+response or either typed session-update listener publishes the result. The
+shared result owner checks every recognized occurrence, including folded and
+escaped aliases, so later duplicate arrays or null resets cannot hide a rejected
+element. Existing numeric type/range checks retain priority. Omitted, null and
+empty arrays and valid uint32 values remain accepted; string and path semantics
+are unchanged. Rejection preserves the prior record and containing response or
+notification. Generic raw handlers retain responsibility for their own validation.
+
 [String and optional array admission](../appserver/protocol/optional_array_validation.go)
 rejects forbidden null arrays and null string elements in plugin, app, model,
 thread lifecycle, reasoning, text-input and workspace-sandbox carriers, as well
