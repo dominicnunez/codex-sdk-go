@@ -36,15 +36,17 @@ func (d *PluginShareDiscoverability) UnmarshalJSON(data []byte) error {
 	return unmarshalEnumString(data, "discoverability", validPluginShareDiscoverabilities, d)
 }
 
-// PluginShareUpdateDiscoverability is the mutable subset of share visibility values.
+// PluginShareUpdateDiscoverability selects the requested share visibility.
 type PluginShareUpdateDiscoverability string
 
 const (
+	PluginShareUpdateDiscoverabilityListed   PluginShareUpdateDiscoverability = "LISTED"
 	PluginShareUpdateDiscoverabilityUnlisted PluginShareUpdateDiscoverability = "UNLISTED"
 	PluginShareUpdateDiscoverabilityPrivate  PluginShareUpdateDiscoverability = "PRIVATE"
 )
 
 var validPluginShareUpdateDiscoverabilities = map[PluginShareUpdateDiscoverability]struct{}{
+	PluginShareUpdateDiscoverabilityListed:   {},
 	PluginShareUpdateDiscoverabilityUnlisted: {},
 	PluginShareUpdateDiscoverabilityPrivate:  {},
 }
