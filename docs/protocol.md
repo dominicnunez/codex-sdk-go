@@ -378,6 +378,15 @@ not an approval or proof that the server resolves a path in a particular way.
 
 ## Compatibility
 
+Config metadata exposes typed `PackagedDefaultsConfigLayerSource` and
+`EnterpriseManagedConfigLayerSource` values. Packaged defaults require an absolute,
+normalized file path; enterprise IDs and names require non-null strings and may be
+empty. These checks cover config origins, included layers and write override
+metadata. Returned paths are checked lexically without resolution or filesystem
+access. Rejection of metadata from a completed write does not roll back that write.
+Future source types retain owned raw JSON, and other branches keep unrelated
+extras unconstrained.
+
 `HookPromptThreadItem` exposes hook-generated prompt fragments through
 `HookPromptFragment` records and retains optional nullable lifecycle times.
 The item union validates required IDs, fragment arrays and fragment strings before

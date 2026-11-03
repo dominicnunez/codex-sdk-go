@@ -76,6 +76,14 @@ application stderr writers still require application cooperation.
 
 ## JSON-RPC framing, dispatch, and resource exhaustion
 
+Known packaged-default and enterprise-managed config sources validate required
+metadata before read or write results are published. Packaged file paths must
+already be absolute and normalized, including earlier canonical occurrences;
+validation does not resolve, open or canonicalize them. Enterprise identifiers and
+display names may be empty, but not null. Unknown future sources remain opaque.
+These checks do not authenticate policy origin or undo a configuration write whose
+returned override metadata fails validation.
+
 The known hook-prompt item validates required fragment strings and array entries
 at the item union before response, notification or cache publication. Fragment
 presence follows native duplicate-array storage reuse, while forbidden null

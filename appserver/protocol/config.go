@@ -399,6 +399,18 @@ func (w *ConfigLayerSourceWrapper) UnmarshalJSON(data []byte) error {
 	}
 
 	switch typeStr {
+	case "packagedDefaults":
+		var v PackagedDefaultsConfigLayerSource
+		if err := jsondecode.Unmarshal(data, &v); err != nil {
+			return fmt.Errorf("config layer source %q: %w", typeStr, err)
+		}
+		w.Value = v
+	case "enterpriseManaged":
+		var v EnterpriseManagedConfigLayerSource
+		if err := jsondecode.Unmarshal(data, &v); err != nil {
+			return fmt.Errorf("config layer source %q: %w", typeStr, err)
+		}
+		w.Value = v
 	case "mdm":
 		var v MdmConfigLayerSource
 		if err := jsondecode.Unmarshal(data, &v); err != nil {
