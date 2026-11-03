@@ -85,6 +85,9 @@ func (s *SubAgentSourceThreadSpawn) UnmarshalJSON(data []byte) error {
 	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
+	if err := validateClosedObjectFields(data, "thread_spawn"); err != nil {
+		return err
+	}
 	*s = SubAgentSourceThreadSpawn(decoded)
 	return nil
 }
@@ -104,6 +107,9 @@ func (s *SubAgentSourceOther) UnmarshalJSON(data []byte) error {
 	type wire SubAgentSourceOther
 	var decoded wire
 	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	if err := validateClosedObjectFields(data, "other"); err != nil {
 		return err
 	}
 
@@ -163,16 +169,19 @@ func (s *SessionSourceWrapper) UnmarshalJSON(data []byte) error {
 	}
 	subAgentRaw, hasKey := raw["subAgent"]
 	if !hasKey {
-		if _, hasCustom := raw["custom"]; hasCustom {
-			var custom SessionSourceCustom
-			if err := unmarshalInboundObject(data, &custom, []string{"custom"}, []string{"custom"}); err != nil {
-				return fmt.Errorf("unmarshal session source custom: %w", err)
-			}
-			s.Value = custom
+		if _, hasCustom := raw["custom"]; !hasCustom {
+			// Unknown object variant — preserve for forward compatibility
+			s.Value = UnknownSessionSource{Raw: append(json.RawMessage(nil), data...)}
 			return nil
 		}
-		// Unknown object variant — preserve for forward compatibility
-		s.Value = UnknownSessionSource{Raw: append(json.RawMessage(nil), data...)}
+		var custom SessionSourceCustom
+		if err := unmarshalInboundObject(data, &custom, []string{"custom"}, []string{"custom"}); err != nil {
+			return fmt.Errorf("unmarshal session source custom: %w", err)
+		}
+		if err := validateClosedObjectFields(data, "custom"); err != nil {
+			return fmt.Errorf("unmarshal session source custom: %w", err)
+		}
+		s.Value = custom
 		return nil
 	}
 	if err := validateRequiredObjectFields(data, "subAgent"); err != nil {
@@ -180,6 +189,9 @@ func (s *SessionSourceWrapper) UnmarshalJSON(data []byte) error {
 	}
 	subAgent, err := unmarshalSubAgentSource(subAgentRaw)
 	if err != nil {
+		return fmt.Errorf("unmarshal session source subAgent: %w", err)
+	}
+	if err := validateClosedObjectFields(data, "subAgent"); err != nil {
 		return fmt.Errorf("unmarshal session source subAgent: %w", err)
 	}
 	s.Value = SessionSourceSubAgent{SubAgent: subAgent}
