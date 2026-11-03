@@ -573,6 +573,9 @@ func executeTurn(ctx context.Context, p turnLifecycleParams) (*RunResult, error)
 // executeStreamedTurn runs the streaming lifecycle: registers filtered listeners,
 // starts the turn, and sends events on ch until completion or context cancellation.
 func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, g *guardedChan, s *Stream) {
+	stopCancellation := context.AfterFunc(ctx, g.stopSending)
+	defer stopCancellation()
+
 	if p.threadGeneration == 0 {
 		p.threadGeneration = p.client.ThreadStateGeneration(p.threadID)
 	}

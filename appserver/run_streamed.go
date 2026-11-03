@@ -40,6 +40,7 @@ type guardedChan struct {
 	closed         bool
 	detached       bool
 	consumerActive bool
+	sendStopped    bool
 	terminalErr    error
 	onOverflow     func(error)
 }
@@ -63,7 +64,7 @@ func (g *guardedChan) send(eoe eventOrErr) {
 
 	for {
 		switch {
-		case g.closed || g.detached || g.terminalErr != nil:
+		case g.closed || g.detached || g.sendStopped || g.terminalErr != nil:
 			g.mu.Unlock()
 			return
 		case g.size < len(g.buf):
@@ -91,6 +92,15 @@ func (g *guardedChan) send(eoe eventOrErr) {
 			g.notFull.Wait()
 		}
 	}
+}
+
+// stopSending releases publication waits without choosing the stream outcome.
+// A lifecycle that already selected completion must retain its result or error.
+func (g *guardedChan) stopSending() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.sendStopped = true
+	g.notFull.Broadcast()
 }
 
 // setTerminalError records the terminal stream error exactly once.
