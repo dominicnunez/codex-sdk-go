@@ -87,6 +87,14 @@ same boundary: matching starts received before the response are buffered, and
 other turn IDs are excluded from the operation's iterator. Client-wide typed
 notification delivery retains its broader scope.
 
+The shared completion owner records the terminal turn and collected items before
+classifying the runtime outcome. A `failed` status is a failure independently of
+the optional nullable diagnostic object. Detailed `TurnError` values retain their
+error chain; absent details do not create synthetic protocol fields. Blocking and
+streaming helpers share this classification, while streams retain the terminal
+completion event before reporting failure. Foreign thread and turn identities
+remain excluded from the active operation.
+
 Stream iteration releases consumer ownership on every exit, including an
 application panic or goroutine exit inside the iterator callback. Detachment
 discards queued events and wakes blocked producers so collection and lifecycle

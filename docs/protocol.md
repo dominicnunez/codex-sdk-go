@@ -32,6 +32,17 @@ failure and internal queues cannot be observed through the required transport
 interface. EOF does not disable ordinary stream backpressure or discard accepted
 runtime replay. A stalled consumer must still drain, detach or cancel.
 
+## Runtime turn outcomes
+
+Run and Conversation helpers report terminal `failed` status as a Go error even
+when the schema-valid completion omits `error` or sets it to null. They return no
+result on failure; streams deliver the terminal `TurnCompleted` event before the
+error and leave `Stream.Result()` nil. Detailed errors retain their existing
+wrapping and can be inspected with `errors.As` into `*TurnError`. Missing details
+produce an SDK error without inventing a protocol `TurnError`. The terminal turn
+and collected items are still recorded in the matching cache incarnation and
+Conversation history before the error is returned.
+
 ## Service map
 
 The main service fields on `Client` include `Thread`, `Turn`, `Account`, `Apps`, `Skills`, and `ExternalAgent`. Recent protocol methods include:

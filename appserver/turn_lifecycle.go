@@ -501,6 +501,9 @@ func finishCompletedTurnLifecycle(p turnLifecycleParams, completed TurnCompleted
 	if completed.Turn.Error != nil {
 		return nil, fmt.Errorf("turn error: %w", completed.Turn.Error)
 	}
+	if completed.Turn.Status == TurnStatusFailed {
+		return nil, errors.New("turn failed without error details")
+	}
 	return result, nil
 }
 
