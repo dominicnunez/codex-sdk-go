@@ -771,6 +771,17 @@ partial updates on errors, while a failed config-read returns no public value.
 These checks validate the supplied representation, not whether a policy should
 be granted or how the server enforces it.
 
+Structured web-search tool settings retain optional domain lists, a declared
+context-size enum and location metadata before config-read publication. The
+existing `Config` admission owner checks closed tool/location objects and
+nullable arrays with non-null string elements, including overwritten invalid
+occurrences. Its earlier sandbox and browser-origin checks keep priority, and
+direct Config decoding retains native partial updates and references on errors.
+Tool and location records remain method-free for ordinary application JSON.
+Root web-search mode and the legacy view-image flag remain separate. These are
+peer-supplied settings; decoding neither performs searches nor validates domain
+ownership, location accuracy or permission to use a provider.
+
 Permission profile listings require an explicit non-null `allowed` flag for
 every summary before a successful response is returned. Missing or null flags
 cannot silently become false, and one invalid entry rejects the whole public

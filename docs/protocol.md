@@ -34,6 +34,15 @@ Omitted Git metadata leaves stored values unchanged, while null requests a
 clear. A null goal budget requests removing the budget; omission keeps it.
 The SDK preserves these requests without performing a server-side update locally.
 
+`Config.Tools.WebSearch` contains a `WebSearchToolConfig` object with optional
+allowed domains, a `low`/`medium`/`high` context size, and location metadata.
+Empty objects and nullable members are supported; a nonnil empty domains slice
+remains an empty array during serialization. Config admission rejects unknown
+properties in the tool and location objects and null domain elements, including
+overwritten occurrences. The separate `Config.WebSearch` mode and the legacy
+`ToolsV2.ViewImage` flag retain their own meanings. The public tool and location
+records keep ordinary JSON behavior when decoded outside Config.
+
 ## Transport termination
 
 Custom transports can implement the optional `TransportLifecycle` capability.

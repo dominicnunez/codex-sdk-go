@@ -121,8 +121,8 @@ type SandboxWorkspaceWrite struct {
 
 // ToolsV2 represents tools configuration
 type ToolsV2 struct {
-	ViewImage *bool `json:"view_image,omitempty"`
-	WebSearch *bool `json:"web_search,omitempty"`
+	ViewImage *bool                `json:"view_image,omitempty"`
+	WebSearch *WebSearchToolConfig `json:"web_search,omitempty"`
 }
 
 // ProfileV2 represents a named configuration profile
