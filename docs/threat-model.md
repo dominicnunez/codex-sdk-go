@@ -721,6 +721,10 @@ error; if forced close also errors, both errors are retained. `Close` does not
 cancel `Wait` or promise to join arbitrary HTTP handler goroutines. Login still
 uses the same callback response, authorization-code and token-exchange behavior;
 the cleanup change affects only callback server lifetime.
+Close also explicitly releases the owned listener when shutdown races ahead of
+Serve registration. Immediate terminal input cannot leave a listening socket
+owned only by a goroutine that has not run yet; already-closed listener errors
+are harmless, and other listener-close failures remain visible.
 
 Callback host, authorization/token endpoints, redirect URI, and HTTP client are [configurable](../login/config.go), including a callback-host environment override. Non-loopback binding and nonstandard endpoints are caller-controlled exposure decisions. The SDK does not require every configured endpoint to use HTTPS, pin endpoint identity, enforce exact browser Origin/Host, or limit callback connections per user. It must not be exposed as a general authenticated HTTP API. The [manual-input parser](../login/parse.go) supports a bare code without state; supplying a manual code relies on the application's trusted user interaction and the flow's PKCE verifier. A provided mismatched state is rejected.
 
@@ -732,9 +736,22 @@ state from being silently treated as absent. Trusted bare-code input and valid
 lower-level callbacks without an expected state retain their existing policy.
 Configured authorization endpoints are caller-controlled configuration, separate
 from inbound redirect validation.
-The manual parser selects raw query input by a literal `code=` spelling; other
-non-URL input retains its trusted bare-code or code/state grammar. Strict query
-validation does not change that separate input selection policy.
+The manual parser recognizes raw query input through its existing literal
+`code=` spelling or literal `error=` query keys before a manual code/state
+separator. Other non-URL input retains its trusted bare-code or code/state
+grammar.
+
+OAuth authorization errors such as access denial or provider failure terminate
+the flow with `ErrAuthorizationFailed`, zero credentials and no token exchange.
+Callbacks validate the expected state before publishing a terminal error; wrong
+or missing state cannot terminate a normal login. Pasted error URLs and queries
+use the manual input's existing state policy. A provider error takes precedence
+over a simultaneously supplied code after state checks.
+The authorization waiter cancels competing input contexts and Login closes the
+callback listener on return. Error code and description previews are bounded
+before wrapping, and the callback page HTML-escapes diagnostic text. Such text is
+still peer-provided information, not a verified account or a universal secret
+redaction boundary; provider error URIs are not followed.
 
 The manual-input state comparison uses the complete received value. A rejected
 state is displayed through a bounded diagnostic preview before error formatting,

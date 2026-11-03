@@ -216,6 +216,20 @@ Malformed input must send no token request or publish credentials. Authorization
 endpoint configuration is caller-owned and remains separate from inbound query
 parsing.
 
+Recognized authorization error responses are terminal failures rather than
+authorization codes. Browser callbacks compare the expected state before
+publishing such a failure; wrong or missing state leaves the legitimate wait
+active. Pasted full URLs and queries use the manual-input state policy and return
+the same `ErrAuthorizationFailed` marker without exchanging a token. The shared
+authorization waiter cancels competing input contexts on either success or
+failure, and Login closes its callback listener on return. Provider error code
+and description previews are bounded before error wrapping; callback HTML escapes
+the resulting text. These failures do not prove reversal of any remote effect.
+Callback close releases its owned listener even if shutdown precedes Serve's
+registration, so immediate manual failure cannot leave the listener open until
+a delayed serving goroutine runs. Graceful active-handler shutdown and forced
+close on shutdown failure retain their existing behavior.
+
 Initialization extensions are serialized and owned before waiting or child
 launch. Snapshot failure rejects admission rather than retaining a mutable Go
 value as fallback. Process cancellation is rechecked after parameter
