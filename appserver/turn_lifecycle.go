@@ -306,11 +306,12 @@ func newPendingTurnStartOverflowError() error {
 }
 
 type turnStartState struct {
-	mu           sync.Mutex
-	ready        bool
-	turnID       string
-	pendingCount int
-	overflowErr  error
+	mu            sync.Mutex
+	publicationMu sync.Mutex
+	ready         bool
+	turnID        string
+	pendingCount  int
+	overflowErr   error
 }
 
 func (s *turnStartState) queuePendingLocked() error {
@@ -348,16 +349,31 @@ func (s *turnStartState) startLocked(turnID string) error {
 	return err
 }
 
-func startTurnStateWithPending[T any](state *turnStartState, turnID string, pending *[]T, completions *[]turnCompletionCandidate) ([]T, []turnCompletionCandidate, error) {
+// publish serializes live publication with the startup-to-live handoff. Never
+// hold mu while publishing: a bounded event send can wait for the application,
+// and cancellation must remain able to release it independently.
+func (s *turnStartState) publish(fn func()) {
+	s.publicationMu.Lock()
+	defer s.publicationMu.Unlock()
+	fn()
+}
+
+func startTurnStateWithPending[T any](state *turnStartState, turnID string, pending *[]T, completions *[]turnCompletionCandidate, replay func([]T, []turnCompletionCandidate)) error {
+	state.publicationMu.Lock()
+	defer state.publicationMu.Unlock()
 	state.mu.Lock()
-	defer state.mu.Unlock()
 
 	err := state.startLocked(turnID)
 	queued := *pending
 	queuedCompletions := *completions
 	*pending = nil
 	*completions = nil
-	return queued, queuedCompletions, err
+	state.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	replay(queued, queuedCompletions)
+	return nil
 }
 
 func (s *blockingTurnState) queueItem(n ItemCompletedNotification) (ThreadItemWrapper, bool, error) {
@@ -390,8 +406,8 @@ func (s *blockingTurnState) queueCompletion(n turnCompletionCandidate) (TurnComp
 	return n.notification, true, nil
 }
 
-func (s *blockingTurnState) start(turnID string) ([]ItemCompletedNotification, []turnCompletionCandidate, error) {
-	return startTurnStateWithPending(&s.turnStartState, turnID, &s.pendingItems, &s.pendingCompletions)
+func (s *blockingTurnState) start(turnID string, replay func([]ItemCompletedNotification, []turnCompletionCandidate)) error {
+	return startTurnStateWithPending(&s.turnStartState, turnID, &s.pendingItems, &s.pendingCompletions, replay)
 }
 
 type streamedTurnState struct {
@@ -432,8 +448,8 @@ func (s *streamedTurnState) queueCompletion(n turnCompletionCandidate) (string, 
 	return s.turnID, true, nil
 }
 
-func (s *streamedTurnState) start(turnID string) ([]func(string), []turnCompletionCandidate, error) {
-	return startTurnStateWithPending(&s.turnStartState, turnID, &s.pendingEvents, &s.pendingCompletions)
+func (s *streamedTurnState) start(turnID string, replay func([]func(string), []turnCompletionCandidate)) error {
+	return startTurnStateWithPending(&s.turnStartState, turnID, &s.pendingEvents, &s.pendingCompletions, replay)
 }
 
 func waitForTurnCompletion(ctx context.Context, done <-chan TurnCompletedNotification) (TurnCompletedNotification, error) {
@@ -512,7 +528,7 @@ func executeTurn(ctx context.Context, p turnLifecycleParams) (*RunResult, error)
 		if !ok {
 			return
 		}
-		appendItem(item)
+		state.publish(func() { appendItem(item) })
 	})
 
 	unsubTurn := p.client.AddNotificationListener(protocol.NotifyTurnCompleted, func(_ context.Context, notif Notification) {
@@ -528,7 +544,7 @@ func executeTurn(ctx context.Context, p turnLifecycleParams) (*RunResult, error)
 		if !ok {
 			return
 		}
-		sendTurnCompletion(done, completed)
+		state.publish(func() { sendTurnCompletion(done, completed) })
 	})
 
 	defer unsubItem()
@@ -545,21 +561,21 @@ func executeTurn(ctx context.Context, p turnLifecycleParams) (*RunResult, error)
 		p.onStart()
 	}
 
-	bufferedItems, bufferedCompletions, err := state.start(startResp.Turn.ID)
+	err = state.start(startResp.Turn.ID, func(bufferedItems []ItemCompletedNotification, bufferedCompletions []turnCompletionCandidate) {
+		for _, n := range bufferedItems {
+			if n.TurnID == startResp.Turn.ID {
+				appendItem(n.Item)
+			}
+		}
+		for _, n := range bufferedCompletions {
+			if !matchesActiveTurn(startResp.Turn.ID, n) {
+				continue
+			}
+			sendTurnCompletion(done, n.notification)
+		}
+	})
 	if err != nil {
 		return nil, err
-	}
-
-	for _, n := range bufferedItems {
-		if n.TurnID == startResp.Turn.ID {
-			appendItem(n.Item)
-		}
-	}
-	for _, n := range bufferedCompletions {
-		if !matchesActiveTurn(startResp.Turn.ID, n) {
-			continue
-		}
-		sendTurnCompletion(done, n.notification)
 	}
 
 	completed, err := waitForTurnCompletion(ctx, done)
@@ -626,7 +642,7 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, g *guardedC
 		if !ready || turnID != activeTurnID {
 			return
 		}
-		fn()
+		turnState.publish(fn)
 	}
 
 	queueTurnCompletionCandidate := func(n turnCompletionCandidate) {
@@ -638,7 +654,7 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, g *guardedC
 		if !ready || !matchesActiveTurn(activeTurnID, n) {
 			return
 		}
-		sendTurnCompletion(turnDone, n.notification)
+		turnState.publish(func() { sendTurnCompletion(turnDone, n.notification) })
 	}
 
 	registerStreamDeltaListeners(p, g, on, onEvent, dispatchTurnScoped)
@@ -660,20 +676,20 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, g *guardedC
 	}
 
 	startedTurnID = startResp.Turn.ID
-	pendingEvents, pendingCompletions, err := turnState.start(startedTurnID)
+	err = turnState.start(startedTurnID, func(pendingEvents []func(string), pendingCompletions []turnCompletionCandidate) {
+		for _, pending := range pendingEvents {
+			pending(startedTurnID)
+		}
+		for _, n := range pendingCompletions {
+			if !matchesActiveTurn(startedTurnID, n) {
+				continue
+			}
+			sendTurnCompletion(turnDone, n.notification)
+		}
+	})
 	if err != nil {
 		emitErr(err)
 		return
-	}
-
-	for _, pending := range pendingEvents {
-		pending(startedTurnID)
-	}
-	for _, n := range pendingCompletions {
-		if !matchesActiveTurn(startedTurnID, n) {
-			continue
-		}
-		sendTurnCompletion(turnDone, n.notification)
 	}
 
 	// Wait for turn completion or context cancellation.
@@ -696,8 +712,10 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, g *guardedC
 }
 
 func registerStreamDeltaListeners(p turnLifecycleParams, g *guardedChan, on func(string, NotificationHandler), onEvent func(Event), dispatchTurnScoped func(string, func())) {
-	streamListen(on, protocol.NotifyTurnStarted, g, p.threadID, p.client.ReportHandlerError, onEvent, func(n TurnStartedNotification) string {
+	streamListenTurnScoped(on, protocol.NotifyTurnStarted, g, p.threadID, p.client.ReportHandlerError, onEvent, dispatchTurnScoped, func(n TurnStartedNotification) string {
 		return n.ThreadID
+	}, func(n TurnStartedNotification) string {
+		return n.Turn.ID
 	}, func(n TurnStartedNotification) Event {
 		return &TurnStarted{Turn: n.Turn, ThreadID: n.ThreadID}
 	})

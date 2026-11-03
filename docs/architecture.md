@@ -50,6 +50,16 @@ not choose the terminal error: a completion already selected by the lifecycle
 retains its result or error. The cancellation registration is removed when that
 lifecycle finishes.
 
+Turn-start readiness establishes the active ID before replay, but live publication
+waits until that replay finishes. A separate publication mutex covers collector
+updates, event sends, item accumulation and completion admission. The startup
+state mutex is released before replay or any blocking send. This keeps the
+existing pending-notification and stream-queue bounds while preserving order at
+the handoff in both blocking and streaming helpers. Turn-owned starts use this
+same boundary: matching starts received before the response are buffered, and
+other turn IDs are excluded from the operation's iterator. Client-wide typed
+notification delivery retains its broader scope.
+
 Stream iteration releases consumer ownership on every exit, including an
 application panic or goroutine exit inside the iterator callback. Detachment
 discards queued events and wakes blocked producers so collection and lifecycle
