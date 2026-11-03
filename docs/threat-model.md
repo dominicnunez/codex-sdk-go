@@ -254,6 +254,16 @@ Unknown account union branches retain raw metadata, and ordinary public scalar
 decoding remains available outside these owners. These metadata checks do not
 establish authentication, billing authority or permission to issue requests.
 
+The rate-limit response owner validates known reset-credit summary and detail
+metadata after existing bucket checks and before successful publication. It
+requires declared non-null fields, kinds and enum values across recognized
+occurrences, retaining signed integer ranges, nullable details and open extras.
+Inner schema names match exactly; differently cased extras remain opaque.
+The complete selected raw value is retained, including null/empty distinctions
+and numeric spelling. Rejection preserves the prior response and returns no
+public result. These checks do not consume a credit, authenticate its issuer,
+enforce a budget or prove authorization to redeem it.
+
 Managed OpenTelemetry requirements expose exporter choices, logging limits and
 server-reported TLS strings as metadata. Admission checks exporter union shapes,
 required members, protocol enums and unsigned byte limits before publishing a

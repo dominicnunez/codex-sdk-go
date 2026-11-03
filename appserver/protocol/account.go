@@ -339,6 +339,9 @@ func (r *GetAccountRateLimitsResponse) UnmarshalJSON(data []byte) error {
 	if err := validateRateLimitBuckets(data); err != nil {
 		return err
 	}
+	if err := validateResetCreditMetadata(data); err != nil {
+		return err
+	}
 	*r = GetAccountRateLimitsResponse(decoded)
 	return nil
 }
