@@ -219,6 +219,8 @@ type Client struct {
 	threadStateListeners   map[string][]threadStateListener
 	threadStateListenerSeq uint64
 	threadStateGeneration  uint64
+	threadStarts           map[*threadStartObservation]struct{}
+	threadStartPins        map[string]int
 	threadStateMu          sync.RWMutex
 
 	// Approval handlers for server→client requests

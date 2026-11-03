@@ -135,7 +135,7 @@ func TestRemovingThreadStateListenerAllowsDeferredEviction(t *testing.T) {
 func (c *Client) cachedThreadStatesWithoutListenersForTest() int {
 	c.threadStateMu.RLock()
 	defer c.threadStateMu.RUnlock()
-	return c.cachedThreadStatesWithoutListenersLocked()
+	return c.unpinnedThreadStatesLocked()
 }
 
 func TestThreadStateListenersReceiveCloseUpdates(t *testing.T) {

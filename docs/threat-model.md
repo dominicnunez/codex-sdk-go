@@ -488,10 +488,22 @@ Callbacks must return promptly: panic recovery does not stop blocked callbacks
 or undo their external effects, and an earlier blocked recipient can delay
 drainers already selected for later recipients.
 
-Conversation startup couples successful response publication, listener
-registration and cache-incarnation capture before callbacks or eviction. Failed
-requests create no new subscription or publication. Cache pressure cannot evict
-the new thread before its Conversation pins observation. If closure coalesces
+Conversation startup captures admitted startup identities and closure evidence
+before sending the request, then couples response publication, listener
+registration and cache-incarnation transfer before callbacks or eviction. Each
+pending start retains at most 64 candidate references. A client-wide admission
+budget limits temporary pins to 64 distinct shared cache entries, so staged
+requests cannot accumulate disjoint pinned snapshots without limit. Existing
+application listener pins are separate. Complete Thread graphs and the number
+of application-controlled pending requests remain unbounded in bytes. Every
+exit releases temporary candidates and pins without releasing other owners'
+references.
+Failed requests create no new subscription or publication. Capacity loss or
+ambiguous same-ID startup history fails conservatively with
+`ErrThreadStartObservationLost`, returning a valid owned initial response to
+direct callers without a listener. This error does not undo a successful remote
+start and must not trigger an automatic retry. Cache pressure cannot evict a
+captured thread before its Conversation pins observation. If closure coalesces
 away the initial pending update, the closed handle retains its owned initial
 response without adopting a reopened incarnation or restoring the cache. Generic
 listener replay follows the same per-recipient delivery admission. New turns

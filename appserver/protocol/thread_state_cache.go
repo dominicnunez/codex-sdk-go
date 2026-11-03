@@ -31,7 +31,19 @@ func (c *Client) cacheThreadStateWithListener(method string, thread Thread, onUp
 	snapshot := cloneThreadState(thread)
 	c.threadStateMu.Lock()
 	c.ensureThreadStateCacheMapsLocked()
-	entry := c.threadStates[thread.ID]
+	generation, id, listeners := c.publishThreadStateLocked(method, snapshot, onUpdate, onClose)
+	c.threadStateMu.Unlock()
+
+	c.drainThreadStateListeners(listeners)
+	if id == 0 {
+		return generation, func() {}
+	}
+	return generation, func() { c.removeThreadStateListener(threadID, id) }
+}
+
+func (c *Client) publishThreadStateLocked(method string, snapshot Thread, onUpdate func(Thread), onClose func()) (uint64, uint64, []threadStateListener) {
+	threadID := snapshot.ID
+	entry := c.threadStates[threadID]
 	if !entry.hasSnapshot || entry.closed {
 		c.threadStateGeneration++
 		entry.generation = c.threadStateGeneration
@@ -39,27 +51,24 @@ func (c *Client) cacheThreadStateWithListener(method string, thread Thread, onUp
 	if snapshot.DisabledPluginIDs == nil {
 		// Thread-only reads and notifications do not carry lifecycle settings.
 		// Preserve the last settings without sharing ownership with the old entry.
-		snapshot.DisabledPluginIDs = cloneArbitraryValue(c.threadStates[thread.ID].thread.DisabledPluginIDs)
+		snapshot.DisabledPluginIDs = cloneArbitraryValue(c.threadStates[threadID].thread.DisabledPluginIDs)
 	}
-	c.threadStates[thread.ID] = threadStateEntry{
+	c.threadStates[threadID] = threadStateEntry{
 		thread:      snapshot,
 		hasSnapshot: true,
 		generation:  entry.generation,
 	}
+	if method == notifyThreadStarted {
+		c.captureThreadStartLocked(threadID, entry.generation, false)
+	}
 	var id uint64
 	if onUpdate != nil || onClose != nil {
-		id = c.newThreadStateListenerLocked(thread.ID, onUpdate, onClose).id
+		id = c.newThreadStateListenerLocked(threadID, onUpdate, onClose).id
 	}
-	c.touchThreadStateLocked(thread.ID)
-	listeners := c.queueThreadUpdateLocked(thread.ID, method, snapshot)
+	c.touchThreadStateLocked(threadID)
+	listeners := c.queueThreadUpdateLocked(threadID, method, snapshot)
 	c.evictThreadStatesLocked()
-	c.threadStateMu.Unlock()
-
-	c.drainThreadStateListeners(listeners)
-	if id == 0 {
-		return entry.generation, func() {}
-	}
-	return entry.generation, func() { c.removeThreadStateListener(threadID, id) }
+	return entry.generation, id, listeners
 }
 
 // CacheThreadState stores a best-effort latest snapshot for a thread.
@@ -181,6 +190,7 @@ func (c *Client) closeThreadState(threadID string) {
 	entry.hasSnapshot = false
 	entry.closed = true
 	c.threadStates[threadID] = entry
+	c.captureThreadStartLocked(threadID, entry.generation, true)
 	c.touchThreadStateLocked(threadID)
 	c.evictThreadStatesLocked()
 	listeners = c.queueThreadCloseLocked(threadID, notifyThreadClosed)
@@ -272,10 +282,10 @@ func (c *Client) touchThreadStateLocked(threadID string) {
 }
 
 func (c *Client) evictThreadStatesLocked() {
-	for c.cachedThreadStatesWithoutListenersLocked() > maxCachedThreadStates {
+	for c.unpinnedThreadStatesLocked() > maxCachedThreadStates {
 		evictedIndex := -1
 		for i, threadID := range c.threadStateOrder {
-			if len(c.threadStateListeners[threadID]) == 0 {
+			if !c.threadStatePinnedLocked(threadID) {
 				evictedIndex = i
 				break
 			}
@@ -285,15 +295,20 @@ func (c *Client) evictThreadStatesLocked() {
 		}
 		evictedID := c.threadStateOrder[evictedIndex]
 		copy(c.threadStateOrder[evictedIndex:], c.threadStateOrder[evictedIndex+1:])
+		c.threadStateOrder[len(c.threadStateOrder)-1] = ""
 		c.threadStateOrder = c.threadStateOrder[:len(c.threadStateOrder)-1]
 		delete(c.threadStates, evictedID)
 	}
 }
 
-func (c *Client) cachedThreadStatesWithoutListenersLocked() int {
+func (c *Client) threadStatePinnedLocked(threadID string) bool {
+	return len(c.threadStateListeners[threadID]) != 0 || c.threadStartPins[threadID] != 0
+}
+
+func (c *Client) unpinnedThreadStatesLocked() int {
 	count := 0
 	for _, threadID := range c.threadStateOrder {
-		if len(c.threadStateListeners[threadID]) == 0 {
+		if !c.threadStatePinnedLocked(threadID) {
 			count++
 		}
 	}

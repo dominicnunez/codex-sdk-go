@@ -167,21 +167,25 @@ func (s *ThreadService) Start(ctx context.Context, params ThreadStartParams) (Th
 	return response, err
 }
 
-// StartWithStateListener starts a thread and atomically registers observation
-// with the successful response's cache publication, before eviction or callbacks.
-// The returned generation belongs to that publication, even if a callback closes
-// or reopens the thread before return. Initial update diagnostics use thread/start;
-// subsequent delivery follows AddThreadStateListener. Both nil callbacks create
-// no subscription. A failed request creates no subscription or publication from
-// this request.
+// StartWithStateListener observes startup before dispatch and atomically transfers
+// the matching incarnation to a listener when the valid response returns. Earlier
+// admitted state and closure take precedence over the initial response snapshot.
+// The returned generation remains bound to the original incarnation through a
+// callback close/reopen. Initial update diagnostics use thread/start; replayed
+// startup closure uses thread/closed. Both nil callbacks create no subscription.
+// Failed response admission returns a zero response. If bounded history cannot
+// identify the incarnation, the owned valid response is returned alongside
+// ErrThreadStartObservationLost, with no listener or generation transferred.
 func (s *ThreadService) StartWithStateListener(ctx context.Context, params ThreadStartParams, onUpdate func(Thread), onClose func()) (ThreadStartResponse, uint64, func(), error) {
+	observation := s.client.beginThreadStartObservation()
+	defer s.client.abortThreadStartObservation(observation)
 	var response ThreadStartResponse
 	if err := s.client.sendRequest(ctx, methodThreadStart, params, &response); err != nil {
 		return ThreadStartResponse{}, 0, func() {}, err
 	}
 	response.Thread = threadWithDisabledPlugins(response.Thread, response.DisabledPluginIDs)
-	generation, unsubscribe := s.client.cacheThreadStateWithListener(methodThreadStart, response.Thread, onUpdate, onClose)
-	return response, generation, unsubscribe, nil
+	generation, unsubscribe, err := s.client.finishThreadStartObservation(observation, response.Thread, onUpdate, onClose)
+	return response, generation, unsubscribe, err
 }
 
 func threadWithDisabledPlugins(thread Thread, pluginIDs []string) Thread {
