@@ -71,16 +71,17 @@ of two short runs:
 
 | Other pending starts | Unrelated notifications | Before time/op | After time/op | Before bytes/op | After bytes/op |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 0 | 0 | 34.0 us | 35.7 us | 13,099 | 14,206 |
-| 0 | 64 | 868 us | 890 us | 327,130 | 321,493 |
-| 8 | 64 | 848 us | 902 us | 327,128 | 314,884 |
-| 64 | 64 | 895 us | 1,149 us | 327,494 | 321,175 |
-| 64 | 65 | 875 us | 1,156 us | 332,404 | 325,785 |
+| 0 | 0 | 34.0 us | 36.1 us | 13,099 | 14,239 |
+| 0 | 64 | 868 us | 912.7 us | 327,130 | 321,538 |
+| 8 | 64 | 848 us | 905.2 us | 327,128 | 314,952 |
+| 64 | 64 | 895 us | 1,155.2 us | 327,494 | 320,926 |
+| 64 | 65 | 875 us | 1,200.1 us | 332,404 | 325,782 |
 
 The added work scales with notification traffic and active pending starts:
 admission visits each pending observation, retaining at most 64 identity records
-per request. Shared cache pins avoid cloning a full Thread graph into each
-observation. At capacity and overflow, cache eviction and pin release remain part
+per request, with at most 64 distinct temporary pins across the client. Shared
+cache pins avoid cloning a full Thread graph into each observation. At capacity
+and overflow, cache eviction and pin release remain part
 of the measured public call. This is a correctness tradeoff, not a performance
 improvement; the application still controls pending-request concurrency and
 complete Thread sizes. Short runs describe the cost without establishing small
@@ -88,14 +89,18 @@ percentage differences or a performance threshold.
 
 A separate manual experiment staggered pending starts and admitted 64 fresh
 identities between each new request. This creates disjoint retained candidate
-sets rather than the benchmark's overlapping warm sets. At 8 pending starts,
-512 cache entries remained pinned; at 64, 4,096 remained pinned. Across two runs,
-the latter case took 218–284 ms to admit all 4,096 notifications, 390–416 us for
-one further complete public start/unsubscribe, and 227–274 ms to cancel and join
-all pending starts. The same workload before observation retained only 64 cache
-entries, took 53–54 ms for admission and 44–55 us for the further public start.
-These short samples are descriptive. Both revisions returned to at most 64 cache
-entries after cancellation. The current cache's linear scans and repeated
-eviction can make large disjoint retention and mass release substantially more
-expensive than overlapping steady traffic; a per-request candidate bound is not
-a constant-time guarantee or a global heap bound.
+sets rather than the benchmark's overlapping warm sets. The client-wide pin
+budget keeps both 8 and 64 pending starts at 128 total cache entries (64 pinned
+plus the ordinary 64-entry unpinned budget). Across two runs, the 64-pending case
+took 72.7–73.0 ms to admit all 4,096 notifications, 55–62 us for one further public
+start attempt, and 155–196 us to cancel and join all pending starts. The further
+start returns an owned response with observation loss because its identity falls
+outside the exhausted shared budget. The same workload before observation
+retained only 64 cache entries, took 53–54 ms for admission and 44–55 us for a
+successful further public start. These outcomes differ deliberately: the earlier
+implementation could silently discard startup history.
+
+Both revisions returned to at most 64 cache entries after cancellation. These
+short samples are descriptive. Linear cache scans, application listener pins,
+full Thread sizes and pending-request concurrency remain relevant costs; the
+shared entry budget is not a constant-time guarantee or a global heap byte bound.

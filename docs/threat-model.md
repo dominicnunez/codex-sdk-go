@@ -491,9 +491,13 @@ drainers already selected for later recipients.
 Conversation startup captures admitted startup identities and closure evidence
 before sending the request, then couples response publication, listener
 registration and cache-incarnation transfer before callbacks or eviction. Each
-pending start retains at most 64 candidate references to shared pinned cache
-entries; complete Thread graphs and application-controlled concurrent starts
-remain unbounded in bytes. Every exit releases temporary candidates and pins.
+pending start retains at most 64 candidate references. A client-wide admission
+budget limits temporary pins to 64 distinct shared cache entries, so staged
+requests cannot accumulate disjoint pinned snapshots without limit. Existing
+application listener pins are separate. Complete Thread graphs and the number
+of application-controlled pending requests remain unbounded in bytes. Every
+exit releases temporary candidates and pins without releasing other owners'
+references.
 Failed requests create no new subscription or publication. Capacity loss or
 ambiguous same-ID startup history fails conservatively with
 `ErrThreadStartObservationLost`, returning a valid owned initial response to

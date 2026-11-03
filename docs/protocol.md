@@ -268,8 +268,9 @@ diagnostics use `thread/closed`. Both nil callbacks create no subscription.
 Conversations use this helper so a close during startup remains terminal for the
 returned handle even if the cache is explicitly reopened afterward.
 
-Each pending start retains at most 64 candidate thread identities and temporarily
-pins their cache entries. A returned identity outside that bound, or ambiguous
+Pending starts share a client-wide budget of 64 temporarily pinned thread
+identities; each request retains at most 64 candidate records. A returned
+identity outside the available budget, or ambiguous
 same-ID start/close history without a correlating start, produces
 `ErrThreadStartObservationLost`. Both `Thread.Start` and
 `Thread.StartWithStateListener` then return the valid, owned initial response with

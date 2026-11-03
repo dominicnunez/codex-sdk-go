@@ -10,6 +10,8 @@ import (
 // response remains available; callers must not assume the remote start failed.
 var ErrThreadStartObservationLost = errors.New("thread/start observation history unavailable")
 
+const maxPendingStartThreads = maxCachedThreadStates
+
 type threadStartCandidate struct {
 	generation uint64
 	started    bool
@@ -39,7 +41,11 @@ func (c *Client) captureThreadStartLocked(threadID string, generation uint64, cl
 	for observation := range c.threadStarts {
 		candidate, exists := observation.candidates[threadID]
 		if !exists {
-			if len(observation.candidates) == maxCachedThreadStates {
+			if observation.overflow || len(observation.candidates) == maxPendingStartThreads ||
+				(c.threadStartPins[threadID] == 0 && len(c.threadStartPins) == maxPendingStartThreads) {
+				// Bound distinct retained snapshots across the client, including
+				// staggered requests observing disjoint notification histories.
+				// Once history is lost, freed slots cannot make it complete again.
 				observation.overflow = true
 				continue
 			}

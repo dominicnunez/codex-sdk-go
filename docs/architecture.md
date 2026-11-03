@@ -142,8 +142,11 @@ through the public raw APIs receive the same owned copies as application listene
 pre-request interval, response publication, initial listener registration and
 pinning. Each pending thread start captures at most 64 candidate identities,
 their first admitted incarnation and sticky closure evidence before callbacks
-or eviction. Temporary reference-counted pins share the latest cache snapshots;
-the pending requests do not clone a snapshot per candidate. Settings supplied by
+or eviction. Temporary reference-counted pins share the latest cache snapshots
+and admit at most 64 distinct identities across the client, including staggered
+requests with disjoint histories. They can retain at most 64 additional entries
+beyond the ordinary unpinned cache budget; application listeners have their own
+existing pins. The pending requests do not clone a snapshot per candidate. Settings supplied by
 notifications, including explicit empty plugin lists, supersede response
 settings. The response fills only settings absent from a started notification.
 
@@ -160,9 +163,14 @@ response must remain available without overwriting newer delivery or reopening a
 closed handle. The acquisition interval and later replay are part of the cache
 lifecycle, rather than independent successful operations.
 Every exit releases temporary pins and candidate maps; cache eviction and order
-backing-storage compaction run after release. Active pending requests can retain
-additional shared cache entries, bounded by 64 candidate references per request;
-the application controls concurrent pending starts. A valid response accompanied
+backing-storage compaction run after release. Each pending request has at most
+64 candidate references, and the application controls concurrent pending starts.
+When the shared identity budget is exhausted, already captured candidates stay
+valid, while uncaptured histories fail conservatively at response handoff.
+An overflowed observation never admits new candidate identities even if another
+request later frees shared slots: the missing earlier history cannot be recovered.
+Cancellation of one request leaves other requests' shared pins intact.
+A valid response accompanied
 by observation loss remains available to the direct caller, with no registered
 listener, because local acquisition failure does not undo a remote start.
 
