@@ -43,6 +43,13 @@ overwritten occurrences. The separate `Config.WebSearch` mode and the legacy
 `ToolsV2.ViewImage` flag retain their own meanings. The public tool and location
 records keep ordinary JSON behavior when decoded outside Config.
 
+`Model.InputModalities` defaults to text followed by image when omitted from
+model metadata, including when decoding into a reused receiver. Explicit empty
+lists stay empty through serialization; supplied nonempty lists retain their
+order. A constructed nil slice omits the property and selects the default on
+decode. Null arrays and null elements remain invalid, including overwritten
+occurrences. This describes catalog metadata, not provider input acceptance.
+
 Realtime startup notifications support versions `v1`, `v2` and `v3` through
 `OnThreadRealtimeStarted` and `AddThreadRealtimeStartedListener`. The optional
 session ID remains nullable. Missing/null required fields and undeclared
