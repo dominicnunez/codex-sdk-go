@@ -583,6 +583,14 @@ closure, and historical results may differ from subsequently published state.
 
 ## Prompt injection, approvals, and tool results
 
+Current and legacy command-approval admission rejects null string elements in
+proposed execpolicy amendments and command argument arrays before application
+callbacks. A valid later duplicate cannot hide a malformed occurrence. Existing
+owner checks keep their precedence; the optional current amendment retains its
+nullable-array contract, and empty arrays and empty arguments remain valid.
+These checks prevent malformed evidence reaching handlers without interpreting
+paths or making an authorization decision on the application's behalf.
+
 The retained `ApprovalPolicyOnFailure` constant cannot be encoded as a typed
 approval policy because the checked-in schemas removed that known value. The
 shared literal encoder and wrapper reject it before request dispatch, including
