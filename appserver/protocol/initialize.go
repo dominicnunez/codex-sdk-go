@@ -76,7 +76,11 @@ func (r *initializeResult) validate() error {
 	if err := r.value.validate(); err != nil {
 		return err
 	}
-	return validateObjectFields(r.raw, nil, []string{"codexHome", "platformFamily", "platformOs", "userAgent"})
+	if err := validateObjectFields(r.raw, nil, []string{"codexHome", "platformFamily", "platformOs", "userAgent"}); err != nil {
+		return err
+	}
+	_, err := validateInboundAbsolutePathField("codexHome", r.value.CodexHome)
+	return err
 }
 
 // InitializeParamsMismatchError reports that a later initialize call attempted
