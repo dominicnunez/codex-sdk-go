@@ -34,6 +34,16 @@ writer is pending, as well as simultaneously ready completion and terminal
 signals. Notifications and internal replies retain actual-write completion
 rather than merely successful queue admission.
 
+Reader-owned malformed-request and overload replies enter the existing serialized
+writer queue without waiting for the external writer. This keeps response
+correlation moving while bounded admission capacity is available. Writer execution
+still owns actual completion and failure; request-worker replies keep their
+synchronous completion contract. Reader rejection payloads have a separate 64 MiB
+backing-capacity budget spanning blocked admission, queued envelopes and claimed
+writes. Admission failure, terminal discard, skipped execution and writer return
+retire that ownership. EOF follows normal terminal policy and may discard an
+unclaimed reply; queue admission does not promise an EOF flush.
+
 Terminal payload release spans the inbound queue, requests stored before handler
 registration, replay, dequeued execution claims and outbound envelopes.
 Admission and draining must remain coordinated so blocked or late producers
