@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"html"
 	"net"
 	"net/http"
 	"strconv"
@@ -76,13 +77,20 @@ func (s *CallbackServer) Close() error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), callbackShutdownTimeout)
 	defer cancel()
-	if err := s.server.Shutdown(ctx); err != nil {
+	err := s.server.Shutdown(ctx)
+	if err != nil {
 		if closeErr := s.server.Close(); closeErr != nil {
+			err = errors.Join(err, closeErr)
+		}
+	}
+	// Serve may not have registered the listener when shutdown begins. Its
+	// eventual exit cannot own listener release after Close has returned.
+	if s.listen != nil {
+		if closeErr := s.listen.Close(); closeErr != nil && !errors.Is(closeErr, net.ErrClosed) {
 			return errors.Join(err, closeErr)
 		}
-		return err
 	}
-	return nil
+	return err
 }
 
 func (s *CallbackServer) send(result callbackResult) {
@@ -97,6 +105,12 @@ func callbackHandler(expectedState string, codeCh chan<- callbackResult) http.Ha
 		code, state, err := parseCallbackQuery(r, expectedState)
 		if err != nil {
 			writeCallbackHTML(w, http.StatusBadRequest, err.Error())
+			if errors.Is(err, ErrAuthorizationFailed) {
+				select {
+				case codeCh <- callbackResult{err: err}:
+				default:
+				}
+			}
 			return
 		}
 		writeCallbackHTML(w, http.StatusOK, "OpenAI authentication completed. You can close this window.")
@@ -124,6 +138,9 @@ func parseCallbackQuery(r *http.Request, expectedState string) (string, string, 
 	if expectedState != "" && state != expectedState {
 		return "", "", ErrStateMismatch
 	}
+	if err := authorizationFailure(query); err != nil {
+		return "", "", err
+	}
 	if code == "" {
 		return "", "", ErrMissingAuthorizationCode
 	}
@@ -133,5 +150,5 @@ func parseCallbackQuery(r *http.Request, expectedState string) (string, string, 
 func writeCallbackHTML(w http.ResponseWriter, status int, message string) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
-	_, _ = fmt.Fprintf(w, "<!doctype html><html><body><p>%s</p></body></html>", message)
+	_, _ = fmt.Fprintf(w, "<!doctype html><html><body><p>%s</p></body></html>", html.EscapeString(message))
 }
