@@ -670,6 +670,13 @@ rejected values do not replace receiver references. Applications own prompt
 rendering and answer handling; these flags do not establish authorization to
 collect input.
 
+The deprecated user-input `autoResolutionMs` field accepts nullable unsigned
+64-bit integers. Negative or overflowing recognized occurrences reject the
+request before callback dispatch, even if a later duplicate is valid or null.
+Absent/null values and present zero remain distinct in the typed representation,
+and large values retain integer precision. This validates reported metadata;
+the SDK does not run a timeout or convert this value into a duration.
+
 MCP elicitation request admission validates every recognized `mode` occurrence
 against `form`, `url`, `openaiForm` and `openai/form` before invoking the
 application handler. Later valid duplicates cannot hide an unsupported mode.
