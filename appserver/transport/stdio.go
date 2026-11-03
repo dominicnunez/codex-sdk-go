@@ -361,6 +361,30 @@ func (t *StdioTransport) ReaderStopped() <-chan struct{} {
 	return t.readerStopped
 }
 
+// Done closes after notification admission ends and every accepted notification
+// is delivered or discarded. EOF preserves pending delivery, so this can happen
+// after ReaderStopped. Close does not wait synchronously for callbacks.
+func (t *StdioTransport) Done() <-chan struct{} {
+	return t.notificationBudget.doneSignal()
+}
+
+// Err returns the terminal transport cause, including io.EOF for clean reader
+// termination. Accepted notifications may still be draining when Err is set.
+func (t *StdioTransport) Err() error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if !t.closed {
+		return nil
+	}
+	if t.scanErr != nil {
+		return t.scanErr
+	}
+	if t.readerEOF {
+		return io.EOF
+	}
+	return errTransportClosed
+}
+
 func (t *StdioTransport) applyDefaultSendTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
 	timeout := t.sendTimeout
 	if timeout <= 0 {
@@ -455,6 +479,7 @@ func (t *StdioTransport) closeWithFailure(scanErr error, cause error) {
 	t.readerEOF = false
 	pending, cancel, readerCloser := t.takeStopResourcesLocked()
 	t.mu.Unlock()
+	t.notificationBudget.end()
 
 	t.stopNotificationWorkers()
 	t.finishTransportStop(cancel, readerCloser)
@@ -819,6 +844,7 @@ func (t *StdioTransport) stopAfterReaderTermination(scanErr error) {
 	t.readerEOF = true
 	_, cancel, readerCloser := t.takeStopResourcesLocked()
 	t.mu.Unlock()
+	t.notificationBudget.end()
 
 	t.finishTransportStop(cancel, readerCloser)
 	go t.drainPendingNotificationsAfterStop()

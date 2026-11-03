@@ -31,6 +31,7 @@ type (
 	RequestID           = protocol.RequestID
 	Response            = protocol.Response
 	TransportError      = protocol.TransportError
+	TransportLifecycle  = protocol.TransportLifecycle
 
 	ApprovalHandlers                  = protocol.ApprovalHandlers
 	FileChangeRequestApprovalParams   = protocol.FileChangeRequestApprovalParams

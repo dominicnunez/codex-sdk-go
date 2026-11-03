@@ -629,9 +629,23 @@ embedding application own enforcement and the meaning of an empty restriction.
 
 ## Thread state, completion, and cancellation
 
-An accepted turn-start response does not complete a runtime turn. If the peer
-terminates without a matching terminal notification, Run and RunStreamed still
-wait for the caller's context to end; callers must bound that context as needed.
+An accepted turn-start response does not complete a runtime turn. Blocking and
+streaming runtime helpers observe the client's notification-delivery boundary.
+When delivery ends without a matching completion, they return a transport error;
+an accepted matching completion retains priority. Stdio EOF drains accepted
+notifications before signaling that boundary, while explicit close discards
+unclaimed notifications and lets claimed callbacks retire. Custom transports
+without `TransportLifecycle` expose only client-close notification entry and
+retirement; autonomous termination and their internal queues remain outside the
+SDK's observation. No synthetic remote thread closure is produced.
+
+Transport termination does not discard runtime-owned startup replay or final
+stream events. An attached, stalled stream consumer therefore retains ordinary
+backpressure even after EOF; consumer progress, detachment or caller cancellation
+is still needed. An application notification callback that never returns can
+likewise delay delivery retirement. These application-cooperation limits preserve
+accepted data and bounded memory rather than treating reader exit as delivery
+completion.
 
 Caller cancellation releases blocked streaming event publication during startup
 replay and terminal-event delivery, even when the lifecycle itself is applying

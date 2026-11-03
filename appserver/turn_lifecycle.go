@@ -452,12 +452,21 @@ func (s *streamedTurnState) start(turnID string, replay func([]func(string), []t
 	return startTurnStateWithPending(&s.turnStartState, turnID, &s.pendingEvents, &s.pendingCompletions, replay)
 }
 
-func waitForTurnCompletion(ctx context.Context, done <-chan TurnCompletedNotification) (TurnCompletedNotification, error) {
+func waitForTurnCompletion(ctx context.Context, done <-chan TurnCompletedNotification, client *Client) (TurnCompletedNotification, error) {
 	select {
 	case completed := <-done:
 		return completed, nil
 	case <-ctx.Done():
 		return TurnCompletedNotification{}, ctx.Err()
+	case <-client.Done():
+		// Delivery has finished, so a completion already admitted to this
+		// operation is authoritative even if both channels became ready.
+		select {
+		case completed := <-done:
+			return completed, nil
+		default:
+			return TurnCompletedNotification{}, protocol.NewTransportError("turn ended before completion", client.Err())
+		}
 	}
 }
 
@@ -578,7 +587,7 @@ func executeTurn(ctx context.Context, p turnLifecycleParams) (*RunResult, error)
 		return nil, err
 	}
 
-	completed, err := waitForTurnCompletion(ctx, done)
+	completed, err := waitForTurnCompletion(ctx, done, p.client)
 	if err != nil {
 		return nil, err
 	}
@@ -692,23 +701,22 @@ func executeStreamedTurn(ctx context.Context, p turnLifecycleParams, g *guardedC
 		return
 	}
 
-	// Wait for turn completion or context cancellation.
-	select {
-	case completed := <-turnDone:
-		emit(&TurnCompleted{Turn: cloneTurn(completed.Turn), ThreadID: completed.ThreadID})
-
-		result, err := finishCompletedTurnLifecycle(p, completed, snapshotCollectedItems(&itemsMu, &items))
-		if err != nil {
-			emitErr(err)
-			return
-		}
-		s.mu.Lock()
-		s.result = result
-		s.mu.Unlock()
-
-	case <-ctx.Done():
-		emitErr(ctx.Err())
+	// Wait for completion, caller cancellation or finished transport delivery.
+	completed, err := waitForTurnCompletion(ctx, turnDone, p.client)
+	if err != nil {
+		emitErr(err)
+		return
 	}
+	emit(&TurnCompleted{Turn: cloneTurn(completed.Turn), ThreadID: completed.ThreadID})
+
+	result, err := finishCompletedTurnLifecycle(p, completed, snapshotCollectedItems(&itemsMu, &items))
+	if err != nil {
+		emitErr(err)
+		return
+	}
+	s.mu.Lock()
+	s.result = result
+	s.mu.Unlock()
 }
 
 func registerStreamDeltaListeners(p turnLifecycleParams, g *guardedChan, on func(string, NotificationHandler), onEvent func(Event), dispatchTurnScoped func(string, func())) {

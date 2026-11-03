@@ -43,6 +43,7 @@ type (
 	RequestID                                  = protocol.RequestID
 	Response                                   = protocol.Response
 	Transport                                  = protocol.Transport
+	TransportLifecycle                         = protocol.TransportLifecycle
 	TransportError                             = protocol.TransportError
 	AgentMessageDeltaNotification              = protocol.AgentMessageDeltaNotification
 	AgentMessageThreadItem                     = protocol.AgentMessageThreadItem

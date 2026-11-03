@@ -16,6 +16,22 @@ Application codec errors retain their identity and chains. The [threat
 model](threat-model.md#json-rpc-framing-dispatch-and-resource-exhaustion)
 describes SDK diagnostic bounds and their limits.
 
+## Transport termination
+
+Custom transports can implement the optional `TransportLifecycle` capability.
+Its stable `Done()` channel closes after notification admission ends and all
+accepted notifications have finished dispatch or been discarded according to the
+transport's shutdown contract. `Err()` supplies the terminal cause. Reader exit
+alone is insufficient when accepted notifications still need delivery.
+
+`Client.Done()` and `Client.Err()` expose that boundary to runtime helpers. A
+matching accepted turn completion wins over transport termination. For transports
+without the capability, `Client.Close()` rejects new client notification entries
+and signals completion after already-entered dispatches retire; their autonomous
+failure and internal queues cannot be observed through the required transport
+interface. EOF does not disable ordinary stream backpressure or discard accepted
+runtime replay. A stalled consumer must still drain, detach or cancel.
+
 ## Service map
 
 The main service fields on `Client` include `Thread`, `Turn`, `Account`, `Apps`, `Skills`, and `ExternalAgent`. Recent protocol methods include:

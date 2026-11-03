@@ -44,3 +44,17 @@ type Transport interface {
 	// Close must be safe to call multiple times.
 	Close() error
 }
+
+// TransportLifecycle is an optional capability for transports that can report
+// permanent termination. It does not change the required Transport interface.
+type TransportLifecycle interface {
+	// Done closes only after notification admission has ended and every accepted
+	// notification has finished dispatch or been discarded according to the
+	// transport's shutdown contract. Reader exit alone is not this boundary.
+	// The returned channel is stable and must not be nil.
+	Done() <-chan struct{}
+
+	// Err reports the terminal cause once Done closes (for example io.EOF).
+	// It returns nil while the transport is live.
+	Err() error
+}
