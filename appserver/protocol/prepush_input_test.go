@@ -34,9 +34,11 @@ exec "$HOOK_REAL_GO" "$@"
 			calls := filepath.Join(f.parent, "go-calls")
 			f.env = append(f.env, "HOOK_REAL_GO="+filepath.ToSlash(realGo), "HOOK_BUILD_INPUT="+filepath.ToSlash(input), "HOOK_GO_CALLS="+filepath.ToSlash(calls))
 			if state == "capture fails" {
-				if err := os.WriteFile(filepath.Join(f.parent, "bin", "cat"), []byte("#!/usr/bin/env bash\necho 'capture fixture failed' >&2\nexit 7\n"), 0o700); err != nil {
+				startup := filepath.Join(f.parent, "capture-env")
+				if err := os.WriteFile(startup, []byte("cat() { echo 'capture fixture failed' >&2; return 7; }\n"), 0o600); err != nil {
 					t.Fatal(err)
 				}
+				f.env = append(f.env, "BASH_ENV="+filepath.ToSlash(startup))
 			}
 			f.install(t)
 			out, err := f.push("main:refs/heads/selected")
