@@ -23,10 +23,18 @@ const (
 
 // Request represents a JSON-RPC 2.0 request sent from client to server.
 type Request struct {
-	JSONRPC string          `json:"jsonrpc"`
-	ID      RequestID       `json:"id"`
-	Method  string          `json:"method"`
-	Params  json.RawMessage `json:"params,omitempty"`
+	JSONRPC string           `json:"jsonrpc"`
+	ID      RequestID        `json:"id"`
+	Method  string           `json:"method"`
+	Params  json.RawMessage  `json:"params,omitempty"`
+	Trace   *W3cTraceContext `json:"trace,omitempty"`
+}
+
+// W3cTraceContext carries opaque distributed tracing metadata on requests.
+// The SDK preserves these strings without interpreting or validating their format.
+type W3cTraceContext struct {
+	Traceparent *string `json:"traceparent,omitempty"`
+	Tracestate  *string `json:"tracestate,omitempty"`
 }
 
 // Response represents a JSON-RPC 2.0 response from server to client.

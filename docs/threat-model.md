@@ -76,6 +76,15 @@ application stderr writers still require application cooperation.
 
 ## JSON-RPC framing, dispatch, and resource exhaustion
 
+Request-only trace context is decoded into owned optional strings before callback
+queue admission and retained in outgoing request serialization. The reader applies
+trace shape checks only to otherwise valid request envelopes, preserving response
+correlation, notification routing and ID/version error precedence. Invalid trace
+shapes receive the existing sanitized invalid-request reply without invoking a
+handler. Duplicate objects retain native merging/null resets without retaining
+one borrowed span per occurrence. These peer-supplied strings are opaque metadata;
+they do not authenticate the sender, create spans or grant approval authority.
+
 Inbound error-response admission requires non-null code and message members,
 including recognized aliases and duplicate occurrences. Malformed records resolve
 only the correlated pending request through the existing sanitized parse-error

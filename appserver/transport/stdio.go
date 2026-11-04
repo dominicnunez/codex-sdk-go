@@ -599,6 +599,7 @@ func (t *StdioTransport) processInboundLine(line []byte) {
 			ID:      id,
 			Method:  frame.Method,
 			Params:  frame.Params,
+			Trace:   frame.Trace,
 		}
 		t.enqueueRequest(req)
 		return
