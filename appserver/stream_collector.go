@@ -44,7 +44,7 @@ type CommandExecutionLifecycle struct {
 	CompletedItem           *CommandExecutionThreadItem
 	OutputDeltas            []string
 	DroppedOutputDeltas     int
-	DroppedOutputDeltaBytes int
+	DroppedOutputDeltaBytes int64
 	AggregatedOutput        string
 }
 
@@ -88,7 +88,7 @@ type StreamSummary struct {
 	LatestPlanText             *string
 	LatestPlanItemID           *string
 	LatestTokenUsage           *ThreadTokenUsage
-	DroppedLatestPlanTextBytes int
+	DroppedLatestPlanTextBytes int64
 
 	NormalizedErrors        []NormalizedStreamError
 	DroppedNormalizedErrors int
@@ -111,7 +111,7 @@ type StreamCollector struct {
 	latestPlanItemID           *string
 	latestPlanScope            lifecycleID
 	latestTokenUsage           *ThreadTokenUsage
-	droppedLatestPlanTextBytes int
+	droppedLatestPlanTextBytes int64
 
 	normalizedErrors        []NormalizedStreamError
 	droppedNormalizedErrors int
@@ -316,7 +316,7 @@ func (c *StreamCollector) mergePlanDeltaLocked(p *PlanDelta) {
 	c.latestPlanItemID = Ptr(p.ItemID)
 	combined, droppedBytes := appendBoundedStringSuffix(*c.latestPlanText, p.Delta, streamCollectorPlanTextBytesLimit)
 	c.latestPlanText = Ptr(combined)
-	c.droppedLatestPlanTextBytes += droppedBytes
+	c.droppedLatestPlanTextBytes += int64(droppedBytes)
 }
 
 func (c *StreamCollector) ingestStartedItemLocked(threadID string, turnID string, item ThreadItem) {
@@ -571,7 +571,7 @@ func (c *StreamCollector) setLatestPlanTextLocked(id lifecycleID, text string) {
 	c.latestPlanScope = id
 	retained, droppedBytes := retainSuffixWithinByteLimit(text, streamCollectorPlanTextBytesLimit)
 	c.latestPlanText = Ptr(retained)
-	c.droppedLatestPlanTextBytes = droppedBytes
+	c.droppedLatestPlanTextBytes = int64(droppedBytes)
 }
 
 func cloneMcpToolCallLifecycle(in McpToolCallLifecycle) McpToolCallLifecycle {
@@ -609,19 +609,19 @@ func appendBoundedHistory[T any](history []T, next T, dropped int, limit int) ([
 	return history, dropped + 1
 }
 
-func appendBoundedStringHistory(history []string, historyBytes int, next string, droppedEntries int, droppedBytes int, maxEntries int, maxBytes int) ([]string, int, int, int) {
+func appendBoundedStringHistory(history []string, historyBytes int, next string, droppedEntries int, droppedBytes int64, maxEntries int, maxBytes int) ([]string, int, int, int64) {
 	if maxEntries <= 0 || maxBytes <= 0 {
-		return history, 0, droppedEntries + 1, droppedBytes + len(next)
+		return history, 0, droppedEntries + 1, droppedBytes + int64(len(next))
 	}
 
 	retainedNext, trimmedBytes := retainSuffixWithinByteLimit(next, maxBytes)
-	droppedBytes += trimmedBytes
+	droppedBytes += int64(trimmedBytes)
 
 	history = append(history, retainedNext)
 	historyBytes += len(retainedNext)
 
 	for len(history) > maxEntries {
-		droppedBytes += len(history[0])
+		droppedBytes += int64(len(history[0]))
 		historyBytes -= len(history[0])
 		history[0] = ""
 		history = history[1:]
@@ -633,11 +633,11 @@ func appendBoundedStringHistory(history []string, historyBytes int, next string,
 			trimmed, trimmedFromEntry := retainSuffixWithinByteLimit(history[0], maxBytes)
 			history[0] = trimmed
 			historyBytes = len(trimmed)
-			droppedBytes += trimmedFromEntry
+			droppedBytes += int64(trimmedFromEntry)
 			break
 		}
 
-		droppedBytes += len(history[0])
+		droppedBytes += int64(len(history[0]))
 		historyBytes -= len(history[0])
 		history[0] = ""
 		history = history[1:]
