@@ -11,11 +11,12 @@ import (
 type CommandExecutionApprovalKind string
 
 const (
-	CommandExecutionApprovalKindCommand    CommandExecutionApprovalKind = "command"
-	CommandExecutionApprovalKindWriteStdin CommandExecutionApprovalKind = "writeStdin"
+	CommandExecutionApprovalKindHumanCommand CommandExecutionApprovalKind = "humanCommand"
+	CommandExecutionApprovalKindCommand      CommandExecutionApprovalKind = "command"
+	CommandExecutionApprovalKindWriteStdin   CommandExecutionApprovalKind = "writeStdin"
 )
 
-var validCommandExecutionApprovalKindValues = map[CommandExecutionApprovalKind]struct{}{CommandExecutionApprovalKindCommand: {}, CommandExecutionApprovalKindWriteStdin: {}}
+var validCommandExecutionApprovalKindValues = map[CommandExecutionApprovalKind]struct{}{CommandExecutionApprovalKindHumanCommand: {}, CommandExecutionApprovalKindCommand: {}, CommandExecutionApprovalKindWriteStdin: {}}
 
 func (v CommandExecutionApprovalKind) MarshalJSON() ([]byte, error) {
 	return marshalEnumString("CommandExecutionApprovalKind", v, validCommandExecutionApprovalKindValues)

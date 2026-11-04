@@ -177,10 +177,11 @@ func (n *ItemStartedNotification) UnmarshalJSON(data []byte) error {
 // ItemCompletedNotification is sent when a thread item completes.
 // Method: item/completed
 type ItemCompletedNotification struct {
-	CompletedAtMs int64             `json:"completedAtMs"`
-	Item          ThreadItemWrapper `json:"item"`
-	ThreadID      string            `json:"threadId"`
-	TurnID        string            `json:"turnId"`
+	ContentTokenCount *uint64           `json:"contentTokenCount,omitempty"`
+	CompletedAtMs     int64             `json:"completedAtMs"`
+	Item              ThreadItemWrapper `json:"item"`
+	ThreadID          string            `json:"threadId"`
+	TurnID            string            `json:"turnId"`
 }
 
 func (n *ItemCompletedNotification) UnmarshalJSON(data []byte) error {

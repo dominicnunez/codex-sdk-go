@@ -2619,6 +2619,16 @@
           "format": "int64",
           "type": "integer"
         },
+        "contentTokenCount": {
+          "default": null,
+          "description": "Native content tokens for the completed assistant message, including a sampled footer. Null when unavailable. Completion telemetry is not part of the stored thread item.",
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "item": {
           "$ref": "#/definitions/ThreadItem"
         },
@@ -6201,6 +6211,26 @@
       },
       "type": "object"
     },
+    "ThreadSectionChangedNotification": {
+      "description": "Broadcast after a successful move into, within, or out of a section.",
+      "properties": {
+        "sectionId": {
+          "description": "Destination section, or `null` when the thread was removed from its section.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "threadId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "sectionId",
+        "threadId"
+      ],
+      "type": "object"
+    },
     "ThreadSettings": {
       "properties": {
         "activePermissionProfile": {
@@ -6923,6 +6953,32 @@
           "type": "object"
         },
         {
+          "anyOf": [
+            {
+              "properties": {
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "url"
+              ],
+              "title": "UrlUserInput",
+              "type": "object"
+            },
+            {
+              "properties": {
+                "fileId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "fileId"
+              ],
+              "title": "FileIdUserInput",
+              "type": "object"
+            }
+          ],
           "properties": {
             "type": {
               "enum": [
@@ -6930,14 +6986,10 @@
               ],
               "title": "AudioUserInputType",
               "type": "string"
-            },
-            "url": {
-              "type": "string"
             }
           },
           "required": [
-            "type",
-            "url"
+            "type"
           ],
           "title": "AudioUserInput",
           "type": "object"
@@ -7406,6 +7458,26 @@
         "params"
       ],
       "title": "Thread/name/updatedNotification",
+      "type": "object"
+    },
+    {
+      "properties": {
+        "method": {
+          "enum": [
+            "thread/section/changed"
+          ],
+          "title": "Thread/section/changedNotificationMethod",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/definitions/ThreadSectionChangedNotification"
+        }
+      },
+      "required": [
+        "method",
+        "params"
+      ],
+      "title": "Thread/section/changedNotification",
       "type": "object"
     },
     {

@@ -185,6 +185,12 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 	verified["model/list"] = verifyMethod(t, transport, "model/list", func() {
 		_, _ = client.Model.List(context.Background(), codex.ModelListParams{})
 	})
+	verified["modelProvider/list"] = verifyMethod(t, transport, "modelProvider/list", func() {
+		_, _ = client.ModelProvider.List(context.Background(), codex.ModelProviderListParams{})
+	})
+	verified["modelProvider/config/write"] = verifyMethod(t, transport, "modelProvider/config/write", func() {
+		_, _ = client.ModelProvider.ConfigWrite(context.Background(), codex.ModelProviderConfigWriteParams{Settings: codex.ProviderSettingsPatchWrapper{Value: codex.BedrockProviderSettingsPatch{ProviderID: codex.BedrockProviderIDAmazonBedrock}}})
+	})
 	verified["modelProvider/capabilities/read"] = verifyMethod(t, transport, "modelProvider/capabilities/read", func() {
 		_, _ = client.ModelProvider.CapabilitiesRead(context.Background(), codex.ModelProviderCapabilitiesReadParams{})
 	})

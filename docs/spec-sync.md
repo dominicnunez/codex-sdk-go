@@ -105,3 +105,25 @@ schema does not add SDK methods. New error-info strings already survive the
 existing opaque `CodexErrorInfo` carrier. Unrecognized future item variants retain
 lifecycle fields in their raw payloads. The known `hookPrompt` branch uses typed
 fragments and lifecycle fields, with admission checks at the item union.
+
+## Schema snapshot 16ddd538bdf2
+
+This snapshot adds model-provider listing/configuration, file-backed audio input,
+managed human checkpoints, thread-section changes and nullable metadata.
+
+| Contract | Owner and callers | Evidence | Decision |
+| --- | --- | --- | --- |
+| Provider settings/auth/patch unions, exact field selection and published summaries | ModelProvider.List/ConfigWrite and their private admission carriers | `TestModelProviderListAdmission`, `TestModelProviderConfigWrite`, `TestModelProviderExactNamesAndMerges`, provider union/patch tests and `FuzzModelProviderOpaquePatch` | Validate the representation actually published; preserve patch omission/null and leave credential paths opaque |
+| Audio URL/file-ID alternatives | UserInput codec, Turn.Start/Steer, history and item callbacks | `TestAudioInputAlternatives`, `TestAudioInputPublicRoutes`, `TestConstructedAudioInputAlternatives`, `FuzzAudioInputAlternatives` | Admit either independent string alternative, including empty identifiers and malformed inactive extras |
+| Human capability and one-time decisions | Initialize normalization/equality and command approval response carrier | `TestHumanApprovalHandshakeIdentity`, `TestHumanCommandOneTimeDecisions` | Retain negotiated identity and reject broad decisions for humanCommand before response publication |
+| Required nullable section destination and protected delivery | Typed listeners and stdio notification owner/reservations | `TestThreadSectionNotificationLifecycle`, `TestThreadSectionNotificationRoundTrip`, `TestStdioSectionNotificationRetention`, schema-wide ordering/pressure tests | Preserve null removal and exact thread identity; retain existing complete byte lifecycle |
+| Completion tokens, account filtering, search provider and SSE logging | Item-completion callbacks, both list DTOs and config services | `TestCompletionContentTokens`, `TestCurrentAccountFilterRoutes`, `TestSyncedSearchAndLoggingMetadata`, `TestSearchProviderRestrictionOrder` | Preserve explicit zero/false and uint64 precision; reject invalid values before successful publication and preserve existing checks |
+
+`ContentItem.input_audio` uses the raw Responses API `file_id` alternative through
+`Thread.InjectItems`; `TestFileBackedRawResponseAudio` covers forwarding it.
+Its nested definitions in `ThreadResumeParams` do not add a typed input property.
+The separate dynamic-tool and function-call-output audio schemas are unchanged.
+`QueuedSubmission` has no referencing wire entry point. `ModelProviderError`
+describes optional structured JSON-RPC error data; the generic raw error and
+unknown fallback remain available. Section notifications supply no destination
+name or entry timestamp, so they do not synthesize cached thread metadata.

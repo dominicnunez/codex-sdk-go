@@ -184,6 +184,8 @@ const (
 	methodCommandExecTerminate                   = "command/exec/terminate"
 	methodCommandExecResize                      = "command/exec/resize"
 	methodModelList                              = "model/list"
+	methodModelProviderList                      = "modelProvider/list"
+	methodModelProviderConfigWrite               = "modelProvider/config/write"
 	methodModelProviderCapabilitiesRead          = "modelProvider/capabilities/read"
 	methodConfigRead                             = "config/read"
 	methodConfigRequirementsRead                 = "configRequirements/read"

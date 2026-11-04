@@ -508,6 +508,7 @@ func isProtectedNotificationMethod(method string) bool {
 		protocol.NotifyThreadPredictionUpdated,
 		protocol.NotifyThreadStatusChanged,
 		protocol.NotifyThreadReadStateChanged,
+		protocol.NotifyThreadSectionChanged,
 		protocol.NotifyThreadTokenUsageUpdated,
 		protocol.NotifyTurnStarted,
 		protocol.NotifyTurnPlanUpdated,
