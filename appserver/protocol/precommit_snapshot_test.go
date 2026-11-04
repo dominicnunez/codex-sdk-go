@@ -161,7 +161,15 @@ func TestPreCommitFixtureIgnoresCallerGitState(t *testing.T) {
 				t.Fatalf("fixture changed caller index: %v", err)
 			}
 			root := strings.TrimSpace(string(inner.git(t, "rev-parse", "--show-toplevel")))
-			if filepath.Clean(filepath.FromSlash(root)) != filepath.Clean(inner.dir) {
+			gotRoot, err := os.Stat(filepath.FromSlash(root))
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantRoot, err := os.Stat(inner.dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !os.SameFile(gotRoot, wantRoot) {
 				t.Fatalf("fixture commands selected caller repository %q", root)
 			}
 		})
@@ -295,6 +303,10 @@ func TestPreCommitPreservesFileModes(t *testing.T) {
 			if err := os.Symlink("../external.go", selected); err != nil {
 				t.Skipf("fixture symlink not available: %v", err)
 			}
+			beforeLink, err := os.Readlink(selected)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if tc.stagedLink {
 				f.git(t, "add", "selected.go")
 			}
@@ -309,7 +321,7 @@ func TestPreCommitPreservesFileModes(t *testing.T) {
 			if data, err := os.ReadFile(target); err != nil || string(data) != outside {
 				t.Errorf("untracked external target changed: %q, %v", data, err)
 			}
-			if link, err := os.Readlink(selected); err != nil || link != "../external.go" {
+			if link, err := os.Readlink(selected); err != nil || link != beforeLink {
 				t.Errorf("working link changed: %q, %v", link, err)
 			}
 		})
