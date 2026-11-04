@@ -1128,13 +1128,34 @@ analysis; symbolic Go sources and links outside the captured tree are rejected.
 Lint findings are bound to added Go lines using full machine-readable reports
 and blob diffs; compiler/tool/report failures block independently. Runner
 descendants enter shared process-group/job supervision before
-execution. Cancellation and normal completion stop remaining runner descendants
+execution. Cancellation and normal completion stop remaining supervised group/job members
 before snapshot removal; the shell waits for an active bootstrap build instead
 of abandoning its compiler frontend. Canonical temporary roots bind reported
 source paths to captured files despite directory aliases. These are local
 developer checks that can be changed or skipped by the developer. They execute
 repository-selected tooling and do not isolate hostile tool configuration or
 replace review and complete CI validation.
+
+The pre-push checker captures Git's ref-update stream before bootstrap. Before
+executing checks, every nondeleted update must resolve to the exact checked-out
+`HEAD`, with no staged or tracked working changes or index flags hiding tracked
+source. This prevents pushing an unattached contributor ref from silently
+executing its test initializers on the host. The developer still trusts the
+checked-out hook, tooling and source; the hook does not establish that trust or
+isolate hostile code. All updates are preflighted, and `HEAD` plus tracked
+cleanliness are checked again before success.
+
+The accepted commit's immutable tree supplies a private source directory for
+ordinary/race tests, pinned lint and module tidiness. Replacement objects,
+untracked files and inherited Git context cannot replace selected inputs.
+Malformed input and failed capture or verification prevent publication.
+Deletion-only updates skip source checks. An admitted ordinary/race test command
+finishes after cancellation so it can clean up independently managed child
+groups; the push then fails and skips later checks. This delays cancellation
+until test completion. Group/job supervision does not contain independently
+detached children left by crashes or test timeouts, or guarantee cleanup after
+uncatchable termination. These local checks verify the accepted tip, not every
+historical commit or release provenance.
 
 # 4. Criticality calibration
 

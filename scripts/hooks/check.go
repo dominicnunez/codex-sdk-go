@@ -36,12 +36,20 @@ func main() {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	if len(os.Args) != 2 || os.Args[1] != "pre-commit" {
-		fmt.Fprintln(os.Stderr, "usage: check pre-commit")
+	if len(os.Args) != 2 || os.Args[1] != "pre-commit" && os.Args[1] != "pre-push" {
+		fmt.Fprintln(os.Stderr, "usage: check pre-commit|pre-push")
 		os.Exit(1)
 	}
-	if err := checkCommit(ctx); err != nil {
-		fmt.Fprintln(os.Stderr, "pre-commit:", err)
+	var err error
+	if os.Args[1] == "pre-push" {
+		stopInput := context.AfterFunc(ctx, func() { _ = os.Stdin.Close() })
+		defer stopInput()
+		err = checkPush(ctx, os.Stdin)
+	} else {
+		err = checkCommit(ctx)
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, os.Args[1]+":", err)
 		os.Exit(1)
 	}
 }
@@ -61,6 +69,10 @@ func runChild(args []string) error {
 
 // runOwned admits the runner only after its process group/job owns descendants.
 func runOwned(ctx context.Context, command, dir string, env, args []string) error {
+	return runCommand(ctx, command, dir, env, args, false)
+}
+
+func runCommand(ctx context.Context, command, dir string, env, args []string, finish bool) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -89,7 +101,11 @@ func runOwned(ctx context.Context, command, dir string, env, args []string) erro
 	defer tree.Close()
 	cancelled := make(chan struct{})
 	stop := context.AfterFunc(ctx, func() {
-		_ = tree.ForceKill(cmd.Process)
+		if finish {
+			fmt.Fprintln(os.Stderr, "pre-push: waiting for active tests before stopping")
+		} else {
+			_ = tree.ForceKill(cmd.Process)
+		}
 		close(cancelled)
 	})
 	if ctx.Err() == nil {
@@ -100,7 +116,7 @@ func runOwned(ctx context.Context, command, dir string, env, args []string) erro
 	if !stop() {
 		<-cancelled
 	}
-	// A runner must not leave background work after its own exit either.
+	// Stop remaining group/job members after the runner's own completion.
 	killErr := tree.ForceKill(cmd.Process)
 	if process.IsExpectedStopError(killErr) {
 		killErr = nil
@@ -145,9 +161,9 @@ func (g hookGit) text(args ...string) (string, error) {
 	return strings.TrimSuffix(strings.TrimSuffix(string(out), "\n"), "\r"), err
 }
 
-func exitCode(err error, code int) bool {
+func exitOne(err error) bool {
 	var failure *exec.ExitError
-	return errors.As(err, &failure) && failure.ExitCode() == code
+	return errors.As(err, &failure) && failure.ExitCode() == 1
 }
 
 func (g hookGit) head() (string, error) {
@@ -155,11 +171,11 @@ func (g hookGit) head() (string, error) {
 	if err == nil {
 		return head, nil
 	}
-	if exitCode(err, 1) {
+	if exitOne(err) {
 		ref, refErr := g.text("symbolic-ref", "--quiet", "HEAD")
 		if refErr == nil {
 			_, existsErr := g.output("show-ref", "--verify", "--quiet", ref)
-			if exitCode(existsErr, 1) {
+			if exitOne(existsErr) {
 				return "", nil
 			}
 		}
@@ -702,15 +718,24 @@ func validateSnapshot(g hookGit, tree, head, gitdir string, selected []string) e
 	return checkIssues(issues, snapshot, lines, entries)
 }
 
-func checkCommit(ctx context.Context) error {
+func rootGit(ctx context.Context) (hookGit, error) {
 	g := hookGit{ctx: ctx, env: replaceEnv(os.Environ(), "GIT_NO_REPLACE_OBJECTS", "1")}
 	g.env = replaceEnv(g.env, "GIT_OPTIONAL_LOCKS", "0")
 	g.env = replaceEnv(g.env, "GIT_DIFF_OPTS", "")
 	root, err := g.text("rev-parse", "--show-toplevel")
 	if err != nil {
-		return err
+		return g, err
 	}
 	g.dir = root
+	return g, nil
+}
+
+func checkCommit(ctx context.Context) error {
+	g, err := rootGit(ctx)
+	if err != nil {
+		return err
+	}
+	root := g.dir
 	gitdir, err := g.text("rev-parse", "--absolute-git-dir")
 	if err != nil {
 		return err

@@ -24,6 +24,7 @@ func TestGolangciLint(t *testing.T) {
 	cmd := exec.Command(
 		bash,
 		repoPath(t, "scripts", "hooks", "run.sh"),
+		"--repo-root", repoRoot(t),
 		"golangci-lint",
 		"run",
 		"./...",

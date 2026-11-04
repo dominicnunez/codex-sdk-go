@@ -97,7 +97,7 @@ func FuzzAddedLineOwnership(f *testing.F) {
 		cmd.Dir = dir
 		cmd.Env = replaceEnv(os.Environ(), "GIT_DIFF_OPTS", "")
 		diff, err := cmd.Output()
-		if err != nil && !exitCode(err, 1) {
+		if err != nil && !exitOne(err) {
 			t.Fatal(err)
 		}
 		ranges, err := addedLines(diff)

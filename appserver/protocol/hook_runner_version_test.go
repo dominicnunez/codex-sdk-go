@@ -99,7 +99,7 @@ case "$*" in
 esac
 `)
 			runLog, installLog := filepath.Join(root, "run.log"), filepath.Join(root, "install.log")
-			cmd := exec.Command(bash, repoPath(t, "scripts", "hooks", "run.sh"), "golangci-lint", "run", "./...")
+			cmd := exec.Command(bash, repoPath(t, "scripts", "hooks", "run.sh"), "--repo-root", repoRoot(t), "golangci-lint", "run", "./...")
 			cmd.Dir = repoRoot(t)
 			nixShell := "1"
 			if tc.nix || tc.noNix {

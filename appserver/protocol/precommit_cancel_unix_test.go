@@ -19,14 +19,19 @@ import (
 
 func TestPreCommitCancellationPreservesIndex(t *testing.T) {
 	for _, phase := range []string{"analysis", "version", "install", "bootstrap", "complete"} {
-		t.Run(phase, func(t *testing.T) { testCommitCancellation(t, phase) })
+		t.Run(phase, func(t *testing.T) { testHookCancellation(t, "pre-commit", phase) })
 	}
 }
 
-func testCommitCancellation(t *testing.T, phase string) {
+func testHookCancellation(t *testing.T, mode, phase string) {
 	t.Helper()
-	f := newCommitFixture(t, map[string]string{"sample.go": fixturePackage + "const Before = 0\n"}, false)
-	if phase == "install" || phase == "bootstrap" {
+	var f *commitFixture
+	if mode == "pre-push" {
+		f = newPushFixture(t).commitFixture
+	} else {
+		f = newCommitFixture(t, map[string]string{"sample.go": fixturePackage + "const Before = 0\n"}, false)
+	}
+	if phase == "install" || phase == "bootstrap" || phase == "ordinary" || phase == "race" || phase == "tidy" {
 		realGo, err := exec.LookPath("go")
 		if err != nil {
 			t.Fatal(err)
@@ -34,12 +39,13 @@ func testCommitCancellation(t *testing.T, phase string) {
 		const fakeGo = `#!/usr/bin/env bash
 set -euo pipefail
 if [ "$1" = -C ]; then cd -- "$2"; shift 2; fi
-if [ "$1" = install ] || { [ "$LINT_FIXTURE_PHASE" = bootstrap ] && [ "$1" = build ]; }; then
-  (read -r reply < "$LINT_FIXTURE_WAIT") &
-  printf '%s\n' "$BASHPID" > "$LINT_FIXTURE_READY"
-  wait
-  [[ "$1" != install ]] || exit 1
-fi
+case "$LINT_FIXTURE_PHASE:$1:${2:-}" in
+  install:install:*|bootstrap:build:*|ordinary:test:./...|race:test:-race|tidy:mod:tidy)
+    (read -r reply < "$LINT_FIXTURE_WAIT") &
+    printf '%s\n' "$BASHPID" > "$LINT_FIXTURE_READY"
+    wait
+    [[ "$1" != install ]] || exit 1 ;;
+esac
 exec "$LINT_FIXTURE_REAL_GO" "$@"
 `
 		if err := os.WriteFile(filepath.Join(f.parent, "bin", "go"), []byte(fakeGo), 0o700); err != nil {
@@ -47,8 +53,22 @@ exec "$LINT_FIXTURE_REAL_GO" "$@"
 		}
 		f.env = append(f.env, "LINT_FIXTURE_REAL_GO="+realGo)
 	}
+	if phase == "capture" {
+		realCat, err := exec.LookPath("cat")
+		if err != nil {
+			t.Fatal(err)
+		}
+		const fakeCat = "#!/usr/bin/env bash\nset -euo pipefail\nprintf '%s\\n' \"$BASHPID\" > \"$LINT_FIXTURE_READY\"\nexec \"$LINT_FIXTURE_REAL_CAT\"\n"
+		if err := os.WriteFile(filepath.Join(f.parent, "bin", "cat"), []byte(fakeCat), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		f.env = append(f.env, "LINT_FIXTURE_REAL_CAT="+realCat)
+	}
 	f.write(t, "sample.go", fixturePackage+"const Selected = 1\n")
 	f.git(t, "add", "sample.go")
+	if mode == "pre-push" {
+		f.git(t, "commit", "--quiet", "-m", "test: clean checked-out push source")
+	}
 	index := filepath.Join(f.dir, ".git", "index")
 	before, err := os.ReadFile(index)
 	if err != nil {
@@ -71,8 +91,21 @@ exec "$LINT_FIXTURE_REAL_GO" "$@"
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, f.bash, filepath.Join(f.dir, ".githooks", "pre-commit"))
+	cmd := exec.CommandContext(ctx, f.bash, filepath.Join(f.dir, ".githooks", mode))
 	cmd.Dir = f.dir
+	if mode == "pre-push" {
+		oid := strings.TrimSpace(string(f.git(t, "rev-parse", "HEAD")))
+		cmd.Stdin = strings.NewReader("refs/heads/main " + oid + " refs/heads/remote " + strings.Repeat("0", len(oid)) + "\n")
+	}
+	if phase == "capture" {
+		input, writer, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer input.Close()
+		defer writer.Close()
+		cmd.Stdin = input
+	}
 	cmd.Env = append(append([]string(nil), f.env...), "LINT_FIXTURE_READY="+ready, "LINT_FIXTURE_WAIT="+held, "LINT_FIXTURE_PHASE="+phase, "TMPDIR="+temporary)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	var output bytes.Buffer
@@ -91,7 +124,9 @@ exec "$LINT_FIXTURE_REAL_GO" "$@"
 	}
 	_ = outputWriter.Close()
 	waited := false
-	var pendingWait <-chan error
+	waitDone := make(chan error, 1)
+	var pendingWait <-chan error = waitDone
+	go func() { waitDone <- cmd.Wait() }()
 	defer func() {
 		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 		if pendingWait != nil {
@@ -116,22 +151,27 @@ exec "$LINT_FIXTURE_REAL_GO" "$@"
 				t.Fatal(err)
 			}
 		}
+	case err := <-waitDone:
+		pendingWait = nil
+		waited = true
+		_ = outputReader.Close()
+		<-outputDone
+		t.Fatalf("checker exited before supervision barrier: %v: %s", err, output.String())
 	case <-ctx.Done():
-		_ = cmd.Wait()
+		<-waitDone
+		pendingWait = nil
 		waited = true
 		_ = outputReader.Close()
 		<-outputDone
 		t.Fatalf("checker did not reach supervised lint: %s", output.String())
 	}
-	waitDone := make(chan error, 1)
-	pendingWait = waitDone
-	go func() { waitDone <- cmd.Wait() }()
-	if phase == "bootstrap" {
+	retained := phase == "bootstrap" || mode == "pre-push" && (phase == "ordinary" || phase == "race")
+	if retained {
 		select {
 		case err := <-waitDone:
 			pendingWait = nil
 			waited = true
-			t.Fatalf("bootstrap cancellation abandoned active build: %v", err)
+			t.Fatalf("cancellation abandoned retained %s work: %v", phase, err)
 		case <-time.After(100 * time.Millisecond):
 		}
 		release, err := os.OpenFile(held, os.O_RDWR, 0o600)

@@ -44,7 +44,16 @@ func newCommitFixture(t *testing.T, files map[string]string, realLint bool) *com
 	f.calls = filepath.Join(f.parent, "lint-calls.txt")
 	f.write(t, "go.mod", "module github.com/dominicnunez/codex-sdk-go\n\ngo 1.27.3\n")
 	f.write(t, "README.md", "fixture\n")
-	paths := []string{".gitattributes", ".githooks/pre-commit", "scripts/hooks/run.sh", ".golangci.yml", "scripts/hooks/check.go", "scripts/hooks/bootstrap.mod"}
+	paths := []string{".gitattributes", ".githooks/pre-commit", "scripts/hooks/run.sh", "scripts/hooks/check.sh", ".golangci.yml", "scripts/hooks/bootstrap.mod"}
+	hookFiles, err := os.ReadDir(repoPath(t, "scripts/hooks"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range hookFiles {
+		if strings.HasSuffix(file.Name(), ".go") && !strings.HasSuffix(file.Name(), "_test.go") {
+			paths = append(paths, "scripts/hooks/"+file.Name())
+		}
+	}
 	processFiles, err := os.ReadDir(repoPath(t, "internal/process"))
 	if err != nil {
 		t.Fatal(err)
@@ -56,9 +65,6 @@ func newCommitFixture(t *testing.T, files map[string]string, realLint bool) *com
 	}
 	for _, path := range paths {
 		data, err := os.ReadFile(repoPath(t, filepath.FromSlash(path)))
-		if path == "scripts/hooks/check.go" && os.IsNotExist(err) {
-			continue // The original hook has no standalone snapshot checker.
-		}
 		if err != nil {
 			t.Fatal(err)
 		}
