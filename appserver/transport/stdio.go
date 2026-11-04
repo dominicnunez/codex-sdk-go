@@ -657,7 +657,7 @@ func (t *StdioTransport) failPendingWithParseError(idField inboundID, message st
 	t.failPendingWithError(idField, ErrCodeParseError, message)
 }
 
-func (t *StdioTransport) failPendingWithError(idField inboundID, code int, message string) {
+func (t *StdioTransport) failPendingWithError(idField inboundID, code int64, message string) {
 	id, ok := idField.requestID()
 	if !ok {
 		return
@@ -665,7 +665,7 @@ func (t *StdioTransport) failPendingWithError(idField inboundID, code int, messa
 	t.failPendingIDWithError(id, code, message)
 }
 
-func (t *StdioTransport) failPendingIDWithError(id RequestID, code int, message string) {
+func (t *StdioTransport) failPendingIDWithError(id RequestID, code int64, message string) {
 	normalizedID, err := normalizePendingRequestID(id.Value)
 	if err != nil {
 		return
@@ -690,11 +690,11 @@ func (t *StdioTransport) publishPendingResult(normalizedID string, result func(p
 	}
 }
 
-func pendingErrorResult(id RequestID, code int, message string) pendingReqResult {
+func pendingErrorResult(id RequestID, code int64, message string) pendingReqResult {
 	return pendingReqResult{resp: errorResponse(id, code, message)}
 }
 
-func errorResponse(id RequestID, code int, message string) Response {
+func errorResponse(id RequestID, code int64, message string) Response {
 	return Response{
 		JSONRPC: jsonrpcVersion,
 		ID:      id,
@@ -705,7 +705,7 @@ func errorResponse(id RequestID, code int, message string) Response {
 	}
 }
 
-func (t *StdioTransport) writeErrorResponse(id RequestID, code int, message string) {
+func (t *StdioTransport) writeErrorResponse(id RequestID, code int64, message string) {
 	if err := t.writeMessage(errorResponse(id, code, message)); err != nil {
 		t.handleWriteFailure(err)
 	}
@@ -897,7 +897,7 @@ func (t *StdioTransport) handleRequest(req Request) {
 	if err != nil {
 		// Handler returned error - use generic message to avoid leaking
 		// internal details across the trust boundary
-		code := ErrCodeInternalError
+		var code int64 = ErrCodeInternalError
 		msg := "internal handler error"
 		if errors.Is(err, errInvalidParams) {
 			code = ErrCodeInvalidParams

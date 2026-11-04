@@ -93,7 +93,15 @@ zero codes, empty messages and arbitrary data remain supported. Requiredness is
 tracked during the existing borrowed-field pass before selected data is copied;
 public error records retain ordinary application JSON behavior. This distinguishes
 malformed envelopes from valid server errors without authenticating the peer or
-changing the existing outer-envelope selection and code-width rules.
+changing the existing outer-envelope selection.
+
+Error-code parsing and the public error record/accessor use the schema's signed
+64-bit range independently of native integer width. Valid wide codes retain their
+message and raw data on 32-bit builds instead of becoming generated parse errors.
+Out-of-range, fractional, exponent-spelled and wrong-type codes retain existing
+rejection behavior, including overwritten occurrences. This changes numeric
+representation without assigning authority or new meaning to server error codes;
+generated protocol errors retain their established codes and diagnostic policy.
 
 Collaboration response/settings admission rejects incomplete mode/settings/model
 records and forbidden nested null occurrences before response, callback or cache

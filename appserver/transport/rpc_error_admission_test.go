@@ -107,7 +107,7 @@ func TestRPCErrorRequiredFields(t *testing.T) {
 	for _, tc := range []struct {
 		name, raw     string
 		valid         bool
-		code          int
+		code          int64
 		message, data string
 	}{
 		{"empty", `{}`, false, 0, "", ""},

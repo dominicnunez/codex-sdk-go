@@ -76,7 +76,7 @@ func TestFilesystemApprovalStdioPublication(t *testing.T) {
 				}
 				return
 			}
-			code, expectedCalls := protocol.ErrCodeInvalidParams, int32(0)
+			code, expectedCalls := int64(protocol.ErrCodeInvalidParams), int32(0)
 			if scenario == "invalid-grant" {
 				code, expectedCalls = protocol.ErrCodeInternalError, 1
 			}

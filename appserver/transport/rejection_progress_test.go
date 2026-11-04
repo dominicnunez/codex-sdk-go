@@ -64,7 +64,7 @@ func TestRejectionReaderProgress(t *testing.T) {
 			response := `{"id":"wanted","result":{"ok":true}}` + "\n"
 			prefix := ""
 			var expectedID any = "bad"
-			expectedCode := ErrCodeInvalidRequest
+			var expectedCode int64 = ErrCodeInvalidRequest
 			switch mode {
 			case "invalid-notification-version":
 				prefix = `{"jsonrpc":"1.0","method":"test"}` + "\n"

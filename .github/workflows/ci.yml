@@ -52,6 +52,12 @@ jobs:
       - name: Test
         run: go test ./...
 
+      - name: Verify 32-bit RPC error codes
+        env:
+          GOARCH: '386'
+          CGO_ENABLED: '0'
+        run: go test -v ./appserver/protocol ./appserver/transport -run 'ErrorCode|RPCError|FuzzInboundRPCError' -count=1
+
   test-windows:
     runs-on: windows-latest
     steps:

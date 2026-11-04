@@ -47,7 +47,7 @@ func (e *RPCError) RPCError() *Error {
 }
 
 // Code returns the JSON-RPC error code.
-func (e *RPCError) Code() int {
+func (e *RPCError) Code() int64 {
 	if e.err == nil {
 		return 0
 	}

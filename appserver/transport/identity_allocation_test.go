@@ -110,6 +110,10 @@ func FuzzInboundFrameSelection(f *testing.F) {
 
 func FuzzInboundRPCError(f *testing.F) {
 	for _, seed := range []string{
+		`{"code":-9223372036854775808,"message":"min"}`, `{"code":9223372036854775807,"message":"max"}`,
+		`{"code":2147483648,"message":"wide"}`, `{"code":-2147483649,"message":"wide"}`,
+		`{"code":-9223372036854775809,"code":0,"message":"underflow"}`,
+		`{"code":9223372036854775808,"code":0,"message":"overflow"}`,
 		`{"code":1,"message":"x"}`, `{"code":{},"code":1}`, `{"message":1,"message":"x"}`,
 		`{"code":1,"CODE":null,"message":"x","Message":null}`, `{"code":1e2}`,
 		`{"code":9223372036854775808}`, `{"data":{"x":1},"Data":null}`, `{"meſſage":"x"}`,
@@ -127,8 +131,13 @@ func FuzzInboundRPCError(f *testing.F) {
 			input, _ = json.Marshal(string(input))
 		}
 		for _, data := range [][]byte{input, append(append([]byte(`{"code":`), input...), []byte(`,"code":7,"message":"x","data":null}`)...)} {
-			var reference Error
-			err := json.Unmarshal(data, &reference)
+			var wire struct {
+				Code    int64           `json:"code"`
+				Message string          `json:"message"`
+				Data    json.RawMessage `json:"data"`
+			}
+			err := json.Unmarshal(data, &wire)
+			reference := Error{Code: wire.Code, Message: wire.Message, Data: wire.Data}
 			got, ok := decodeInboundRPCError(data)
 			wantOK := err == nil && referenceRequiredErrorFields(data)
 			if ok != wantOK || (ok && !reflect.DeepEqual(got, reference)) {
