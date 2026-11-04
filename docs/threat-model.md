@@ -63,6 +63,13 @@ The application controls the working directory and stderr destination. Codex and
 
 Process shutdown uses Unix process groups or Windows Job Objects through [internal/process](../internal/process/). These support cleanup of an owned runtime and its tracked children. Unix graceful shutdown waits for both parent completion and group disappearance, polling surviving descendants at a fixed interval after disabling the completed parent signal. Grace expiry still triggers a group kill; OS termination and reaping may finish after that signal returns. These controls do not establish containment of a hostile program, termination of escaped Unix descendants, termination of remote work, or rollback of completed filesystem/network effects. A process wrapped with `NewProcessFromClient` is externally owned; closing that wrapper does not terminate an external runtime.
 
+Windows job configuration uses architecture-specific native record layouts,
+including the 386 basic-limit record's trailing padding. Compiler assertions fix
+record sizes and field offsets against independent ABI constants on 386, amd64
+and arm64. Native CI exercises real configuration, attachment and kill-on-close
+with an owned inert test child on both 386 and amd64. These checks protect the
+cleanup integration; job objects do not establish a hostile-program sandbox.
+
 If cancellation prevents publication after process-tree attachment, startup
 force-kills the attached tree and closes its handle before killing and reaping the
 direct child. This prevents tracked descendants from surviving a parent-only

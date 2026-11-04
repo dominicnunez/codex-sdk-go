@@ -117,6 +117,14 @@ Wait and force-kill. Verify concurrent Wait/Close, descendant liveness,
 deadlines and waiting CPU cost. Removing already observed terminal signals from
 repeated selects avoids spinning while other cleanup remains live.
 
+Windows job-object records use separate 386 and 64-bit basic-limit declarations
+to match the native ABI. The 386 record includes four trailing padding bytes;
+the shared extended record then places I/O counters and memory limits at their
+native offsets. Independent compiler assertions cover every basic/extended field,
+record sizes and the I/O-counter size on all three supported Windows targets.
+Native CI tests create and configure a job, attach an owned test child, and verify
+that closing the last job handle terminates that child, including in a 386 binary.
+
 Cancellation observed after tree attachment but before process publication uses
 that attached owner for force-kill, then releases its handle before the parent
 fallback kill and wait. Handle release can supply kill-on-close fallback if

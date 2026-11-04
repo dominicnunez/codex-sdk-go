@@ -80,6 +80,12 @@ jobs:
       - name: Test
         run: go test ./...
 
+      - name: Verify 32-bit job objects
+        env:
+          GOARCH: '386'
+          CGO_ENABLED: '0'
+        run: go test -v ./internal/process -count=1
+
   test-race:
     runs-on: ubuntu-latest
     steps:
