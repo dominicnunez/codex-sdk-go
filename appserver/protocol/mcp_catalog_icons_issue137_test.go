@@ -84,7 +84,7 @@ func TestMcpCatalogIconsAcceptArrayItemsWithoutAdditionalRestrictions(t *testing
 		map[string]any{"src": "nested", "metadata": []any{true, "value"}},
 		[]any{},
 		"glyph",
-		float64(3),
+		json.Number("3"),
 		false,
 	}
 
