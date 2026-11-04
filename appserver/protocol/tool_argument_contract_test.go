@@ -149,7 +149,7 @@ func FuzzExactToolArguments(f *testing.F) {
 	})
 }
 
-func TestToolArgumentEnvelopeAndUnrelatedFields(t *testing.T) {
+func TestToolArgumentEnvelopeAndResultPolicy(t *testing.T) {
 	// Adding an argument policy at union admission must not add a JSON method
 	// to plain records or consume an application's anonymous envelope.
 	var embedded struct {
@@ -168,8 +168,8 @@ func TestToolArgumentEnvelopeAndUnrelatedFields(t *testing.T) {
 	if _, ok := call.Arguments.(json.Number); !ok {
 		t.Fatal("argument policy missing")
 	}
-	if _, ok := call.Result.StructuredContent.(map[string]any)["n"].(float64); !ok {
-		t.Fatal("unrelated result decoder policy changed")
+	if _, ok := call.Result.StructuredContent.(map[string]any)["n"].(json.Number); !ok {
+		t.Fatal("MCP result owner did not preserve its numeric policy")
 	}
 	wrapper := struct {
 		Before int

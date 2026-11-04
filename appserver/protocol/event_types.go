@@ -404,8 +404,11 @@ type McpToolCallResult struct {
 func (r *McpToolCallResult) UnmarshalJSON(data []byte) error {
 	type wire McpToolCallResult
 	var decoded wire
-	if err := unmarshalRequiredEventObject(data, &decoded, "content"); err != nil {
+	if err := validateRequiredObjectFields(data, "content"); err != nil {
 		return err
+	}
+	if err := unmarshalExactJSON(data, &decoded); err != nil {
+		return fmt.Errorf("unmarshal required event object: %w", err)
 	}
 	*r = McpToolCallResult(decoded)
 	return nil

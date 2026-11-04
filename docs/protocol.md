@@ -241,6 +241,14 @@ of the plain history-item records retains its existing float64 behavior; use the
 item union or SDK service admission for the number-preserving representation.
 Unrelated metadata and application-selected codecs keep their existing policy.
 
+`McpToolCallResult.Content` and `StructuredContent` also preserve arbitrary
+numeric tokens as `json.Number`, including nested values and exponents outside
+float64 range. The shared result decoder applies before history, item callbacks
+and cached snapshots publish the record. Content remains a required non-null
+array, and null elements are valid. `_meta` retains its owned raw JSON bytes.
+The direct MCP tool service continues to expose raw JSON for the same result
+data; the two representations agree on numeric values.
+
 `ImageUserInput.URL` and `InputImageFunctionCallOutputContentItem.ImageURL`
 are optional string pointers. A nonnil pointer, including one to an empty string,
 selects an explicit URL; nil leaves that alternative absent. Both image codecs
