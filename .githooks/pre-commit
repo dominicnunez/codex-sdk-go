@@ -35,7 +35,7 @@ run_child() {
   child=
 }
 run_child env GO111MODULE=on GOWORK=off GOENV=off GOFLAGS= "$runner" \
-  go build -modfile="$repo_root/scripts/hooks/bootstrap.mod" -buildvcs=false \
-  -o "$temporary/checker.exe" "$repo_root/scripts/hooks"
+  go -C "$repo_root" build -modfile="$repo_root/scripts/hooks/bootstrap.mod" -buildvcs=false \
+  -o "$temporary/checker.exe" ./scripts/hooks
 building=0
 run_child "$temporary/checker.exe" pre-commit

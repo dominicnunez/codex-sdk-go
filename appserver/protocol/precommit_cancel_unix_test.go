@@ -33,6 +33,7 @@ func testCommitCancellation(t *testing.T, phase string) {
 		}
 		const fakeGo = `#!/usr/bin/env bash
 set -euo pipefail
+if [ "$1" = -C ]; then cd -- "$2"; shift 2; fi
 if [ "$1" = install ] || { [ "$LINT_FIXTURE_PHASE" = bootstrap ] && [ "$1" = build ]; }; then
   (read -r reply < "$LINT_FIXTURE_WAIT") &
   printf '%s\n' "$BASHPID" > "$LINT_FIXTURE_READY"

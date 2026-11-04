@@ -9,6 +9,17 @@ import (
 	"testing"
 )
 
+func TestPreCommitNestedWorkingDirectory(t *testing.T) {
+	f := newCommitFixture(t, map[string]string{"sample.go": fixturePackage + "const Before = 0\n"}, false)
+	f.write(t, "sample.go", fixturePackage+"const Selected = 1\n")
+	f.git(t, "add", "sample.go")
+	cmd := exec.Command(f.bash, filepath.ToSlash(filepath.Join(f.dir, ".githooks", "pre-commit")))
+	cmd.Dir, cmd.Env = filepath.Join(f.dir, "scripts"), f.env
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("nested invocation did not select repository package: %v: %s", err, out)
+	}
+}
+
 func TestPreCommitActualCommitOwnsSnapshot(t *testing.T) {
 	f := newCommitFixture(t, map[string]string{"sample.go": fixturePackage + "const Before = 0\n"}, false)
 	selected := fixturePackage + "const Selected = 1\n"
