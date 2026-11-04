@@ -37,7 +37,7 @@ func TestCollectorTrimmedSuffixOwnsStorage(t *testing.T) {
 			assertOwnedTrimmedString(t, input, *collector.Summary().LatestPlanText)
 			collector.processCommandExecutionOutputDelta(CommandExecutionOutputDeltaNotification{ItemID: "command", Delta: input})
 			command := collector.Summary().CommandExecutions["command"]
-			if len(command.OutputDeltas) != 1 || command.DroppedOutputDeltaBytes != size-streamCollectorOutputDeltaBytesLimit {
+			if len(command.OutputDeltas) != 1 || command.DroppedOutputDeltaBytes != int64(size-streamCollectorOutputDeltaBytesLimit) {
 				t.Fatal("command retention accounting changed")
 			}
 			assertOwnedTrimmedString(t, input, command.OutputDeltas[0])
@@ -55,7 +55,7 @@ func TestCollectorDiscardedHistorySlotsAreCleared(t *testing.T) {
 				maxBytes, maxEntries = 100, 2
 			}
 			retained, total, dropped, droppedSize := appendBoundedStringHistory(backing[:2], 5, "4", 0, 0, maxEntries, maxBytes)
-			if !reflect.DeepEqual(retained, []string{"22", "4"}) || total != bytes || len(retained) != entries || dropped != droppedEntries || droppedSize != droppedBytes {
+			if !reflect.DeepEqual(retained, []string{"22", "4"}) || total != bytes || len(retained) != entries || dropped != droppedEntries || droppedSize != int64(droppedBytes) {
 				t.Fatal("append history semantics changed")
 			}
 			if backing[0] != "" {

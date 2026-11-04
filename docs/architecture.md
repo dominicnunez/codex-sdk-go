@@ -226,6 +226,12 @@ Compatible bare presentation keys need reservation before fallback selection;
 test adversarial spellings, insertion-order independence, accounting and
 completion cleanup for each tuple.
 
+Plan-text and command-output dropped-byte totals use `int64` throughout stored
+state, accumulation and summaries. They count discarded input over the applicable
+lifecycle independently of retained-text budgets, including on 32-bit builds.
+Latest-plan replacement resets its total; command completion preserves its total.
+Retained lengths and dropped-entry counts remain `int`.
+
 ## Initialization and credentials
 
 Authorization query parsing owns syntax validation for pasted full redirect

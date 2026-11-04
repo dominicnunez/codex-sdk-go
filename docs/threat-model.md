@@ -649,6 +649,10 @@ lifecycle's fields; presentation keys must not be parsed as authority. Correlati
 separates records but does not authenticate peer-provided IDs or content.
 Latest plan deltas append only within the same full tuple; changing thread, turn
 or item identity replaces that latest text and resets its dropped-byte accounting.
+Both plan and command dropped-byte totals use 64-bit integers independently of
+retained-text budgets, preventing long streams from wrapping those totals at the
+32-bit integer boundary. This accounting does not add a retention or event-count
+limit; command completion preserves the accumulated dropped-byte total.
 
 For an outbound request admitted to the serialized write queue, accepting its
 correlated result and abandoning it on cancellation or transport failure share
