@@ -135,8 +135,7 @@ gh() {
 }
 export -f gh
 `
-			cmd := exec.Command(bash, "-c", specSyncFixture+scheduleFixture+specSyncWorkflowRun(t))
-			cmd.Dir = dir
+			cmd := specSyncCommand(t, bash, dir, specSyncFixture+scheduleFixture+specSyncWorkflowRun(t))
 			cmd.Env = append(os.Environ(), "NO_PROXY=127.0.0.1,localhost", "no_proxy=127.0.0.1,localhost",
 				"SPEC_HTTP="+server.URL, "SPEC_CURL="+filepath.ToSlash(curl), "SPEC_CALLS="+filepath.ToSlash(calls), "SPEC_PROPOSAL="+filepath.ToSlash(proposal),
 				"PIN_CURRENT="+filepath.ToSlash(current), "PIN_API="+filepath.ToSlash(api), "PIN_SHA="+tc.sha, "PIN_ADVANCED="+advanced, "PIN_SCHEDULE="+tc.schedule,
