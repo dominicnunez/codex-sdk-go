@@ -57,6 +57,10 @@ func clonePointer(v reflect.Value, seen map[visitKey]reflect.Value) reflect.Valu
 		return cached
 	}
 	cloned := reflect.New(v.Type().Elem())
+	// Keep the concrete pointer type in both results and cached cycle references.
+	if cloned.Type() != key.typ {
+		cloned = cloned.Convert(key.typ)
+	}
 	seen[key] = cloned
 	cloned.Elem().Set(cloneValue(v.Elem(), seen))
 	return cloned

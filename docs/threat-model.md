@@ -996,6 +996,12 @@ A stale or unrelated notification could contaminate a turn result. [Turn lifecyc
 
 Context cancellation and RPC timeouts stop local waiting or request cooperative interruption. They do not prove that Codex or a remote provider stopped, nor that a command, file write, or network action was undone. Applications must retain uncertainty and reconcile consequential operations before retrying. The SDK does not provide general exactly-once execution, transactional rollback, or durable recovery of application approvals and effects.
 
+Programmatically supplied metadata retains defined Go pointer types through the
+shared copy boundary, including its remembered cyclic references. Direct generic
+copies own supported writable pointer targets, and cache/collector snapshots keep
+the metadata's concrete type. This does not expand the existing limits for opaque
+application state, unexported internals, channels, functions or codec ownership.
+
 ## OAuth callbacks, provider routing, and account identity
 
 The [normal login flow](../login/login.go) generates a random state and an S256 PKCE challenge using [crypto/rand](../login/pkce.go). The [callback server](../login/callback.go) defaults to IPv4 loopback, accepts only the callback route, checks the expected state when supplied, and has a header-read timeout. Wrong-state requests do not complete the normal flow. A caller invoking the lower-level callback API with an empty expected state opts out of that comparison.

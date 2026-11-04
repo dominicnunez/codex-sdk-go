@@ -209,6 +209,11 @@ mutation isolation in both directions with nil, empty and populated values, and
 measure representative snapshot cost. See [thread-state
 benchmarks](thread-state-benchmarks.md) for workloads and prior measurements.
 
+The pointer allocator preserves a defined pointer's reflection type before
+remembering it. Direct generic copies and interface metadata retain their Go
+types, including typed nils. Repeated references and cycles within the same
+concrete pointer type reuse their copied storage.
+
 Bounded histories need bounded backing storage as well as bounded visible
 lengths. Trimmed substrings can retain their original allocation, and evicted
 slice slots can keep payloads alive. Own trimmed substrings and clear evicted
