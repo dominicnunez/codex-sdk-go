@@ -740,6 +740,13 @@ form-schema errors keep their precedence, and rejected parameters do not replace
 a seeded receiver. These checks validate request shape; they do not authorize
 input collection, choose a trusted URL or fetch external resources.
 
+The same request owner preserves arbitrary `_meta` numbers as `json.Number`
+before callback publication in every supported mode. It retains nested numeric
+tokens and accepts values outside float64 range without imposing form-schema
+integer limits on opaque metadata. Echoing received metadata in a response does
+not round those numbers; application-owned response codecs remain unchanged.
+Metadata stays untrusted data and does not grant approval authority.
+
 Standard `form` requests also validate the typed `requestedSchema` before
 callback publication: its root must be an object schema, and property definitions
 must match a supported string, numeric, boolean or select alternative. Closed
