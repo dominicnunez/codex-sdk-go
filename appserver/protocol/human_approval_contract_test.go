@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"path/filepath"
 	"testing"
 
 	p "github.com/dominicnunez/codex-sdk-go/appserver/protocol"
@@ -15,7 +14,7 @@ func TestHumanApprovalHandshakeIdentity(t *testing.T) {
 		mock := NewMockTransport()
 		client := p.NewClient(mock)
 		t.Cleanup(func() { _ = client.Close() })
-		if err := mock.SetResponseData("initialize", map[string]any{"codexHome": filepath.ToSlash(t.TempDir()), "platformFamily": "fixture", "platformOs": "fixture", "userAgent": "fixture"}); err != nil {
+		if err := mock.SetResponseData("initialize", validInitializeResponseData("fixture")); err != nil {
 			t.Fatal(err)
 		}
 		var params p.InitializeParams
