@@ -17,9 +17,18 @@ func specSyncWorkflowRun(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, run, ok := strings.Cut(string(data), "        run: |\n")
+	run, ok := extractSpecSyncRun(string(data))
 	if !ok {
 		t.Fatal("spec-sync run block missing")
+	}
+	return run
+}
+
+func extractSpecSyncRun(data string) (string, bool) {
+	data = strings.ReplaceAll(data, "\r\n", "\n")
+	_, run, ok := strings.Cut(data, "        run: |\n")
+	if !ok {
+		return "", false
 	}
 	var script strings.Builder
 	for _, line := range strings.Split(run, "\n") {
@@ -33,7 +42,23 @@ func specSyncWorkflowRun(t *testing.T) string {
 		}
 		script.WriteString(line + "\n")
 	}
-	return script.String()
+	return script.String(), true
+}
+
+func TestSpecSyncWorkflowLineEndings(t *testing.T) {
+	const workflow = "        run: |\n          set -euo pipefail\n          echo fixture\n"
+	const want = "set -euo pipefail\necho fixture\n\n"
+	for name, input := range map[string]string{
+		"LF":   workflow,
+		"CRLF": strings.ReplaceAll(workflow, "\n", "\r\n"),
+	} {
+		t.Run(name, func(t *testing.T) {
+			got, ok := extractSpecSyncRun(input)
+			if !ok || got != want {
+				t.Fatalf("extracted run = %q, found=%v; want %q", got, ok, want)
+			}
+		})
+	}
 }
 
 func TestSpecSyncRejectsFailedDownloads(t *testing.T) {
