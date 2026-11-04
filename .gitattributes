@@ -1,1 +1,3 @@
 scripts/spec-sync-prune.sh text eol=lf
+.githooks/* text eol=lf
+scripts/hooks/*.sh text eol=lf

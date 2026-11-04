@@ -290,12 +290,15 @@ git config --local --get core.hooksPath
 
 Hook behavior:
 
-- `pre-commit`: runs `gofmt` on staged Go files, re-stages them, then runs `golangci-lint run --new`
+- `pre-commit`: checks formatting and lint against a private copy of the staged snapshot. It leaves working files and staging unchanged; files needing formatting must be formatted and staged before committing.
 - `pre-push`: runs `go test ./...`, `go test -race ./...`, `golangci-lint run ./...`, and `go mod tidy -diff`
 
 The hook runner reuses only golangci-lint v2.14.0, matching CI, and installs that
 version with Go when needed. Hooks preserve caller-supplied Go experiments.
 Nix is optional; without it, hooks use the current environment's
 Go toolchain, which must meet the Go 1.27.3 minimum.
+
+[Hook verification](docs/hooks.md) describes staged-file selection, lint scope,
+supported file identities and verification cases.
 
 To bypass hooks intentionally for a one-off operation, use Git's standard `--no-verify` flag.

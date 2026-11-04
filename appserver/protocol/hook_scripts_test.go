@@ -31,27 +31,6 @@ func TestPrePushHookRunsRaceAndLintChecks(t *testing.T) {
 	}
 }
 
-func TestPreCommitHookFormatsAndLintsStagedGoFiles(t *testing.T) {
-	scriptPath := repoPath(t, ".githooks", "pre-commit")
-	data, err := os.ReadFile(scriptPath)
-	if err != nil {
-		t.Fatalf("read %s: %v", scriptPath, err)
-	}
-
-	script := string(data)
-	requiredSnippets := []string{
-		`git diff --cached --name-only --diff-filter=ACM -- '*.go'`,
-		`"$runner" gofmt -w "${staged[@]}"`,
-		`git add -- "${staged[@]}"`,
-		`"$runner" golangci-lint run --new`,
-	}
-	for _, snippet := range requiredSnippets {
-		if !strings.Contains(script, snippet) {
-			t.Fatalf("%s is missing required snippet %q", scriptPath, snippet)
-		}
-	}
-}
-
 func TestHookRunnerPinsGolangciLintV2(t *testing.T) {
 	scriptPath := repoPath(t, "scripts", "hooks", "run.sh")
 	data, err := os.ReadFile(scriptPath)
