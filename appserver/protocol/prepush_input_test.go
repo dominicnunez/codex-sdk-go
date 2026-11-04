@@ -15,7 +15,6 @@ func TestPrePushOwnsInputBeforeBootstrap(t *testing.T) {
 			f.write(t, "sample.go", "package fixture\nfunc Broken( {\n")
 			f.git(t, "add", "sample.go")
 			f.git(t, "commit", "--quiet", "-m", "test: bad outgoing source")
-			f.write(t, "sample.go", fixturePackage+"func Value() int { return 1 }\n")
 			realGo, err := exec.LookPath("go")
 			if err != nil {
 				t.Fatal(err)
@@ -118,7 +117,6 @@ func TestPrePushIgnoresReplacementObjects(t *testing.T) {
 	bad := strings.TrimSpace(string(f.git(t, "rev-parse", "HEAD")))
 	replacement := strings.TrimSpace(string(f.git(t, "commit-tree", goodTree, "-m", "test: independent valid replacement")))
 	f.git(t, "replace", bad, replacement)
-	f.write(t, "sample.go", fixturePackage+"func Value() int { return 1 }\n")
 	f.install(t)
 	out, err := f.push("main:refs/heads/selected")
 	if err == nil || !strings.Contains(string(out), "syntax error") {

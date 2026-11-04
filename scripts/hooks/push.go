@@ -105,6 +105,55 @@ func checkPushTree(g hookGit, tree, runner string, env []string) error {
 	return nil
 }
 
+func cleanTracked(g hookGit, head string) error {
+	data, err := g.output("ls-files", "-v", "-z")
+	if err != nil {
+		return err
+	}
+	entries, err := nulFields(data)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if len(entry) < 3 || entry[:2] != "H " {
+			return errors.New("unsupported index flags; clear assume-unchanged or sparse-checkout flags before pushing so tracked source is visible")
+		}
+	}
+	dirty := errors.New("tracked source differs from checked-out HEAD; inspect and commit or set aside tracked edits before pushing")
+	if _, err := g.output("diff", "--quiet", "--cached", "--no-ext-diff", "--no-textconv", head, "--"); err != nil {
+		if exitOne(err) {
+			return dirty
+		}
+		return err
+	}
+	// A copied index could reuse stale size/mtime data and miss changed bytes.
+	// Populate a new index from HEAD without any caller stat cache or hidden
+	// entry flags, so Git reads working content with its checkout conversions.
+	root, err := os.MkdirTemp("", "hook-clean-index-*")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(root)
+	root, err = filepath.EvalSymlinks(root)
+	if err != nil {
+		return err
+	}
+	fresh := g
+	fresh.env = replaceEnv(g.env, "GIT_INDEX_FILE", filepath.ToSlash(filepath.Join(root, "index")))
+	config := []string{"-c", "core.splitIndex=false", "-c", "core.sparseCheckout=false", "-c", "core.fsmonitor=false", "-c", "core.ignoreStat=false", "-c", "core.checkStat=default", "-c", "core.trustctime=true"}
+	if _, err := fresh.output(append(append([]string{}, config...), "read-tree", head)...); err != nil {
+		return err
+	}
+	args := append(append([]string{}, config...), "diff", "--quiet", "--no-ext-diff", "--no-textconv", "--")
+	if _, err := fresh.output(args...); err != nil {
+		if exitOne(err) {
+			return dirty
+		}
+		return err
+	}
+	return nil
+}
+
 func checkPush(ctx context.Context, input io.Reader) error {
 	tips, err := pushTips(input)
 	if err != nil {
@@ -121,33 +170,52 @@ func checkPush(ctx context.Context, input io.Reader) error {
 	if err != nil {
 		return err
 	}
-	env, err := toolEnvironment(g)
+	head, err := g.head()
 	if err != nil {
 		return err
 	}
-	runner := filepath.Join(g.dir, "scripts", "hooks", "run.sh")
-	seen := make(map[string]bool)
+	if head == "" {
+		return errors.New("check out the intended commit before pushing; only checked-out HEAD is supported")
+	}
+	// Preflight every update before executing even the first supported tree.
 	for _, tip := range tips {
 		commit, err := g.text("rev-parse", "--verify", tip.oid+"^{commit}")
 		if err != nil {
 			return fmt.Errorf("cannot verify outgoing %q: only commit-backed refs are supported: %w", tip.ref, err)
 		}
-		tree, err := g.text("rev-parse", "--verify", commit+"^{tree}")
-		if err != nil {
-			return err
+		if commit != head {
+			return fmt.Errorf("outgoing %q is not checked-out HEAD; inspect and check out that commit before pushing it, so uninspected ref code is not executed", tip.ref)
 		}
-		if seen[tree] {
-			continue
-		}
-		seen[tree] = true
-		fmt.Fprintf(os.Stdout, "pre-push: verifying %q at %s\n", tip.ref, commit)
-		if err := checkPushTree(g, tree, runner, env); err != nil {
-			return err
-		}
+	}
+	if err := cleanTracked(g, head); err != nil {
+		return err
+	}
+	tree, err := g.text("rev-parse", "--verify", head+"^{tree}")
+	if err != nil {
+		return err
+	}
+	env, err := toolEnvironment(g)
+	if err != nil {
+		return err
+	}
+	runner := filepath.Join(g.dir, "scripts", "hooks", "run.sh")
+	fmt.Fprintf(os.Stdout, "pre-push: verifying checked-out HEAD at %s\n", head)
+	if err := checkPushTree(g, tree, runner, env); err != nil {
+		return err
 	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	fmt.Fprintf(os.Stdout, "pre-push: verified %d outgoing trees\n", len(seen))
+	after, err := g.head()
+	if err != nil {
+		return err
+	}
+	if after != head {
+		return errors.New("HEAD changed during verification; retry the push after inspecting the checked-out revision")
+	}
+	if err := cleanTracked(g, head); err != nil {
+		return err
+	}
+	fmt.Fprintln(os.Stdout, "pre-push: verified checked-out HEAD for all outgoing updates")
 	return nil
 }

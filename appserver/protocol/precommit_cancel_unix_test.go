@@ -66,6 +66,9 @@ exec "$LINT_FIXTURE_REAL_GO" "$@"
 	}
 	f.write(t, "sample.go", fixturePackage+"const Selected = 1\n")
 	f.git(t, "add", "sample.go")
+	if mode == "pre-push" {
+		f.git(t, "commit", "--quiet", "-m", "test: clean checked-out push source")
+	}
 	index := filepath.Join(f.dir, ".git", "index")
 	before, err := os.ReadFile(index)
 	if err != nil {
@@ -121,7 +124,9 @@ exec "$LINT_FIXTURE_REAL_GO" "$@"
 	}
 	_ = outputWriter.Close()
 	waited := false
-	var pendingWait <-chan error
+	waitDone := make(chan error, 1)
+	var pendingWait <-chan error = waitDone
+	go func() { waitDone <- cmd.Wait() }()
 	defer func() {
 		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 		if pendingWait != nil {
@@ -146,16 +151,20 @@ exec "$LINT_FIXTURE_REAL_GO" "$@"
 				t.Fatal(err)
 			}
 		}
+	case err := <-waitDone:
+		pendingWait = nil
+		waited = true
+		_ = outputReader.Close()
+		<-outputDone
+		t.Fatalf("checker exited before supervision barrier: %v: %s", err, output.String())
 	case <-ctx.Done():
-		_ = cmd.Wait()
+		<-waitDone
+		pendingWait = nil
 		waited = true
 		_ = outputReader.Close()
 		<-outputDone
 		t.Fatalf("checker did not reach supervised lint: %s", output.String())
 	}
-	waitDone := make(chan error, 1)
-	pendingWait = waitDone
-	go func() { waitDone <- cmd.Wait() }()
 	retained := phase == "bootstrap" || mode == "pre-push" && (phase == "ordinary" || phase == "race")
 	if retained {
 		select {

@@ -35,7 +35,7 @@ func pushFixtureWithLint(t *testing.T, realLint bool) *pushFixture {
 	return p
 }
 
-func TestPrePushExcludesWorkingInputs(t *testing.T) {
+func TestPrePushWorkingInputs(t *testing.T) {
 	for _, state := range []string{"untracked Go", "ignored Go", "staged Go", "working module", "working workspace", "working lint config"} {
 		t.Run(state, func(t *testing.T) {
 			f := newPushFixture(t)
@@ -60,8 +60,13 @@ func TestPrePushExcludesWorkingInputs(t *testing.T) {
 				t.Fatal(err)
 			}
 			f.install(t)
-			if out, err := f.push("main:refs/heads/selected"); err != nil {
-				t.Fatalf("unselected %s changed outgoing verification: %v: %s", state, err, out)
+			wantError := state == "staged Go" || state == "working module" || state == "working lint config"
+			out, err := f.push("main:refs/heads/selected")
+			if (err != nil) != wantError {
+				t.Fatalf("working %s outcome: %v: %s", state, err, out)
+			}
+			if wantError && !strings.Contains(string(out), "tracked source differs") {
+				t.Fatalf("tracked changes were not the rejection owner: %s", out)
 			}
 			if after, err := os.ReadFile(filepath.Join(f.dir, ".git", "index")); err != nil || !bytes.Equal(before, after) {
 				t.Fatalf("outgoing check changed caller index: %v", err)
@@ -73,8 +78,8 @@ func TestPrePushExcludesWorkingInputs(t *testing.T) {
 	}
 }
 
-func TestPrePushChecksEveryDistinctTree(t *testing.T) {
-	for _, state := range []string{"distinct good", "same tree", "second bad"} {
+func TestPrePushPreflightsAllUpdates(t *testing.T) {
+	for _, state := range []string{"distinct good", "same tree", "same commit", "second bad"} {
 		t.Run(state, func(t *testing.T) {
 			f := newPushFixture(t)
 			f.git(t, "checkout", "--quiet", "-b", "other")
@@ -84,19 +89,24 @@ func TestPrePushChecksEveryDistinctTree(t *testing.T) {
 			case "second bad":
 				f.write(t, "sample.go", "package fixture\nfunc Broken( {\n")
 			}
-			f.git(t, "add", "sample.go")
-			f.git(t, "commit", "--quiet", "--allow-empty", "-m", "test: another outgoing tip")
+			if state != "same commit" {
+				f.git(t, "add", "sample.go")
+				f.git(t, "commit", "--quiet", "--allow-empty", "-m", "test: another outgoing tip")
+			}
 			f.git(t, "checkout", "--quiet", "main")
 			f.install(t)
 			out, err := f.push("main:refs/heads/first", "other:refs/heads/second")
-			if state == "second bad" {
+			if state != "same commit" {
 				if err == nil {
-					t.Fatalf("bad second tip was published: %s", out)
+					t.Fatalf("unsupported second tip was published: %s", out)
 				}
 				for _, ref := range []string{"first", "second"} {
 					if id, err := f.remoteCommand("rev-parse", "--verify", "refs/heads/"+ref); err == nil {
 						t.Fatalf("failed multi-update published %s: %s", ref, id)
 					}
+				}
+				if _, err := os.Stat(f.calls); !os.IsNotExist(err) {
+					t.Fatalf("unsupported update selection ran lint: %v", err)
 				}
 				return
 			}
@@ -107,10 +117,7 @@ func TestPrePushChecksEveryDistinctTree(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			want := 2
-			if state == "same tree" {
-				want = 1
-			}
+			want := 1
 			if got := strings.Count(string(calls), "\n"); got != want {
 				t.Fatalf("lint ran %d times for %s, want %d: %s", got, state, want, calls)
 			}
@@ -224,8 +231,9 @@ func TestPrePushOwnsOutgoingRevision(t *testing.T) {
 				f.git(t, "checkout", "--quiet", "-b", "other")
 				branch = "other"
 			}
-			wantError := kind != "clean good" && kind != "good HEAD with broken working edit"
-			if wantError {
+			wantError := kind != "clean good"
+			badTip := kind == "clean bad" || kind == "bad HEAD with working fix" || kind == "other bad branch"
+			if badTip {
 				f.write(t, "sample.go", bad)
 				f.git(t, "add", "sample.go")
 				f.git(t, "commit", "--quiet", "-m", "test: broken outgoing source")

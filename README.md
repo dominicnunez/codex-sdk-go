@@ -291,7 +291,7 @@ git config --local --get core.hooksPath
 Hook behavior:
 
 - `pre-commit`: checks formatting and lint against a private copy of the staged snapshot. It leaves working files and staging unchanged; files needing formatting must be formatted and staged before committing.
-- `pre-push`: runs `go test ./...`, `go test -race ./...`, `golangci-lint run ./...`, and `go mod tidy -diff` on private copies of the outgoing commit trees. Working files and staging remain unchanged.
+- `pre-push`: runs `go test ./...`, `go test -race ./...`, `golangci-lint run ./...`, and `go mod tidy -diff` against a private copy of clean, checked-out `HEAD`. Other revisions and tracked edits are rejected before checks; working files and staging remain unchanged.
 
 The hook runner reuses only golangci-lint v2.14.0, matching CI, and installs that
 version with Go when needed. Hooks preserve caller-supplied Go experiments.

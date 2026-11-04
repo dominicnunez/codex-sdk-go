@@ -1136,22 +1136,26 @@ developer checks that can be changed or skipped by the developer. They execute
 repository-selected tooling and do not isolate hostile tool configuration or
 replace review and complete CI validation.
 
-The pre-push checker captures Git's ref-update stream before bootstrap and binds
-each distinct outgoing commit tree to its own private source directory. A dirty
-working tree, another checked-out branch, replacement objects or inherited Git
-context cannot substitute source for the supplied commit IDs. Ordinary and race
-tests, pinned lint and module tidiness must all pass for every selected tree;
-malformed input and failed capture or verification prevent publication. Deletion
-updates do not publish source and skip these checks when no other tips remain.
-The current bootstrap and runner are trusted tooling; outgoing tests and
-configuration still execute code and are not a hostile-code isolation boundary.
-An admitted ordinary/race test command finishes after cancellation so it can
-clean up independently managed child groups; the push then fails and skips later
-checks. This delays cancellation until test completion. Group/job supervision
-does not contain independently detached children left by crashes or test
-timeouts, or guarantee cleanup after uncatchable termination.
-These local checks verify ref tips, not every historical commit or release
-provenance.
+The pre-push checker captures Git's ref-update stream before bootstrap. Before
+executing checks, every nondeleted update must resolve to the exact checked-out
+`HEAD`, with no staged or tracked working changes or index flags hiding tracked
+source. This prevents pushing an unattached contributor ref from silently
+executing its test initializers on the host. The developer still trusts the
+checked-out hook, tooling and source; the hook does not establish that trust or
+isolate hostile code. All updates are preflighted, and `HEAD` plus tracked
+cleanliness are checked again before success.
+
+The accepted commit's immutable tree supplies a private source directory for
+ordinary/race tests, pinned lint and module tidiness. Replacement objects,
+untracked files and inherited Git context cannot replace selected inputs.
+Malformed input and failed capture or verification prevent publication.
+Deletion-only updates skip source checks. An admitted ordinary/race test command
+finishes after cancellation so it can clean up independently managed child
+groups; the push then fails and skips later checks. This delays cancellation
+until test completion. Group/job supervision does not contain independently
+detached children left by crashes or test timeouts, or guarantee cleanup after
+uncatchable termination. These local checks verify the accepted tip, not every
+historical commit or release provenance.
 
 # 4. Criticality calibration
 

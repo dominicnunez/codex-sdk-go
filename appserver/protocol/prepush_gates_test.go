@@ -49,17 +49,15 @@ func TestPrePushRequiredGates(t *testing.T) {
 
 func TestPrePushRealLint(t *testing.T) {
 	requireHookLinter(t)
-	for _, state := range []string{"working source fix", "working lint override"} {
+	for _, state := range []string{"clean source", "untracked lint override"} {
 		t.Run(state, func(t *testing.T) {
 			f := pushFixtureWithLint(t, true)
 			bad := fixturePackage + "import \"os\"\n\nfunc Check() { os.Chdir(\".\") }\n"
 			f.write(t, "sample.go", formattedGo(t, bad))
 			f.git(t, "add", "sample.go")
 			f.git(t, "commit", "--quiet", "-m", "test: outgoing errcheck finding")
-			if state == "working source fix" {
-				f.write(t, "sample.go", formattedGo(t, strings.Replace(bad, "os.Chdir", "_ = os.Chdir", 1)))
-			} else {
-				f.write(t, ".golangci.yml", "version: \"2\"\nlinters:\n  default: none\n  enable: [asciicheck]\n")
+			if state == "untracked lint override" {
+				f.write(t, ".golangci.yaml", "version: \"2\"\nlinters:\n  default: none\n  enable: [asciicheck]\n")
 			}
 			f.install(t)
 			out, err := f.push("main:refs/heads/selected")
@@ -91,6 +89,7 @@ func TestPrePushProtocolAndImmutableSelection(t *testing.T) {
 				f.write(t, "sample.go", "package fixture\nfunc Broken( {\n")
 				f.git(t, "add", "sample.go")
 				f.git(t, "commit", "--quiet", "-m", "test: move mutable branch past captured tip")
+				wantError = true
 			case "empty":
 				input = ""
 			}
@@ -100,10 +99,8 @@ func TestPrePushProtocolAndImmutableSelection(t *testing.T) {
 			if (err != nil) != wantError {
 				t.Fatalf("%s protocol outcome: %v: %s", state, err, out)
 			}
-			if state != "immutable old tip" {
-				if _, err := os.Stat(f.calls); !os.IsNotExist(err) {
-					t.Fatalf("invalid/empty selection ran lint: %v", err)
-				}
+			if _, err := os.Stat(f.calls); !os.IsNotExist(err) {
+				t.Fatalf("unsupported/empty selection ran lint: %v", err)
 			}
 		})
 	}

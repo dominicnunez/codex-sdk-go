@@ -161,9 +161,9 @@ func (g hookGit) text(args ...string) (string, error) {
 	return strings.TrimSuffix(strings.TrimSuffix(string(out), "\n"), "\r"), err
 }
 
-func exitCode(err error, code int) bool {
+func exitOne(err error) bool {
 	var failure *exec.ExitError
-	return errors.As(err, &failure) && failure.ExitCode() == code
+	return errors.As(err, &failure) && failure.ExitCode() == 1
 }
 
 func (g hookGit) head() (string, error) {
@@ -171,11 +171,11 @@ func (g hookGit) head() (string, error) {
 	if err == nil {
 		return head, nil
 	}
-	if exitCode(err, 1) {
+	if exitOne(err) {
 		ref, refErr := g.text("symbolic-ref", "--quiet", "HEAD")
 		if refErr == nil {
 			_, existsErr := g.output("show-ref", "--verify", "--quiet", ref)
-			if exitCode(existsErr, 1) {
+			if exitOne(existsErr) {
 				return "", nil
 			}
 		}

@@ -62,28 +62,41 @@ hunk parser with independently known inserted-line positions in actual Git diffs
 
 ## Outgoing revisions
 
-Pre-push checks each distinct nondeleted ref tip's commit tree, including tips
-from branches other than the checked-out branch. It checks immutable object IDs
-supplied by Git, with replacement objects disabled. Identical trees need only one
-verification. Annotated tags pointing to commits are supported; noncommit targets
-are rejected. This verifies the selected tips, rather than certifying every
-historical commit reachable from them.
+Pre-push accepts nondeleted updates only when each resolves to the exact
+checked-out `HEAD` commit. All updates are preflighted before checks begin, so an
+unsupported ref prevents execution even when another update is supported. Tags
+pointing to `HEAD` and multiple refs pointing to it are supported. Other commits,
+including unattached contributor refs, are rejected with a request to inspect and
+check out the intended revision first. This retains the existing trust assumption
+that the developer has chosen the checked-out code to run; snapshot isolation
+alone does not authorize executing other repository code on the host.
+
+Tracked working edits, staged changes and index flags that hide tracked source
+(assume-unchanged or sparse-checkout entries) reject the push. Working content
+is compared through a fresh private `HEAD` index without caller stat-cache data;
+Git checkout conversions still apply, while stale size/mtime metadata cannot hide
+changed bytes. Untracked and ignored
+files remain excluded from verification inputs. The checker captures immutable
+`HEAD` source and rechecks both `HEAD` and tracked cleanliness before success.
+Concurrent edits are preserved and require a retry. It verifies the selected
+commit, rather than certifying every historical commit reachable from it.
 
 The shell captures the complete ref-update input before building the checker.
-The compiler receives EOF instead of Git's input. Capture failures and malformed
-records stop the push; a successful empty or deletion-only selection skips source
-checks. Mixed updates still require every distinct outgoing source tree to pass.
+The compiler receives EOF instead of Git's input. Capture failures, malformed
+records and noncommit targets stop the push. A successful empty or deletion-only
+selection skips source checks. Deletions mixed with source updates still require
+the complete selection to be supported and verified.
 
-Each private tree comes from Git blobs and modes, using the same path and symlink
-boundaries as pre-commit. Unstaged, staged, ignored and untracked working files do
-not supply verification input. The four checks run in that private tree using its
-module and lint configuration. Working files and the caller's index are never
-rewritten, and a failed check prevents Git from publishing the updates.
+The private tree comes from Git blobs and modes using pre-commit's path and
+symlink boundaries. Ordinary tests, race tests, pinned lint and module tidiness
+run against its module and lint configuration. Working files and the caller's
+index are never rewritten. Replacement objects cannot substitute another tree,
+and a failed check prevents Git from publishing the updates.
 
 The checked-out bootstrap and runner remain trusted tooling prerequisites. The
 runner consumes an explicit source-root argument without exporting a sticky
 override. Git-local environment variables are removed before checks, including
-for their nested Git fixtures; the private tree contains no Git metadata.
+for nested Git fixtures; the private tree contains no Git metadata.
 `GOFLAGS=-buildvcs=false` disables metadata stamping, and workspace, overlay and
 persisted Go defaults cannot replace selected inputs. Caller-supplied experiments
 remain available. Nix delegation uses the same trusted runner and a URL-escaped
@@ -96,17 +109,17 @@ active build. Admitted ordinary/race tests also finish before cancellation
 returns: their own cleanup can release independently managed process groups.
 The cancelled push then fails without starting later checks. This can delay
 cancellation until test completion. Other checks stop their supervised group/job
-before source removal. Temporary trees are released after each distinct tree.
-Crashing or timing-out tools, uncatchable termination and independently detached
-children are outside this containment guarantee; hooks execute trusted tooling
-and tests rather than isolating arbitrary code.
+before source removal. Crashing or timing-out tools, uncatchable termination and
+independently detached children are outside this containment guarantee; hooks
+execute trusted tooling and checked-out tests rather than isolating arbitrary
+code.
 
-Execution regressions use actual Git pushes to local bare repositories. They
-verify the remote ref and source contents after success or rejection, exercise
-all four failing gates, multiple updates, tags, deletions and unselected edits,
-and check pinned-linter findings from the outgoing source. Ref-protocol tests
-preserve exact Unicode names and propagate producer failures without returning
-partial selections. Actual hook-PID cancellation covers capture, compilation and
-each verification phase. Finite ordinary/race fixtures retain source through
-their independent child-group cleanup despite repeated cancellation; successful
-checks also stop leftover group/job members.
+Execution regressions use actual Git pushes to local bare repositories and check
+remote refs and source contents. Harmless marker-writing initializers demonstrate
+that unattached refs, mixed unsupported updates and hidden or patched tracked
+source are rejected before execution. Tests also cover all four failing gates,
+multiple supported refs, tags, deletions, exact Unicode names and capture failures.
+Actual hook-PID cancellation covers capture, compilation and each check phase.
+Finite ordinary/race fixtures retain source through independent child-group
+cleanup despite repeated cancellation, and checkout drift cannot produce a
+successful verification.
