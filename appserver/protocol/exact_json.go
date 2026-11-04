@@ -15,7 +15,13 @@ import (
 type exactJSONValue struct{ value any }
 
 func (v *exactJSONValue) UnmarshalJSON(data []byte) error {
-	return jsondecode.NativeError(jsonv2.Unmarshal(data, &v.value,
+	return unmarshalExactJSON(data, &v.value)
+}
+
+// Use only with SDK-owned destinations whose arbitrary fields share the exact
+// numeric policy. Ordinary typed fields and raw JSON retain native behavior.
+func unmarshalExactJSON(data []byte, dest any) error {
+	return jsondecode.NativeError(jsonv2.Unmarshal(data, dest,
 		json.DefaultOptionsV1(), jsonv2.WithUnmarshalers(exactJSONNumbers)))
 }
 

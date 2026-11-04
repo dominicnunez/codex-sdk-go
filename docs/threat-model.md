@@ -783,6 +783,14 @@ tool arguments remain the application's responsibility. The policy does not
 change direct ordinary decoding of plain item records, unrelated metadata or
 application-selected codecs. Exact numeric tokens are data, not tool authority.
 
+The shared MCP result owner preserves numeric tokens in arbitrary content
+array elements and structured content before history and typed item-notification
+publication. It keeps the required non-null content array, nullable elements,
+existing error/receiver behavior and raw `_meta` ownership. Cached snapshots own
+the complete nested graph. This prevents numeric rounding at result admission;
+it does not validate tool claims or assign authority to returned data. Other
+metadata and application-selected decoder policies remain separate.
+
 Image input and function-call image output codecs evaluate their URL/file-ID
 alternatives independently, matching the open schema alternatives. Invalid
 inactive properties are discarded; a valid shared image detail is still required
