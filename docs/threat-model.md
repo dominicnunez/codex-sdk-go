@@ -1119,6 +1119,18 @@ upstream content.
 
 The [CI workflow](../.github/workflows/ci.yml) runs formatting, module tidiness, builds, vet, Linux and Windows tests, race tests, and lint. These detect selected implementation defects without establishing trustworthy runtime binaries or release provenance. The absence of external Go modules reduces one dependency surface; action version tags, the Go toolchain, Codex, and upstream schemas remain dependencies. No signed-release or hostile-build isolation guarantee is made here.
 
+An unstaged edit or symlink replacement could otherwise make a local hook change
+unselected files or validate different source from the intended commit. The
+[pre-commit checker](../scripts/hooks/check.go) captures indexed blobs and modes,
+checks a private snapshot, and leaves working files and staging unchanged on
+success and failure. Exact path selection and failure propagation precede
+analysis; symbolic Go sources and links outside the captured tree are rejected.
+Lint findings are bound to added Go lines using full machine-readable reports
+and blob diffs; compiler/tool/report failures block independently. These are local
+developer checks that can be changed or skipped by the developer. They execute
+repository-selected tooling and do not isolate hostile tool configuration or
+replace review and complete CI validation.
+
 # 4. Criticality calibration
 
 Severity depends on demonstrated reachability, attacker prerequisites, deployment authority, affected data, and consequences. The examples below calibrate possible findings; they are not a list of confirmed vulnerabilities. A malicious administrator, intentionally permissive application policy, or unsupported deployment assumption does not by itself establish an SDK defect.

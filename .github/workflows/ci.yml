@@ -27,6 +27,14 @@ jobs:
       - name: Show Go version
         run: go version
 
+      - name: Configure identity for local Git fixtures
+        shell: bash
+        run: |
+          if ! git var GIT_AUTHOR_IDENT >/dev/null 2>&1 || ! git var GIT_COMMITTER_IDENT >/dev/null 2>&1; then
+            git config --global user.name "$GITHUB_ACTOR"
+            git config --global user.email "${GITHUB_ACTOR_ID}+${GITHUB_ACTOR}@users.noreply.github.com"
+          fi
+
       - name: Download modules
         run: go mod download
 
@@ -77,6 +85,14 @@ jobs:
       - name: Show Go version
         run: go version
 
+      - name: Configure identity for local Git fixtures
+        shell: bash
+        run: |
+          if ! git var GIT_AUTHOR_IDENT >/dev/null 2>&1 || ! git var GIT_COMMITTER_IDENT >/dev/null 2>&1; then
+            git config --global user.name "$GITHUB_ACTOR"
+            git config --global user.email "${GITHUB_ACTOR_ID}+${GITHUB_ACTOR}@users.noreply.github.com"
+          fi
+
       - name: Download modules
         run: go mod download
 
@@ -105,6 +121,14 @@ jobs:
       - name: Show Go version
         run: go version
 
+      - name: Configure identity for local Git fixtures
+        shell: bash
+        run: |
+          if ! git var GIT_AUTHOR_IDENT >/dev/null 2>&1 || ! git var GIT_COMMITTER_IDENT >/dev/null 2>&1; then
+            git config --global user.name "$GITHUB_ACTOR"
+            git config --global user.email "${GITHUB_ACTOR_ID}+${GITHUB_ACTOR}@users.noreply.github.com"
+          fi
+
       - name: Download modules
         run: go mod download
 
@@ -121,8 +145,21 @@ jobs:
           go-version-file: go.mod
           cache: false
 
+      - name: Configure identity for local Git fixtures
+        shell: bash
+        run: |
+          if ! git var GIT_AUTHOR_IDENT >/dev/null 2>&1 || ! git var GIT_COMMITTER_IDENT >/dev/null 2>&1; then
+            git config --global user.name "$GITHUB_ACTOR"
+            git config --global user.email "${GITHUB_ACTOR_ID}+${GITHUB_ACTOR}@users.noreply.github.com"
+          fi
+
       - name: Lint
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.14.0
           args: --config=.golangci.yml ./...
+
+      - name: Verify staged hook lint scope
+        env:
+          REQUIRE_PINNED_HOOK_LINT: '1'
+        run: go test -v ./appserver/protocol -run '^TestPreCommitRealLintScope$' -count=1
