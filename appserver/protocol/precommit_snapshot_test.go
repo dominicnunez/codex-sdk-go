@@ -42,9 +42,19 @@ func newCommitFixture(t *testing.T, files map[string]string, realLint bool) *com
 	}
 	f.dir = filepath.Join(f.parent, "repo")
 	f.calls = filepath.Join(f.parent, "lint-calls.txt")
-	f.write(t, "go.mod", "module fixture\n\ngo 1.27.3\n")
+	f.write(t, "go.mod", "module github.com/dominicnunez/codex-sdk-go\n\ngo 1.27.3\n")
 	f.write(t, "README.md", "fixture\n")
-	for _, path := range []string{".gitattributes", ".githooks/pre-commit", "scripts/hooks/run.sh", ".golangci.yml", "scripts/hooks/check.go"} {
+	paths := []string{".gitattributes", ".githooks/pre-commit", "scripts/hooks/run.sh", ".golangci.yml", "scripts/hooks/check.go", "scripts/hooks/bootstrap.mod"}
+	processFiles, err := os.ReadDir(repoPath(t, "internal/process"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range processFiles {
+		if strings.HasSuffix(file.Name(), ".go") && !strings.HasSuffix(file.Name(), "_test.go") {
+			paths = append(paths, "internal/process/"+file.Name())
+		}
+	}
+	for _, path := range paths {
 		data, err := os.ReadFile(repoPath(t, filepath.FromSlash(path)))
 		if path == "scripts/hooks/check.go" && os.IsNotExist(err) {
 			continue // The original hook has no standalone snapshot checker.
@@ -74,12 +84,23 @@ func newCommitFixture(t *testing.T, files map[string]string, realLint bool) *com
 		const linter = `#!/usr/bin/env bash
 set -euo pipefail
 if [ "$1" = version ]; then
+  if [ "${LINT_FIXTURE_PHASE:-}" = version ]; then
+    (read -r reply < "$LINT_FIXTURE_WAIT") &
+    printf '%s\n' "$BASHPID" > "$LINT_FIXTURE_READY"
+    wait
+  fi
+  if [ "${LINT_FIXTURE_PHASE:-}" = install ]; then echo 'golangci-lint has version 2.13.0'; exit 0; fi
   echo 'golangci-lint has version 2.14.0'
   exit 0
 fi
 printf '%s\n' "$*" >> "$LINT_FIXTURE_CALLS"
-if [ -n "${LINT_FIXTURE_READY:-}" ]; then printf '%s\n' "$PPID" > "$LINT_FIXTURE_READY"; fi
-if [ -n "${LINT_FIXTURE_WAIT:-}" ]; then read -r reply < "$LINT_FIXTURE_WAIT"; fi
+if [ "${LINT_FIXTURE_PHASE:-}" = complete ]; then
+  (read -r reply < "$LINT_FIXTURE_WAIT") &
+  printf '%s\n' "$!" > "$LINT_FIXTURE_READY"
+else
+  if [ -n "${LINT_FIXTURE_READY:-}" ]; then printf '%s\n' "$PPID" > "$LINT_FIXTURE_READY"; fi
+  [[ -z "${LINT_FIXTURE_WAIT:-}" ]] || read -r reply < "$LINT_FIXTURE_WAIT"
+fi
 if [ "$LINT_FIXTURE_EXIT" != 0 ]; then exit "$LINT_FIXTURE_EXIT"; fi
 report_body='{"Issues":[]}'
 if [[ -v LINT_FIXTURE_REPORT ]]; then report_body="$LINT_FIXTURE_REPORT"; fi
@@ -138,6 +159,22 @@ func formattedGo(t *testing.T, source string) string {
 }
 
 const fixturePackage = "// Package fixture exercises local hook snapshots.\npackage fixture\n\n"
+
+func TestPreCommitMissingBootstrapModuleBlocks(t *testing.T) {
+	f := newCommitFixture(t, map[string]string{"sample.go": fixturePackage + "const Before = 0\n"}, false)
+	f.write(t, "sample.go", fixturePackage+"const Selected = 1\n")
+	f.git(t, "add", "sample.go")
+	before := f.git(t, "show", ":sample.go")
+	if err := os.Remove(filepath.Join(f.dir, "go.mod")); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := f.hook(); err == nil {
+		t.Fatalf("missing bootstrap module did not block check: %s", out)
+	}
+	if after := f.git(t, "show", ":sample.go"); !bytes.Equal(before, after) {
+		t.Fatal("missing bootstrap prerequisite changed staging")
+	}
+}
 
 func TestPreCommitFixtureIgnoresCallerGitState(t *testing.T) {
 	for _, repositoryEnv := range []bool{false, true} {

@@ -78,6 +78,28 @@ func TestPreCommitRealLintScope(t *testing.T) {
 			t.Fatalf("already committed finding entered staged scope: %v: %s", err, out)
 		}
 	})
+	t.Run("temporary directory alias", func(t *testing.T) {
+		f := newCommitFixture(t, map[string]string{"sample.go": formattedGo(t, bad)}, true)
+		physical := filepath.Join(f.parent, "physical")
+		alias := filepath.Join(f.parent, "alias")
+		if err := os.Mkdir(physical, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(physical, alias); err != nil {
+			t.Skipf("temporary directory alias unavailable: %v", err)
+		}
+		f.write(t, "added.go", fixturePackage+"const Added = 1\n")
+		f.git(t, "add", "added.go")
+		extra := []string{"TMPDIR=" + alias, "TMP=" + alias, "TEMP=" + alias}
+		if out, err := f.hook(extra...); err != nil {
+			t.Fatalf("temporary directory alias included unchanged finding: %v: %s", err, out)
+		}
+		f.write(t, "added.go", formattedGo(t, strings.Replace(bad, "Check()", "Added()", 1)))
+		f.git(t, "add", "added.go")
+		if out, err := f.hook(extra...); err == nil || !strings.Contains(string(out), "os.Chdir") {
+			t.Fatalf("temporary directory alias hid selected finding: %v: %s", err, out)
+		}
+	})
 	t.Run("Git diff environment cannot widen scope", func(t *testing.T) {
 		f := newCommitFixture(t, map[string]string{"sample.go": formattedGo(t, bad) + "\nconst Value = 1\n"}, true)
 		f.write(t, "sample.go", formattedGo(t, bad)+"\nconst Value = 2\n")

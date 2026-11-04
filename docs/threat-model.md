@@ -1126,7 +1126,12 @@ checks a private snapshot, and leaves working files and staging unchanged on
 success and failure. Exact path selection and failure propagation precede
 analysis; symbolic Go sources and links outside the captured tree are rejected.
 Lint findings are bound to added Go lines using full machine-readable reports
-and blob diffs; compiler/tool/report failures block independently. These are local
+and blob diffs; compiler/tool/report failures block independently. Runner
+descendants enter shared process-group/job supervision before
+execution. Cancellation and normal completion stop remaining runner descendants
+before snapshot removal; the shell waits for an active bootstrap build instead
+of abandoning its compiler frontend. Canonical temporary roots bind reported
+source paths to captured files despite directory aliases. These are local
 developer checks that can be changed or skipped by the developer. They execute
 repository-selected tooling and do not isolate hostile tool configuration or
 replace review and complete CI validation.

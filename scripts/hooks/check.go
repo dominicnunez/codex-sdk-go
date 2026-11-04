@@ -22,9 +22,18 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/process"
 )
 
 func main() {
+	if len(os.Args) >= 3 && os.Args[1] == "hook-child" {
+		if err := runChild(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, "hook child:", err)
+			os.Exit(1)
+		}
+		return
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if len(os.Args) != 2 || os.Args[1] != "pre-commit" {
@@ -35,6 +44,68 @@ func main() {
 		fmt.Fprintln(os.Stderr, "pre-commit:", err)
 		os.Exit(1)
 	}
+}
+
+func runChild(args []string) error {
+	var gate [1]byte
+	if _, err := io.ReadFull(os.Stdin, gate[:]); err != nil {
+		return err
+	}
+	if gate[0] != 1 {
+		return errors.New("invalid hook child admission")
+	}
+	cmd := exec.Command(args[0], args[1:]...) //nolint:noctx // The admitted process tree owns runner cancellation.
+	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+	return cmd.Run()
+}
+
+// runOwned admits the runner only after its process group/job owns descendants.
+func runOwned(ctx context.Context, command, dir string, env, args []string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	executable, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command(executable, append([]string{"hook-child", command}, args...)...) //nolint:noctx // Attach the tree before arming cancellation or admitting the runner.
+	cmd.Dir, cmd.Env = dir, env
+	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+	gate, err := cmd.StdinPipe()
+	if err != nil {
+		return err
+	}
+	defer gate.Close()
+	process.ConfigureCommand(cmd)
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	tree, err := process.AttachTree(cmd)
+	if err != nil {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		return err
+	}
+	defer tree.Close()
+	cancelled := make(chan struct{})
+	stop := context.AfterFunc(ctx, func() {
+		_ = tree.ForceKill(cmd.Process)
+		close(cancelled)
+	})
+	if ctx.Err() == nil {
+		_, err = gate.Write([]byte{1})
+	}
+	_ = gate.Close()
+	waitErr := cmd.Wait()
+	if !stop() {
+		<-cancelled
+	}
+	// A runner must not leave background work after its own exit either.
+	killErr := tree.ForceKill(cmd.Process)
+	if process.IsExpectedStopError(killErr) {
+		killErr = nil
+	}
+	return errors.Join(err, waitErr, killErr, ctx.Err())
 }
 
 type hookGit struct {
@@ -493,17 +564,14 @@ func lintReport(g hookGit, root, gitdir, index string) ([]lintIssue, error) {
 		"--config=" + filepath.ToSlash(filepath.Join(root, ".golangci.yml")), "--issues-exit-code=0", "--show-stats=false", "--path-mode=abs",
 		"--output.json.path=" + filepath.ToSlash(report), "--output.text.path=", "--max-issues-per-linter=0", "--max-same-issues=0", "--uniq-by-line=false",
 		"--new=false", "--new-from-rev=", "--new-from-patch=", "--new-from-merge-base=", "--whole-files=false", "./..."}
-	cmd := exec.CommandContext(g.ctx, bash, args...)
-	cmd.Dir = root
-	cmd.Env = replaceEnv(g.env, "GIT_DIR", filepath.ToSlash(gitdir))
-	cmd.Env = replaceEnv(cmd.Env, "GIT_WORK_TREE", filepath.ToSlash(root))
-	cmd.Env = replaceEnv(cmd.Env, "GIT_INDEX_FILE", filepath.ToSlash(index))
-	cmd.Env = replaceEnv(cmd.Env, "GO111MODULE", "on")
-	cmd.Env = replaceEnv(cmd.Env, "GOWORK", "off")
-	cmd.Env = replaceEnv(cmd.Env, "GOENV", "off")
-	cmd.Env = replaceEnv(cmd.Env, "GOFLAGS", "")
-	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-	if err := cmd.Run(); err != nil {
+	env := replaceEnv(g.env, "GIT_DIR", filepath.ToSlash(gitdir))
+	env = replaceEnv(env, "GIT_WORK_TREE", filepath.ToSlash(root))
+	env = replaceEnv(env, "GIT_INDEX_FILE", filepath.ToSlash(index))
+	env = replaceEnv(env, "GO111MODULE", "on")
+	env = replaceEnv(env, "GOWORK", "off")
+	env = replaceEnv(env, "GOENV", "off")
+	env = replaceEnv(env, "GOFLAGS", "")
+	if err := runOwned(g.ctx, bash, root, env, args); err != nil {
 		return nil, fmt.Errorf("lint staged snapshot: %w", err)
 	}
 	data, err := os.ReadFile(report)
@@ -607,6 +675,10 @@ func validateSnapshot(g hookGit, tree, head, gitdir string, selected []string) e
 		return err
 	}
 	defer os.RemoveAll(snapshot)
+	snapshot, err = filepath.EvalSymlinks(snapshot)
+	if err != nil {
+		return err
+	}
 	if err := materialize(g, entries, snapshot); err != nil {
 		return err
 	}

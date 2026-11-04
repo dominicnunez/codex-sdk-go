@@ -5,6 +5,15 @@ working tree or index. Partially staged files retain their selected contents;
 unselected edits, untracked files and working copies of module or lint
 configuration do not become validation inputs.
 
+The hook builds its checker with a dedicated, dependency-free bootstrap module
+and reuses the existing process-tree controls. Bootstrap source files and the
+root `go.mod` must remain present; Go requires the latter to locate the module
+even though its working contents are ignored. A missing prerequisite blocks the
+check without changing staging. The shell owns the temporary executable and
+forwards cancellation to the checker before removing it.
+Cancellation during bootstrap waits for the active build to finish before
+cleanup and prevents checker launch; it does not abandon the compiler frontend.
+
 The checker copies the effective index, including alternate indices and linked
 worktrees, then captures its tree. Checked NUL-delimited Git output selects added,
 copied, modified, renamed, type-changed and deleted Go paths. A failed selection
@@ -36,7 +45,11 @@ settings such as `GOEXPERIMENT` remain available. Owned Git diffs also ignore
 
 The checker rechecks the index tree and `HEAD` before success. Changes during
 validation require a retry. Temporary files and child processes are cleaned up
-on ordinary failures and handled cancellation. The hook does not synchronize
+on ordinary failures and handled cancellation. Runner execution begins only
+after process-tree attachment; version checks, installation and analysis share
+that ownership. Remaining runner descendants are stopped on ordinary completion
+as well. Temporary roots are resolved before analysis and report validation.
+The hook does not synchronize
 concurrent Git operations after it returns. Its changed-line lint scope is
 complemented by the complete repository checks in pre-push and CI.
 
