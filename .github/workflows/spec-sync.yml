@@ -52,15 +52,38 @@ jobs:
           download_dir() {
             local api_path="$1"
             local dest="$2"
+            local status
             mkdir -p "${dest}"
             gh api "repos/${upstream_repo}/contents/${api_path}" --jq '.[] | select(.type == "file") | .download_url' | while read -r url; do
-              curl -sL -o "${dest}/$(basename "${url}")" "${url}"
+              status="$(curl --fail --silent --show-error --location \
+                --output "${dest}/$(basename "${url}")" --write-out '%{http_code}' "${url}")"
+              if [[ "${status}" != 2[0-9][0-9] ]]; then
+                echo "Schema download returned HTTP ${status}: ${url}" >&2
+                return 1
+              fi
             done
           }
 
           download_dir "${upstream_path}" "${tmpdir}"
           download_dir "${upstream_path}/v1" "${tmpdir}/v1"
           download_dir "${upstream_path}/v2" "${tmpdir}/v2"
+
+          # Validate the complete candidate before comparing or publishing it.
+          python3 - "${tmpdir}" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          def reject_constant(value):
+              raise ValueError(f"Invalid JSON number: {value}")
+
+          for path in Path(sys.argv[1]).rglob("*.json"):
+              with path.open(encoding="utf-8") as source:
+                  try:
+                      json.load(source, parse_constant=reject_constant)
+                  except ValueError as error:
+                      raise SystemExit(f"Invalid schema JSON in {path}: {error}")
+          PY
 
           # --- 4. Diff upstream vs local ---
           new_schemas=""

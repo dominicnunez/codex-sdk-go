@@ -2,6 +2,25 @@
 
 The `spec-sync` workflow checks the upstream Codex app-server schemas on its schedule and through manual dispatch. When it detects changes, it commits the schema snapshot to a bot-owned `spec-sync/*` branch and opens a pull request.
 
+## Download admission
+
+The workflow downloads root, v1 and v2 files into a temporary candidate directory.
+Transfers must complete with a final HTTP 2xx status, including after redirects.
+Python's standard-library JSON parser then checks every candidate `.json` file
+before the workflow compares or replaces the tracked snapshot, updates the
+baseline, publishes a branch or changes pull requests. Empty, malformed,
+multiple-document and nonstandard non-finite JSON bodies fail this gate.
+
+Download, inventory or JSON-validation failure exits before publication and
+removes the temporary candidate. Existing tracked schemas, the baseline and
+earlier sync proposals remain intact. This checks JSON syntax, rather than schema
+semantics or SDK compatibility; those still need review and protocol checks.
+
+`TestSpecSyncRejectsFailedDownloads` executes the workflow's run block with real
+curl against a local HTTP server, while branch and pull-request operations use
+inert fixtures. It covers failures in each downloaded directory, valid bodies,
+redirects and preservation of existing state.
+
 ## Superseded pull requests
 
 Spec-sync workflow runs are serialized with `cancel-in-progress: false`. A run creates or finds its current pull request before looking for older sync pull requests. It then closes an older pull request only when all of these conditions hold:
