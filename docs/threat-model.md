@@ -1107,6 +1107,13 @@ Applications must avoid logging serialized auth requests, protect backups and tr
 
 An upstream schema change can alter required fields, unions, routing metadata, or approval semantics. [Spec-sync maintenance](spec-sync.md) and the [sync workflow](../.github/workflows/spec-sync.yml) create reviewable changes; imported schemas are the protocol contract, not proof that an implementation is safe. Review must include custom marshalers, dispatch registration, snapshot ownership, and callers of newly added fields.
 
+Schema-sync downloads must finish with a final HTTP 2xx status. The complete
+temporary candidate is checked as JSON before snapshot replacement, baseline
+advancement, branch publication or stale-proposal cleanup. HTTP errors, incomplete
+transfers and malformed JSON therefore preserve the existing snapshot and sync
+proposals. Syntax validation does not establish schema semantics, SDK support or
+the trustworthiness of upstream content.
+
 The [CI workflow](../.github/workflows/ci.yml) runs formatting, module tidiness, builds, vet, Linux and Windows tests, race tests, and lint. These detect selected implementation defects without establishing trustworthy runtime binaries or release provenance. The absence of external Go modules reduces one dependency surface; action version tags, the Go toolchain, Codex, and upstream schemas remain dependencies. No signed-release or hostile-build isolation guarantee is made here.
 
 # 4. Criticality calibration
