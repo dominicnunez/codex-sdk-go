@@ -71,8 +71,8 @@ func TestCreateKillOnCloseJobObjectConfiguresKillOnCloseLimit(t *testing.T) {
 	if gotInfoClass != jobObjectExtendedLimitInformation {
 		t.Fatalf("infoClass = %d, want %d", gotInfoClass, jobObjectExtendedLimitInformation)
 	}
-	if gotInfoLen != uint32(unsafe.Sizeof(jobObjectExtendedLimitInfo{})) {
-		t.Fatalf("infoLen = %d, want %d", gotInfoLen, uint32(unsafe.Sizeof(jobObjectExtendedLimitInfo{})))
+	if gotInfoLen != uint32(jobExtendedBytes) {
+		t.Fatalf("infoLen = %d, want %d", gotInfoLen, uint32(jobExtendedBytes))
 	}
 	if gotInfo.BasicLimitInformation.LimitFlags != jobObjectLimitKillOnJobClose {
 		t.Fatalf("limitFlags = %#x, want %#x", gotInfo.BasicLimitInformation.LimitFlags, jobObjectLimitKillOnJobClose)
