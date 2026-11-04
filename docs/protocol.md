@@ -451,7 +451,12 @@ invalid earlier duplicates. Use `IsBlocking` to decide whether a request blocks.
 
 For `mcpServer/elicitation/request`, standard `form` mode validates the typed
 `requestedSchema`, including its property definitions, before invoking the
-handler. The `openaiForm` and `openai/form` modes retain arbitrary JSON in
+handler. String `minLength`/`maxLength` limits use the uint32 range, and array
+`minItems`/`maxItems` limits use the uint64 range. These four property-map members
+retain exact `json.Number` values, including integral decimal/exponent spellings;
+omitted and null members keep their existing meaning. Numeric-property
+`minimum`, `maximum` and `default` remain doubles represented as float64.
+The `openaiForm` and `openai/form` modes retain arbitrary JSON in
 `OpenAIRequestedSchema`. Schema admission does not validate answers or decide
 whether the application should collect the requested information.
 

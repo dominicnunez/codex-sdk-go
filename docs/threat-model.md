@@ -745,7 +745,10 @@ callback publication: its root must be an object schema, and property definition
 must match a supported string, numeric, boolean or select alternative. Closed
 schema objects reject unknown members; required members, nullable metadata,
 array elements, string-format literals and nonnegative integer limits follow the
-checked-in definitions. Numeric limits are checked from their decimal spelling
+checked-in definitions. String lengths are bounded by uint32 and select-array
+item counts by uint64. Their admitted property-map values retain exact numeric
+tokens instead of rounded float64 values; numeric-property double fields keep
+their existing representation. Limits are checked from decimal length and digits
 without expanding exponent-sized integers. Property definitions and their nested options retain final-member map decoding;
 repeated root property dictionaries retain their merging behavior. Existing
 native and required-field errors take precedence over these added checks, and
