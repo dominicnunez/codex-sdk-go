@@ -469,6 +469,12 @@ The `openaiForm` and `openai/form` modes retain arbitrary JSON in
 `OpenAIRequestedSchema`. Schema admission does not validate answers or decide
 whether the application should collect the requested information.
 
+In all four elicitation modes, request `Meta` preserves arbitrary JSON numbers
+as `json.Number`, including nested numbers and values outside float64 range.
+Returning that metadata in the response preserves its numeric tokens. Missing
+or null metadata remains nil; strings and other JSON kinds retain their meaning.
+Application-constructed response values keep their existing encoding behavior.
+
 Legacy additional-filesystem permission paths and approval cwd, command-action,
 parsed-command and grantRoot strings are preserved as supplied. They may be
 relative, empty or contain dot segments. The SDK does not resolve them against

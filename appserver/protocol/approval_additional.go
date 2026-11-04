@@ -162,6 +162,7 @@ func (p *McpServerElicitationRequestParams) UnmarshalJSON(data []byte) error {
 	type elicitationWire struct {
 		*wire
 		RequestedSchema *json.RawMessage `json:"requestedSchema"`
+		Meta            exactJSONValue   `json:"_meta"`
 	}
 	w := elicitationWire{wire: &decoded, RequestedSchema: &schema}
 	required := []string{"serverName", "threadId"}
@@ -210,6 +211,7 @@ func (p *McpServerElicitationRequestParams) UnmarshalJSON(data []byte) error {
 	if err := validateEnumOccurrences(data, "mode", false, validateElicitationMode); err != nil {
 		return err
 	}
+	decoded.Meta = w.Meta.value
 	*p = McpServerElicitationRequestParams(decoded)
 	return nil
 }
