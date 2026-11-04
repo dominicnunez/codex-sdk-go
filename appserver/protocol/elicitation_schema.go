@@ -26,6 +26,8 @@ var elicitationSchemaRule = elicitationObjectRule(map[string]elicitationRule{
 var elicitationPrimitiveRules = buildElicitationRules()
 
 func buildElicitationRules() []elicitationRule {
+	uint32Limit := elicitationNullable(elicitationNatural((1 << 32) - 1))
+	uint64Limit := elicitationNullable(elicitationNatural((1 << 64) - 1))
 	stringList := elicitationList(elicitationString)
 	option := elicitationObject(map[string]elicitationRule{"const": elicitationString, "title": elicitationString}, "const", "title")
 	options := elicitationList(option)
@@ -38,13 +40,13 @@ func buildElicitationRules() []elicitationRule {
 		members  map[string]elicitationRule
 		required []string
 	}{
-		{elicitationLiteral("string"), map[string]elicitationRule{"default": elicitationNullable(elicitationString), "format": elicitationNullable(elicitationLiteral("email", "uri", "date", "date-time")), "minLength": elicitationNullable(elicitationNatural), "maxLength": elicitationNullable(elicitationNatural)}, nil},
+		{elicitationLiteral("string"), map[string]elicitationRule{"default": elicitationNullable(elicitationString), "format": elicitationNullable(elicitationLiteral("email", "uri", "date", "date-time")), "minLength": uint32Limit, "maxLength": uint32Limit}, nil},
 		{elicitationLiteral("number", "integer"), map[string]elicitationRule{"default": elicitationNullable(elicitationNumber), "minimum": elicitationNullable(elicitationNumber), "maximum": elicitationNullable(elicitationNumber)}, nil},
 		{elicitationLiteral("boolean"), map[string]elicitationRule{"default": elicitationNullable(elicitationBoolean)}, nil},
 		{elicitationLiteral("string"), map[string]elicitationRule{"default": elicitationNullable(elicitationString), "enum": stringList, "enumNames": elicitationNullable(stringList)}, []string{"enum"}},
 		{elicitationLiteral("string"), map[string]elicitationRule{"default": elicitationNullable(elicitationString), "oneOf": options}, []string{"oneOf"}},
-		{elicitationLiteral("array"), map[string]elicitationRule{"default": elicitationNullable(stringList), "items": untitledItems, "minItems": elicitationNullable(elicitationNatural), "maxItems": elicitationNullable(elicitationNatural)}, []string{"items"}},
-		{elicitationLiteral("array"), map[string]elicitationRule{"default": elicitationNullable(stringList), "items": titledItems, "minItems": elicitationNullable(elicitationNatural), "maxItems": elicitationNullable(elicitationNatural)}, []string{"items"}},
+		{elicitationLiteral("array"), map[string]elicitationRule{"default": elicitationNullable(stringList), "items": untitledItems, "minItems": uint64Limit, "maxItems": uint64Limit}, []string{"items"}},
+		{elicitationLiteral("array"), map[string]elicitationRule{"default": elicitationNullable(stringList), "items": titledItems, "minItems": uint64Limit, "maxItems": uint64Limit}, []string{"items"}},
 	}
 	rules := make([]elicitationRule, 0, len(definitions))
 	for _, definition := range definitions {
@@ -59,15 +61,15 @@ func buildElicitationRules() []elicitationRule {
 // Validate after the original typed decode so its native and required errors
 // retain precedence. Repeated properties dictionaries merge like the public Go
 // map, while each property's object members use their existing last-value rule.
-func validateElicitationSchema(data []byte) error {
+func validateElicitationSchema(data []byte) (map[string]json.RawMessage, error) {
 	if err := elicitationSchemaRule(data); err != nil {
-		return err
+		return nil, err
 	}
 	var wire struct {
 		Properties map[string]json.RawMessage `json:"properties"`
 	}
 	if err := jsondecode.Unmarshal(data, &wire); err != nil {
-		return err
+		return nil, err
 	}
 	for name, property := range wire.Properties {
 		matched := false
@@ -78,10 +80,10 @@ func validateElicitationSchema(data []byte) error {
 			}
 		}
 		if !matched {
-			return fmt.Errorf("invalid MCP elicitation property %s", quotedValueDiagnostic(name))
+			return nil, fmt.Errorf("invalid MCP elicitation property %s", quotedValueDiagnostic(name))
 		}
 	}
-	return nil
+	return wire.Properties, nil
 }
 
 func elicitationPropertyObject(raw json.RawMessage) error {
@@ -230,48 +232,119 @@ func elicitationNumber(raw json.RawMessage) error {
 	return nil
 }
 
-func elicitationNatural(raw json.RawMessage) error {
-	if err := elicitationNumber(raw); err != nil {
-		return err
+func elicitationNatural(maximum uint64) elicitationRule {
+	maximumText := strconv.FormatUint(maximum, 10)
+	return func(raw json.RawMessage) error {
+		if err := elicitationNumber(raw); err != nil {
+			return err
+		}
+		// Work on the validated decimal spelling instead of expanding a power of
+		// ten. Very small exponents can decode to zero in the public float64 map,
+		// but still describe a fractional, schema-invalid length.
+		spelling := string(raw)
+		mantissa, exponent := spelling, int64(0)
+		if index := strings.IndexAny(spelling, "eE"); index >= 0 {
+			mantissa = spelling[:index]
+			// ParseInt saturates on overflow. Either limit is beyond the number of
+			// digits in this input, so its comparison below remains sufficient.
+			exponent, _ = strconv.ParseInt(spelling[index+1:], 10, 64)
+		}
+		var prefix [20]byte // A uint64 bound has at most 20 decimal digits.
+		significant := int64(0)
+		nonzero := false
+		trailing := int64(0)
+		fraction := int64(0)
+		dot := false
+		for _, digit := range mantissa {
+			if digit == '.' {
+				dot = true
+				continue
+			}
+			if digit == '-' {
+				continue
+			}
+			if dot {
+				fraction++
+			}
+			if digit != '0' {
+				nonzero = true
+				trailing = 0
+			} else {
+				trailing++
+			}
+			if nonzero {
+				if significant < int64(len(prefix)) {
+					prefix[significant] = byte(digit)
+				}
+				significant++
+			}
+		}
+		if !nonzero {
+			return nil
+		}
+		if mantissa[0] == '-' || exponent < fraction-trailing {
+			return errors.New("expected nonnegative schema integer")
+		}
+		return checkElicitationMaximum(maximumText, prefix, significant, fraction, exponent)
 	}
-	// Work on the validated decimal spelling instead of expanding a power of
-	// ten. Very small exponents can decode to zero in the public float64 map,
-	// but still describe a fractional, schema-invalid length.
-	spelling := string(raw)
-	mantissa, exponent := spelling, int64(0)
-	if index := strings.IndexAny(spelling, "eE"); index >= 0 {
-		mantissa = spelling[:index]
-		// ParseInt saturates on overflow. Either limit is beyond the number of
-		// digits in this input, so its comparison below remains sufficient.
-		exponent, _ = strconv.ParseInt(spelling[index+1:], 10, 64)
+}
+
+func checkElicitationMaximum(maximumText string, prefix [20]byte, significant, fraction, exponent int64) error {
+	// Compare decimal length before digits. Subtract small input counts from
+	// the bound instead of adding to a potentially saturated exponent.
+	equalLength := int64(len(maximumText)) + fraction - significant
+	if exponent > equalLength {
+		return errors.New("schema integer exceeds unsigned range")
 	}
-	nonzero := false
-	trailing := int64(0)
-	fraction := int64(0)
-	dot := false
-	for _, digit := range mantissa {
-		if digit == '.' {
-			dot = true
-			continue
-		}
-		if digit == '-' {
-			continue
-		}
-		if dot {
-			fraction++
-		}
-		if digit != '0' {
-			nonzero = true
-			trailing = 0
-		} else {
-			trailing++
-		}
-	}
-	if !nonzero {
+	if exponent < equalLength {
 		return nil
 	}
-	if mantissa[0] == '-' || exponent < fraction-trailing {
-		return errors.New("expected nonnegative schema integer")
+	for i := range maximumText {
+		digit := byte('0')
+		if int64(i) < significant {
+			digit = prefix[i]
+		}
+		if digit > maximumText[i] {
+			return errors.New("schema integer exceeds unsigned range")
+		}
+		if digit < maximumText[i] {
+			return nil
+		}
+	}
+	return nil
+}
+
+// After complete schema validation, retain the exact final limits in the fresh
+// public map. Other numbers remain doubles, and the original native decode
+// still owns error precedence. Raw property values share its map selection.
+func preserveElicitationLimits(raw map[string]json.RawMessage, decoded map[string]interface{}) error {
+	names := [...]string{"minLength", "maxLength", "minItems", "maxItems"}
+	for name, property := range raw {
+		var selected [4][]byte
+		jsonobject.WalkFields(property, true, func(key, value []byte) {
+			for i, field := range names {
+				if jsonobject.FieldMatches(key, field) {
+					selected[i] = value
+					return
+				}
+			}
+		})
+		// A validated property definition and its native interface value are
+		// objects. Both decoders started with fresh storage and the same input.
+		definition, ok := decoded[name].(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("invalid MCP elicitation property %s", quotedValueDiagnostic(name))
+		}
+		for i, value := range selected {
+			if value == nil {
+				continue
+			}
+			if isNullJSONValue(value) {
+				definition[names[i]] = nil
+			} else {
+				definition[names[i]] = json.Number(string(value))
+			}
+		}
 	}
 	return nil
 }

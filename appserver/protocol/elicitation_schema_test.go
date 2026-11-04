@@ -58,7 +58,7 @@ func TestElicitationSchemaAlternatives(t *testing.T) {
 		`{"type":"string","enum":[]}`, `{"type":"string","enum":["a"],"enumNames":["A"],"default":"b"}`,
 		`{"type":"string","enum":["a","b"],"enumNames":null}`,
 		`{"type":"string","oneOf":[{"const":"a","title":"A"}],"default":"a"}`,
-		`{"type":"array","items":{"type":"string","enum":[]},"default":[],"minItems":-0,"maxItems":18446744073709551616}`,
+		`{"type":"array","items":{"type":"string","enum":[]},"default":[],"minItems":-0,"maxItems":18446744073709551615}`,
 		`{"type":"array","items":{"anyOf":[{"const":"a","title":"A"}]},"default":["a"],"minItems":1.0,"maxItems":100e-2}`,
 		`{"type":"array","items":{"anyOf":[]},"default":null,"minItems":null,"maxItems":null}`,
 	}
@@ -82,6 +82,8 @@ func TestElicitationSchemaAlternatives(t *testing.T) {
 
 func TestElicitationSchemaRejectsMalformedMembers(t *testing.T) {
 	invalidProperties := []string{
+		`{"type":"string","minLength":4294967296}`,
+		`{"type":"array","items":{"type":"string","enum":[]},"maxItems":18446744073709551616}`,
 		`null`, `[]`, `"string"`, `{}`, `{"type":null}`, `{"type":"object"}`, `{"TYPE":"string"}`,
 		`{"type":"string","format":"uuid"}`, `{"type":"string","format":true}`,
 		`{"type":"string","default":1}`, `{"type":"string","title":[]}`, `{"type":"string","description":false}`,

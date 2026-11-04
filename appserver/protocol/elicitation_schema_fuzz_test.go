@@ -145,6 +145,23 @@ func elicitationContractMatches(schema map[string]any, value any, definitions ma
 	if value == nil {
 		return true
 	}
+	if format, ok := schema["format"].(string); ok && (format == "uint32" || format == "uint64") {
+		number, ok := value.(json.Number)
+		if !ok {
+			return false
+		}
+		rational, ok := new(big.Rat).SetString(string(number))
+		if !ok || !rational.IsInt() || rational.Sign() < 0 {
+			return false
+		}
+		width := 32
+		if format == "uint64" {
+			width = 64
+		}
+		if rational.Num().BitLen() > width {
+			return false
+		}
+	}
 	if minimum, ok := schema["minimum"].(float64); ok {
 		number, ok := value.(json.Number)
 		if !ok {
