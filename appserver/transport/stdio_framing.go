@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+
+	"github.com/dominicnunez/codex-sdk-go/internal/jsondecode"
 )
 
 const (
@@ -31,6 +33,7 @@ type inboundFrame struct {
 	Params  json.RawMessage        `json:"params,omitempty"`
 	Result  json.RawMessage        `json:"result,omitempty"`
 	Error   inboundError           `json:"error,omitempty"`
+	Trace   *W3cTraceContext       `json:"trace,omitempty"`
 }
 
 func (f inboundFrame) hasResultField() bool {
@@ -275,8 +278,9 @@ func decodeInboundFrame(data []byte) (inboundFrame, error) {
 	if !json.Valid(data) {
 		return frame, errors.New("invalid inbound JSON")
 	}
-	var version, id, method, params, result, rpcError json.RawMessage
+	var version, id, method, params, result, rpcError, trace json.RawMessage
 	methodInvalid := false
+	duplicateTrace := false
 	if !walkJSONObjectFields(data, true, func(key, value []byte) {
 		switch {
 		case jsonFieldMatchesFolded(key, "jsonrpc"):
@@ -297,6 +301,9 @@ func decodeInboundFrame(data []byte) (inboundFrame, error) {
 			result = value
 		case jsonFieldMatchesFolded(key, "error"):
 			rpcError = value
+		case jsonFieldMatchesFolded(key, "trace"):
+			duplicateTrace = trace != nil
+			trace = value
 		}
 	}) || methodInvalid {
 		return frame, errors.New("invalid inbound object")
@@ -319,7 +326,37 @@ func decodeInboundFrame(data []byte) (inboundFrame, error) {
 	if len(rpcError) > 0 {
 		_ = frame.Error.UnmarshalJSON(rpcError)
 	}
+	if len(trace) > 0 {
+		if err := frame.decodeRequestTrace(data, trace, duplicateTrace); err != nil {
+			return inboundFrame{}, err
+		}
+	}
 	return frame, nil
+}
+
+func (f *inboundFrame) decodeRequestTrace(data, trace []byte, duplicates bool) error {
+	// Trace belongs only to valid request envelopes. Unrelated metadata must
+	// not change response correlation, notification delivery or version errors.
+	if f.Method == "" || f.hasResponseFields() || f.hasInvalidProtocolVersion() {
+		return nil
+	}
+	if _, ok := f.ID.requestID(); !ok {
+		return nil
+	}
+	if !duplicates {
+		return jsondecode.Unmarshal(trace, &f.Trace)
+	}
+	var err error
+	// Decode every recognized occurrence into the same fresh pointer, retaining
+	// native duplicate-object merging, null resets and errors hidden by duplicates.
+	// A second borrowed pass avoids retaining one raw span per duplicate or
+	// materializing trace graphs on envelopes where trace is an ignored extra.
+	walkJSONObjectFields(data, true, func(key, value []byte) {
+		if err == nil && jsonFieldMatchesFolded(key, "trace") {
+			err = jsondecode.Unmarshal(value, &f.Trace)
+		}
+	})
+	return err
 }
 
 func parseRequestID(data json.RawMessage) (RequestID, error) {

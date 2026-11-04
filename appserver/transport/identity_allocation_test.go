@@ -61,6 +61,10 @@ func FuzzInboundFrameSelection(f *testing.F) {
 		`{"jſonrpc":"2.0","\u0049D":7,"error":null}`, `{"id":7,"id":null}`,
 		`{"error":{"code":1,"message":"x"},"error":null}`, `{"params":{},"params":null}`,
 		`{"id":7,"id":[]}`, `{"jsonrpc":"2.0","jsonrpc":[]}`, `{"error":{"code":1},"error":[]}`,
+		`{"id":7,"method":"request","trace":{"traceparent":"opaque"}}`,
+		`{"id":7,"method":"request","trace":[],"trace":{}}`,
+		`{"id":7,"method":"request","trace":{"traceparent":"a"},"TRACE":{"tracestate":"b"}}`,
+		`{"method":"notification","trace":[]}`, `{"id":7,"result":{},"trace":[]}`,
 	} {
 		f.Add([]byte(seed))
 	}
@@ -69,7 +73,22 @@ func FuzzInboundFrameSelection(f *testing.F) {
 			t.Skip()
 		}
 		var reference inboundFrame
-		refErr := json.Unmarshal(data, &reference)
+		// Trace is a known field only on request envelopes. Decode the original
+		// routing fields independently before applying its native record codec.
+		routing := struct {
+			*inboundFrame
+			Trace json.RawMessage `json:"trace"`
+		}{inboundFrame: &reference}
+		refErr := json.Unmarshal(data, &routing)
+		if refErr == nil && reference.Method != "" && reference.ID.present && !reference.ID.isNull && !reference.ID.invalid &&
+			len(reference.Result) == 0 && !reference.Error.present &&
+			(!reference.JSONRPC.present || (!reference.JSONRPC.invalid && reference.JSONRPC.value == "2.0")) {
+			var requestTrace struct {
+				Trace *W3cTraceContext `json:"trace"`
+			}
+			refErr = json.Unmarshal(data, &requestTrace)
+			reference.Trace = requestTrace.Trace
+		}
 		got, err := decodeInboundFrame(data)
 		// Invalid wrapper values are inaccessible to routing. The reference
 		// may retain an earlier value while setting the invalid flag; selecting

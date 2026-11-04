@@ -16,6 +16,13 @@ Application codec errors retain their identity and chains. The [threat
 model](threat-model.md#json-rpc-framing-dispatch-and-resource-exhaustion)
 describes SDK diagnostic bounds and their limits.
 
+`Request.Trace` carries optional `W3cTraceContext` metadata through `Client.Send`
+and both stdio request directions. Its optional `Traceparent` and `Tracestate`
+strings are opaque: empty strings remain explicit, and absent or null values
+mean no supplied value. A nonnil empty context remains an empty object. The SDK
+does not create spans, validate W3C string formats or add trace fields to responses
+and notifications.
+
 `ServiceTier` and `ThreadSource` are open protocol strings. Their named constants
 are conveniences rather than exhaustive lists; custom and empty strings retain
 their spelling through requests, responses and thread state. A nil optional

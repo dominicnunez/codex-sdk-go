@@ -173,14 +173,16 @@ func marshalStdioFrame(msg interface{}) ([]byte, error) {
 
 func marshalStdioRequest(req Request) ([]byte, error) {
 	type wireRequest struct {
-		ID     RequestID       `json:"id"`
-		Method string          `json:"method"`
-		Params json.RawMessage `json:"params,omitempty"`
+		ID     RequestID        `json:"id"`
+		Method string           `json:"method"`
+		Params json.RawMessage  `json:"params,omitempty"`
+		Trace  *W3cTraceContext `json:"trace,omitempty"`
 	}
 	return json.Marshal(wireRequest{
 		ID:     req.ID,
 		Method: req.Method,
 		Params: req.Params,
+		Trace:  req.Trace,
 	})
 }
 

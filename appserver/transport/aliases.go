@@ -29,6 +29,7 @@ type (
 	Request             = protocol.Request
 	RequestHandler      = protocol.RequestHandler
 	RequestID           = protocol.RequestID
+	W3cTraceContext     = protocol.W3cTraceContext
 	Response            = protocol.Response
 	TransportError      = protocol.TransportError
 	TransportLifecycle  = protocol.TransportLifecycle

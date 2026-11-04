@@ -70,6 +70,15 @@ completion over transport failure. Transport termination does not disable stream
 publication: runtime-owned replay and final events retain ordinary bounded
 backpressure, so an attached consumer must drain, detach or cancel to make progress.
 
+Request envelopes own decoded trace strings before queue admission. The reader
+selects the trace field during envelope scanning and decodes it only after valid
+request classification. Duplicate trace objects retain ordinary pointer merging
+and null resets through a second borrowed pass; a single occurrence needs no
+second envelope scan. Response correlation, notification delivery and invalid
+ID/version handling ignore this request-only metadata. Queued requests and handler
+replay carry the complete request value, and outgoing serialization copies the
+trace strings into the existing owned write payload.
+
 Streaming event publication observes caller cancellation independently of the
 lifecycle's completion select. This releases backpressure while the lifecycle
 replays startup events or publishes a terminal event. Releasing publication does
