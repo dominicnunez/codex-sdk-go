@@ -16,6 +16,11 @@ Application codec errors retain their identity and chains. The [threat
 model](threat-model.md#json-rpc-framing-dispatch-and-resource-exhaustion)
 describes SDK diagnostic bounds and their limits.
 
+JSON-RPC `Error.Code` and `RPCError.Code()` use `int64`, preserving the schema's
+full signed 64-bit range on both 32-bit and 64-bit builds. Stdio response decoding
+and callback error replies retain the original code, message and raw data;
+malformed error records still take the existing sanitized parse-error path.
+
 `Request.Trace` carries optional `W3cTraceContext` metadata through `Client.Send`
 and both stdio request directions. Its optional `Traceparent` and `Tracestate`
 strings are opaque: empty strings remain explicit, and absent or null values

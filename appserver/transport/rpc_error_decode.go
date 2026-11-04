@@ -29,12 +29,12 @@ func decodeInboundRPCError(data []byte) (Error, bool) {
 				invalid = true
 				return
 			}
-			code, err := strconv.ParseInt(string(value), 10, strconv.IntSize)
+			code, err := strconv.ParseInt(string(value), 10, 64)
 			if err != nil {
 				invalid = true
 				return
 			}
-			parsed.Code = int(code)
+			parsed.Code = code
 		case jsonFieldMatchesFolded(key, "message"):
 			hasMessage = true
 			if value[0] == '"' {

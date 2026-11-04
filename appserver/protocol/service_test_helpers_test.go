@@ -7,7 +7,7 @@ import (
 	codex "github.com/dominicnunez/codex-sdk-go/appserver/protocol"
 )
 
-func assertRPCErrorCode(t *testing.T, err error, want int) {
+func assertRPCErrorCode(t *testing.T, err error, want int64) {
 	t.Helper()
 
 	if err == nil {

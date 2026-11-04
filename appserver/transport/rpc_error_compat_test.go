@@ -12,9 +12,16 @@ func TestRPCErrorFieldOccurrences(t *testing.T) {
 	for _, tc := range []struct {
 		name, raw     string
 		valid         bool
-		code          int
+		code          int64
 		message, data string
 	}{
+		{"int64-min", `{"code":-9223372036854775808,"message":"min"}`, true, -9223372036854775808, "min", ""},
+		{"int64-max-alias", `{"CODE":9223372036854775807,"message":"max"}`, true, 9223372036854775807, "max", ""},
+		{"wide-duplicates", `{"code":-9223372036854775808,"code":9223372036854775807,"message":"last"}`, true, 9223372036854775807, "last", ""},
+		{"underflow-hidden", `{"code":-9223372036854775809,"code":0,"message":"fixture"}`, false, 0, "", ""},
+		{"overflow-hidden", `{"code":9223372036854775808,"code":0,"message":"fixture"}`, false, 0, "", ""},
+		{"fraction-hidden", `{"code":1.5,"code":0,"message":"fixture"}`, false, 0, "", ""},
+		{"exponent-hidden", `{"code":1e2,"code":0,"message":"fixture"}`, false, 0, "", ""},
 		{"aliases", `{"CODE":0,"MESSAGE":""}`, true, 0, "", ""},
 		{"escaped", `{"c\u006fde":17,"messa\u0067e":"fixture"}`, true, 17, "fixture", ""},
 		{"unicode-alias", `{"CODE":17,"meſſage":"fixture"}`, true, 17, "fixture", ""},

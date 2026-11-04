@@ -12,7 +12,7 @@ var errRejectionByteLimit = errors.New("retained rejection reply byte limit exce
 // Reader-owned rejections enter the existing serialized writer queue without
 // waiting for the external writer. Admission is not successful delivery: the
 // writer still owns actual completion and terminal failure handling.
-func (t *StdioTransport) enqueueRejection(id RequestID, code int, message string) {
+func (t *StdioTransport) enqueueRejection(id RequestID, code int64, message string) {
 	data, err := marshalStdioFrame(errorResponse(id, code, message))
 	if err != nil {
 		t.handleWriteFailure(NewTransportError("marshal rejection", err))

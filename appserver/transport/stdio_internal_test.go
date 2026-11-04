@@ -279,7 +279,7 @@ func TestStdioInboundRequestDispatchIsBounded(t *testing.T) {
 		}, nil
 	})
 
-	errCodes := make(chan int, inboundRequestWorkers+inboundRequestQueueSize+16)
+	errCodes := make(chan int64, inboundRequestWorkers+inboundRequestQueueSize+16)
 	go func() {
 		scanner := bufio.NewScanner(serverReader)
 		for scanner.Scan() {

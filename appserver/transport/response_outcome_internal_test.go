@@ -96,7 +96,7 @@ func TestSendAcceptedOutcomeWithAllTerminalCasesReady(t *testing.T) {
 							t.Fatalf("response=%+v", got.resp)
 						}
 					} else {
-						code := ErrCodeParseError
+						var code int64 = ErrCodeParseError
 						message := "failed to parse server response"
 						switch wire {
 						case `{"id":"accepted","error":{"code":-32000,"message":"denied"}}`:
