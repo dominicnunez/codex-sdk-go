@@ -68,10 +68,15 @@ func (r *Resource) UnmarshalJSON(data []byte) error {
 	}
 	type wire Resource
 	var decoded wire
-	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
-		return err
+	if iconErr := validateOptionalFields(data, validateMcpCatalogIconArray, "icons"); iconErr != nil {
+		// This record cannot be admitted. Use ordinary native decoding to
+		// retain first-error diagnostics without allocating two graphs.
+		if err := jsondecode.Unmarshal(data, &decoded); err != nil {
+			return err
+		}
+		return iconErr
 	}
-	if err := validateOptionalFields(data, validateMcpCatalogIconArray, "icons"); err != nil {
+	if err := unmarshalExactJSON(data, &decoded); err != nil {
 		return err
 	}
 	*r = Resource(decoded)
@@ -94,7 +99,7 @@ func (r *ResourceTemplate) UnmarshalJSON(data []byte) error {
 	}
 	type wire ResourceTemplate
 	var decoded wire
-	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
+	if err := unmarshalExactJSON(data, &decoded); err != nil {
 		return err
 	}
 	*r = ResourceTemplate(decoded)
@@ -119,10 +124,15 @@ func (t *Tool) UnmarshalJSON(data []byte) error {
 	}
 	type wire Tool
 	var decoded wire
-	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
-		return err
+	if iconErr := validateOptionalFields(data, validateMcpCatalogIconArray, "icons"); iconErr != nil {
+		// This record cannot be admitted. Use ordinary native decoding to
+		// retain first-error diagnostics without allocating two graphs.
+		if err := jsondecode.Unmarshal(data, &decoded); err != nil {
+			return err
+		}
+		return iconErr
 	}
-	if err := validateOptionalFields(data, validateMcpCatalogIconArray, "icons"); err != nil {
+	if err := unmarshalExactJSON(data, &decoded); err != nil {
 		return err
 	}
 	*t = Tool(decoded)

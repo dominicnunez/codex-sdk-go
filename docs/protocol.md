@@ -107,6 +107,15 @@ are present. `InputImages` preserves absent versus present empty provenance list
 paths and SHA-256 strings describe the peer's reported inputs and are not local
 file verification. `TurnToolOutput.Retain` preserves an explicit false value.
 MCP catalog `ToolListMeta` retains arbitrary JSON, including null and numeric tokens.
+Tool input/output schemas, metadata, annotations and icon entries preserve numeric
+tokens as `json.Number`. Resource metadata, annotations and icons, and resource
+template annotations use the same policy before `Mcp.ListServerStatus` returns.
+Arbitrary nonnumeric JSON shapes remain supported; icon roots must still be
+arrays or null, with unrestricted elements. Typed fields such as resource size
+retain their declared Go types. Raw tool-list metadata, server capabilities and
+server-info icons remain raw JSON. Catalog schemas and metadata are peer data;
+the SDK does not execute a tool or fetch an icon based on these values.
+
 
 ## Server path resolution
 

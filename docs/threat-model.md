@@ -891,9 +891,13 @@ at their own boundary. A partial-answer phase is display metadata; turn
 completion remains a separate lifecycle event.
 
 `Resource.icons` and `Tool.icons` catalog values are admitted only when absent,
-null, or arrays; the schema leaves array elements unrestricted. The check runs
-after each owner's existing required-field and native type decoding, before a
-successful value is assigned to its receiver. A rejected icon root returns from
+null, or arrays; the schema leaves array elements unrestricted. Required-field
+guards retain priority. Icon shape selects the decoding policy: records with an
+invalid root use ordinary native decoding before reporting the shape failure,
+preserving the prior first-error contract in one pass. Valid catalog records
+preserve numeric tokens as `json.Number` in all nine arbitrary schema, metadata,
+annotation and icon-entry fields before successful receiver assignment. Typed
+resource sizes and existing raw catalog fields retain their own representations. A rejected icon root returns from
 the custom item decoder, so it can replace an earlier outer sibling error or
 prevent a later sibling from being decoded. This is limited to catalog response
 shape; it does not validate icon contents or establish that a peer is trusted.
