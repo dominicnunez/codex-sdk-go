@@ -78,16 +78,20 @@ func TestHookChildAdmission(t *testing.T) {
 }
 
 func TestOwnedRunnerRejectsCancelledAdmission(t *testing.T) {
-	marker := filepath.Join(t.TempDir(), "marker")
-	env := replaceEnv(os.Environ(), "HOOK_TEST_MARKER", marker)
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	err := runOwned(ctx, os.Args[0], "", env, []string{"-test.run=^TestHookRunnerProbe$"})
-	if !errors.Is(err, context.Canceled) {
-		t.Fatalf("cancelled admission returned %v", err)
-	}
-	if _, err := os.Stat(marker); !os.IsNotExist(err) {
-		t.Fatalf("cancelled runner executed: %v", err)
+	for _, finish := range []bool{false, true} {
+		t.Run(strconv.FormatBool(finish), func(t *testing.T) {
+			marker := filepath.Join(t.TempDir(), "marker")
+			env := replaceEnv(os.Environ(), "HOOK_TEST_MARKER", marker)
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			err := runCommand(ctx, os.Args[0], "", env, []string{"-test.run=^TestHookRunnerProbe$"}, finish)
+			if !errors.Is(err, context.Canceled) {
+				t.Fatalf("cancelled admission returned %v", err)
+			}
+			if _, err := os.Stat(marker); !os.IsNotExist(err) {
+				t.Fatalf("cancelled runner executed: %v", err)
+			}
+		})
 	}
 }
 

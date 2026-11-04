@@ -159,7 +159,7 @@ jobs:
           version: v2.14.0
           args: --config=.golangci.yml ./...
 
-      - name: Verify staged hook lint scope
+      - name: Verify hook lint snapshots
         env:
           REQUIRE_PINNED_HOOK_LINT: '1'
-        run: go test -v ./appserver/protocol -run '^TestPreCommitRealLintScope$' -count=1
+        run: go test -v ./appserver/protocol -run '^TestPre(CommitRealLintScope|PushRealLint)$' -count=1
