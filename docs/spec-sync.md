@@ -2,6 +2,22 @@
 
 The `spec-sync` workflow checks the upstream Codex app-server schemas on its schedule and through manual dispatch. When it detects changes, it commits the schema snapshot to a bot-owned `spec-sync/*` branch and opens a pull request.
 
+## Snapshot identity
+
+The latest upstream commit affecting the schema path selects one snapshot for a
+run. Its full commit SHA is checked before inventory requests; empty values,
+branch names and abbreviated or malformed IDs stop the run. Root, v1 and v2
+inventories all use that SHA as the Contents API `ref`. GitHub returns download
+URLs containing the selected commit, so later upstream changes cannot switch
+the file list or individual downloads to another revision.
+
+The baseline records that full SHA, and branch names and pull-request metadata
+use its matching short prefix. `TestSpecSyncPinsSnapshot` exercises upstream
+advances after selection, after inventory selection and between file downloads,
+including files added or removed between revisions and common files whose
+contents change. The test verifies inventory requests, downloaded bytes and
+publication metadata against the selected snapshot.
+
 ## Download admission
 
 The workflow downloads root, v1 and v2 files into a temporary candidate directory.

@@ -45,6 +45,18 @@ func extractSpecSyncRun(data string) (string, bool) {
 	return script.String(), true
 }
 
+func specSyncCommand(t *testing.T, bash, dir, script string) *exec.Cmd {
+	t.Helper()
+	// A workflow plus its fixtures can exceed native command-line limits.
+	path := filepath.Join(dir, "workflow.sh")
+	if err := os.WriteFile(path, []byte(script), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(bash, filepath.ToSlash(path))
+	cmd.Dir = dir
+	return cmd
+}
+
 func TestSpecSyncWorkflowLineEndings(t *testing.T) {
 	const workflow = "        run: |\n          set -euo pipefail\n          echo fixture\n"
 	const want = "set -euo pipefail\necho fixture\n\n"
@@ -149,43 +161,8 @@ func TestSpecSyncRejectsFailedDownloads(t *testing.T) {
 			}
 			// All external publication operations are inert fixtures. The actual
 			// workflow and real curl run against a loopback-only HTTP server.
-			const harness = `
-gh() {
-  case "$1 $2" in
-    'api repos/openai/codex/commits'*) printf '%s\n' 2222222222222222222222222222222222222222 ;;
-    'api repos/openai/codex/contents/'*)
-      case "${2%%\?*}" in
-        */json) stage=root ;;
-        */json/v1) stage=v1 ;;
-        */json/v2) stage=v2 ;;
-        *) return 2 ;;
-      esac
-      if [ "$SPEC_FAILURE" = inventory ] && [ "$stage" = "$SPEC_STAGE" ]; then return 1; fi
-      printf '%s/%s.json\n' "$SPEC_HTTP" "$stage"
-      ;;
-    'api --paginate') printf '53\tgithub-actions[bot]\tspec-sync/old\ttrue\n' ;;
-    'label create') printf '%s\n' "$*" >> "$SPEC_CALLS" ;;
-    'pr create') printf '%s\n' "$*" >> "$SPEC_CALLS"; printf '%s\n' https://example.invalid/pull/54 ;;
-    'pr view') printf '54\n' ;;
-    'pr close') printf '%s\n' "$*" >> "$SPEC_CALLS"; printf closed > "$SPEC_PROPOSAL" ;;
-    *) return 2 ;;
-  esac
-}
-git() {
-  printf 'git %s\n' "$*" >> "$SPEC_CALLS"
-  if [ "$1 $2" = 'diff --quiet' ]; then return 1; fi
-}
-rsync() {
-  printf 'rsync %s\n' "$*" >> "$SPEC_CALLS"
-  local source="${@: -2:1}" dest="${@: -1}"
-  mkdir -p "$dest"
-  cp "$source"*.json "$dest"
-}
-curl() { "$SPEC_CURL" "$@"; }
-export -f gh git rsync curl
-`
-			cmd := exec.Command(bash, "-c", harness+specSyncWorkflowRun(t))
-			cmd.Dir = dir
+
+			cmd := specSyncCommand(t, bash, dir, specSyncFixture+specSyncWorkflowRun(t))
 			cmd.Env = append(os.Environ(), "NO_PROXY=127.0.0.1,localhost", "no_proxy=127.0.0.1,localhost", "SPEC_HTTP="+server.URL, "SPEC_FAILURE="+tc.failure, "SPEC_STAGE="+tc.stage,
 				"SPEC_CALLS="+filepath.ToSlash(calls), "SPEC_PROPOSAL="+filepath.ToSlash(proposal), "SPEC_CURL="+filepath.ToSlash(curl),
 				"TMPDIR="+filepath.ToSlash(temporary), "GITHUB_REPOSITORY=owner/repo", "GITHUB_RUN_ID=123", "GITHUB_RUN_ATTEMPT=1")
@@ -236,3 +213,40 @@ export -f gh git rsync curl
 		})
 	}
 }
+
+const specSyncFixture = `
+spec_fixture_gh() {
+  case "$1 $2" in
+    'api repos/openai/codex/commits'*) printf '%s\n' 2222222222222222222222222222222222222222 ;;
+    'api repos/openai/codex/contents/'*)
+      case "${2%%\?*}" in
+        */json) stage=root ;;
+        */json/v1) stage=v1 ;;
+        */json/v2) stage=v2 ;;
+        *) return 2 ;;
+      esac
+      if [ "$SPEC_FAILURE" = inventory ] && [ "$stage" = "$SPEC_STAGE" ]; then return 1; fi
+      printf '%s/%s.json\n' "$SPEC_HTTP" "$stage"
+      ;;
+    'api --paginate') printf '53\tgithub-actions[bot]\tspec-sync/old\ttrue\n' ;;
+    'label create') printf '%s\n' "$*" >> "$SPEC_CALLS" ;;
+    'pr create') printf '%s\n' "$*" >> "$SPEC_CALLS"; printf '%s\n' https://example.invalid/pull/54 ;;
+    'pr view') printf '54\n' ;;
+    'pr close') printf '%s\n' "$*" >> "$SPEC_CALLS"; printf closed > "$SPEC_PROPOSAL" ;;
+    *) return 2 ;;
+  esac
+}
+git() {
+  printf 'git %s\n' "$*" >> "$SPEC_CALLS"
+  if [ "$1 $2" = 'diff --quiet' ]; then return 1; fi
+}
+rsync() {
+  printf 'rsync %s\n' "$*" >> "$SPEC_CALLS"
+  local source="${@: -2:1}" dest="${@: -1}"
+  mkdir -p "$dest"
+  cp "$source"*.json "$dest"
+}
+curl() { "$SPEC_CURL" "$@"; }
+gh() { spec_fixture_gh "$@"; }
+export -f gh spec_fixture_gh git rsync curl
+`

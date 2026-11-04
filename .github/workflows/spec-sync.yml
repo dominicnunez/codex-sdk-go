@@ -36,6 +36,10 @@ jobs:
 
           # --- 2. Get current upstream HEAD for the schema path ---
           upstream_sha="$(gh api "repos/${upstream_repo}/commits?path=${upstream_path}&per_page=1" --jq '.[0].sha')"
+          if [[ ! "${upstream_sha}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Upstream API did not return a full commit SHA." >&2
+            exit 1
+          fi
           echo "Upstream SHA: ${upstream_sha}"
 
           if [ "${baseline_sha}" = "${upstream_sha}" ]; then
@@ -54,7 +58,7 @@ jobs:
             local dest="$2"
             local status
             mkdir -p "${dest}"
-            gh api "repos/${upstream_repo}/contents/${api_path}" --jq '.[] | select(.type == "file") | .download_url' | while read -r url; do
+            gh api "repos/${upstream_repo}/contents/${api_path}?ref=${upstream_sha}" --jq '.[] | select(.type == "file") | .download_url' | while read -r url; do
               status="$(curl --fail --silent --show-error --location \
                 --output "${dest}/$(basename "${url}")" --write-out '%{http_code}' "${url}")"
               if [[ "${status}" != 2[0-9][0-9] ]]; then

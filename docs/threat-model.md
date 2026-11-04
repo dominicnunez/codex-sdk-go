@@ -1111,8 +1111,11 @@ Schema-sync downloads must finish with a final HTTP 2xx status. The complete
 temporary candidate is checked as JSON before snapshot replacement, baseline
 advancement, branch publication or stale-proposal cleanup. HTTP errors, incomplete
 transfers and malformed JSON therefore preserve the existing snapshot and sync
-proposals. Syntax validation does not establish schema semantics, SDK support or
-the trustworthiness of upstream content.
+proposals. A selected full commit SHA pins all three directory inventories and
+their download URLs; the baseline and pull-request metadata describe that same
+snapshot even when upstream advances during a run. Syntax validation and snapshot
+identity do not establish schema semantics, SDK support or the trustworthiness of
+upstream content.
 
 The [CI workflow](../.github/workflows/ci.yml) runs formatting, module tidiness, builds, vet, Linux and Windows tests, race tests, and lint. These detect selected implementation defects without establishing trustworthy runtime binaries or release provenance. The absence of external Go modules reduces one dependency surface; action version tags, the Go toolchain, Codex, and upstream schemas remain dependencies. No signed-release or hostile-build isolation guarantee is made here.
 
