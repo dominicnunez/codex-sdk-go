@@ -734,6 +734,15 @@ nullable-array contract, and empty arrays and empty arguments remain valid.
 These checks prevent malformed evidence reaching handlers without interpreting
 paths or making an authorization decision on the application's behalf.
 
+Managed `humanCommand` checkpoints use the existing command-approval callback.
+The `requiredHumanApproval` capability participates in initialize identity; the
+server requires it alongside `experimentalApi`. The response carrier permits only
+one-time accept, decline or cancel decisions and rejects session approvals or
+policy amendments before publication. A peer cannot use this checkpoint kind to
+obtain a broader decision through the SDK response path. The application still
+owns human presentation and authorization; the SDK does not verify who decided
+or treat a checkpoint as evidence that a command execution started.
+
 The retained `ApprovalPolicyOnFailure` constant cannot be encoded as a typed
 approval policy because the checked-in schemas removed that known value. The
 shared literal encoder and wrapper reject it before request dispatch, including
@@ -1100,6 +1109,15 @@ SDK does not independently enforce the server's attestation or elicitation polic
 [Credential storage](../login/auth/store.go) validates required credential fields, writes a temporary file in the destination directory, and replaces the target by rename. It requests directory mode `0700` and file mode `0600`, with a directory-mode check on non-Windows systems. Credentials remain plaintext. Windows mode bits do not establish a restrictive ACL, and loading does not independently validate ownership, permissions, symlinks, or a maximum file size. The application must choose a protected storage location and appropriate platform access controls; this is not a keychain or encrypted vault.
 
 [Credential values](../login/auth/credentials.go) and [auth payload helpers](../login/auth/params.go) redact tokens in their custom formatting methods, while their JSON serialization intentionally includes secrets for storage and protocol exchange. The protocol package's login and refresh credential types redact both ordinary formatting and `json.Marshal`; dedicated wire serialization sends the real tokens. These distinctions have coverage in [credential_redact_test.go](../appserver/protocol/credential_redact_test.go). Redaction does not cover every raw request, error, copied string, application logger, or transport recorder. Prompts, account IDs, paths, stderr, and tool results may also be sensitive even when tokens are removed.
+
+Model-provider configuration operations validate provider/auth/patch branches
+before publication and preserve explicit null clearing separately from omission.
+Returned endpoint hints may already be redacted by the server; the SDK does not
+recover missing endpoints. Credential-file paths and environment-key names are
+opaque server configuration metadata. The SDK neither reads those files nor
+expands the named variables or contacts providers when listing/writing settings.
+Applications control whether to invoke configuration writes and must protect
+configuration and raw error data from inappropriate logging.
 
 Applications must avoid logging serialized auth requests, protect backups and traces, and minimize credential lifetime and authority. The SDK does not promise encrypted memory, secure deletion, crash-dump protection, or complete audit logging. Returned attachment payloads and conversation data must retain their original trust level when stored or reused.
 

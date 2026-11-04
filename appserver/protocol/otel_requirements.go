@@ -12,6 +12,7 @@ import (
 
 // OtelRequirements describes managed telemetry settings; it does not configure an exporter.
 type OtelRequirements struct {
+	LogSseDeltas           *bool                         `json:"log_sse_deltas,omitempty"`
 	Environment            *string                       `json:"environment,omitempty"`
 	Exporter               *OtelExporter                 `json:"exporter,omitempty"`
 	MetricsExporter        *OtelExporter                 `json:"metrics_exporter,omitempty"`

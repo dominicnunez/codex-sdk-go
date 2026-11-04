@@ -804,6 +804,9 @@ func (p ThreadListParamsJSON) prepareRequest() (interface{}, error) {
 	if p.UseStateDbOnly.Present && p.UseStateDbOnly.Value == nil {
 		return nil, invalidParamsError("useStateDbOnly must not be null")
 	}
+	if p.CurrentAccountOnly.Present && p.CurrentAccountOnly.Value == nil {
+		return nil, invalidParamsError("currentAccountOnly must not be null")
+	}
 	p.ExcludedThreadIDs = preserveFilterArray(p.ExcludedThreadIDs)
 	p.ModelProviders = preserveFilterArray(p.ModelProviders)
 	p.Originators = preserveFilterArray(p.Originators)

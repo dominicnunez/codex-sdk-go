@@ -58,3 +58,20 @@ func validateWebSearchConfig(data []byte) error {
 		}, "web_search")
 	}, "tools")
 }
+
+// WebSearchProvider identifies the effective model-selected search provider.
+type WebSearchProvider string
+
+const (
+	WebSearchProviderStandalone WebSearchProvider = "standalone"
+	WebSearchProviderSearchMcp  WebSearchProvider = "search_mcp"
+)
+
+var validWebSearchProviders = map[WebSearchProvider]struct{}{WebSearchProviderStandalone: {}, WebSearchProviderSearchMcp: {}}
+
+func (s WebSearchProvider) MarshalJSON() ([]byte, error) {
+	return marshalEnumString("client_search_provider", s, validWebSearchProviders)
+}
+func (s *WebSearchProvider) UnmarshalJSON(data []byte) error {
+	return unmarshalEnumString(data, "client_search_provider", validWebSearchProviders, s)
+}

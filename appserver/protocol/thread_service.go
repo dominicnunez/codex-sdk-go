@@ -220,6 +220,7 @@ func (s *ThreadService) Read(ctx context.Context, params ThreadReadParams) (Thre
 
 // ThreadListParams are parameters for listing threads
 type ThreadListParams struct {
+	CurrentAccountOnly *bool `json:"currentAccountOnly,omitempty"`
 	// Originators filters exact originator values on hosted backends. The local
 	// app-server rejects nonempty lists; omitted or empty lists are unrestricted.
 	Originators []string `json:"originators,omitempty"`
@@ -244,19 +245,20 @@ type ThreadListParams struct {
 // or null; nil omits the member. Nullable properties distinguish omission from
 // explicit null and empty values.
 type ThreadListParamsJSON struct {
-	Archived          OptionalNullable[bool]               `json:"archived,omitzero"`
-	Cursor            OptionalNullable[string]             `json:"cursor,omitzero"`
-	Cwd               json.RawMessage                      `json:"cwd,omitempty"`
-	ExcludedThreadIDs OptionalNullable[[]string]           `json:"excludedThreadIds,omitzero"`
-	Limit             OptionalNullable[uint32]             `json:"limit,omitzero"`
-	ModelProviders    OptionalNullable[[]string]           `json:"modelProviders,omitzero"`
-	Originators       OptionalNullable[[]string]           `json:"originators,omitzero"`
-	SearchTerm        OptionalNullable[string]             `json:"searchTerm,omitzero"`
-	SectionID         OptionalNullable[string]             `json:"sectionId,omitzero"`
-	SortDirection     OptionalNullable[SortDirection]      `json:"sortDirection,omitzero"`
-	SortKey           OptionalNullable[ThreadSortKey]      `json:"sortKey,omitzero"`
-	SourceKinds       OptionalNullable[[]ThreadSourceKind] `json:"sourceKinds,omitzero"`
-	UseStateDbOnly    OptionalNullable[bool]               `json:"useStateDbOnly,omitzero"`
+	CurrentAccountOnly OptionalNullable[bool]               `json:"currentAccountOnly,omitzero"`
+	Archived           OptionalNullable[bool]               `json:"archived,omitzero"`
+	Cursor             OptionalNullable[string]             `json:"cursor,omitzero"`
+	Cwd                json.RawMessage                      `json:"cwd,omitempty"`
+	ExcludedThreadIDs  OptionalNullable[[]string]           `json:"excludedThreadIds,omitzero"`
+	Limit              OptionalNullable[uint32]             `json:"limit,omitzero"`
+	ModelProviders     OptionalNullable[[]string]           `json:"modelProviders,omitzero"`
+	Originators        OptionalNullable[[]string]           `json:"originators,omitzero"`
+	SearchTerm         OptionalNullable[string]             `json:"searchTerm,omitzero"`
+	SectionID          OptionalNullable[string]             `json:"sectionId,omitzero"`
+	SortDirection      OptionalNullable[SortDirection]      `json:"sortDirection,omitzero"`
+	SortKey            OptionalNullable[ThreadSortKey]      `json:"sortKey,omitzero"`
+	SourceKinds        OptionalNullable[[]ThreadSourceKind] `json:"sourceKinds,omitzero"`
+	UseStateDbOnly     OptionalNullable[bool]               `json:"useStateDbOnly,omitzero"`
 }
 
 // ThreadListResponse is the response from listing threads

@@ -588,6 +588,7 @@ func testStructFields(t *testing.T) {
 		{"schema/json/v2/ThreadGoalClearedNotification.json", reflect.TypeOf(ThreadGoalClearedNotification{})},
 		{"schema/json/v2/ThreadSettingsUpdatedNotification.json", reflect.TypeOf(ThreadSettingsUpdatedNotification{})},
 		{"schema/json/v2/ThreadNameUpdatedNotification.json", reflect.TypeOf(ThreadNameUpdatedNotification{})},
+		{"schema/json/v2/ThreadSectionChangedNotification.json", reflect.TypeOf(ThreadSectionChangedNotification{})},
 		{"schema/json/v2/ThreadStatusChangedNotification.json", reflect.TypeOf(ThreadStatusChangedNotification{})},
 		{"schema/json/v2/ThreadTokenUsageUpdatedNotification.json", reflect.TypeOf(ThreadTokenUsageUpdatedNotification{})},
 		{"schema/json/v2/ServerRequestResolvedNotification.json", reflect.TypeOf(ServerRequestResolvedNotification{})},

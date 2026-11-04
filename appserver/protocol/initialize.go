@@ -23,6 +23,9 @@ type ClientInfo struct {
 type InitializeCapabilities struct {
 	// ExperimentalAPI opts into receiving experimental API methods and fields.
 	ExperimentalAPI bool `json:"experimentalApi"`
+	// RequiredHumanApproval opts into one-time human-command checkpoints.
+	// The server requires ExperimentalAPI for this capability.
+	RequiredHumanApproval bool `json:"requiredHumanApproval,omitempty"`
 	// ExplicitGatewayOAuth uses explicit gateway OAuth login instead of automatic browser authorization.
 	ExplicitGatewayOAuth bool `json:"explicitGatewayOauth,omitempty"`
 	// Extensions declares MCP extension settings. Empty maps declare no extensions.
@@ -142,7 +145,7 @@ func normalizeOwnedInitializeParams(params InitializeParams) InitializeParams {
 		cp.Capabilities = &capabilities
 		cp.Capabilities.OptOutNotificationMethods = normalizeNotificationMethodSet(cp.Capabilities.OptOutNotificationMethods)
 	}
-	if cp.Capabilities != nil && !cp.Capabilities.ExperimentalAPI && !cp.Capabilities.ExplicitGatewayOAuth && !cp.Capabilities.McpServerOpenaiFormElicitation && !cp.Capabilities.RequestAttestation && len(cp.Capabilities.Extensions) == 0 && len(cp.Capabilities.OptOutNotificationMethods) == 0 {
+	if cp.Capabilities != nil && !cp.Capabilities.ExperimentalAPI && !cp.Capabilities.RequiredHumanApproval && !cp.Capabilities.ExplicitGatewayOAuth && !cp.Capabilities.McpServerOpenaiFormElicitation && !cp.Capabilities.RequestAttestation && len(cp.Capabilities.Extensions) == 0 && len(cp.Capabilities.OptOutNotificationMethods) == 0 {
 		cp.Capabilities = nil
 	}
 	return cp
@@ -171,6 +174,7 @@ func normalizedInitializeParamsEqual(a, b InitializeParams) bool {
 		return a.Capabilities == nil && b.Capabilities == nil
 	default:
 		return a.Capabilities.ExperimentalAPI == b.Capabilities.ExperimentalAPI &&
+			a.Capabilities.RequiredHumanApproval == b.Capabilities.RequiredHumanApproval &&
 			a.Capabilities.ExplicitGatewayOAuth == b.Capabilities.ExplicitGatewayOAuth &&
 			a.Capabilities.McpServerOpenaiFormElicitation == b.Capabilities.McpServerOpenaiFormElicitation &&
 			a.Capabilities.RequestAttestation == b.Capabilities.RequestAttestation &&

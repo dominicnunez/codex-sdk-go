@@ -105,6 +105,18 @@ The main service fields on `Client` include `Thread`, `Turn`, `Account`, `Apps`,
 | `Thread` | `Delete`, `GoalGet`, `GoalSet`, `GoalClear`, and the `SectionCreate`, `SectionDelete`, `SectionList`, `SectionUpdate`, and `SectionMove` methods |
 | `Skills` | `SetExtraRoots` |
 | `ExternalAgent` | `ImportHistories`, `RecordImportHistory` |
+| `ModelProvider` | `CapabilitiesRead`, `List`, `ConfigWrite` |
+
+`ModelProvider.List` returns provider display metadata and edit capabilities.
+`ConfigWrite` accepts `ProviderSettingsPatchWrapper` with custom-gateway, Bedrock
+or GCP patches. `OptionalNullable[string]` patch members distinguish omission
+(preserve), null (clear) and a string (including empty). Provider settings and
+`GatewayAuthWrapper` retain the schema's tagged alternatives. Credential-file
+paths and environment-variable names refer to the server's configuration; the
+SDK does not read those files, expand environment values or contact providers.
+A nil `BaseURL` means the endpoint is unavailable or not safe to display.
+`ModelProviderErrorWrapper` can decode known structured `RPCError.Data`; unknown
+errors keep the ordinary raw RPC error fallback.
 
 Parameters and responses are separate schema-shaped types. Optional fields use pointers when the wire protocol distinguishes omission from a zero value.
 
@@ -192,6 +204,10 @@ omitted when encoding, selecting the schema default on the next decode.
 
 ## Thread-list filters
 
+`CurrentAccountOnly` filters local history visible to the current ChatGPT account.
+Both `Thread.List` and `ListJSON` preserve explicit true and false; omission uses
+the server's false default. The presence-aware carrier rejects explicit null.
+
 `Thread.List` preserves its existing parameter fields. A nil `ModelProviders`
 slice omits the provider filter; a nonnil empty slice sends `[]`, which asks for
 all providers. Its scalar `Cwd` is sent unchanged. The server resolves relative
@@ -270,14 +286,23 @@ array, and null elements are valid. `_meta` retains its owned raw JSON bytes.
 The direct MCP tool service continues to expose raw JSON for the same result
 data; the two representations agree on numeric values.
 
-`ImageUserInput.URL` and `InputImageFunctionCallOutputContentItem.ImageURL`
+`ImageUserInput.URL`, `AudioUserInput.URL` and `InputImageFunctionCallOutputContentItem.ImageURL`
 are optional string pointers. A nonnil pointer, including one to an empty string,
-selects an explicit URL; nil leaves that alternative absent. Both image codecs
+selects an explicit URL; nil leaves that alternative absent. The image and audio user-input codecs
 evaluate URL and file-ID alternatives independently. A malformed inactive
 property does not reject a valid alternative; shared image-detail restrictions
 still apply. If both alternatives are valid, both are retained. The SDK preserves
 opaque URL text without fetching it or checking whether it identifies a usable
 image. Empty file IDs remain representable as nonnil pointers.
+
+The `UserInput` carrier owns audio union validation. Direct ordinary JSON decoding
+of an `AudioUserInput` record retains native receiver and embedding behavior;
+use `UnmarshalUserInput` for schema admission.
+
+`AudioUserInput.FileID` selects an uploaded audio attachment, including an empty
+file identifier. The distinct raw Responses API audio form uses `file_id` inside
+`Thread.InjectItems` items. Dynamic-tool and function-call-output audio records
+keep their separate schemas.
 
 `UserInput` supports text, remote and local images, remote and local audio, skills, and mentions. For example:
 
@@ -312,6 +337,15 @@ defer unsubscribe()
 ```
 
 The typed surface also covers thread reverts and queue changes, project updates, strict-review requirements, external-agent import progress, moderation metadata, and model safety-buffering changes. Use raw notification handlers only when intentionally handling a future method that the SDK does not yet type.
+
+`OnThreadSectionChanged` and `AddThreadSectionChangedListener` deliver section
+moves in thread order with protected transport delivery. A null `SectionID`
+means removal. These events do not refresh cached section metadata: they do not
+supply the destination name or entry timestamp needed by a complete thread view.
+
+`ItemCompletedNotification.ContentTokenCount` retains native assistant-content
+completion tokens, including zero and the full unsigned 64-bit range. Nil means
+unavailable. This telemetry belongs to the notification, not the stored item.
 
 `TurnModerationMetadataJSONNotification.Metadata` is an owned `json.RawMessage`,
 matching the schema's arbitrary JSON value. It preserves objects, arrays,
@@ -439,6 +473,15 @@ for each entry. An explicit false value is preserved; missing or null flags
 reject the response rather than becoming an implicit false value.
 
 ## Approvals
+
+Set `InitializeCapabilities.RequiredHumanApproval` with `ExperimentalAPI` to
+receive managed `humanCommand` checkpoints. This capability is part of initialize
+identity, so changing it requires a different session. The existing command
+approval handler receives the checkpoint kind. Only one-time `accept`, `decline`
+or `cancel` responses are valid; the SDK rejects session-wide approvals and
+policy amendments before response publication. Present these checkpoints to a
+person; the SDK cannot establish that a human made the decision. A checkpoint
+alone does not start a command-execution item.
 
 `ApprovalPolicyOnFailure` retains its exported name and value, but encoding that
 known removed policy returns an error before typed thread/turn request dispatch.
@@ -786,3 +829,8 @@ path strings without local resolution.
 
 Reviews run inline. The retained `ReviewDeliveryDetached` constant is rejected
 by encoding and decoding because it is absent from the current schema.
+
+Effective configuration includes nullable `ClientSearchProvider` values
+`standalone` and `search_mcp`. Managed `OtelRequirements.LogSseDeltas` preserves an
+explicit false setting. These values describe server configuration; the SDK does
+not select a search endpoint or enable telemetry exporters on their basis.

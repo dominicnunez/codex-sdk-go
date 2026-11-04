@@ -401,19 +401,62 @@ func (l *LocalImageUserInput) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// AudioUserInput represents remote audio input.
+// AudioUserInput represents audio from an inline URL or uploaded file.
 type AudioUserInput struct {
-	URL string `json:"url"`
+	URL    *string `json:"url,omitempty"`
+	FileID *string `json:"fileId,omitempty"`
 }
 
 func (a *AudioUserInput) userInput() {}
 
 func (a *AudioUserInput) MarshalJSON() ([]byte, error) {
+	if a.URL == nil && a.FileID == nil {
+		return nil, errors.New("audio input requires url or fileId")
+	}
 	type Alias AudioUserInput
 	return jsonencode.Marshal(&struct {
 		Type string `json:"type"`
 		*Alias
 	}{Type: "audio", Alias: (*Alias)(a)})
+}
+
+// The UserInput carrier owns schema admission. Keep the public audio record's
+// ordinary decoding method set for native receiver and application composition.
+func decodeAudioInput(data []byte) (*AudioUserInput, error) {
+	var original AudioUserInput
+	originalErr := jsondecode.Unmarshal(data, &original)
+	if originalErr == nil {
+		if original.URL == nil && original.FileID == nil {
+			return nil, errors.New("audio input requires url or fileId")
+		}
+		return &original, nil
+	}
+	var decoded AudioUserInput
+	common := struct {
+		*AudioUserInput
+		URL    discardedImageAlternative `json:"url"`
+		FileID discardedImageAlternative `json:"fileId"`
+	}{AudioUserInput: &decoded}
+	commonErr := jsondecode.Unmarshal(data, &common)
+	var url struct {
+		URL *string `json:"url"`
+	}
+	if err := jsondecode.Unmarshal(data, &url); err == nil {
+		decoded.URL = url.URL
+	}
+	var file struct {
+		FileID *string `json:"fileId"`
+	}
+	if err := jsondecode.Unmarshal(data, &file); err == nil {
+		decoded.FileID = file.FileID
+	}
+	if decoded.URL == nil && decoded.FileID == nil {
+		return nil, originalErr
+	}
+	if commonErr != nil {
+		return nil, commonErr
+	}
+	return &decoded, nil
 }
 
 // LocalAudioUserInput represents local audio input.
@@ -521,14 +564,7 @@ func UnmarshalUserInput(data []byte) (UserInput, error) {
 		}
 		return &input, nil
 	case "audio":
-		var input AudioUserInput
-		if err := validateRequiredTaggedObjectFields(data, "url"); err != nil {
-			return nil, err
-		}
-		if err := jsondecode.Unmarshal(data, &input); err != nil {
-			return nil, err
-		}
-		return &input, nil
+		return decodeAudioInput(data)
 	case "localAudio":
 		var input LocalAudioUserInput
 		if err := validateRequiredTaggedObjectFields(data, "path"); err != nil {

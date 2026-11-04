@@ -22,9 +22,13 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 	type Config configWithoutMethods
 	wire := struct {
 		*Config
-		Workspace workspaceRestrictionDecoder `json:"forced_chatgpt_workspace_id"`
-	}{Config: (*Config)(c), Workspace: workspaceRestrictionDecoder{single: &c.ForcedChatgptWorkspaceID, multiple: &c.ForcedChatgptWorkspaceIDs}}
+		Workspace            workspaceRestrictionDecoder `json:"forced_chatgpt_workspace_id"`
+		ClientSearchProvider *string                     `json:"client_search_provider,omitempty"`
+	}{Config: (*Config)(c), Workspace: workspaceRestrictionDecoder{single: &c.ForcedChatgptWorkspaceID, multiple: &c.ForcedChatgptWorkspaceIDs}, ClientSearchProvider: (*string)(c.ClientSearchProvider)}
 	err := jsondecode.Unmarshal(data, &wire)
+	// Preserve native receiver updates, while deferring the new enum restriction
+	// until the established Config checks have run.
+	c.ClientSearchProvider = (*WebSearchProvider)(wire.ClientSearchProvider)
 	// The shadow wire's anonymous embedding adds a synthetic Config path and
 	// erases its name. Restore the direct Config field context.
 	var typeError *json.UnmarshalTypeError
@@ -60,7 +64,16 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 	}, "browser_use"); err != nil {
 		return err
 	}
-	return validateWebSearchConfig(data)
+	if err := validateWebSearchConfig(data); err != nil {
+		return err
+	}
+	return validateOptionalFields(data, func(_ string, raw []byte) error {
+		if isNullJSONValue(raw) {
+			return nil
+		}
+		var value WebSearchProvider
+		return jsondecode.Unmarshal(raw, &value)
+	}, "client_search_provider")
 }
 
 type configWithoutMethods Config

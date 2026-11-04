@@ -39,6 +39,7 @@ func (r *ConfigReadResponse) UnmarshalJSON(data []byte) error {
 
 // Config represents the effective configuration
 type Config struct {
+	ClientSearchProvider *WebSearchProvider `json:"client_search_provider,omitempty"`
 	// Apps contains experimental connector configuration when provided by the server.
 	Apps                            *AppsConfig                                  `json:"apps,omitempty"`
 	BrowserUse                      *BrowserUseConfig                            `json:"browser_use,omitempty"`

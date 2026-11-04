@@ -26,6 +26,7 @@ func TestStdioOrdersNotificationsWithinScope(t *testing.T) {
 	}{
 		{"thread", Notification{Method: protocol.NotifyAgentMessageDelta, Params: json.RawMessage(`{"threadId":"a","turnId":"turn","itemId":"item","delta":"A"}`)}, []Notification{
 			{Method: protocol.NotifyThreadNameUpdated, Params: json.RawMessage(`{"threadId":"a","threadName":"new"}`)},
+			{Method: protocol.NotifyThreadSectionChanged, Params: json.RawMessage(`{"threadId":"a","ThreadID":"other","sectionId":null}`)},
 			{Method: protocol.NotifyItemCompleted, Params: json.RawMessage(`{"threadId":"a","turnId":"turn","item":{"type":"agentMessage","id":"item","text":"AB"}}`)},
 			{Method: protocol.NotifyTurnCompleted, Params: json.RawMessage(`{"threadId":"a","turn":{"id":"turn","status":"completed","items":[]}}`)},
 			{Method: protocol.NotifyThreadClosed, Params: json.RawMessage(`{"threadId":"a"}`)},
@@ -302,26 +303,30 @@ func TestStdioOrderedQueueReuse(t *testing.T) {
 }
 
 func TestStdioMalformedOrderedIdentityUsesFallback(t *testing.T) {
-	for _, params := range []string{`{}`, `{"threadId":null}`, `{"threadId":99}`, `{"threadId":[]}`, `[]`} {
-		t.Run(params, func(t *testing.T) {
-			r, w := io.Pipe()
-			tr := NewStdioTransport(r, io.Discard)
-			t.Cleanup(func() { _ = tr.Close(); _ = w.Close() })
-			seen := make(chan string, 2)
-			tr.OnNotify(func(_ context.Context, n Notification) { seen <- string(n.Params) })
-			writeAuditNotification(t, w, Notification{Method: protocol.NotifyThreadNameUpdated, Params: json.RawMessage(params)})
-			writeAuditNotification(t, w, Notification{Method: protocol.NotifyAgentMessageDelta, Params: json.RawMessage(`{"threadId":"valid"}`)})
-			got := map[string]bool{}
-			for range 2 {
-				select {
-				case s := <-seen:
-					got[s] = true
-				case <-time.After(2 * time.Second):
-					t.Fatal("fallback prevented unrelated delivery")
-				}
-			}
-			if !got[params] || !got[`{"threadId":"valid"}`] {
-				t.Fatalf("fallback delivery = %v", got)
+	for _, method := range []string{protocol.NotifyThreadNameUpdated, protocol.NotifyThreadSectionChanged} {
+		t.Run(method, func(t *testing.T) {
+			for _, params := range []string{`{}`, `{"threadId":null}`, `{"threadId":99}`, `{"threadId":[]}`, `[]`} {
+				t.Run(params, func(t *testing.T) {
+					r, w := io.Pipe()
+					tr := NewStdioTransport(r, io.Discard)
+					t.Cleanup(func() { _ = tr.Close(); _ = w.Close() })
+					seen := make(chan string, 2)
+					tr.OnNotify(func(_ context.Context, n Notification) { seen <- string(n.Params) })
+					writeAuditNotification(t, w, Notification{Method: method, Params: json.RawMessage(params)})
+					writeAuditNotification(t, w, Notification{Method: protocol.NotifyAgentMessageDelta, Params: json.RawMessage(`{"threadId":"valid"}`)})
+					got := map[string]bool{}
+					for range 2 {
+						select {
+						case s := <-seen:
+							got[s] = true
+						case <-time.After(2 * time.Second):
+							t.Fatal("fallback prevented unrelated delivery")
+						}
+					}
+					if !got[params] || !got[`{"threadId":"valid"}`] {
+						t.Fatalf("fallback delivery = %v", got)
+					}
+				})
 			}
 		})
 	}

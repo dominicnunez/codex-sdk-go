@@ -13,7 +13,7 @@ import (
 )
 
 func TestStdioNotificationBytesBoundedBeforeHandler(t *testing.T) {
-	for _, method := range []string{"item/agentMessage/delta", "thread/name/updated", "error", "mixed", "unknown"} {
+	for _, method := range []string{"item/agentMessage/delta", "thread/name/updated", "thread/section/changed", "error", "mixed", "unknown"} {
 		for _, owner := range []string{`"a"`, `99`} {
 			t.Run(method+owner, func(t *testing.T) { checkStdioNotificationByteLimit(t, method, owner) })
 		}

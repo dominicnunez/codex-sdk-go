@@ -588,7 +588,10 @@ func (c *Client) dispatchApproval(ctx context.Context, req Request) (Response, e
 		if handlers.OnCommandExecutionRequestApproval == nil {
 			return methodNotFoundResponse(req.ID), nil
 		}
-		return handleApproval(ctx, req, handlers.OnCommandExecutionRequestApproval)
+		return handleApproval(ctx, req, func(ctx context.Context, params CommandExecutionRequestApprovalParams) (commandApprovalResult, error) {
+			response, err := handlers.OnCommandExecutionRequestApproval(ctx, params)
+			return commandApprovalResult{CommandExecutionRequestApprovalResponse: response, kind: params.Kind}, err
+		})
 
 	case methodExecCommandApproval:
 		if handlers.OnExecCommandApproval == nil {

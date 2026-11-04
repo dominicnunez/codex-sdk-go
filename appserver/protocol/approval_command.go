@@ -241,6 +241,27 @@ func (r CommandExecutionRequestApprovalResponse) validate() error {
 	return validateCommandExecutionApprovalDecisionWrapper(r.Decision)
 }
 
+// The approval carrier owns the relationship between a checkpoint kind and
+// its response; the public response alone cannot identify that request kind.
+type commandApprovalResult struct {
+	CommandExecutionRequestApprovalResponse
+	kind CommandExecutionApprovalKind
+}
+
+func (r commandApprovalResult) validate() error {
+	if err := r.CommandExecutionRequestApprovalResponse.validate(); err != nil {
+		return err
+	}
+	if r.kind != CommandExecutionApprovalKindHumanCommand {
+		return nil
+	}
+	decision, ok := normalizeCommandExecutionApprovalDecisionValue(r.Decision.Value).(string)
+	if ok && (decision == CommandExecutionApprovalDecisionAccept || decision == CommandExecutionApprovalDecisionDecline || decision == CommandExecutionApprovalDecisionCancel) {
+		return nil
+	}
+	return errors.New("humanCommand requires a one-time accept, decline, or cancel decision")
+}
+
 // CommandExecutionApprovalDecisionWrapper wraps the decision for command execution approval.
 // String values should use the CommandExecutionApprovalDecision* constants.
 type CommandExecutionApprovalDecisionWrapper struct {
