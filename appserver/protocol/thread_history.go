@@ -58,9 +58,10 @@ func (v *TurnItemsView) UnmarshalJSON(data []byte) error {
 
 // ThreadItemsListParams selects a page of items, optionally restricted to one turn.
 type ThreadItemsListParams struct {
-	ThreadID string  `json:"threadId"`
-	TurnID   *string `json:"turnId,omitempty"`
-	Cursor   *string `json:"cursor,omitempty"`
+	DeferOutput OptionalNullable[ThreadItemOutputDeferral] `json:"deferOutput,omitzero"`
+	ThreadID    string                                     `json:"threadId"`
+	TurnID      *string                                    `json:"turnId,omitempty"`
+	Cursor      *string                                    `json:"cursor,omitempty"`
 	// CursorAnchor selects an item-relative position. It is mutually exclusive with Cursor.
 	CursorAnchor  *ThreadItemsListAnchor `json:"-"`
 	Limit         *uint32                `json:"limit,omitempty"`
@@ -72,11 +73,12 @@ func (p ThreadItemsListParams) MarshalJSON() ([]byte, error) {
 		return nil, errors.New("cursor and cursor anchor are mutually exclusive")
 	}
 	type wire struct {
-		ThreadID      string         `json:"threadId"`
-		TurnID        *string        `json:"turnId,omitempty"`
-		Cursor        interface{}    `json:"cursor,omitempty"`
-		Limit         *uint32        `json:"limit,omitempty"`
-		SortDirection *SortDirection `json:"sortDirection,omitempty"`
+		DeferOutput   OptionalNullable[ThreadItemOutputDeferral] `json:"deferOutput,omitzero"`
+		ThreadID      string                                     `json:"threadId"`
+		TurnID        *string                                    `json:"turnId,omitempty"`
+		Cursor        interface{}                                `json:"cursor,omitempty"`
+		Limit         *uint32                                    `json:"limit,omitempty"`
+		SortDirection *SortDirection                             `json:"sortDirection,omitempty"`
 	}
 	var cursor interface{}
 	if p.Cursor != nil {
@@ -85,23 +87,24 @@ func (p ThreadItemsListParams) MarshalJSON() ([]byte, error) {
 	if p.CursorAnchor != nil {
 		cursor = p.CursorAnchor
 	}
-	return jsonencode.Marshal(wire{p.ThreadID, p.TurnID, cursor, p.Limit, p.SortDirection})
+	return jsonencode.Marshal(wire{p.DeferOutput, p.ThreadID, p.TurnID, cursor, p.Limit, p.SortDirection})
 }
 
 // UnmarshalJSON distinguishes the schema's string and item-anchor cursor variants.
 func (p *ThreadItemsListParams) UnmarshalJSON(data []byte) error {
 	type wire struct {
-		ThreadID      string          `json:"threadId"`
-		TurnID        *string         `json:"turnId,omitempty"`
-		Cursor        json.RawMessage `json:"cursor,omitempty"`
-		Limit         *uint32         `json:"limit,omitempty"`
-		SortDirection *SortDirection  `json:"sortDirection,omitempty"`
+		DeferOutput   OptionalNullable[ThreadItemOutputDeferral] `json:"deferOutput,omitzero"`
+		ThreadID      string                                     `json:"threadId"`
+		TurnID        *string                                    `json:"turnId,omitempty"`
+		Cursor        json.RawMessage                            `json:"cursor,omitempty"`
+		Limit         *uint32                                    `json:"limit,omitempty"`
+		SortDirection *SortDirection                             `json:"sortDirection,omitempty"`
 	}
 	var decoded wire
 	if err := jsondecode.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
-	*p = ThreadItemsListParams{ThreadID: decoded.ThreadID, TurnID: decoded.TurnID, Limit: decoded.Limit, SortDirection: decoded.SortDirection}
+	*p = ThreadItemsListParams{DeferOutput: decoded.DeferOutput, ThreadID: decoded.ThreadID, TurnID: decoded.TurnID, Limit: decoded.Limit, SortDirection: decoded.SortDirection}
 	if len(decoded.Cursor) == 0 || string(decoded.Cursor) == "null" {
 		return nil
 	}
@@ -315,3 +318,6 @@ func (s *ThreadService) Revert(ctx context.Context, params ThreadRevertParams) (
 	s.client.cacheThreadStateForMethod(methodThreadRevert, response.Thread)
 	return response, nil
 }
+
+// ThreadItemOutputDeferral is an open object; the schema defines no selectors yet.
+type ThreadItemOutputDeferral map[string]json.RawMessage

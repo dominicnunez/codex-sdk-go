@@ -9,6 +9,7 @@ import (
 
 // ModelListParams are parameters for listing available models.
 type ModelListParams struct {
+	ModelProvider *string `json:"modelProvider,omitempty"`
 	// Opaque pagination cursor returned by a previous call.
 	Cursor *string `json:"cursor,omitempty"`
 	// When true, include models that are hidden from the default picker list.

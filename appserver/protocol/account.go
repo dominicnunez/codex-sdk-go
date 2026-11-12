@@ -20,6 +20,7 @@ type GetAccountParams struct {
 
 // GetAccountResponse is the response from account/read.
 type GetAccountResponse struct {
+	UserID             *string         `json:"userId,omitempty"`
 	Account            *AccountWrapper `json:"account"`
 	RequiresOpenaiAuth bool            `json:"requiresOpenaiAuth"`
 }

@@ -439,6 +439,9 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 		_, _ = client.Plugin.Reconcile(context.Background(), codex.PluginReconcileParams{})
 	})
 
+	verified["account/securitySetup/read"] = verifyMethod(t, transport, "account/securitySetup/read", func() {
+		_, _ = client.Account.SecuritySetupRead(context.Background())
+	})
 	// Check that all methods were verified
 	var missing []string
 	for method := range requiredMethods {

@@ -387,21 +387,58 @@ func (v *InputImageFunctionCallOutputContentItem) MarshalJSON() ([]byte, error) 
 
 // InputAudioFunctionCallOutputContentItem follows the upstream InputAudioFunctionCallOutputContentItem schema.
 type InputAudioFunctionCallOutputContentItem struct {
-	AudioURL string `json:"audio_url"`
+	AudioURL *string `json:"audio_url,omitempty"`
+	FileID   *string `json:"file_id,omitempty"`
 }
 
 func (v *InputAudioFunctionCallOutputContentItem) UnmarshalJSON(data []byte) error {
 	type wire InputAudioFunctionCallOutputContentItem
-	var decoded wire
-	if err := unmarshalInboundObject(data, &decoded, []string{"audio_url"}, []string{"audio_url"}); err != nil {
-		return err
+	// Ordinary records need only one native pass. Retry independent views
+	// only when an inactive alternative may own the native failure.
+	var original wire
+	originalErr := jsondecode.Unmarshal(data, &original)
+	if originalErr == nil {
+		if original.AudioURL == nil && original.FileID == nil {
+			return fmt.Errorf("input audio requires audio_url or file_id")
+		}
+		*v = InputAudioFunctionCallOutputContentItem(original)
+		return nil
 	}
-	*v = InputAudioFunctionCallOutputContentItem(decoded)
+	// Each anyOf alternative constrains only its own string property.
+	var decoded InputAudioFunctionCallOutputContentItem
+	common := struct {
+		*wire
+		AudioURL discardedImageAlternative `json:"audio_url"`
+		FileID   discardedImageAlternative `json:"file_id"`
+	}{wire: (*wire)(&decoded)}
+	commonErr := jsondecode.Unmarshal(data, &common)
+	var url struct {
+		AudioURL *string `json:"audio_url"`
+	}
+	if err := jsondecode.Unmarshal(data, &url); err == nil {
+		decoded.AudioURL = url.AudioURL
+	}
+	var file struct {
+		FileID *string `json:"file_id"`
+	}
+	if err := jsondecode.Unmarshal(data, &file); err == nil {
+		decoded.FileID = file.FileID
+	}
+	if decoded.AudioURL == nil && decoded.FileID == nil {
+		return originalErr
+	}
+	if commonErr != nil {
+		return commonErr
+	}
+	*v = decoded
 	return nil
 }
 
 func (*InputAudioFunctionCallOutputContentItem) isFunctionCallOutputContentItem() {}
 func (v *InputAudioFunctionCallOutputContentItem) MarshalJSON() ([]byte, error) {
+	if v.AudioURL == nil && v.FileID == nil {
+		return nil, fmt.Errorf("input audio requires audio_url or file_id")
+	}
 	type wire InputAudioFunctionCallOutputContentItem
 	return jsonencode.Marshal(struct {
 		Type string `json:"type"`

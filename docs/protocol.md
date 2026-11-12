@@ -101,7 +101,7 @@ The main service fields on `Client` include `Thread`, `Turn`, `Account`, `Apps`,
 | Service | Methods |
 | --- | --- |
 | `Apps` | `Read`, `Installed` |
-| `Account` | `ConsumeRateLimitResetCredit`, `GetTokenUsage`, `GetWorkspaceMessages` |
+| `Account` | `ConsumeRateLimitResetCredit`, `GetTokenUsage`, `GetWorkspaceMessages`, `SecuritySetupRead` |
 | `Thread` | `Delete`, `GoalGet`, `GoalSet`, `GoalClear`, and the `SectionCreate`, `SectionDelete`, `SectionList`, `SectionUpdate`, and `SectionMove` methods |
 | `Skills` | `SetExtraRoots` |
 | `ExternalAgent` | `ImportHistories`, `RecordImportHistory` |
@@ -117,6 +117,39 @@ SDK does not read those files, expand environment values or contact providers.
 A nil `BaseURL` means the endpoint is unavailable or not safe to display.
 `ModelProviderErrorWrapper` can decode known structured `RPCError.Data`; unknown
 errors keep the ordinary raw RPC error fallback.
+
+`Account.GatewayOAuthReadWithParams` selects a configured `ModelProvider`;
+`GatewayOAuthLoginWithParams` additionally accepts `DeviceAuth`, including explicit
+false. Nil parameters select the server default, as do the existing context-only
+methods. Read responses expose `SupportsDeviceAuth`; login responses may contain
+a `GatewayOAuthPrompt` with `LoginID`, `UserCode` and `VerificationURL`.
+Both gateway-changed listener APIs retain nullable `LoginID` for correlation.
+The SDK does not open the supplied URL or complete device authorization itself.
+`Account.SecuritySetupRead` returns an optional account-bound reminder and action;
+it does not change account security. `Account.Get` retains nullable `UserID`.
+
+`Model.List` accepts nullable `ModelProvider` to list another configured provider's
+models. `McpResourceReadParams.Meta` is raw `_meta` JSON: nil omits the member,
+`null` sends explicit null, and an object retains arbitrary members and numeric
+tokens. Other JSON kinds are rejected before dispatch. Account and turn routing
+keys are reserved by the server; the SDK does not infer a local key allowlist.
+`Thread.ItemsList` accepts `DeferOutput` as
+`OptionalNullable[ThreadItemOutputDeferral]`, preserving omission, null and an open
+object, including `{}`. The current schema declares no selector properties.
+
+`AgentMessageThreadItem.Moderation` retains the required `Moderated` boolean and
+optional `Display` instruction. `AgentMessageDisplay` preserves unknown actions,
+nullable block types and explicit false values for trusted-contact and cyber-access
+hints. Item admission validates required fields before history or typed callbacks
+publish them; snapshots own the nested references. The application interprets and
+renders these instructions.
+
+Function-call-output audio accepts `InputAudioFunctionCallOutputContentItem` with
+`AudioURL` or `FileID` string pointers. Either independent alternative may be used,
+including an empty string; malformed inactive properties do not invalidate a
+valid alternative. Constructed output must supply at least one alternative.
+These rules apply to `Turn.Start` tool output and typed function-output history;
+URLs and file identifiers remain opaque data.
 
 Parameters and responses are separate schema-shaped types. Optional fields use pointers when the wire protocol distinguishes omission from a zero value.
 
