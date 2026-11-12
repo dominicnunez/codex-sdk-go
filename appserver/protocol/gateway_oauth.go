@@ -29,11 +29,12 @@ func (s *GatewayOAuthStatus) UnmarshalJSON(data []byte) error {
 }
 
 type GatewayOAuthReadResponse struct {
-	Error        *string             `json:"error,omitempty"`
-	ProviderID   string              `json:"providerId"`
-	ProviderName string              `json:"providerName"`
-	Required     bool                `json:"required"`
-	Status       *GatewayOAuthStatus `json:"status,omitempty"`
+	SupportsDeviceAuth bool                `json:"supportsDeviceAuth"`
+	Error              *string             `json:"error,omitempty"`
+	ProviderID         string              `json:"providerId"`
+	ProviderName       string              `json:"providerName"`
+	Required           bool                `json:"required"`
+	Status             *GatewayOAuthStatus `json:"status,omitempty"`
 }
 
 func (r *GatewayOAuthReadResponse) UnmarshalJSON(data []byte) error {
@@ -44,14 +45,20 @@ func (r *GatewayOAuthReadResponse) UnmarshalJSON(data []byte) error {
 		[]string{"providerId", "providerName", "required"}); err != nil {
 		return err
 	}
+	if err := validateOptionalBooleans(data, "supportsDeviceAuth"); err != nil {
+		return err
+	}
 	*r = GatewayOAuthReadResponse(decoded)
 	return nil
 }
 
-type GatewayOAuthLoginResponse struct{}
+type GatewayOAuthLoginResponse struct {
+	Prompt *GatewayOAuthPrompt `json:"prompt,omitempty"`
+}
 type GatewayOAuthCancelResponse struct{}
 
 type GatewayOAuthChangedNotification struct {
+	LoginID    *string            `json:"loginId,omitempty"`
 	AuthURL    *string            `json:"authUrl,omitempty"`
 	Error      *string            `json:"error,omitempty"`
 	ProviderID string             `json:"providerId"`
@@ -70,18 +77,29 @@ func (n *GatewayOAuthChangedNotification) UnmarshalJSON(data []byte) error {
 }
 
 func (s *AccountService) GatewayOAuthRead(ctx context.Context) (GatewayOAuthReadResponse, error) {
+	return s.GatewayOAuthReadWithParams(ctx, nil)
+}
+
+// GatewayOAuthReadWithParams reads readiness for a selected provider.
+func (s *AccountService) GatewayOAuthReadWithParams(ctx context.Context, params *GatewayOAuthReadParams) (GatewayOAuthReadResponse, error) {
 	var response GatewayOAuthReadResponse
-	if err := s.client.sendRequest(ctx, methodGatewayOAuthRead, nil, &response); err != nil {
+	if err := s.client.sendRequest(ctx, methodGatewayOAuthRead, params, &response); err != nil {
 		return GatewayOAuthReadResponse{}, err
 	}
 	return response, nil
 }
 
 func (s *AccountService) GatewayOAuthLogin(ctx context.Context) (GatewayOAuthLoginResponse, error) {
-	if err := s.client.sendEmptyObjectRequest(ctx, methodGatewayOAuthLogin, nil); err != nil {
+	return s.GatewayOAuthLoginWithParams(ctx, nil)
+}
+
+// GatewayOAuthLoginWithParams starts provider login using the requested flow.
+func (s *AccountService) GatewayOAuthLoginWithParams(ctx context.Context, params *GatewayOAuthLoginParams) (GatewayOAuthLoginResponse, error) {
+	var response gatewayLoginAdmission
+	if err := s.client.sendRequest(ctx, methodGatewayOAuthLogin, params, &response); err != nil {
 		return GatewayOAuthLoginResponse{}, err
 	}
-	return GatewayOAuthLoginResponse{}, nil
+	return response.GatewayOAuthLoginResponse, nil
 }
 
 func (s *AccountService) GatewayOAuthCancel(ctx context.Context) (GatewayOAuthCancelResponse, error) {
@@ -104,4 +122,41 @@ func (c *Client) OnGatewayOAuthChanged(handler func(GatewayOAuthChangedNotificat
 		}
 		handler(value)
 	})
+}
+
+type GatewayOAuthReadParams struct {
+	ModelProvider *string `json:"modelProvider,omitempty"`
+}
+type GatewayOAuthLoginParams struct {
+	DeviceAuth    *bool   `json:"deviceAuth,omitempty"`
+	ModelProvider *string `json:"modelProvider,omitempty"`
+}
+
+// NullableGatewayOAuthReadParams includes the schema's null request alternative.
+type NullableGatewayOAuthReadParams = *GatewayOAuthReadParams
+
+// NullableGatewayOAuthLoginParams includes the schema's null request alternative.
+type NullableGatewayOAuthLoginParams = *GatewayOAuthLoginParams
+
+type GatewayOAuthPrompt struct {
+	LoginID         string `json:"loginId"`
+	UserCode        string `json:"userCode"`
+	VerificationURL string `json:"verificationUrl"`
+}
+
+// gatewayLoginAdmission owns service validation without adding JSON methods to
+// the public response or its nested records.
+type gatewayLoginAdmission struct{ GatewayOAuthLoginResponse }
+
+func (r *gatewayLoginAdmission) UnmarshalJSON(data []byte) error {
+	type wire GatewayOAuthLoginResponse
+	var decoded wire
+	if err := unmarshalInboundObject(data, &decoded, nil, nil); err != nil {
+		return err
+	}
+	if err := validateNestedRecord(data, "prompt", recordRule{required: []string{"loginId", "userCode", "verificationUrl"}}); err != nil {
+		return err
+	}
+	r.GatewayOAuthLoginResponse = GatewayOAuthLoginResponse(decoded)
+	return nil
 }

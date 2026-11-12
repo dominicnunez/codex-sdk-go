@@ -127,3 +127,28 @@ The separate dynamic-tool and function-call-output audio schemas are unchanged.
 describes optional structured JSON-RPC error data; the generic raw error and
 unknown fallback remain available. Section notifications supply no destination
 name or entry timestamp, so they do not synthesize cached thread metadata.
+
+
+## Schema snapshot 9018f3a3b021
+
+This snapshot adds provider-selectable gateway device authorization, account
+security notices, agent-message display instructions and file-backed tool audio.
+
+| Contract | Owner and callers | Evidence | Decision |
+| --- | --- | --- | --- |
+| Nullable gateway parameters, prompt and device capability | Account gateway read/login, both changed listeners | `TestGatewayDeviceFlowAndSecuritySetup`, `TestNestedSchemaRecordMerges` | Preserve existing methods and add parameter-taking methods; URLs and codes remain data |
+| Optional account-bound notice and account user ID | SecuritySetupRead and Get responses | `TestGatewayDeviceFlowAndSecuritySetup`, `TestNestedSchemaRecordMerges` | Validate required notice/action members; preserve absent/null notices and empty strings |
+| Agent moderation and display instructions | Private item admission, history, both item listener APIs, shared copies | `TestAgentModerationAdmission`, `TestAgentModerationPublicRoutesAndOwnership`, `TestNestedSchemaRecordMerges`, `FuzzAgentModerationMerges`, existing complete item/run/conversation/stream ownership tests | Preserve unknown actions and false hints; follow duplicate merges and null resets without adding methods to nested public records |
+| Provider selection, metadata and output deferral | Model.List, Mcp.ResourceRead and Thread.ItemsList request codecs | `TestNewSchemaRequests`, `TestMcpRequestMetadataRejectsNonObjects` | Retain raw object values and explicit null; deferral object has no declared selectors |
+| URL/file-ID function-output audio | FunctionCallOutputContentItemWrapper, Turn.Start and typed history | `TestFunctionAudioAlternatives`, `TestFunctionAudioPublicRoutes`, `FuzzFunctionAudioAlternatives`, complete reference-copy tests | Evaluate alternatives independently, including empty strings and malformed inactive properties |
+
+`QueuedSubmission.responsesapiClientMetadata` has no referencing wire consumer.
+The added `ThreadEnvironment` definition is likewise unreferenced by the actual
+thread-settings notification. Neither creates a new SDK operation. The plugin
+prompt change updates a prose limit from 128 to 512 characters; the schema adds
+no length constraint, and the SDK had no old limit to remove.
+`inferenceHookDenied` remains available through opaque `TurnError.CodexErrorInfo`
+(`TestOpaqueInferenceHookError`). Raw Responses API audio already supports file
+IDs through `Thread.InjectItems`; its nested definitions in resume parameters do
+not add a new typed request property. `RawResponseItemCompletedNotification`
+remains absent from the server-method union.

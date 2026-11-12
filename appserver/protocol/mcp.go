@@ -269,6 +269,7 @@ type McpServerRefreshResponse struct{}
 
 // McpResourceReadParams reads a resource from an MCP server.
 type McpResourceReadParams struct {
+	Meta         json.RawMessage        `json:"_meta,omitempty"`
 	ConnectorID  *string                `json:"connectorId,omitempty"`
 	OriginCallID *string                `json:"originCallId,omitempty"`
 	Server       string                 `json:"server"`
@@ -533,4 +534,13 @@ func (c *Client) OnMcpToolCallProgress(handler func(McpToolCallProgressNotificat
 		}
 		handler(params)
 	})
+}
+
+func (p McpResourceReadParams) prepareRequest() (interface{}, error) {
+	if len(p.Meta) > 0 && !isNullJSONValue(p.Meta) {
+		if err := validateObjectResponseResult(p.Meta); err != nil {
+			return nil, invalidParamsError("_meta must be an object or null")
+		}
+	}
+	return p, nil
 }

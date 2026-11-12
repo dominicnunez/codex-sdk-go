@@ -847,6 +847,20 @@ shared copy boundary owns URL pointers in snapshots. Admission establishes wire
 shape only: URLs and file IDs remain opaque peer data, and the SDK does not fetch
 or verify their contents.
 
+Agent-message moderation and display records retain unknown action strings and
+explicit false hints through history, typed item callbacks and isolated snapshots.
+Private item admission validates required booleans and display actions across
+native object merges and resets. Public nested records retain ordinary JSON
+behavior. This preserves presentation evidence; the SDK does not interpret the
+instructions, render content or establish that a response is safe to display.
+Function-output audio accepts independent URL/file-ID alternatives without fetching
+or verifying the referenced content.
+
+MCP resource-read request metadata accepts only an object or null before dispatch,
+retaining raw numeric tokens and server-reserved routing metadata. These fields
+are not local authentication or authorization. The open history-output deferral
+object is forwarded as data; it does not establish local retention or access policy.
+
 The SDK does not fetch or render MCP app UI metadata, execute attachment payloads, or provide an HTML sanitizer. An application that renders model text, links, images, or tool metadata must use appropriate escaping and destination checks. Exposing SDK service methods through HTTP or another remote interface requires a separate authorization boundary.
 
 Typed MCP results preserve arbitrary `_meta` JSON, including explicit null and
@@ -1082,6 +1096,14 @@ intended expiration from the local clock; unsupported values return no partial
 credentials, and lifetime errors omit token fields. This prevents arithmetic
 overflow, not false lifetime claims from a trusted endpoint or verification of
 token validity. Stored credentials may already be expired and still need refresh.
+
+Gateway device-login parameters select server-side provider and authorization
+flow choices. Prompt admission checks required login ID, user code and
+verification URL before returning a successful response; the SDK does not open
+URLs, submit codes or establish provider identity. Account security notices retain
+required account/user identity and action fields, but remain peer assertions;
+the read does not change security settings. Applications must correlate the
+notice with their selected account and validate links before presenting actions.
 
 [JWT claim extraction](../login/auth/jwt.go) decodes the payload without signature, issuer, audience, or expiry verification. Account/plan fields are useful metadata from a trusted token source; they must not authorize a user, tenant, routing choice, or backend action on their own. Gateway OAuth methods and explicit-login capability settings in [gateway_oauth.go](../appserver/protocol/gateway_oauth.go) and [initialize.go](../appserver/protocol/initialize.go) convey app-server protocol choices. They do not independently establish consent, account ownership, or secure provider routing.
 

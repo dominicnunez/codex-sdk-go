@@ -55,6 +55,7 @@ func (u *UserMessageThreadItem) MarshalJSON() ([]byte, error) {
 
 // AgentMessageThreadItem represents an agent message in a thread.
 type AgentMessageThreadItem struct {
+	Moderation     *AgentMessageModeration   `json:"moderation,omitempty"`
 	StartedAtMs    *int64                    `json:"startedAtMs,omitempty"`
 	CompletedAtMs  *int64                    `json:"completedAtMs,omitempty"`
 	Questions      *[]AsyncUserInputQuestion `json:"questions,omitempty"`
@@ -573,6 +574,9 @@ func decodeAgentMessageThreadItem(data []byte) (ThreadItem, error) {
 		return nil, err
 	}
 	if err := validateItemEnumField(data, "delivery", validAgentMessageDeliveries, true); err != nil {
+		return nil, err
+	}
+	if err := validateNestedRecord(data, "moderation", recordRule{required: []string{"moderated"}, children: map[string]recordRule{"display": {required: []string{"action"}}}}); err != nil {
 		return nil, err
 	}
 	return item, nil

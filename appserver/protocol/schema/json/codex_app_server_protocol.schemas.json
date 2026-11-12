@@ -1850,7 +1850,14 @@
               "type": "string"
             },
             "params": {
-              "type": "null"
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/v2/GatewayOAuthReadParams"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           },
           "required": [
@@ -1873,7 +1880,14 @@
               "type": "string"
             },
             "params": {
-              "type": "null"
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/v2/GatewayOAuthLoginParams"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           },
           "required": [
@@ -2285,6 +2299,29 @@
             "method"
           ],
           "title": "Account/logoutRequest",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/v2/RequestId"
+            },
+            "method": {
+              "enum": [
+                "account/securitySetup/read"
+              ],
+              "title": "Account/securitySetup/readRequestMethod",
+              "type": "string"
+            },
+            "params": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "id",
+            "method"
+          ],
+          "title": "Account/securitySetup/readRequest",
           "type": "object"
         },
         {
@@ -7002,6 +7039,48 @@
         ],
         "type": "string"
       },
+      "AccountSecuritySetupAction": {
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "url"
+        ],
+        "type": "object"
+      },
+      "AccountSecuritySetupNotice": {
+        "properties": {
+          "accountId": {
+            "type": "string"
+          },
+          "action": {
+            "$ref": "#/definitions/v2/AccountSecuritySetupAction"
+          },
+          "description": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "accountId",
+          "action",
+          "description",
+          "title",
+          "userId"
+        ],
+        "type": "object"
+      },
       "AccountSession": {
         "properties": {
           "displayName": {
@@ -7329,6 +7408,37 @@
         "title": "AgentMessageDeltaNotification",
         "type": "object"
       },
+      "AgentMessageDisplay": {
+        "description": "A presentation instruction for Chat to apply to this answer when recovering history.",
+        "properties": {
+          "action": {
+            "description": "Unknown actions must be left for the producing client to handle.",
+            "type": "string"
+          },
+          "blockType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "checkTrustedContacts": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "cyberTrustedAccess": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "type": "object"
+      },
       "AgentMessageInputContent": {
         "oneOf": [
           {
@@ -7372,6 +7482,27 @@
             "type": "object"
           }
         ]
+      },
+      "AgentMessageModeration": {
+        "properties": {
+          "display": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/v2/AgentMessageDisplay"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "moderated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "moderated"
+        ],
+        "type": "object"
       },
       "AgentPath": {
         "type": "string"
@@ -8791,6 +8922,13 @@
               "threadRollbackFailed",
               "sandboxError",
               "other"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "The workspace's inference hook explicitly denied this request.",
+            "enum": [
+              "inferenceHookDenied"
             ],
             "type": "string"
           },
@@ -13040,10 +13178,34 @@
             "type": "object"
           },
           {
-            "properties": {
-              "audio_url": {
-                "type": "string"
+            "anyOf": [
+              {
+                "properties": {
+                  "audio_url": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "audio_url"
+                ],
+                "title": "AudioUrlFunctionCallOutputContentItem",
+                "type": "object"
               },
+              {
+                "properties": {
+                  "file_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file_id"
+                ],
+                "title": "FileIdFunctionCallOutputContentItem",
+                "type": "object"
+              }
+            ],
+            "description": "Inline audio data or an uploaded file loaded by the Responses API.",
+            "properties": {
               "type": {
                 "enum": [
                   "input_audio"
@@ -13053,7 +13215,6 @@
               }
             },
             "required": [
-              "audio_url",
               "type"
             ],
             "title": "InputAudioFunctionCallOutputContentItem",
@@ -13163,6 +13324,13 @@
               "null"
             ]
           },
+          "loginId": {
+            "description": "Identifies the completed device login attempt.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "providerId": {
             "type": "string"
           },
@@ -13177,9 +13345,70 @@
         "title": "GatewayOAuthChangedNotification",
         "type": "object"
       },
+      "GatewayOAuthLoginParams": {
+        "description": "Authorize a configured provider without changing the default or any thread's provider.",
+        "properties": {
+          "deviceAuth": {
+            "description": "Select device authorization when the server advertises support for it.",
+            "type": "boolean"
+          },
+          "modelProvider": {
+            "description": "Defaults to the current provider when omitted.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
       "GatewayOAuthLoginResponse": {
         "$schema": "http://json-schema.org/draft-07/schema#",
+        "properties": {
+          "prompt": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/v2/GatewayOAuthPrompt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
         "title": "GatewayOAuthLoginResponse",
+        "type": "object"
+      },
+      "GatewayOAuthPrompt": {
+        "properties": {
+          "loginId": {
+            "type": "string"
+          },
+          "userCode": {
+            "type": "string"
+          },
+          "verificationUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "loginId",
+          "userCode",
+          "verificationUrl"
+        ],
+        "type": "object"
+      },
+      "GatewayOAuthReadParams": {
+        "description": "Read credential readiness for a configured provider without starting browser login.",
+        "properties": {
+          "modelProvider": {
+            "description": "Defaults to the current provider when omitted.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
         "type": "object"
       },
       "GatewayOAuthReadResponse": {
@@ -13212,6 +13441,11 @@
               }
             ],
             "description": "Null when the effective provider does not use gateway OAuth."
+          },
+          "supportsDeviceAuth": {
+            "default": false,
+            "description": "Whether the administrator configured a device authorization endpoint.",
+            "type": "boolean"
           }
         },
         "required": [
@@ -13332,12 +13566,38 @@
           },
           "requiresOpenaiAuth": {
             "type": "boolean"
+          },
+          "userId": {
+            "default": null,
+            "description": "ChatGPT user ID belonging to this account response, when available.",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
           "requiresOpenaiAuth"
         ],
         "title": "GetAccountResponse",
+        "type": "object"
+      },
+      "GetAccountSecuritySetupResponse": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "description": "Optional security reminder bound to the account that fetched it. Unavailable or ineligible accounts return no notice; this read never changes account security.",
+        "properties": {
+          "notice": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/v2/AccountSecuritySetupNotice"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "GetAccountSecuritySetupResponse",
         "type": "object"
       },
       "GetAccountTokenUsageParams": {
@@ -15299,6 +15559,14 @@
       "McpResourceReadParams": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "properties": {
+          "_meta": {
+            "additionalProperties": true,
+            "description": "Additional MCP request metadata. Account and turn routing keys are reserved.",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
           "connectorId": {
             "type": [
               "string",
@@ -16262,6 +16530,13 @@
               "integer",
               "null"
             ]
+          },
+          "modelProvider": {
+            "description": "List models for this configured provider instead of the app-server default.",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "title": "ModelListParams",
@@ -16870,6 +17145,30 @@
           "compact"
         ],
         "type": "string"
+      },
+      "NullableGatewayOAuthLoginParams": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "anyOf": [
+          {
+            "$ref": "#/definitions/v2/GatewayOAuthLoginParams"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Nullable_GatewayOAuthLoginParams"
+      },
+      "NullableGatewayOAuthReadParams": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "anyOf": [
+          {
+            "$ref": "#/definitions/v2/GatewayOAuthReadParams"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Nullable_GatewayOAuthReadParams"
       },
       "NullableGetAccountRateLimitsParams": {
         "$schema": "http://json-schema.org/draft-07/schema#",
@@ -17652,7 +17951,7 @@
             ]
           },
           "defaultPrompt": {
-            "description": "Starter prompts for the plugin. Capped at 3 entries with a maximum of 128 characters per entry.",
+            "description": "Starter prompts for the plugin. Capped at 3 entries with a maximum of 512 characters per entry.",
             "items": {
               "type": "string"
             },
@@ -19165,6 +19464,16 @@
               "$ref": "#/definitions/v2/UserInput"
             },
             "type": "array"
+          },
+          "responsesapiClientMetadata": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Metadata retained with this input, including across reconnect and restoration.",
+            "type": [
+              "object",
+              "null"
+            ]
           }
         },
         "required": [
@@ -23349,6 +23658,17 @@
                 ],
                 "default": null
               },
+              "moderation": {
+                "anyOf": [
+                  {
+                    "$ref": "#/definitions/v2/AgentMessageModeration"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
               "phase": {
                 "anyOf": [
                   {
@@ -24226,6 +24546,10 @@
         ],
         "type": "object"
       },
+      "ThreadItemOutputDeferral": {
+        "properties": {},
+        "type": "object"
+      },
       "ThreadItemsListAnchor": {
         "description": "An exclusive item position within the requested visible turn.",
         "oneOf": [
@@ -24275,6 +24599,17 @@
               }
             ],
             "description": "Opaque continuation cursor or an exclusive item anchor in the requested visible turn. An item anchor requires a non-empty `turnId`; ascending (the default) returns items after it, and descending returns items before it. Continue with the returned string cursor."
+          },
+          "deferOutput": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/v2/ThreadItemOutputDeferral"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "For a single turn, choose which saved outputs to fetch separately by item ID."
           },
           "limit": {
             "description": "Optional item page size.",

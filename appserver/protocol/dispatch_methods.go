@@ -145,6 +145,7 @@ const (
 	methodAccountLoginStart                      = "account/login/start"
 	methodAccountLoginCancel                     = "account/login/cancel"
 	methodAccountLogout                          = "account/logout"
+	methodAccountSecuritySetupRead               = "account/securitySetup/read"
 	methodGatewayOAuthRead                       = "account/gatewayOAuth/read"
 	methodGatewayOAuthLogin                      = "account/gatewayOAuth/login"
 	methodGatewayOAuthCancel                     = "account/gatewayOAuth/cancel"
