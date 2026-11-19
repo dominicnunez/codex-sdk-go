@@ -105,7 +105,7 @@ The main service fields on `Client` include `Thread`, `Turn`, `Account`, `Apps`,
 | `Thread` | `Delete`, `GoalGet`, `GoalSet`, `GoalClear`, and the `SectionCreate`, `SectionDelete`, `SectionList`, `SectionUpdate`, and `SectionMove` methods |
 | `Skills` | `SetExtraRoots` |
 | `ExternalAgent` | `ImportHistories`, `RecordImportHistory` |
-| `ModelProvider` | `CapabilitiesRead`, `List`, `ConfigWrite` |
+| `ModelProvider` | `CapabilitiesRead`, `List`, `ConfigWrite`, `DefaultSet` |
 
 `ModelProvider.List` returns provider display metadata and edit capabilities.
 `ConfigWrite` accepts `ProviderSettingsPatchWrapper` with custom-gateway, Bedrock
@@ -138,11 +138,15 @@ keys are reserved by the server; the SDK does not infer a local key allowlist.
 object, including `{}`. The current schema declares no selector properties.
 
 `AgentMessageThreadItem.Moderation` retains the required `Moderated` boolean and
-optional `Display` instruction. `AgentMessageDisplay` preserves unknown actions,
-nullable block types and explicit false values for trusted-contact and cyber-access
-hints. Item admission validates required fields before history or typed callbacks
-publish them; snapshots own the nested references. The application interprets and
-renders these instructions.
+optional `Display` instruction. Current display records require `Version` 1 and
+`Mode` show, hide or block. Show includes trusted-contact handling and an optional
+annotation; hide includes a replacement instruction; block includes protection or
+cyber reason metadata. Legacy `Action`, `BlockType`, `CheckTrustedContacts` and
+`CyberTrustedAccess` fields remain optional compatibility inputs and are not
+required for current display modes. Item admission validates the selected branch
+before history or typed callbacks publish it; snapshots own nested references.
+Public display records retain ordinary JSON behavior. The application interprets
+and renders these instructions.
 
 Function-call-output audio accepts `InputAudioFunctionCallOutputContentItem` with
 `AudioURL` or `FileID` string pointers. Either independent alternative may be used,
@@ -150,6 +154,44 @@ including an empty string; malformed inactive properties do not invalidate a
 valid alternative. Constructed output must supply at least one alternative.
 These rules apply to `Turn.Start` tool output and typed function-output history;
 URLs and file identifiers remain opaque data.
+
+`ModelProvider.DefaultSet` selects the configured default for new threads and
+unscoped model lists. It returns the existing `ConfigWriteResponse`, including
+file path, status and version; it does not retarget existing threads.
+Both managed Bedrock login carriers accept nullable `ProviderID`, including
+`amazon-bedrock-runtime`; credential encoders retain that choice and debug JSON
+continues to redact credential values.
+
+MCP tool/resource calls, OAuth login and catalog selection accept nullable
+`EnvironmentID` for exact server-registration scope. Catalog records, startup
+updates, tool history and elicitation requests retain that same opaque value.
+Omission preserves legacy name-only selection; an empty supplied string is not
+normalized into another identifier. `Thread.List` and `ListJSON` accept
+`IncludedThreadIDs` with omission/null for unrestricted selection and an empty
+array to match nothing. The server applies inclusion and exclusion before
+pagination; repeat the same filter on every page. Its documented limit is 100 IDs.
+
+`OnThreadSearchPartial` and `AddThreadSearchPartialListener` receive provisional
+batches correlated by `RequestID`, including string and signed 64-bit numeric IDs.
+These notifications are best-effort: batches may be dropped under load and do not
+populate the authoritative thread cache. Replace provisional matches with the
+final response. Callbacks run asynchronously, so a queued batch may arrive after
+the final response or error has reached the caller. Once accepting that final
+outcome, ignore later batches for its `RequestID`. Use distinct request IDs on
+a connection; raw `Send` callers must account for queued batches before reusing
+an ID. The current request-method
+schema does not expose a search-stream
+request, so the SDK does not invent one from the notification description.
+
+Realtime item-started/completed listeners retain nullable `ObservedAtMs` on every
+known branch. `FrameThreadRealtimeItem` contains the required voice transcript;
+`TurnInputAcceptedThreadRealtimeItem` and `SessionInputSavedThreadRealtimeItem`
+retain handoff/save identifiers, input, source event IDs and their enum metadata.
+Required nested records and source arrays are validated before typed callbacks.
+`AccountUpdatedNotification.Reason` exposes `workspaceRoutingReady` or `unknown`.
+Managed telemetry requirements retain `HeadersHelper` and
+`HeadersHelperRefreshIntervalMs` (a positive uint64); these are server settings,
+and the SDK does not execute the helper.
 
 Parameters and responses are separate schema-shaped types. Optional fields use pointers when the wire protocol distinguishes omission from a zero value.
 

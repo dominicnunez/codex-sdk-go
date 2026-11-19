@@ -9,11 +9,12 @@ import (
 // AmazonBedrockAccessKeysLoginAccountParams authenticates with AWS access keys.
 // Credentials are redacted from standard JSON and formatting; Login sends them on the wire.
 type AmazonBedrockAccessKeysLoginAccountParams struct {
-	Type            string  `json:"type"`
-	AccessKeyID     string  `json:"accessKeyId"`
-	SecretAccessKey string  `json:"secretAccessKey"`
-	SessionToken    *string `json:"sessionToken,omitempty"`
-	Region          string  `json:"region"`
+	ProviderID      *BedrockProviderID `json:"providerId,omitempty"`
+	Type            string             `json:"type"`
+	AccessKeyID     string             `json:"accessKeyId"`
+	SecretAccessKey string             `json:"secretAccessKey"`
+	SessionToken    *string            `json:"sessionToken,omitempty"`
+	Region          string             `json:"region"`
 }
 
 func (*AmazonBedrockAccessKeysLoginAccountParams) isLoginAccountParams() {}

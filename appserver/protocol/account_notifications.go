@@ -41,8 +41,9 @@ func validateOptionalAuthModeField(field string, value *AuthMode) error {
 
 // AccountUpdatedNotification is sent when account information changes
 type AccountUpdatedNotification struct {
-	AuthMode *AuthMode `json:"authMode,omitempty"`
-	PlanType *PlanType `json:"planType,omitempty"`
+	Reason   *AccountUpdateReason `json:"reason,omitempty"`
+	AuthMode *AuthMode            `json:"authMode,omitempty"`
+	PlanType *PlanType            `json:"planType,omitempty"`
 }
 
 func (n *AccountUpdatedNotification) UnmarshalJSON(data []byte) error {
@@ -68,6 +69,11 @@ func (n *AccountUpdatedNotification) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	if err := validateInboundObjectFields(data, nil, nil); err != nil {
+		return err
+	}
+	if err := validateEnumOccurrences(data, "reason", true, func(v *AccountUpdateReason) error {
+		return validateOptionalEnumValue("account.reason", v, validAccountUpdateReasons)
+	}); err != nil {
 		return err
 	}
 	*n = AccountUpdatedNotification(decoded)

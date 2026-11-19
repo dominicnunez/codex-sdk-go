@@ -141,6 +141,7 @@ func (s *McpElicitationSchema) UnmarshalJSON(data []byte) error {
 
 // McpServerElicitationRequestParams represents a server request for MCP elicitation.
 type McpServerElicitationRequestParams struct {
+	EnvironmentID *string `json:"environmentId,omitempty"`
 	// OpenAIRequestedSchema preserves the arbitrary JSON schema for either OpenAI form mode.
 	// RequestedSchema remains the typed schema for standard form mode.
 	OpenAIRequestedSchema json.RawMessage          `json:"-"`

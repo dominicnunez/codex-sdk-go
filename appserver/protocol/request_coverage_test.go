@@ -442,6 +442,9 @@ func TestAllRequestMethodsCovered(t *testing.T) {
 	verified["account/securitySetup/read"] = verifyMethod(t, transport, "account/securitySetup/read", func() {
 		_, _ = client.Account.SecuritySetupRead(context.Background())
 	})
+	verified["modelProvider/default/set"] = verifyMethod(t, transport, "modelProvider/default/set", func() {
+		_, _ = client.ModelProvider.DefaultSet(context.Background(), codex.ModelProviderDefaultSetParams{})
+	})
 	// Check that all methods were verified
 	var missing []string
 	for method := range requiredMethods {

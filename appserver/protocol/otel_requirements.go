@@ -12,17 +12,19 @@ import (
 
 // OtelRequirements describes managed telemetry settings; it does not configure an exporter.
 type OtelRequirements struct {
-	LogSseDeltas           *bool                         `json:"log_sse_deltas,omitempty"`
-	Environment            *string                       `json:"environment,omitempty"`
-	Exporter               *OtelExporter                 `json:"exporter,omitempty"`
-	MetricsExporter        *OtelExporter                 `json:"metrics_exporter,omitempty"`
-	TraceExporter          *OtelExporter                 `json:"trace_exporter,omitempty"`
-	LogAgentResponses      *bool                         `json:"log_agent_responses,omitempty"`
-	LogGuardianAssessments *bool                         `json:"log_guardian_assessments,omitempty"`
-	LogUserPrompt          *bool                         `json:"log_user_prompt,omitempty"`
-	SpanAttributes         *map[string]string            `json:"span_attributes,omitempty"`
-	Tracestate             *map[string]map[string]string `json:"tracestate,omitempty"`
-	ToolResult             *OtelToolResultLogConfig      `json:"tool_result,omitempty"`
+	HeadersHelper                  *string                       `json:"headers_helper,omitempty"`
+	HeadersHelperRefreshIntervalMs *uint64                       `json:"headers_helper_refresh_interval_ms,omitempty"`
+	LogSseDeltas                   *bool                         `json:"log_sse_deltas,omitempty"`
+	Environment                    *string                       `json:"environment,omitempty"`
+	Exporter                       *OtelExporter                 `json:"exporter,omitempty"`
+	MetricsExporter                *OtelExporter                 `json:"metrics_exporter,omitempty"`
+	TraceExporter                  *OtelExporter                 `json:"trace_exporter,omitempty"`
+	LogAgentResponses              *bool                         `json:"log_agent_responses,omitempty"`
+	LogGuardianAssessments         *bool                         `json:"log_guardian_assessments,omitempty"`
+	LogUserPrompt                  *bool                         `json:"log_user_prompt,omitempty"`
+	SpanAttributes                 *map[string]string            `json:"span_attributes,omitempty"`
+	Tracestate                     *map[string]map[string]string `json:"tracestate,omitempty"`
+	ToolResult                     *OtelToolResultLogConfig      `json:"tool_result,omitempty"`
 }
 
 func (o *OtelRequirements) UnmarshalJSON(data []byte) error {
@@ -45,6 +47,21 @@ func (o *OtelRequirements) UnmarshalJSON(data []byte) error {
 		}
 		return validateOtelStringMap(raw, true)
 	}, "tracestate"); err != nil {
+		return err
+	}
+	if err := validateOptionalFields(data, func(_ string, raw []byte) error {
+		if isNullJSONValue(raw) {
+			return nil
+		}
+		var value uint64
+		if err := jsondecode.Unmarshal(raw, &value); err != nil {
+			return err
+		}
+		if value == 0 {
+			return errors.New("headers_helper_refresh_interval_ms must be at least 1")
+		}
+		return nil
+	}, "headers_helper_refresh_interval_ms"); err != nil {
 		return err
 	}
 	*o = OtelRequirements(decoded)

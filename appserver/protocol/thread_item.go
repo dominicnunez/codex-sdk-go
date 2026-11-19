@@ -177,6 +177,7 @@ func (f *FileChangeThreadItem) MarshalJSON() ([]byte, error) {
 
 // McpToolCallThreadItem represents an MCP tool call in a thread.
 type McpToolCallThreadItem struct {
+	EnvironmentID     *string                `json:"environmentId,omitempty"`
 	StartedAtMs       *int64                 `json:"startedAtMs,omitempty"`
 	CompletedAtMs     *int64                 `json:"completedAtMs,omitempty"`
 	ID                string                 `json:"id"`
@@ -555,8 +556,14 @@ func decodeUserMessageThreadItem(data []byte) (ThreadItem, error) {
 
 func decodeAgentMessageThreadItem(data []byte) (ThreadItem, error) {
 	agentMessage := &AgentMessageThreadItem{}
-	item, err := decodeThreadItemInto(data, agentMessage, "id", "text")
-	if err != nil {
+	if err := validateRequiredTaggedObjectFields(data, "id", "text"); err != nil {
+		return nil, err
+	}
+	view := agentDisplayView{source: data, data: data, legacy: true}
+	if hasCurrentAgentDisplay(data) {
+		view = makeAgentDisplayView(data)
+	}
+	if err := decodeAgentMessageRecord(view.data, agentMessage); err != nil {
 		return nil, err
 	}
 	// Keep the public citation representation method-free. Validate each
@@ -576,10 +583,10 @@ func decodeAgentMessageThreadItem(data []byte) (ThreadItem, error) {
 	if err := validateItemEnumField(data, "delivery", validAgentMessageDeliveries, true); err != nil {
 		return nil, err
 	}
-	if err := validateNestedRecord(data, "moderation", recordRule{required: []string{"moderated"}, children: map[string]recordRule{"display": {required: []string{"action"}}}}); err != nil {
+	if err := validateAgentDisplayAdmission(view, agentMessage); err != nil {
 		return nil, err
 	}
-	return item, nil
+	return agentMessage, nil
 }
 
 func decodePlanThreadItem(data []byte) (ThreadItem, error) {
