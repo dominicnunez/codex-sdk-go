@@ -172,6 +172,7 @@ func (s *McpServerInfo) UnmarshalJSON(data []byte) error {
 }
 
 type McpServerStatus struct {
+	EnvironmentID *string `json:"environmentId,omitempty"`
 	// ToolListMeta is opaque metadata from the first page of the tool catalog.
 	ToolListMeta json.RawMessage `json:"toolListMeta,omitempty"`
 	// ToolsError reports discovery failure when no catalog was returned.
@@ -203,11 +204,12 @@ func (s *McpServerStatus) UnmarshalJSON(data []byte) error {
 
 // ListMcpServerStatusParams are parameters for the mcpServerStatus/list request.
 type ListMcpServerStatusParams struct {
-	Cursor     *string                `json:"cursor,omitempty"`
-	Detail     *McpServerStatusDetail `json:"detail,omitempty"`
-	Limit      *uint32                `json:"limit,omitempty"`
-	ThreadID   *string                `json:"threadId,omitempty"`
-	ServerName *string                `json:"serverName,omitempty"`
+	EnvironmentID *string                `json:"environmentId,omitempty"`
+	Cursor        *string                `json:"cursor,omitempty"`
+	Detail        *McpServerStatusDetail `json:"detail,omitempty"`
+	Limit         *uint32                `json:"limit,omitempty"`
+	ThreadID      *string                `json:"threadId,omitempty"`
+	ServerName    *string                `json:"serverName,omitempty"`
 }
 
 func (p ListMcpServerStatusParams) prepareRequest() (interface{}, error) {
@@ -238,6 +240,7 @@ func (r *ListMcpServerStatusResponse) UnmarshalJSON(data []byte) error {
 
 // McpServerOauthLoginParams are parameters for the mcpServer/oauth/login request.
 type McpServerOauthLoginParams struct {
+	EnvironmentID      *string         `json:"environmentId,omitempty"`
 	Name               string          `json:"name"`
 	Scopes             *[]string       `json:"scopes,omitempty"`
 	TimeoutSecs        *int64          `json:"timeoutSecs,omitempty"`
@@ -269,13 +272,14 @@ type McpServerRefreshResponse struct{}
 
 // McpResourceReadParams reads a resource from an MCP server.
 type McpResourceReadParams struct {
-	Meta         json.RawMessage        `json:"_meta,omitempty"`
-	ConnectorID  *string                `json:"connectorId,omitempty"`
-	OriginCallID *string                `json:"originCallId,omitempty"`
-	Server       string                 `json:"server"`
-	ThreadID     *string                `json:"threadId,omitempty"`
-	URI          string                 `json:"uri"`
-	Target       *McpResourceReadTarget `json:"target,omitempty"`
+	EnvironmentID *string                `json:"environmentId,omitempty"`
+	Meta          json.RawMessage        `json:"_meta,omitempty"`
+	ConnectorID   *string                `json:"connectorId,omitempty"`
+	OriginCallID  *string                `json:"originCallId,omitempty"`
+	Server        string                 `json:"server"`
+	ThreadID      *string                `json:"threadId,omitempty"`
+	URI           string                 `json:"uri"`
+	Target        *McpResourceReadTarget `json:"target,omitempty"`
 }
 
 // McpResourceReadTarget selects a hosted connector account for a resource read.
@@ -322,11 +326,12 @@ func (r *McpResourceReadResponse) UnmarshalJSON(data []byte) error {
 
 // McpServerToolCallParams calls an MCP server tool.
 type McpServerToolCallParams struct {
-	Meta      json.RawMessage `json:"_meta,omitempty"`
-	Arguments json.RawMessage `json:"arguments,omitempty"`
-	Server    string          `json:"server"`
-	ThreadID  string          `json:"threadId"`
-	Tool      string          `json:"tool"`
+	EnvironmentID *string         `json:"environmentId,omitempty"`
+	Meta          json.RawMessage `json:"_meta,omitempty"`
+	Arguments     json.RawMessage `json:"arguments,omitempty"`
+	Server        string          `json:"server"`
+	ThreadID      string          `json:"threadId"`
+	Tool          string          `json:"tool"`
 }
 
 // McpServerToolCallResponse is the response from mcpServer/tool/call.
@@ -373,6 +378,7 @@ func (s *McpServerStartupState) UnmarshalJSON(data []byte) error {
 
 // McpServerStatusUpdatedNotification reports MCP server startup status updates.
 type McpServerStatusUpdatedNotification struct {
+	EnvironmentID *string               `json:"environmentId,omitempty"`
 	Error         *string               `json:"error,omitempty"`
 	FailureReason *string               `json:"failureReason,omitempty"`
 	Name          string                `json:"name"`

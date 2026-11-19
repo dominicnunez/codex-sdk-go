@@ -146,6 +146,17 @@ and malformed fallback attribution must agree on owner identity. Bound retained
 payload bytes across queued, in-flight, fallback and replay ownership; a queue's
 event count alone does not establish that bound.
 
+Search partial notifications are the explicit best-effort exception among known
+methods. They are request-correlated provisional rows, not thread-state updates;
+row thread IDs and extra top-level thread fields do not create ordered owners.
+Queue or retained-byte pressure may discard them without failing the connection.
+The existing reservation lifecycle releases discarded, delivered and closed
+payloads. Final responses remain authoritative, and partial rows do not update
+the thread-state cache. Responses and errors resolve requests directly in the
+reader while notification callbacks run on workers; queued partial callbacks may
+therefore run after a final outcome. Applications stop applying batches for a
+request ID once they accept its final response or error.
+
 Callback fanout isolates each recipient, including initial replay and direct
 service/cache calls. Committed state must still reach later SDK consumers if a
 callback or error reporter panics. Preserve the diagnostic origin. Replay

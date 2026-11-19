@@ -23,8 +23,12 @@ type recordPresence struct {
 // Forbidden null occurrences remain errors even when a later member overwrites
 // them. Requiredness is checked on the final merged record before publication.
 func validateNestedRecord(data []byte, field string, rule recordRule) error {
+	return validateRecordField(data, field, rule, true)
+}
+
+func validateRecordField(data []byte, field string, rule recordRule, acceptAliases bool) error {
 	state := recordPresence{}
-	if err := validateOptionalFields(data, func(_ string, raw []byte) error { return state.observe(raw, rule, field) }, field); err != nil {
+	if err := validateFields(data, func(_ string, raw []byte) error { return state.observe(raw, rule, field) }, acceptAliases, field); err != nil {
 		return err
 	}
 	return state.validate(rule, field)

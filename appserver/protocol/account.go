@@ -731,9 +731,10 @@ func (p ChatgptAuthTokensLoginAccountParams) Format(f fmt.State, verb rune) {
 
 // AmazonBedrockLoginAccountParams represents managed Amazon Bedrock login parameters.
 type AmazonBedrockLoginAccountParams struct {
-	Type   string `json:"type"`
-	ApiKey string `json:"apiKey"`
-	Region string `json:"region"`
+	ProviderID *BedrockProviderID `json:"providerId,omitempty"`
+	Type       string             `json:"type"`
+	ApiKey     string             `json:"apiKey"`
+	Region     string             `json:"region"`
 }
 
 func (*AmazonBedrockLoginAccountParams) isLoginAccountParams() {}
@@ -741,10 +742,11 @@ func (*AmazonBedrockLoginAccountParams) isLoginAccountParams() {}
 // MarshalJSON redacts the API key from logs and debug serializers.
 func (p AmazonBedrockLoginAccountParams) MarshalJSON() ([]byte, error) {
 	return jsonencode.Marshal(struct {
-		Type   string `json:"type"`
-		ApiKey string `json:"apiKey"`
-		Region string `json:"region"`
-	}{Type: loginTypeAmazonBedrock, ApiKey: "[REDACTED]", Region: p.Region})
+		Type       string             `json:"type"`
+		ApiKey     string             `json:"apiKey"`
+		Region     string             `json:"region"`
+		ProviderID *BedrockProviderID `json:"providerId,omitempty"`
+	}{Type: loginTypeAmazonBedrock, ApiKey: "[REDACTED]", Region: p.Region, ProviderID: p.ProviderID})
 }
 
 func (p *AmazonBedrockLoginAccountParams) marshalWire() ([]byte, error) {
@@ -758,7 +760,7 @@ func (p *AmazonBedrockLoginAccountParams) marshalWire() ([]byte, error) {
 		return nil, err
 	}
 	type wire AmazonBedrockLoginAccountParams
-	return jsonencode.Marshal(wire{Type: loginTypeAmazonBedrock, ApiKey: p.ApiKey, Region: p.Region})
+	return jsonencode.Marshal(wire{Type: loginTypeAmazonBedrock, ApiKey: p.ApiKey, Region: p.Region, ProviderID: p.ProviderID})
 }
 
 func (p AmazonBedrockLoginAccountParams) String() string {

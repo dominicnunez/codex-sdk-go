@@ -11,6 +11,9 @@ import (
 // for the same state owner. Only classified methods participate; unknown
 // methods retain the best-effort policy.
 func orderedNotificationKey(notif Notification) string {
+	if isBestEffortNotificationMethod(notif.Method) {
+		return ""
+	}
 	if notif.Method != protocol.NotifyItemCompleted && notif.Method != protocol.NotifyTurnCompleted &&
 		!isProtectedNotificationMethod(notif.Method) && !isStreamingNotificationMethod(notif.Method) && !isCriticalNotificationMethod(notif.Method) {
 		return ""
@@ -89,6 +92,9 @@ func orderedNotificationKey(notif Notification) string {
 }
 
 func isThreadNotificationMethod(method string) bool {
+	if isBestEffortNotificationMethod(method) {
+		return false
+	}
 	switch method {
 	case protocol.NotifyError, protocol.NotifyServerRequestResolved, protocol.NotifyModelRerouted,
 		protocol.NotifyHookStarted, protocol.NotifyHookCompleted, protocol.NotifyMcpServerOauthLoginCompleted,

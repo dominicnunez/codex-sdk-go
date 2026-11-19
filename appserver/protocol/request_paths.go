@@ -785,6 +785,7 @@ func (p ThreadListParams) prepareRequest() (interface{}, error) {
 		return nil, err
 	}
 	p.ExcludedThreadIDs = preserveFilterArray(p.ExcludedThreadIDs)
+	p.IncludedThreadIDs = preserveFilterArray(p.IncludedThreadIDs)
 	return p, nil
 }
 
@@ -808,6 +809,7 @@ func (p ThreadListParamsJSON) prepareRequest() (interface{}, error) {
 		return nil, invalidParamsError("currentAccountOnly must not be null")
 	}
 	p.ExcludedThreadIDs = preserveFilterArray(p.ExcludedThreadIDs)
+	p.IncludedThreadIDs = preserveFilterArray(p.IncludedThreadIDs)
 	p.ModelProviders = preserveFilterArray(p.ModelProviders)
 	p.Originators = preserveFilterArray(p.Originators)
 	p.SourceKinds = preserveFilterArray(p.SourceKinds)

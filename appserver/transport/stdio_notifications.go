@@ -182,6 +182,10 @@ func (t *StdioTransport) enqueueBufferedNotification(notif bufferedNotification)
 		notif.release()
 		return
 	}
+	if isBestEffortNotificationMethod(notif.Method) {
+		t.enqueueBestEffortNotification(t.notifQueue, notif)
+		return
+	}
 	if notif.scopeKey != "" {
 		t.enqueueTurnScopedNotification(notif, notif.scopeKey)
 		return
@@ -199,6 +203,7 @@ func (t *StdioTransport) enqueueBufferedNotification(notif bufferedNotification)
 		return
 	}
 
+	// Schema-declared search partials and unknown notifications are best-effort.
 	// Unknown notifications remain best-effort to preserve read-loop liveness
 	// without changing known SDK-visible behavior.
 	t.enqueueBestEffortNotification(t.notifQueue, notif)
@@ -668,4 +673,14 @@ func (t *StdioTransport) invokeNotificationHandler(notif Notification, handler N
 		}
 	}()
 	handler(t.ctx, notif)
+}
+
+// Search partials may be dropped under load; a final response replaces them.
+func isBestEffortNotificationMethod(method string) bool {
+	switch method {
+	case protocol.NotifyThreadSearchPartial:
+		return true
+	default:
+		return false
+	}
 }

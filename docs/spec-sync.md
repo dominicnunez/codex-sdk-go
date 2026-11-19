@@ -152,3 +152,28 @@ no length constraint, and the SDK had no old limit to remove.
 IDs through `Thread.InjectItems`; its nested definitions in resume parameters do
 not add a new typed request property. `RawResponseItemCompletedNotification`
 remains absent from the server-method union.
+
+## Schema snapshot 29cb67623c6c
+
+This snapshot replaces current recovered-answer display instructions, adds
+provisional search batches, registration-scoped MCP metadata, provider-default
+selection and realtime timeline branches.
+
+| Contract | Owner and callers | Evidence | Decision |
+| --- | --- | --- | --- |
+| Current show/hide/block display union and optional legacy hints | Private agent-message item admission, history, typed callbacks and shared snapshots | `TestAgentDisplaySchemaBranches`, `TestAgentDisplayPublicRoutes`, display merge/error/composition tests, `FuzzAgentDisplayBranches`, complete item/run/conversation/stream ownership tests | Validate active current branches and preserve independent open extras; public records remain method-free |
+| Search partial shape, correlation and recipient ownership | Typed replacement/additive listeners | `TestSearchPartialCallbacks` | Preserve string/int64 request IDs without populating authoritative thread state |
+| Explicit best-effort policy and retained-byte cleanup | Stdio selection, bounded queue, overflow and Close | `TestSearchPartialsAreBestEffort`, `TestSearchPartialQueueOverflowDrops`, schema-wide policy/order tests | Provisional batches may be dropped; row IDs and extra fields do not create thread owners |
+| Exact MCP registration metadata | Four requests, catalog, startup update, tool history and elicitation | `TestSyncedMcpSelectors`, `TestMcpEnvironmentOutputs`, schema field coverage | Preserve opaque nullable/empty identifiers across all eight carriers |
+| Included-thread selection before pagination | Both list DTOs and request preparation | `TestIncludedThreadSelection` | Preserve omitted/null/empty distinctions and server-side filtering |
+| Realtime frame/handoff/save branches and observation times | Concrete union codecs and both started/completed listener APIs | `TestSyncedRealtimeBranches`, `TestRealtimePublicationAndIsolation`, `TestFrameNestedMergeAndAliases` | Validate nested required fields and arrays before callbacks; preserve all seven known branches |
+| Model-provider default and Bedrock login selection | DefaultSet service and both credential/debug encoders | `TestDefaultProviderSelection`, `TestBedrockProviderSelection`, request coverage | Reuse `ConfigWriteResponse` admission; retain provider selection without weakening redaction |
+| Account reason and telemetry helper requirements | Account listeners and requirements response codecs | `TestSyncedAccountAndTelemetry`, `TestAccountReasonAliases`, `TestTelemetryIntervalOccurrences` | Follow each owner's field-selection rules; retain positive uint64 precision and opaque helper text |
+
+`modelProvider/default/set` returns `ConfigWriteResponse`; the pinned upstream
+protocol declaration supplies its response type. The search-partial description
+mentions `thread/search/stream`, but this request is absent from `ClientRequest`;
+notification support does not create an invented request API. `Project` loses a
+required position field but has no referencing wire consumer. The new realtime
+coverage/entry/order definitions are likewise unreferenced. New `bioPolicy` error
+information survives the existing raw `TurnError.CodexErrorInfo` carrier.

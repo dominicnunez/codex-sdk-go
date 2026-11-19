@@ -523,6 +523,7 @@ type ThreadRealtimeItemWrapper struct{ Value ThreadRealtimeItem }
 
 // RealtimeSessionStartedThreadRealtimeItem follows the upstream RealtimeSessionStartedThreadRealtimeItem schema.
 type RealtimeSessionStartedThreadRealtimeItem struct {
+	ObservedAtMs      *int64 `json:"observedAtMs,omitempty"`
 	ID                string `json:"id"`
 	RealtimeSessionID string `json:"realtimeSessionId"`
 }
@@ -564,6 +565,7 @@ func (v *ThreadRealtimeTranscriptRole) UnmarshalJSON(data []byte) error {
 
 // TranscriptSegmentThreadRealtimeItem follows the upstream TranscriptSegmentThreadRealtimeItem schema.
 type TranscriptSegmentThreadRealtimeItem struct {
+	ObservedAtMs      *int64                       `json:"observedAtMs,omitempty"`
 	ID                string                       `json:"id"`
 	RealtimeSessionID string                       `json:"realtimeSessionId"`
 	Role              ThreadRealtimeTranscriptRole `json:"role"`
@@ -688,6 +690,7 @@ func (w ThreadRealtimeBemItemPresentationWrapper) MarshalJSON() ([]byte, error) 
 
 // BemItemPromotedThreadRealtimeItem follows the upstream BemItemPromotedThreadRealtimeItem schema.
 type BemItemPromotedThreadRealtimeItem struct {
+	ObservedAtMs      *int64                                   `json:"observedAtMs,omitempty"`
 	ID                string                                   `json:"id"`
 	RealtimeSessionID string                                   `json:"realtimeSessionId"`
 	ItemID            string                                   `json:"item_id"`
@@ -732,6 +735,7 @@ func (v *ThreadRealtimeSessionOutcome) UnmarshalJSON(data []byte) error {
 
 // RealtimeSessionClosedThreadRealtimeItem follows the upstream RealtimeSessionClosedThreadRealtimeItem schema.
 type RealtimeSessionClosedThreadRealtimeItem struct {
+	ObservedAtMs      *int64                       `json:"observedAtMs,omitempty"`
 	ID                string                       `json:"id"`
 	RealtimeSessionID string                       `json:"realtimeSessionId"`
 	Outcome           ThreadRealtimeSessionOutcome `json:"outcome"`
@@ -766,6 +770,24 @@ func (w *ThreadRealtimeItemWrapper) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	switch tag {
+	case "frame":
+		var v FrameThreadRealtimeItem
+		if err := jsondecode.Unmarshal(data, &v); err != nil {
+			return err
+		}
+		w.Value = &v
+	case "turnInputAccepted":
+		var v TurnInputAcceptedThreadRealtimeItem
+		if err := jsondecode.Unmarshal(data, &v); err != nil {
+			return err
+		}
+		w.Value = &v
+	case "sessionInputSaved":
+		var v SessionInputSavedThreadRealtimeItem
+		if err := jsondecode.Unmarshal(data, &v); err != nil {
+			return err
+		}
+		w.Value = &v
 	case "realtimeSessionStarted":
 		var v RealtimeSessionStartedThreadRealtimeItem
 		if err := jsondecode.Unmarshal(data, &v); err != nil {

@@ -64,6 +64,10 @@ func TestStdioAllKnownNotificationsSurviveBestEffortPressure(t *testing.T) {
 			t.Fatal("unsupported method schema shape")
 		}
 		method := event.Properties.Method.Values[0]
+		// Search progress is explicitly provisional and droppable in the schema.
+		if method == "thread/search/partial" {
+			continue
+		}
 		missing[method] = true
 		writeAuditNotification(t, w, Notification{Method: method, Params: json.RawMessage(`{"threadId":"a","thread":{"id":"a"},"processHandle":"a","processId":"a","sessionId":"a","importId":"a","projectId":"a","watchId":"a","subscriptionId":"a"}`)})
 	}

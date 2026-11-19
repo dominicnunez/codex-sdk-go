@@ -220,7 +220,8 @@ func (s *ThreadService) Read(ctx context.Context, params ThreadReadParams) (Thre
 
 // ThreadListParams are parameters for listing threads
 type ThreadListParams struct {
-	CurrentAccountOnly *bool `json:"currentAccountOnly,omitempty"`
+	IncludedThreadIDs  OptionalNullable[[]string] `json:"includedThreadIds,omitzero"`
+	CurrentAccountOnly *bool                      `json:"currentAccountOnly,omitempty"`
 	// Originators filters exact originator values on hosted backends. The local
 	// app-server rejects nonempty lists; omitted or empty lists are unrestricted.
 	Originators []string `json:"originators,omitempty"`
@@ -245,6 +246,7 @@ type ThreadListParams struct {
 // or null; nil omits the member. Nullable properties distinguish omission from
 // explicit null and empty values.
 type ThreadListParamsJSON struct {
+	IncludedThreadIDs  OptionalNullable[[]string]           `json:"includedThreadIds,omitzero"`
 	CurrentAccountOnly OptionalNullable[bool]               `json:"currentAccountOnly,omitzero"`
 	Archived           OptionalNullable[bool]               `json:"archived,omitzero"`
 	Cursor             OptionalNullable[string]             `json:"cursor,omitzero"`

@@ -242,9 +242,9 @@ conversion or pending-request admission. Inbound JSON integers are range checked
 without floating conversion. String IDs remain a distinct correlation family.
 These checks preserve correlation identity; an ID is not authentication.
 
-A peer may send malformed envelopes, oversized frames, unexpected IDs, or notification floods. The built-in [stdio transport](../appserver/transport/stdio.go) limits inbound frames to 10 MiB, uses fixed worker pools and bounded queues, and gives outbound operations a default timeout. [Frame parsing](../appserver/transport/stdio_framing.go) distinguishes numeric and string request IDs, checks protocol versions and response shape, and classifies malformed input. Queue-overflow handling and notification classes are explicit in [notification dispatch](../appserver/transport/stdio_notifications.go). All 85 methods in the checked-in notification schema have explicit delivery classes. Thread events, including streaming deltas and completion, share an ordered queue per thread. Process handles, command process IDs, search sessions, import IDs, project IDs, filesystem watch IDs, and MCP subscription IDs have separate identity scopes; account updates share one account scope, and global methods share a queue per method. Exact schema properties determine the owner, including a present empty string when the schema permits it; optional missing or null thread identities use global method scope. Eight workers yield between callbacks, with at most 128 active scopes and 1,280 queued events per scope, and 34,048 queued ordered events in total. Overflow fails the connection explicitly rather than silently discarding an update. Unattributable events retain their class's fallback policy; unknown methods remain best-effort.
+A peer may send malformed envelopes, oversized frames, unexpected IDs, or notification floods. The built-in [stdio transport](../appserver/transport/stdio.go) limits inbound frames to 10 MiB, uses fixed worker pools and bounded queues, and gives outbound operations a default timeout. [Frame parsing](../appserver/transport/stdio_framing.go) distinguishes numeric and string request IDs, checks protocol versions and response shape, and classifies malformed input. Queue-overflow handling and notification classes are explicit in [notification dispatch](../appserver/transport/stdio_notifications.go). All 87 methods in the checked-in notification schema have explicit delivery classes. Search partials are explicitly best-effort: they are correlated by request ID, may be dropped under load and never populate authoritative thread state. Row thread IDs do not create ordered owners. Thread events, including streaming deltas and completion, share an ordered queue per thread. Process handles, command process IDs, search sessions, import IDs, project IDs, filesystem watch IDs, and MCP subscription IDs have separate identity scopes; account updates share one account scope, and global methods share a queue per method. Exact schema properties determine the owner, including a present empty string when the schema permits it; optional missing or null thread identities use global method scope. Eight workers yield between callbacks, with at most 128 active scopes and 1,280 queued events per scope, and 34,048 queued ordered events in total. Overflow fails the connection explicitly rather than silently discarding an update. Unattributable events retain their class's fallback policy; unknown methods remain best-effort.
 
-All notification delivery classes share a 64 MiB retained-data budget, charged before routing. It covers payload backing capacity, method/version strings and owner keys while events are queued, awaiting handler registration, transferring between buffers, or executing callbacks. A reservation stays with an event through replay and panic recovery until delivery finishes or the event is discarded. Classified delivery fails the connection on byte exhaustion; best-effort delivery may drop an event. Count limits separately bound queue bookkeeping. Accepted ordered events retain their queue ownership and reservation when the reader terminates, including EOF; registering a handler later can drain them. Explicit transport close stops queued notification dispatch and releases buffered payloads. A callback already admitted for execution may finish and keeps its reservation until it returns. Notification and request workers recover application handler panics and suppress secondary panics from the configured panic-reporting callback. Deferred ordered cleanup retires callback ownership before releasing its reservation, allowing subsequent events to proceed after recovery.
+All notification delivery classes share a 64 MiB retained-data budget, charged before routing. It covers payload backing capacity, method/version strings and owner keys while events are queued, awaiting handler registration, transferring between buffers, or executing callbacks. A reservation stays with an event through replay and panic recovery until delivery finishes or the event is discarded. Lossless delivery fails the connection on byte exhaustion; best-effort delivery may drop an event. Count limits separately bound queue bookkeeping. Accepted ordered events retain their queue ownership and reservation when the reader terminates, including EOF; registering a handler later can drain them. Explicit transport close stops queued notification dispatch and releases buffered payloads. A callback already admitted for execution may finish and keeps its reservation until it returns. Notification and request workers recover application handler panics and suppress secondary panics from the configured panic-reporting callback. Deferred ordered cleanup retires callback ownership before releasing its reservation, allowing subsequent events to proceed after recovery.
 
 A peer can place invalid requests before a valid response while the external
 writer is held. Reader-owned rejection replies use bounded admission to the
@@ -849,8 +849,11 @@ or verify their contents.
 
 Agent-message moderation and display records retain unknown action strings and
 explicit false hints through history, typed item callbacks and isolated snapshots.
-Private item admission validates required booleans and display actions across
-native object merges and resets. Public nested records retain ordinary JSON
+Private item admission validates required booleans and the current version1
+show/hide/block branches across native object merges and resets. Nested
+annotations, replacements, trusted-contact choices and protection/cyber reasons
+are validated only for the selected open branch. Supported legacy action hints
+remain optional and do not become requirements for current modes. Public nested records retain ordinary JSON
 behavior. This preserves presentation evidence; the SDK does not interpret the
 instructions, render content or establish that a response is safe to display.
 Function-output audio accepts independent URL/file-ID alternatives without fetching
@@ -1096,6 +1099,17 @@ intended expiration from the local clock; unsupported values return no partial
 credentials, and lifetime errors omit token fields. This prevents arithmetic
 overflow, not false lifetime claims from a trusted endpoint or verification of
 token validity. Stored credentials may already be expired and still need refresh.
+
+MCP environment selectors identify the intended server registration; they are
+opaque routing data, not proof of account or workspace authority. The SDK retains
+them across calls, discovery, history and elicitation without resolving paths or
+choosing an alternate registration locally. Bedrock login provider selection
+changes server-side routing while preserving credential redaction. Account-update
+routing-ready reasons remain peer assertions. Managed telemetry header helpers
+are configuration data; the SDK validates positive refresh intervals but does
+not execute commands or configure exporters. Provider-default changes use the
+existing configuration response admission and do not authorize unrelated local
+file changes.
 
 Gateway device-login parameters select server-side provider and authorization
 flow choices. Prompt admission checks required login ID, user code and

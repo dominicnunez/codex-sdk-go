@@ -531,6 +531,10 @@ func TestStdioOrdersAllSchemaNotifications(t *testing.T) {
 		}
 		_ = definition // Every schema method participates, including globals.
 		method := event.Properties.Method.Values[0]
+		// Request-correlated search partials use the best-effort queue, not an ordered owner.
+		if method == "thread/search/partial" {
+			continue
+		}
 		for _, owner := range []string{"a", ""} {
 			t.Run(method+" owner="+owner, func(t *testing.T) {
 				r, w := io.Pipe()
