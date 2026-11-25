@@ -121,6 +121,15 @@
         },
         "moderated": {
           "type": "boolean"
+        },
+        "promptWellbeingResults": {
+          "items": {
+            "$ref": "#/definitions/PromptWellbeingResult"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
         }
       },
       "required": [
@@ -991,6 +1000,33 @@
         }
       ]
     },
+    "PromptWellbeingResult": {
+      "description": "Wellbeing results for a single scored input item.",
+      "properties": {
+        "inputItemId": {
+          "type": "string"
+        },
+        "labels": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "scores": {
+          "additionalProperties": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "inputItemId",
+        "labels",
+        "scores"
+      ],
+      "type": "object"
+    },
     "ReasoningEffort": {
       "description": "A non-empty reasoning effort value advertised by the model.",
       "minLength": 1,
@@ -1840,6 +1876,11 @@
             },
             "id": {
               "type": "string"
+            },
+            "imageMetadata": {
+              "additionalProperties": true,
+              "description": "Per-image metadata selected by the backend for the receiving surface.",
+              "type": "object"
             },
             "inputImages": {
               "description": "Observed local inputs for a completed generation, absent on older items.",

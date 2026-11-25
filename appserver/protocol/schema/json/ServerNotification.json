@@ -305,6 +305,15 @@
         },
         "moderated": {
           "type": "boolean"
+        },
+        "promptWellbeingResults": {
+          "items": {
+            "$ref": "#/definitions/PromptWellbeingResult"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
         }
       },
       "required": [
@@ -880,6 +889,9 @@
             "contextWindowExceeded",
             "sessionBudgetExceeded",
             "usageLimitExceeded",
+            "apiKeySpendLimitExceeded",
+            "projectSpendLimitExceeded",
+            "organizationSpendLimitExceeded",
             "rateLimitExceeded",
             "flexUnavailable",
             "serverOverloaded",
@@ -3136,6 +3148,15 @@
     },
     "McpServerStatusUpdatedNotification": {
       "properties": {
+        "durationMs": {
+          "description": "Elapsed startup time for a measured attempt. Older servers omit this field.",
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "environmentId": {
           "description": "Registration scope, not necessarily the server's execution environment.",
           "type": [
@@ -3793,6 +3814,33 @@
       "required": [
         "changeType",
         "projectId"
+      ],
+      "type": "object"
+    },
+    "PromptWellbeingResult": {
+      "description": "Wellbeing results for a single scored input item.",
+      "properties": {
+        "inputItemId": {
+          "type": "string"
+        },
+        "labels": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "scores": {
+          "additionalProperties": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "inputItemId",
+        "labels",
+        "scores"
       ],
       "type": "object"
     },
@@ -5744,6 +5792,11 @@
             },
             "id": {
               "type": "string"
+            },
+            "imageMetadata": {
+              "additionalProperties": true,
+              "description": "Per-image metadata selected by the backend for the receiving surface.",
+              "type": "object"
             },
             "inputImages": {
               "description": "Observed local inputs for a completed generation, absent on older items.",
